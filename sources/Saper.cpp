@@ -187,16 +187,17 @@ protected:
 };
 
 typedef  const char* CCR;
-void rules         ();
-void show_of_mines ();
-void openmines     ();
-bool empty (int, int);
-bool is_mine  (int, int);
-void print_array_2D();
-void clean (int, int);
-bool is_win   ();
-void final     (bool);
-void pause      (CCR);
+void rules          ();
+void show_of_mines  ();
+void openmines      ();
+bool empty  (int, int);
+bool is_mine(int, int);
+void print_array_2D ();
+void clean  (int, int);
+bool is_win         ();
+void final      (bool);
+void pause       (CCR);
+bool is_find_mine   ();
 
 template<class T>
 T input_user(const char* promt)
@@ -220,6 +221,9 @@ const int Bomba =  9; // Чтоб не тратиься на форматиро�
 carr<int>  Playing_field;
 carr<bool> openn        ;
 int        its_my_lifes ;
+int        myrating     ;
+int        prize        ;
+int        steps        ;
 
 
 class cConfig
@@ -243,6 +247,9 @@ public:
         openn.init_one           (false);
 
         its_my_lifes = 3;
+        myrating     = 0;
+        prize        = 5;
+        steps        = 0;
     }
 }config;
 
@@ -373,6 +380,7 @@ int main()
                 }
 
 Playing_field[0][0] = Bomba;
+Playing_field[3][3] = Bomba;
 
                 ///------------------------|
                 /// Заполнение подсказками.|
@@ -403,7 +411,13 @@ Playing_field[0][0] = Bomba;
                     print_array_2D();
                     ENDL(1);
 
-                    std::cout << "\n\nМои жизни: " << its_my_lifes << "\n\n";
+                    if(steps == 5)
+                    {   steps = 0;
+                        prize += 5;
+                    }
+                    steps++;
+                    std::cout << "\n\nМои жизни: " << its_my_lifes;
+                    std::cout <<   "\nОчки     : " << myrating     << "\n\n";
 
 Log("Я читер!");
 Playing_field.show();
@@ -446,23 +460,22 @@ Playing_field.show();
                     {   openmines();
                         
                         its_my_lifes--;
+                        myrating  -= 5;
+
                         final(true);
 
                         if(its_my_lifes == 0)
-                        {   break; /// Проигрыш!
-                        }
-                        else
-                        {   cout << "Еще есть жизни!\n";
+                        {   break;        /// Проигрыш!
                         }
                     }
                     else
-                    {   bool bis_win = is_win();
-
-                        if (bis_win)
+                    {   if (is_win())
                         {   final(false); /// Выигрыш!
                             break;
                         }
                     }
+
+                    is_find_mine();
                 }
             }
             break;
@@ -662,4 +675,39 @@ void final(bool loser)
 void pause(const char* mess)
 {   std::cout << "\nЖмите ENTER " << mess << " ";
     _getch();
+}
+
+///----------------------------------------------------------------------------|
+/// Обезвредить мину.
+///----------------------------------------------------------------------------:
+bool is_open(int i, int j)
+{   if    ((i >= 0) && (i<NRow))
+    {   if((j >= 0) && (j<NCol))
+        {   if(openn[i][j]) return true;
+            else            return false;
+        }
+    }
+    return true;
+}
+
+bool is_find_mine()
+{   FORi(NRow)
+    {   FORj(NCol)
+        {   if((!openn[i][j]) && (Playing_field[i][j] == Bomba) &&
+                    is_open(i - 1, j - 1) &&
+                    is_open(i - 1, j    ) &&
+                    is_open(i - 1, j + 1) &&
+                    is_open(i    , j - 1) &&
+                    is_open(i    , j + 1) &&
+                    is_open(i + 1, j - 1) &&
+                    is_open(i + 1, j    ) &&
+                    is_open(i + 1, j + 1) )
+            {   /// Ёлы-палы!!! Тут мина!
+                openn[i][j] = true;
+                myrating += prize;
+                return true;
+            }
+        }
+    }
+    return false;
 }
