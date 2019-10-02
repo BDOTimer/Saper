@@ -375,14 +375,14 @@ int main()
                     {   if (Playing_field[i][j] != -1)
                         {   int quantity = 0;
                             if (mine(i - 1, j - 1)) quantity++;
-                            if (mine(i - 1, j)) quantity++;
+                            if (mine(i - 1, j    )) quantity++;
                             if (mine(i - 1, j + 1)) quantity++;
-                            if (mine(i, j - 1)) quantity++;
-                            if (mine(i, j + 1)) quantity++;
+                            if (mine(i, j - 1    )) quantity++;
+                            if (mine(i, j + 1    )) quantity++;
                             if (mine(i + 1, j - 1)) quantity++;
-                            if (mine(i + 1, j)) quantity++;
+                            if (mine(i + 1, j    )) quantity++;
                             if (mine(i + 1, j + 1)) quantity++;
-                            Playing_field[i][j] = quantity;
+                            Playing_field[i][j]  =  quantity;
                         }
                     }
                 }
