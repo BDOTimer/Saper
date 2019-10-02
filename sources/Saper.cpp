@@ -1,6 +1,6 @@
 ﻿///----------------------------------------------------------------------------|
 /// Консольный сапер.
-/// Version 0.1.1
+/// Version 0.2.1
 ///----------------------------------------------------------------------------:
 #include <iostream>
 #include <time.h>
@@ -444,11 +444,12 @@ Playing_field.show();
 
                     if (is_mine(i, j))
                     {   openmines();
-                        final(true);
+                        
                         its_my_lifes--;
+                        final(true);
+
                         if(its_my_lifes == 0)
-                        {   //pause("Конец игры!");
-                            break;
+                        {   break; /// Проигрыш!
                         }
                         else
                         {   cout << "Еще есть жизни!\n";
@@ -458,15 +459,10 @@ Playing_field.show();
                     {   bool bis_win = is_win();
 
                         if (bis_win)
-                        {   final(false);
-                            system("cls");
-                            pause("Вы выграли!");
+                        {   final(false); /// Выигрыш!
                             break;
                         }
-
                     }
-
-                    
                 }
             }
             break;
