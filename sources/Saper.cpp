@@ -1,6 +1,6 @@
 ﻿///----------------------------------------------------------------------------|
 /// Консольный сапер.
-/// Version 0.1.0
+/// Version 0.1.1
 ///----------------------------------------------------------------------------:
 #include <iostream>
 #include <time.h>
@@ -402,21 +402,28 @@ int main()
                     //cin.clear();
                     //cin.ignore(100, '\n');
                     //cin.get(input_coordinate, 2);
-                  cin >> input_coordinate;
+                    cin >> input_coordinate;
 
     int i, j;
     // Переводим координаты в цифровой вид ------------------------------------:
-    if ((input_coordinate[0] >= 65) && (input_coordinate[0] <= 74))
-    {   j = input_coordinate[0] - 65; // Буква в промежутке от A до J.
+    if ((input_coordinate[0] >= 65) && (input_coordinate[0] <= 90))
+    {   j = input_coordinate[0] - 65; // буква в промежутке от A до Z
     }
-    else if ((input_coordinate[0] >= 97) && (input_coordinate[0] <= 106))
-    {   j = input_coordinate[0] - 97; // Буква в промежутке от a до j
+    else if ((input_coordinate[0] >= 97) && (input_coordinate[0] <= 122))
+    {   j = input_coordinate[0] - 97; // буква в промежутке от a до z
     }
-    else continue;   // Если введены неверные значения, возврат в начало цикла.
-    if ((input_coordinate[1] >= 48) && (input_coordinate[1] <= 57))
-    {   i = input_coordinate[1] - 48;
+    else 
+    {   std::cout << "Не пытайтесь жульничать!1"; _getch();
+        continue;
     }
-    else continue;
+                        
+    i = input_coordinate[1] - 48;
+    if(i < 0  && 9 < i)
+    {   std::cout << "Не пытайтесь жульничать!2";
+        std::cout << i;
+        _getch();
+        continue;
+    }
                     // Далее проверяем все восемь окрестных полей на пустые .
                     // клетки показываем некий кусок поля.
                     clean(i, j);
