@@ -18,7 +18,7 @@ const char* mode_win_for_base = "mode 64,40";
 const char* mode_win_for_help = "mode 64,40";
 struct smystart
 {   smystart()
-    {   system(mode_win_for_base);setlocale(0, "");
+    {   setlocale(0, "");
         system(mode_win_for_base);
         srand((unsigned int)time(NULL));
     }
