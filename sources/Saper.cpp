@@ -14,8 +14,8 @@ using namespace std;
 #define ENDL(v)  FORi(v)std::cout << "\n"
 #define DEBUG(v) Log ("DEBUG: signal!", v); _getch();
 
-const char* mode_win_for_base = "mode 64,40";
-const char* mode_win_for_help = "mode 64,40";
+const char* mode_win_for_base = "mode 64,41";
+const char* mode_win_for_help = "mode 64,36";
 struct smystart
 {   smystart()
     {   setlocale(0, "");
@@ -95,7 +95,7 @@ public:
     
     //-------------------------------------------------------------------show():
     void show()
-    {   info();
+    {   //info();
         if(arr == NULL)
         {   std::cout << "Нет массива!\n";
             return;
@@ -191,10 +191,10 @@ void rules         ();
 void show_of_mines ();
 void openmines     ();
 bool empty (int, int);
-bool mine  (int, int);
+bool is_mine  (int, int);
 void print_array_2D();
 void clean (int, int);
-bool win_or_lose   ();
+bool is_win   ();
 void final     (bool);
 void pause      (CCR);
 
@@ -215,9 +215,12 @@ T input_user(const char* promt)
 /// Глобалы.
 ///----------------------------------------------------------------------------:
 const int SIZEE = 12; // Рамер поля по дефолту.
+const int Bomba =  9; // Чтоб не тратиься на форматировние :)
 
 carr<int>  Playing_field;
 carr<bool> openn        ;
+int        its_my_lifes ;
+
 
 class cConfig
 {
@@ -238,12 +241,15 @@ public:
 
         openn.resize        (NRow, NCol);
         openn.init_one           (false);
+
+        its_my_lifes = 3;
     }
 }config;
 
 int& NRow = config.NRow;
 int& NCol = config.NCol;
 int& BOOM = config.BOOM; // Количество бомб на поле.
+
 
 ///----------------------------------------------------------------------------|
 /// GUI
@@ -355,6 +361,7 @@ int main()
                 /// Заполнение минами.     |
                 ///------------------------:
                 int i,j;
+
                 for (int c = 0; c < BOOM; c++)
                 {   do
                     {   i = rand() % NRow;
@@ -362,24 +369,26 @@ int main()
                     }
                     while (Playing_field[i][j] != 0);
 
-                    Playing_field[i][j] = -1;
+                    //Playing_field[i][j] = Bomba;
                 }
+
+Playing_field[0][0] = Bomba;
 
                 ///------------------------|
                 /// Заполнение подсказками.|
                 ///------------------------:
                 FORi(NRow)
                 {   FORj(NCol)
-                    {   if (Playing_field[i][j] != -1)
+                    {   if (Playing_field[i][j] != Bomba)
                         {   int quantity = 0;
-                            if (mine(i - 1, j - 1)) quantity++;
-                            if (mine(i - 1, j    )) quantity++;
-                            if (mine(i - 1, j + 1)) quantity++;
-                            if (mine(i, j - 1    )) quantity++;
-                            if (mine(i, j + 1    )) quantity++;
-                            if (mine(i + 1, j - 1)) quantity++;
-                            if (mine(i + 1, j    )) quantity++;
-                            if (mine(i + 1, j + 1)) quantity++;
+                            if (is_mine(i - 1, j - 1)) quantity++;
+                            if (is_mine(i - 1, j    )) quantity++;
+                            if (is_mine(i - 1, j + 1)) quantity++;
+                            if (is_mine(i, j - 1    )) quantity++;
+                            if (is_mine(i, j + 1    )) quantity++;
+                            if (is_mine(i + 1, j - 1)) quantity++;
+                            if (is_mine(i + 1, j    )) quantity++;
+                            if (is_mine(i + 1, j + 1)) quantity++;
                             Playing_field[i][j]  =  quantity;
                         }
                     }
@@ -393,6 +402,11 @@ int main()
                     ENDL(3);
                     print_array_2D();
                     ENDL(1);
+
+                    std::cout << "\n\nМои жизни: " << its_my_lifes << "\n\n";
+
+Log("Я читер!");
+Playing_field.show();
 
                     ///-----------------------------|
                     ///запрашиваем координаты удара.|
@@ -424,18 +438,35 @@ int main()
         _getch();
         continue;
     }
-                    // Далее проверяем все восемь окрестных полей на пустые .
-                    // клетки показываем некий кусок поля.
+                    // Проверяем все восемь окрестных полей на пустые клетки.
+                    // Показываем некий кусок поля.
                     clean(i, j);
-                    if (mine(i, j))
+
+                    if (is_mine(i, j))
                     {   openmines();
                         final(true);
-                        break;
+                        its_my_lifes--;
+                        if(its_my_lifes == 0)
+                        {   //pause("Конец игры!");
+                            break;
+                        }
+                        else
+                        {   cout << "Еще есть жизни!\n";
+                        }
                     }
-                    if (win_or_lose())
-                    {   final(false);
-                        break;
+                    else
+                    {   bool bis_win = is_win();
+
+                        if (bis_win)
+                        {   final(false);
+                            system("cls");
+                            pause("Вы выграли!");
+                            break;
+                        }
+
                     }
+
+                    
                 }
             }
             break;
@@ -516,7 +547,7 @@ void print_array_2D()
         {   
             if (openn[i][j])
             {   switch(Playing_field[i][j])
-                {   case -1:
+                {   case Bomba:
                     show_of_mines();
                     break;
                     
@@ -576,21 +607,21 @@ bool empty(int i, int j)
 }
 
 ///----------------------------------------------------------------|
-/// Проверяет ячейку на мину ; выход за пределы возвращает false.  |
+/// Проверяет ячейку на мину: выход за пределы возвращает false.   |
 ///----------------------------------------------------------------:
-bool mine(int i, int j)
+bool is_mine(int i, int j)
 {   if    ((i >= 0) && (i<NRow))
     {   if((j >= 0) && (j<NCol))
-        {   if(Playing_field[i][j] == -1) return true;
+        {   if(Playing_field[i][j] == Bomba) return true;
         }
     }
     return false;
 }
 
-bool win_or_lose()
+bool is_win()
 {   FORi(NRow)
     {   FORj(NCol)
-        {   if ((Playing_field[i][j] != -1) && !openn[i][j])
+        {   if ((Playing_field[i][j] == Bomba) && !openn[i][j])
                 return false;
         }
     }
@@ -601,7 +632,7 @@ bool win_or_lose()
 void openmines()
 {   FORi(NRow)
     {   FORj(NCol)
-        {   if (Playing_field[i][j] == -1) openn[i][j] = true;
+        {   if (Playing_field[i][j] == Bomba) openn[i][j] = true;
         }
     }
 }
@@ -612,13 +643,21 @@ void final(bool loser)
     print_array_2D();
     if (loser)
     {   cout << "\a\n" << "ВЫ ПРОИГРАЛИ...(:\n\n";
+        if(its_my_lifes != 0)
+        {
+            cout << "НО У ВАС ЕЩЁ ЕСТЬ ШАНС!\n\n";
+            cout << "ОСТАЛОСЬ ЖИЗНЕЙ: " << its_my_lifes << "\n\n";
+        }
+        else
+        {   cout << "ВЫ ПОКОЙНИК!(:\n\n"
+                 << "ЖИЗНЕЙ БОЛЬШЕ НЕТ!\n";
+        }
     }
     else
-    {   cout << "\a\n" << "ВЫ ВЫИГРАЛИ!)))\n\n";
+    {   cout << "\a\n" << "УРА! ВЫ ВЫИГРАЛИ!)))\n\n";
     }
 
-    system("pause");
-    ENDL(3);
+    pause("продолжить...");
 }
 
 ///----------------------------------------------------------------------------|
@@ -626,5 +665,5 @@ void final(bool loser)
 ///----------------------------------------------------------------------------:
 void pause(const char* mess)
 {   std::cout << "\nЖмите ENTER " << mess << " ";
-    std::cin.get();
+    _getch();
 }
