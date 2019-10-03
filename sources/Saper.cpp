@@ -1,11 +1,11 @@
 ﻿///----------------------------------------------------------------------------|
 /// Консольный сапер.
-/// Version 0.3.0
+/// Version 0.3.1
 ///----------------------------------------------------------------------------:
 #include <iostream>
 #include <time.h>
 #include <stdio.h>
-#include <cstdlib>
+//#include <cstdlib> atoi()
 #include <conio.h>
 using namespace std;
 
@@ -196,7 +196,7 @@ bool is_mine(int, int);
 void print_array_2D ();
 void clean  (int, int);
 bool is_win         ();
-void final      (bool);
+bool final      (bool);
 void pause       (CCR);
 void is_find_mine   ();
 
@@ -367,7 +367,7 @@ int main()
             {   ///------------------------|
                 /// Заполнение минами.     |
                 ///------------------------:
-                int i,j;
+start:          int i,j;
 
                 for (int c = 0; c < BOOM; c++)
                 {   do
@@ -433,8 +433,8 @@ Playing_field.show();
                 int i, j;
                 // Переводим координаты в цифровой вид ------------------------:
                 j = (unsigned int)input_coordinate[0];
-                if(j > 97 ) j = j - 97; // буква в промежутке от A до Z [65- 90]
-                else        j = j - 65; // буква в промежутке от a до z [97-122]
+                if(j < 66 ) j = j - 65; // буква в промежутке от A до Z [65- 90]
+                else        j = j - 97; // буква в промежутке от a до z [97-122]
 
                 i = (input_coordinate[1] - 48);
                 if(input_coordinate[2]) i = i *10 +(input_coordinate[2] - 48);
@@ -476,7 +476,11 @@ pause("дальше\n");
                         its_my_lifes--;
                         myrating  -= 5;
 
-                        final(true);
+                        if(final(true))
+                        {   prize = 5;
+                            steps = 0;
+                            goto start;
+                        }
 
                         if(its_my_lifes == 0)
                         {   break;        /// Проигрыш!
@@ -492,7 +496,6 @@ pause("дальше\n");
                     is_find_mine();
                 } /// loop
             }
-            config.init_start();
             break;
 
             case '2':
@@ -661,7 +664,10 @@ void openmines()
     }
 }
 
-void final(bool loser)
+///----------------------------------------------------------------------------|
+/// true - игра продолжается!
+///----------------------------------------------------------------------------:
+bool final(bool loser)
 {   system("cls");
 
     print_array_2D();
@@ -671,6 +677,7 @@ void final(bool loser)
         {
             cout << "НО У ВАС ЕЩЁ ЕСТЬ ШАНС!\n\n"
                  << "ОСТАЛОСЬ ЖИЗНЕЙ: " << its_my_lifes << "\n\n";
+            return true;
         }
         else
         {   cout << "ВЫ ПОКОЙНИК!(:\n\n"
@@ -685,6 +692,8 @@ void final(bool loser)
 
     pause("продолжить...");
     system("color 07");
+    config.init_start();
+    return false;
 }
 
 ///----------------------------------------------------------------------------|
