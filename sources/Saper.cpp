@@ -1,10 +1,11 @@
 ﻿///----------------------------------------------------------------------------|
 /// Консольный сапер.
-/// Version 0.2.1
+/// Version 0.3.0
 ///----------------------------------------------------------------------------:
 #include <iostream>
 #include <time.h>
 #include <stdio.h>
+#include <cstdlib>
 #include <conio.h>
 using namespace std;
 
@@ -14,7 +15,7 @@ using namespace std;
 #define ENDL(v)  FORi(v)std::cout << "\n"
 #define DEBUG(v) Log ("DEBUG: signal!", v); _getch();
 
-const char* mode_win_for_base = "mode 64,41";
+const char* mode_win_for_base = "mode 64,48";
 const char* mode_win_for_help = "mode 64,36";
 struct smystart
 {   smystart()
@@ -197,7 +198,7 @@ void clean  (int, int);
 bool is_win         ();
 void final      (bool);
 void pause       (CCR);
-bool is_find_mine   ();
+void is_find_mine   ();
 
 template<class T>
 T input_user(const char* promt)
@@ -295,7 +296,7 @@ public:
                     while(b)
                     {
                         x = input_user<int>(" Введите ШИРИНУ  поля: ");
-                        b = (x < 4) || (x > 28);
+                        b = (x < 4) || (x > 25);
                      if(b) continue;
                         y = input_user<int>(" Введите ВЫСОТУ поля: ");
                         b = (y < 4) || (y > 35);
@@ -341,21 +342,20 @@ void test_all()
 /// main()
 ///----------------------------------------------------------------------------:
 int main()
-{   config.init_start();
-
-    test_all();
+{   test_all();
+    config.init_start();
 
     char choice;
     while (true)
     {   choice = 0;
         system("cls");
-        cout << "САПЕР\n\n\n"
-             << "1 - ИГРАТЬ. \n"
-             << "2 - ПРАВИЛА ИГРЫ << САПЕР. >> \n"
-             << "3 - НАСТРОЙКИ. >> \n"
-             << "0 - ВЫХОД.\n\n\n";
+        cout << " САПЕР\n\n\n"
+             << " 1 - ИГРАТЬ. \n"
+             << " 2 - ПРАВИЛА ИГРЫ << САПЕР. >> \n"
+             << " 3 - НАСТРОЙКИ. >> \n"
+             << " 0 - ВЫХОД.\n\n\n";
 
-           choice = input_user<char>("СДЕЛАЙТЕ ВАШ ВЫБОР: "); ENDL(2);
+           choice = input_user<char>(" СДЕЛАЙТЕ ВАШ ВЫБОР: "); ENDL(2);
         if(choice == '0') break;
 
         switch (choice)
@@ -380,7 +380,7 @@ int main()
                 }
 
 Playing_field[0][0] = Bomba;
-Playing_field[3][3] = Bomba;
+//Playing_field[3][3] = Bomba;
 
                 ///------------------------|
                 /// Заполнение подсказками.|
@@ -415,7 +415,6 @@ Playing_field[3][3] = Bomba;
                     {   steps = 0;
                         prize += 5;
                     }
-                    steps++;
                     std::cout << "\n\nМои жизни: " << its_my_lifes;
                     std::cout <<   "\nОчки     : " << myrating     << "\n\n";
 
@@ -425,35 +424,50 @@ Playing_field.show();
                     ///-----------------------------|
                     ///запрашиваем координаты удара.|
                     ///-----------------------------:
-                    char input_coordinate[3] = { '\0' };
+                    char input_coordinate[4] = {0};
                     cout << "Введите координаты удара (E7): ";
-                    //cin.clear();
-                    //cin.ignore(100, '\n');
-                    //cin.get(input_coordinate, 2);
-                    cin >> input_coordinate;
+                    std::cin.clear();
+                    std::cin.sync();
+                    cin.get(input_coordinate, 4, '\n');
 
-    int i, j;
-    // Переводим координаты в цифровой вид ------------------------------------:
-    if ((input_coordinate[0] >= 65) && (input_coordinate[0] <= 90))
-    {   j = input_coordinate[0] - 65; // буква в промежутке от A до Z
-    }
-    else if ((input_coordinate[0] >= 97) && (input_coordinate[0] <= 122))
-    {   j = input_coordinate[0] - 97; // буква в промежутке от a до z
-    }
-    else 
-    {   std::cout << "Не пытайтесь жульничать!1"; _getch();
-        continue;
-    }
-                        
-    i = input_coordinate[1] - 48;
-    if(i < 0  && 9 < i)
-    {   std::cout << "Не пытайтесь жульничать!2";
-        std::cout << i;
-        _getch();
-        continue;
-    }
-                    // Проверяем все восемь окрестных полей на пустые клетки.
-                    // Показываем некий кусок поля.
+                int i, j;
+                // Переводим координаты в цифровой вид ------------------------:
+                j = (unsigned int)input_coordinate[0];
+                if(j > 97 ) j = j - 97; // буква в промежутке от A до Z [65- 90]
+                else        j = j - 65; // буква в промежутке от a до z [97-122]
+
+                i = (input_coordinate[1] - 48);
+                if(input_coordinate[2]) i = i *10 +(input_coordinate[2] - 48);
+
+///==================|
+/// Отладочный код.  |
+///------------------:
+Log("\nDEBUGER:\n");
+LOG(input_coordinate);
+LOG(j);
+LOG(i);
+pause("дальше\n");
+///==================|
+
+                if ((0 > j) && (j > NCol))
+                {   std::cout << "Не пытайтесь жульничать!"; LOG(j);
+                    _getch();
+                    continue;
+                }
+                //i = atoi(input_coordinate+1);
+                if( 0 > i  && i > NRow)
+                {   std::cout << "Не пытайтесь жульничать!"; LOG(i);
+                    _getch();
+                    continue;
+                }
+                ///--------------
+                /// Ход принят! |
+                ///-------------:
+                steps++;
+
+                    ///--------------------------------------------------------|
+                    /// Показываем окрестный кусок поля c пустыми клетками.    |
+                    ///--------------------------------------------------------:
                     clean(i, j);
 
                     if (is_mine(i, j))
@@ -476,8 +490,9 @@ Playing_field.show();
                     }
 
                     is_find_mine();
-                }
+                } /// loop
             }
+            config.init_start();
             break;
 
             case '2':
@@ -537,7 +552,7 @@ void rules()
 #include <iomanip>
 void print_array_2D()
 {   
-    char strLetters[30] = {"ABCDEFGHFGHIJKLMNOPQRSTUVWXYZ"};
+    char strLetters[30] = {"ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
     cout << "    ";
     for (int i = 0; i < config.NCol; i++)
     {   cout << " " << strLetters[i];
@@ -654,19 +669,22 @@ void final(bool loser)
     {   cout << "\a\n" << "ВЫ ПРОИГРАЛИ...(:\n\n";
         if(its_my_lifes != 0)
         {
-            cout << "НО У ВАС ЕЩЁ ЕСТЬ ШАНС!\n\n";
-            cout << "ОСТАЛОСЬ ЖИЗНЕЙ: " << its_my_lifes << "\n\n";
+            cout << "НО У ВАС ЕЩЁ ЕСТЬ ШАНС!\n\n"
+                 << "ОСТАЛОСЬ ЖИЗНЕЙ: " << its_my_lifes << "\n\n";
         }
         else
         {   cout << "ВЫ ПОКОЙНИК!(:\n\n"
                  << "ЖИЗНЕЙ БОЛЬШЕ НЕТ!\n";
+            system("color 47");
         }
     }
     else
     {   cout << "\a\n" << "УРА! ВЫ ВЫИГРАЛИ!)))\n\n";
+        system("color 70");
     }
 
     pause("продолжить...");
+    system("color 07");
 }
 
 ///----------------------------------------------------------------------------|
@@ -674,6 +692,8 @@ void final(bool loser)
 ///----------------------------------------------------------------------------:
 void pause(const char* mess)
 {   std::cout << "\nЖмите ENTER " << mess << " ";
+    std::cin.clear();
+    std::cin.sync();
     _getch();
 }
 
@@ -690,7 +710,7 @@ bool is_open(int i, int j)
     return true;
 }
 
-bool is_find_mine()
+void is_find_mine()
 {   FORi(NRow)
     {   FORj(NCol)
         {   if((!openn[i][j]) && (Playing_field[i][j] == Bomba) &&
@@ -705,9 +725,7 @@ bool is_find_mine()
             {   /// Ёлы-палы!!! Тут мина!
                 openn[i][j] = true;
                 myrating += prize;
-                return true;
             }
         }
     }
-    return false;
 }
