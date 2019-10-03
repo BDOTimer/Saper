@@ -1,8 +1,11 @@
 ﻿///----------------------------------------------------------------------------|
 /// Консольный сапер.
-/// Version 0.4.2
+/// Version 0.5.0
 /// (нужен тест!)
 ///----------------------------------------------------------------------------:
+#define TESTMODE // Раскомментить для тестирования ИГРОВОЙ ЛОГИКИ.
+///----------------------------------------------------------------------------|
+
 #include <iostream>
 #include <time.h>
 #include <stdio.h>
@@ -199,7 +202,8 @@ void clean  (int, int);
 bool is_win         ();
 bool final      (bool);
 void pause       (CCR);
-void is_find_mine   ();
+bool is_find_mine   ();
+void beep()           ;
 
 template<class T>
 T input_user(const char* promt)
@@ -259,7 +263,6 @@ int& NRow = config.NRow;
 int& NCol = config.NCol;
 int& BOOM = config.BOOM; // Количество бомб на поле.
 
-
 ///----------------------------------------------------------------------------|
 /// GUI
 ///----------------------------------------------------------------------------:
@@ -306,6 +309,10 @@ public:
                     mb.resize(x, y);
                     cfg.NCol = x;
                     cfg.NRow = y;
+                    ///--------------------------------|
+                    /// Пересчитать кол-во бомб.       |
+                    ///--------------------------------:
+                    config.BOOM = x*y/10 + carr<int>::rrand(2);
                 }
                 break;
 
@@ -337,6 +344,7 @@ void test_all()
 {
     //test_class_cGui_03(Playing_field, openn);
 }
+
 ///----------------------------------------------------------------------------|
 /// main()
 ///----------------------------------------------------------------------------:
@@ -354,6 +362,10 @@ int main()
              << " 3 - НАСТРОЙКИ.\n"
              << "     ...\n\n"
              << " 0 - ВЫХОД.\n\n\n";
+        
+        {   static         bool islock = false;
+            if(!islock){ beep();islock = true; }
+        }
 
            choice = input_user<char>(" СДЕЛАЙТЕ ВАШ ВЫБОР: "); ENDL(2);
         if(choice == '0') break;
@@ -371,8 +383,11 @@ start:          Playing_field.init_one (0);
                 ///------------------------|
                 /// Заполнение минами.     |
                 ///------------------------:
+#ifdef TESTMODE 
+    Playing_field[0][0]           = Bomba;
+    Playing_field[NRow-1][NCol-1] = Bomba;
+#else TESTMODE
                 int i,j;
-
                 for (int c = 0; c < BOOM; c++)
                 {   do
                     {   i = rand() % NRow;
@@ -381,10 +396,7 @@ start:          Playing_field.init_one (0);
                     while (Playing_field[i][j] != 0);
                     Playing_field[i][j] = Bomba;
                 }
-
-//Playing_field[0][0] = Bomba;
-//Playing_field[3][3] = Bomba;
-
+#endif
                 ///------------------------|
                 /// Заполнение подсказками.|
                 ///------------------------:
@@ -410,6 +422,9 @@ start:          Playing_field.init_one (0);
                     cout << "*****************************\n"
                          << "* САПЕР ОШИБАЕТСЯ  ОДИН РАЗ *\n"
                          << "*****************************\n";
+#ifdef TESTMODE
+    Log("\n             TESTMODE define!");
+#endif
                     ENDL(3);
                     print_array_2D();
                     ENDL(1);
@@ -421,9 +436,10 @@ start:          Playing_field.init_one (0);
                     std::cout << "\n\nМои жизни: " << its_my_lifes;
                     std::cout <<   "\nОчки     : " << myrating     << "\n\n";
 
-Log("Я читер!");
-Playing_field.show();
-
+#ifdef TESTMODE
+    Log("Я читер!");
+    Playing_field.show();
+#endif
                     ///-----------------------------|
                     ///запрашиваем координаты удара.|
                     ///-----------------------------:
@@ -463,6 +479,14 @@ pause("дальше\n");
                     _getch();
                     continue;
                 }
+
+                if (openn[i][j])
+                {   if((Playing_field[i][j]) == Bomba)
+                         pause("Эта бомба уже обезврежена...");
+                    else pause("Здесь вы уже были...");
+                    continue;
+                }
+
                 ///--------------
                 /// Ход принят! |
                 ///-------------:
@@ -485,19 +509,14 @@ pause("дальше\n");
                             goto start;
                         }
 
-                        if(its_my_lifes == 0)
-                        {   break;        /// Проигрыш!
-                        }
-                    }
-                    else
-                    {   if (is_win())
-                        {   final(false); /// Выигрыш!
-                            break;
-                        }
+                        if(its_my_lifes == 0) break; /// Проигрыш!
                     }
 
-                    is_find_mine();
-                } /// loop
+                    if (is_find_mine() && is_win())
+                    {   final(false);                /// Выигрыш!
+                        break;
+                    }
+                }// while(true)
             }
             break;
 
@@ -600,6 +619,7 @@ void print_array_2D()
 void show_of_mines()
 {   cout << "* ";
 }
+
 ///----------------------------------------------------------------|
 /// Рекурсивная функция, которая открывает поля в точке попадания. |
 ///----------------------------------------------------------------:
@@ -648,6 +668,9 @@ bool is_mine(int i, int j)
     return false;
 }
 
+///----------------------------------------------------------------|
+/// Победа: все ячейки с бомбами открыты - true.                   |
+///----------------------------------------------------------------:
 bool is_win()
 {   FORi(NRow)
     {   FORj(NCol)
@@ -658,7 +681,9 @@ bool is_win()
     return true;
 }
 
-// в случае проигрыша эта функция откроет все мины
+///----------------------------------------------------------------|
+/// В случае проигрыша эта функция откроет все мины.               |
+///----------------------------------------------------------------:
 void openmines()
 {   FORi(NRow)
     {   FORj(NCol)
@@ -670,6 +695,30 @@ void openmines()
 ///----------------------------------------------------------------------------|
 /// true - игра продолжается!
 ///----------------------------------------------------------------------------:
+#include <windows.h>
+void beep() 
+{   return; ///<<<---Отключено!
+// Нотки	
+    int   B = 493,
+          D = 587,
+          A = 440,
+          G = 392;
+
+    Beep(B, 200);
+    Beep(D, 200);
+    Beep(B, 200);
+    Beep(D, 400);
+
+    Beep(B, 200);
+    Beep(A, 200);
+    Beep(B, 400);
+
+    Beep(A, 200);
+    Beep(G, 200);
+    Beep(A, 400);
+    Beep(G, 400);
+}
+
 bool final(bool loser)
 {   system("cls");
 
@@ -680,11 +729,11 @@ bool final(bool loser)
         {
             cout << "НО У ВАС ЕЩЁ ЕСТЬ ШАНС!\n\n"
                  << "ОСТАЛОСЬ ЖИЗНЕЙ: " << its_my_lifes << "\n\n";
-            pause("продолжить...");
+            pause("Продолжить...");
             return true;
         }
         else
-        {   cout << "ВЫ ПОКОЙНИК!(:\n\n"
+        {   cout << "\a\a\aВЫ ПОКОЙНИК!(:\n\n"
                  << "ЖИЗНЕЙ БОЛЬШЕ НЕТ!\n";
             system("color 47");
         }
@@ -692,9 +741,10 @@ bool final(bool loser)
     else
     {   cout << "\a\n" << "УРА! ВЫ ВЫИГРАЛИ!)))\n\n";
         system("color 70");
+        beep();
     }
 
-    pause("продолжить...");
+    pause("Новая игра?");
     system("color 07");
     config.init_start();
     return false;
@@ -704,7 +754,7 @@ bool final(bool loser)
 /// Пауза.
 ///----------------------------------------------------------------------------:
 void pause(const char* mess)
-{   std::cout << "\nЖмите ENTER " << mess << " ";
+{   std::cout << "\n" << mess  << " (жмите ENTER)" << " ";
     std::cin.clear();
     std::cin.sync();
     _getch();
@@ -723,7 +773,7 @@ bool is_open(int i, int j)
     return true;
 }
 
-void is_find_mine()
+bool is_find_mine()
 {   FORi(NRow)
     {   FORj(NCol)
         {   if((!openn[i][j]) && (Playing_field[i][j] == Bomba) &&
@@ -738,15 +788,10 @@ void is_find_mine()
             {   /// Ёлы-палы!!! Тут мина!
                 openn[i][j] = true;
                 myrating += prize;
+                return true;
             }
         }
     }
+    return false;
 }
 
-///----------------------------------------------------------------------------|
-/// Инициализатор
-///----------------------------------------------------------------------------:
-void init_game()
-{
-
-}
