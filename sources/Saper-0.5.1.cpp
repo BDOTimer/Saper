@@ -1,6 +1,6 @@
 ﻿///----------------------------------------------------------------------------|
 /// Консольный сапер.
-/// Version 0.5.0
+/// Version 0.5.1
 /// (нужен тест!)
 ///----------------------------------------------------------------------------:
 #define TESTMODE // Раскомментить для тестирования ИГРОВОЙ ЛОГИКИ.
@@ -45,35 +45,25 @@ template<class T>
 class carr
 {
 public:
+    carr()               : arr(NULL), row(0),  column(0) {}
     carr(int _r, int _c) : arr(NULL), row(_r), column(_c)
     {   arr = create_arr(row, column);
     }
-    
-    carr() : arr(NULL), row(0), column(0)
-    {   
-    }
-    
-    carr(carr& _arr) : arr(NULL), row(0), column(0)
+
+    carr(carr& _arr)     : arr(NULL), row(0), column(0)
     {   resize(_arr.row, _arr.column);
         FORi(row)
             FORj(column)
                 arr[i][j] = _arr[i][j];
     }
-    
-    carr(carr&& _arr) : arr(NULL), row(0), column(0)
-    {   
-    }
-    
-   ~carr()
-    {   delete_arr(arr);
-    }
+
+    carr(carr&& _arr)    : arr(NULL), row(0), column(0) {}
+   ~carr()               { delete_arr(arr); }
     
     //------------------------------------------------------resize(int r, int c)
     void resize(int _r, int _c)
-    {   
-        if(arr != NULL) 
-        {   
-            delete_arr   (arr);
+    {   if(arr != NULL) 
+        {   delete_arr   (arr);
         }
         row    = _r;
         column = _c;
@@ -91,12 +81,8 @@ public:
                 arr[i][j] = _val;
     }
     
-    int row_()
-    {   return row;
-    }
-    int column_()
-    {   return column;
-    }
+    int row_   () { return row;    }
+    int column_() { return column; }
     
     //-------------------------------------------------------------------show():
     void show()
@@ -113,6 +99,7 @@ public:
         }
         std::cout << "\n";
     }
+
     void info()
     {   Log(__FUNCTION__);
         LOG(row);
@@ -120,6 +107,7 @@ public:
         LOG(arr);
         std::cout << "\n";
     }
+
     //-------------------------------------------Форматированный вывод на экран:
     void show_format()
     {   
@@ -175,8 +163,7 @@ protected:
     
     //--------------------------------------------------------------delete_arr()
     void delete_arr(T**& p)
-    {   
-        FORi(row)
+    {   FORi(row)
         {   delete[] p[i];
         }
         delete[] p;
@@ -230,7 +217,6 @@ int        its_my_lifes ;
 int        myrating     ;
 int        prize        ;
 int        steps        ;
-
 
 class cConfig
 {
@@ -416,7 +402,7 @@ start:          Playing_field.init_one (0);
                         }
                     }
                 }
-                    
+
                 while (true)
                 {   system("cls");
                     cout << "*****************************\n"
@@ -593,7 +579,7 @@ void print_array_2D()
     FORi(NRow)
     {   cout << std::setw(3) << i << " |";
         FORj(NCol)
-        {   
+        {
             if (openn[i][j])
             {   switch(Playing_field[i][j])
                 {   case Bomba:
@@ -608,9 +594,7 @@ void print_array_2D()
                         cout << Playing_field[i][j] << " ";
                 }
             }
-            else
-            {   cout << "& ";
-            }
+            else cout << "& ";
         }
         cout << "\n";
     }
