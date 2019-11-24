@@ -1,5 +1,5 @@
 ﻿///----------------------------------------------------------------------------|
-/// Просто Филя. статус:[ГРАФ-ИНТЕЛЛЕКТ] version 0.2
+/// Просто Филя. статус:[ГРАФ-ИНТЕЛЛЕКТ] version 0.3
 /// Ниже выберите режим компиляции.
 ///     Возможны два режима:    1. Бот.
 ///                             2. Игра.
@@ -1105,7 +1105,7 @@ public:
         int two_;
 
         void show_result()
-        {   COORD xy = {0, 46};
+        {   COORD xy = {0, 45};
             engine.setPosCursor(xy);
 
             std::cout << "Игрок One: " << one_ << "\n";
@@ -1116,13 +1116,14 @@ public:
         {   std::cout << "ПОБЕДИТЕЛЬ: " 
                       << (one_ > two_ ? "Игрок One!" : 
                          (one_ < two_ ? "Игрок Two!" : "ДРУЖБА!"))
-                      << "\n\n";
+                      << "\n";
         }
 
     }stat;
 
+    #define START_POSION_SCREEN engine.setPosCursor(xy)
     void go()
-    {   COORD xy      = {0,0};
+    {   const COORD xy      = {0,0};
         int   mem     =  0   ;
         bool  is_mess = false;
          
@@ -1135,13 +1136,14 @@ public:
                      one.go();
             if(      one.paint() == 'Z') is_mess = true;
             
-            engine.setPosCursor(xy);
+            START_POSION_SCREEN;
             one.show(2);
             if( is_mess)
             {   is_mess   =  false;
                 std::cout << "У игрока One НЕТ РЕШЕНИЯ!\n";
                 engine.pause("...");
             }
+            else print_empty();
             Sleep(200);
 
             //engine.pause(" дальше two ... ");
@@ -1151,13 +1153,14 @@ public:
                      two.go();
             if(      two.paint() == 'Z') is_mess = true;
 
-            engine.setPosCursor(xy);
+            START_POSION_SCREEN;
             two.show(2);
             if( is_mess)
             {   is_mess   =  false;
                 std::cout << "У игрока Two НЕТ РЕШЕНИЯ!\n";
                 engine.pause("...");
             }
+            else print_empty();
             Sleep(200);
             
             //engine.pause(" дальше one ... ");
@@ -1171,11 +1174,11 @@ public:
             else                                    mem = 0;
 
             if( mem == 3)
-            {
+            {   START_POSION_SCREEN;
                 stat.one_ = one.stat_amount_mycell.start;
                 stat.two_ = two.stat_amount_mycell.start;
-                two.show(1);
-
+                two. show(1);
+                stat.show_result();
                 break;
             }
 
@@ -1186,6 +1189,10 @@ public:
     }
 
 private:
+
+    void print_empty()
+    {   std::cout << "                                           ";
+    }
 
     bool arbiter()
     {   static int count = 0;
