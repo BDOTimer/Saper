@@ -208,7 +208,6 @@ int main()
 #include <Windows.h>
 #include <conio.h>
 
-
 #define FORi(v)  for(int i = 0; i < v; ++i)
 #define FORj(v)  for(int j = 0; j < v; ++j)
 #define LOG(v)   Log(#v, v)
@@ -249,10 +248,10 @@ public:
     };
     
     ///---------------------------------------------------------------set_color:
-    void set_color( WORD text,
-                    WORD background,
-                    SHORT x, 
-                    SHORT y, 
+    void set_color( WORD   text,
+                    WORD   background,
+                    SHORT  x, 
+                    SHORT  y, 
                     size_t size )
     {   COORD pos = {y, x};
         COORD mem = getPosCursor();
@@ -261,14 +260,14 @@ public:
         int aa = GetConsoleCP ();
         SetConsoleCP      (1251);
         SetConsoleOutputCP(1251);
-        SHORT n = pos.X  +  size;
+        SHORT n = pos.X  + size ;
         for(; pos.X < n; ++pos.X)
         {   char a = read_char (pos);
             std::cout << char(a+256);
         }
         mySetColor();
         
-        SetConsoleCP(aa);
+        SetConsoleCP      (aa);
         SetConsoleOutputCP(aa);
         SetConsoleCursorPosition(hcon, mem);
     }
@@ -365,7 +364,7 @@ m:      set_color(7);
 #define NCHAR_COLOR(N)  engine.set_color(COLOR(N-48));\
                         std::cout << N
 #define DISPLEY         std::cout
-#define BANNER(a,b,c)       std::cout <<"\n"<< a <<"\n"<< b <<"\n"<< c <<"\n";
+#define BANNER(a,b,c)   std::cout <<"\n"<< a <<"\n"<< b <<"\n"<< c <<"\n";
 
 ///------------------------------------------------|
 /// Чтобы ОТКЛЮЧИТЬ лог закоментируйте нижестроку. |
@@ -1210,9 +1209,9 @@ public:
             /// Если ТРИ ХОДА без решений то ГЕЙМОВЕР!     |
             ///--------------------------------------------:
             if( 0   == one.stat_amount_mycell.add) mem++;
-            else                                    mem = 0;
+            else                                   mem = 0;
             if( 0   == two.stat_amount_mycell.add) mem++;
-            else                                    mem = 0;
+            else                                   mem = 0;
 
             if( mem == 3)
             {   START_POSION_SCREEN;
@@ -1237,15 +1236,7 @@ private:
 
     bool arbiter()
     {   static int count = 0;
-/*
-        if(one.get_stat() == 0) count++;
-        else                    count = 0;
-
-        if(two.get_stat() == 0) count++;
-        else                    count = 0;
-
-        if(count == 2) return true;
-*/
+//TODO:
         return true;
     }
     
@@ -1262,13 +1253,13 @@ void Game()
               "/// ИГРА ЗАВЕРШЕНА! |",
               "///-----------------:")
 
-    engine.pause   (" выход в ОС ...");
+    engine.pause(" для выхода в ОС ...");
 }
 
 ///----------------------------------------------------------------------------|
 /// Тесты.
 ///----------------------------------------------------------------------------:
-void all_test()//--------------------------------------------------------------|
+void all_test()
 {   //test_class_cNode();
     //test_class_carr ();
     //testclass_sField();
