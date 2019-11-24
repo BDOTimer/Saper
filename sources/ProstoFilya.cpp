@@ -1,6 +1,28 @@
 ﻿///----------------------------------------------------------------------------|
-/// Просто Филя. статус:[ГРАФ-ИНТЕЛЛЕКТ +]
+/// Просто Филя. статус:[ГРАФ-ИНТЕЛЛЕКТ] version 0.2
+/// Ниже выберите режим компиляции.
+///     Возможны два режима:    1. Бот.
+///                             2. Игра.
 ///----------------------------------------------------------------------------:
+/// (по умолчанию выбран режим игры.)
+#define GAME_x //x
+///----------------------------------------------------------------------------|
+
+#ifdef GAME_
+    const bool _MODE_ = true;
+#else
+    const bool _MODE_ = false;
+#endif
+
+///-//////////////////////////////////////////////////////////////////////////-|
+/// 
+/// РАЗДЕЛ - 1.
+///     1. Загрузка из файла.
+///     2. Подготовка данных.
+///     3. Запуск зайца Вояджера.
+///     4. Отправка решения в файл.
+///
+///-//////////////////////////////////////////////////////////////////////////-|
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
@@ -78,59 +100,16 @@ void arr_generator()
 }
 
 ///----------------------------------------------------------------------------|
-/// Святая святых.
-/// Алгоритм поиска цвета color_result.
+/// sSuper_analize_field был УДАЛЕН!
 ///----------------------------------------------------------------------------:
 struct sSuper_analize_field
-{   char color_my;
-    char color_enemy;
-    char color_res;
-    sSuper_analize_field() : color_res(-1)
-    {   color_my    = field[0][0];
-        color_enemy = field[ROW-1][COL-1];
-        color_res   = work();
-    }
-    struct sdata
-    {   sdata() : c(-1), count(0){}
-        char c;
-        int  count;
-        void inc(char _c, int i)
-        {   c      = _c;
-            count +=  i;
-        }
-    };
-    
-    char work()
-    {   sdata data[ROW];
-    
-        for    (int i = 0; i < ROW; ++i)
-        {   if(field[i][0] != color_my) break;
-            
-            for(int j = 0; j < COL; ++j)
-            {   if(field[i][j] == color_enemy)
-                {   continue;
-                }
-                else if(field[i][j] != color_my)
-                {   if((data[i].c == field[i][j]) || (data[i].c == -1))
-                        data[i].inc(field[i][j], 1);
-                }
-            }
-        }
-    
-        sdata o;
-        for(int i = 0; i < ROW; ++i)
-        {   if(data[i].count > o.count) o = data[i];
-        }
-        color_res = o.c;
-        return color_res;
-    }
-    char test()
-    {   //char color = field[0][0];
-        return color_res;
+{      sSuper_analize_field()
+    {  std::cout << "... ДАУН-ИНТЕЛЛЕКТ изгнан!\n"; std::cin.get();
     }
 };
 
 void all_test();
+char bot_go();
 ///----------------------------------------------------------------------------|
 /// Старт.
 ///----------------------------------------------------------------------------:
@@ -162,13 +141,19 @@ int main()
     /// Вывод на экран "filya.in"      |
     ///--------------------------------:
     //show();
-    all_test();
+
+    ///--------------------------------|
+    /// Если ИГРА, то играем.          |
+    ///--------------------------------:
+    if(_MODE_)
+    {   all_test();
+        return 0;
+    }
     
     ///--------------------------------|
     /// Запуск алгорима поиска цвета.  |
     ///--------------------------------:
-    sSuper_analize_field go;
-    char color_result = go.test();
+    char color_result = bot_go();
     
     ///--------------------------------|
     /// Отсылает результат на сервер.  |
@@ -186,9 +171,10 @@ int main()
 }
 
 ///-//////////////////////////////////////////////////////////////////////////-|
-///
-/// В поисках Святого Грааля ...
-/// (Делаем искусственный СВЕРХ-РАЗУМ)
+/// 
+/// РАЗДЕЛ - 2.
+///     В поисках Святого Грааля ...
+///     (Делаем искусственный СВЕРХ-РАЗУМ)
 ///
 ///-//////////////////////////////////////////////////////////////////////////-|
 struct A_start
@@ -255,10 +241,10 @@ public:
         COORD mem = getPosCursor();
         SetConsoleCursorPosition(hcon, pos);
         mySetColor(text, background);
-        int aa = GetConsoleCP();
+        int aa = GetConsoleCP ();
         SetConsoleCP      (1251);
         SetConsoleOutputCP(1251);
-        SHORT n = pos.X + size;
+        SHORT n = pos.X  +  size;
         for(; pos.X < n; ++pos.X)
         {   char a = read_char (pos);
             std::cout << char(a+256);
@@ -614,34 +600,22 @@ public:
     }
     
 
-    void put_in_order()
-    {   std::set<T> a(vec.begin(), vec.end());
+    bool put_in_order()
+    {   if(vec.empty   ()) return true;
+
+        std::set<T> a(vec.begin(), vec.end());
 
         vec.clear();
         for ( auto it = a.begin(); it != a.end(); ++it )
         {   vec.push_back(*it);
         }
+        return false;
     }
 };
 
 typedef int crd_t;
 struct  cNode;
 typedef cNode* pn;
-
-void test_class_cNode();
-void testclass_sField();
-void testclass_sVoyager();
-void Game();
-void all_test()//--------------------------------------------------------------|
-{   //test_class_cNode();
-    //test_class_carr ();
-    //testclass_sField();
-
-    //while(true)
-        //testclass_sVoyager();
-
-    Game();
-}
 
 struct sIndexCell
 {   sIndexCell(crd_t r, crd_t c) : row(r), col(c) {}
@@ -795,6 +769,10 @@ struct sField : public carr<pn>
         }
     }
 
+    void reset() //-------------------------------------------------------reset:
+    {   
+    }
+
 private:
     void show_mark()
     {   
@@ -879,13 +857,10 @@ void testclass_sField()
 class sVoyager
 {   
 public:
-    sField        pole;
-    cmyStack_task stack;
-    cmyStack_task stack_border;
-    cmyStack_task ncolor;
+    sField     pole;
 
-    const crd_t xs;
-    const crd_t ys;
+    const crd_t  xs;
+    const crd_t  ys;
 
     char    mycolor;
     char enemycolor;
@@ -897,45 +872,42 @@ public:
         else        enemycolor = pole[0       ][0       ]->color;
     }
 
-    void reset()
-    {   stack.       reset();
-        stack_border.reset();
-        ncolor.      reset();
+    void reset() //-------------------------------------------------------reset:
+    {   pole.reset();
     }
 
-    void show(int n)
+    void show(int n) //----------------------------------------------------show:
     {   pole.show(n);
     }
 
     struct sStatictics
-    {   sStatictics() : start(0), add(0), all(0) {}
-        unsigned start;
+    {   unsigned start; /// +
         unsigned add;
         unsigned all;
     }stat_amount_mycell;
 
-    void go()
-    {   
+    void go() //-------------------------------------------------------------go:
+    {   stat_amount_mycell.add = 1;
+        cmyStack_task stack_border;
         tour_to_border(mycolor, pole[ys][xs], stack_border);
-
-        //LOG(stack_border.size   ());
         stack_border.put_in_order();
-        //LOG(stack_border.size   ());
 
-        int i = 0;
+        cmyStack_task ncolor;
         while(       !stack_border.empty())
         {   pn next = stack_border.top  ();
                       stack_border.pop  ();
             
             tour_intro(next->color, next, ncolor);
-            //LOG(++i); LOG(ncolor.size   ());
         }
-
-        //engine.pause   ("...");
-
-        //LOG(ncolor.size   ());
-        ncolor.put_in_order();
-        //LOG(ncolor.size   ());
+        if(ncolor.put_in_order())
+        {
+            ///-----------------|
+            /// Нет решений!    |
+            ///-----------------:
+            stat_amount_mycell.add = 0;
+            newmycolor = 'Z';
+            return;
+        }
 
         int m[256] = {0};
         while(!ncolor.empty())
@@ -951,12 +923,13 @@ public:
             }
             //std::cout << m[i] << " ";
         }
-
         //LOG(newmycolor);
     }
 
-    char paint()
-    {   pole.paint(mycolor, newmycolor);
+    char paint() //-------------------------------------------------------paint:
+    {   if(newmycolor == 'Z') return 'Z';
+        
+        pole.paint(mycolor, newmycolor);
         pole.send_to_game();
 
         mycolor    =        newmycolor;
@@ -966,7 +939,8 @@ public:
     
 private:
     void tour_to_border(char Color, pn p, cmyStack_task& cargo)
-    {   
+    {   cmyStack_task stack;
+
         pn  next = p;
             stack. push(next);
             next->mark = cNode::MARK;
@@ -1000,10 +974,12 @@ private:
             
         }
         //LOG(stat_amount_mycell.start);
+        //engine.pause(", чтобы продлолжить ...");
     }
 
     int tour_intro(char Color, pn p, cmyStack_task& cargo)
-    {   
+    {   cmyStack_task stack;
+
         pn         next = p;
         stack.push(next);
         
@@ -1040,38 +1016,36 @@ private:
         }
         return count;
     }
-
-public:
-    void test_mark()
-    {
-        //FORi(ROW)
-        {   //pole[i][1]->mark = cNode::MARK;
-        }
-    }
 };
 
-void testclass_sVoyager()
-{   //sVoyager test(0, 0);
+char testclass_sVoyager()
+{   sVoyager bot(0, 0);
     //system("cls");
     COORD xy = {0,0};
     engine.setPosCursor(xy);
 
 
-    sVoyager test(ROW-1, COL - 1);
+    //sVoyager bot(ROW-1, COL - 1);
     //test.show    (1);
     //engine.pause(", чтобы продлолжить ...");
 
-    //test.pole[0][1]->color = '8';
+    bot.go();
+    //test.paint();
 
-    test.go();
-    test.paint();
-
-
-    test.show(2);
+    bot.show(2);
     engine.pause(", чтобы продлолжить ...");
+
+    return bot.newmycolor;
 }
 
+char bot_go()
+{   return testclass_sVoyager();
+}
+
+
 ///-//////////////////////////////////////////////////////////////////////////-|
+/// 
+/// РАЗДЕЛ - 3.
 ///
 /// ИГРА.
 ///     Правила:
@@ -1083,7 +1057,7 @@ void testclass_sVoyager()
 ///         6. Игрок выбирает цвет прилегающий к его области.
 ///         7. Выбраным цветом область игрока перекрашивается.
 ///         8. Игроку запрещено выбирать цвет области противника.
-///         9. Игра заканчивается, за 3 хода размер области не изменится.
+///         9. Игра заканчивается, если за 3 хода размер области не изменится.
 ///        10. Победитель определяется большим кол-вом закрашеных клеток.
 ///
 ///-//////////////////////////////////////////////////////////////////////////-|
@@ -1126,46 +1100,88 @@ public:
     {   
     }
 
-    void go()
-    {   COORD xy = {0,0};
-        int mem = -1;
+    struct sResult
+    {   int one_;
+        int two_;
 
+        void show_result()
+        {   COORD xy = {0, 46};
+            engine.setPosCursor(xy);
+
+            std::cout << "Игрок One: " << one_ << "\n";
+            std::cout << "Игрок Two: " << two_ << "\n\n";
+        }
+
+        void show_win()
+        {   std::cout << "ПОБЕДИТЕЛЬ: " 
+                      << (one_ > two_ ? "Игрок One!" : 
+                         (one_ < two_ ? "Игрок Two!" : "ДРУЖБА!"))
+                      << "\n\n";
+        }
+
+    }stat;
+
+    void go()
+    {   COORD xy      = {0,0};
+        int   mem     =  0   ;
+        bool  is_mess = false;
+         
         while(arbiter())
         {   //one.step();
             //two.step();
-            
-            engine.setPosCursor(xy);
 
+            ///----------------------------------------------------------------:
             sVoyager one(0, 0);
-            one.go();
-            one.paint();
+                     one.go();
+            if(      one.paint() == 'Z') is_mess = true;
             
-
-            Sleep(200);
             engine.setPosCursor(xy);
             one.show(2);
-            
+            if( is_mess)
+            {   is_mess   =  false;
+                std::cout << "У игрока One НЕТ РЕШЕНИЯ!\n";
+                engine.pause("...");
+            }
+            Sleep(200);
+
             //engine.pause(" дальше two ... ");
             
-
+            ///----------------------------------------------------------------:
             sVoyager two(ROW-1, COL - 1);
-            two.go();
-            two.paint();
+                     two.go();
+            if(      two.paint() == 'Z') is_mess = true;
 
-            Sleep(200);
             engine.setPosCursor(xy);
             two.show(2);
+            if( is_mess)
+            {   is_mess   =  false;
+                std::cout << "У игрока Two НЕТ РЕШЕНИЯ!\n";
+                engine.pause("...");
+            }
+            Sleep(200);
             
             //engine.pause(" дальше one ... ");
-            
-            if( mem == one.stat_amount_mycell.start)
+
+            ///--------------------------------------------|
+            /// Если ТРИ ХОДА без решений то ГЕЙМОВЕР!     |
+            ///--------------------------------------------:
+            if( 0   == one.stat_amount_mycell.add) mem++;
+            else                                    mem = 0;
+            if( 0   == two.stat_amount_mycell.add) mem++;
+            else                                    mem = 0;
+
+            if( mem == 3)
             {
-                system("cls");
-std::cout << "Игрок one: " << one.stat_amount_mycell.start << "\n";
-std::cout << "Игрок two: " << two.stat_amount_mycell.start << "\n\n";
+                stat.one_ = one.stat_amount_mycell.start;
+                stat.two_ = two.stat_amount_mycell.start;
+                two.show(1);
+
                 break;
             }
-                mem  = one.stat_amount_mycell.start;
+
+            stat.one_ = one.stat_amount_mycell.start;
+            stat.two_ = two.stat_amount_mycell.start;
+            stat.show_result();
         }
     }
 
@@ -1191,5 +1207,25 @@ void Game()
 {
     cGame game;
           game.go();
+          game.stat.show_win();
+
+          BANNER(
+              "///-----------------|",
+              "/// ИГРА ЗАВЕРШЕНА! |",
+              "///-----------------:")
+
+    engine.pause   (" выход в ОС ...");
+}
+
+///----------------------------------------------------------------------------|
+/// Тесты.
+///----------------------------------------------------------------------------:
+void all_test()//--------------------------------------------------------------|
+{   //test_class_cNode();
+    //test_class_carr ();
+    //testclass_sField();
+    //testclass_sVoyager();
+
+    Game();
 }
 
