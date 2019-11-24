@@ -1,18 +1,26 @@
 ﻿///----------------------------------------------------------------------------|
-/// Просто Филя. статус:[ГРАФ-ИНТЕЛЛЕКТ] version 0.3
+/// Просто Филя. статус:[ГРАФ-ИНТЕЛЛЕКТ] version 0.5
 /// Ниже выберите режим компиляции.
-///     Возможны два режима:    1. Бот.
-///                             2. Игра.
+///     Возможны три режима:    1. Игра.
+///                             2. Бот.
+///                             3. Бот - невидимка.(для турнира)
+///
+/// TODO: 1. Режим VANGA    (Предсказание лучшего решения на N ходов вперёд.)
+///       2. Режми ITEACHER (Тестирование ботов нашкоденных студентами.)
+///
 ///----------------------------------------------------------------------------:
 /// (по умолчанию выбран режим игры.)
 #define GAME_ //x
-///----------------------------------------------------------------------------|
 
-#ifdef GAME_
+#ifdef  GAME_
     const bool _MODE_ = true;
 #else
     const bool _MODE_ = false;
 #endif
+///----------------------------------------------------------------------------|
+/// Режим молчаливого бота.(выключен)
+#define MUTE_BOT_x //x
+///----------------------------------------------------------------------------|
 
 ///-//////////////////////////////////////////////////////////////////////////-|
 /// 
@@ -159,6 +167,11 @@ int main()
     /// Отсылает результат на сервер.  |
     ///--------------------------------:
     send_result("filya.out", color_result);
+
+#ifdef  MUTE_BOT_
+    return 0;
+#endif
+
     std::cout << "color_result = " << color_result << "\n";
     
     std::cout <<                                          "\n" <<
@@ -177,10 +190,7 @@ int main()
 ///     (Делаем искусственный СВЕРХ-РАЗУМ)
 ///
 ///-//////////////////////////////////////////////////////////////////////////-|
-struct A_start
-{
-    /// (Делаем искусственный СВЕРХ-РАЗУМ) // метка для быстрого поиска в коде.
-} const _a_;
+
 ///----------------------------------------------------------------------------|
 /// Супер-Пупер(с)
 /// Консольный Псевдо-Графический Движок.
@@ -197,6 +207,13 @@ struct A_start
 #include <iostream>
 #include <Windows.h>
 #include <conio.h>
+
+
+#define FORi(v)  for(int i = 0; i < v; ++i)
+#define FORj(v)  for(int j = 0; j < v; ++j)
+#define LOG(v)   Log(#v, v)
+#define ENDL     std::cout << "\n"
+#define DEBUG(v) std::cout << #v << " = " << v << "\n"
 /// TODO
 ///----------------------------------------------------------------------------|
 /// class Engine
@@ -280,6 +297,10 @@ public:
     void setPosCursor(COORD xy)
     {   SetConsoleCursorPosition(hcon, xy);
     }
+
+    void pause_time()
+    {   pause_time_9(3);
+    }
  
 private:
     void anim_1980()
@@ -322,6 +343,22 @@ private:
         ReadConsoleOutputAttribute(hcon, buff, sz, pos, &cbRead);
         return buff[0];
     }
+
+    void pause_time_9(int sec)
+    {   std::cout << "...   ";
+        set_color(LightRed);
+        for(int i = sec; i > -1; i--)
+        {   std::cout << "\b\b" << i << " "; 
+            FORj(10)
+            {   Sleep(100);
+                if (_kbhit()) 
+                {   _getch (); goto m;
+                }
+            }
+        }
+m:      set_color(7);
+        std::cout << "\r                            "; 
+    }
 }engine;
 
 #define COLOR           cConEngine::ConsoleColor
@@ -350,12 +387,6 @@ private:
 #include <ctime>
 #include <iomanip>
 #include <conio.h>
-
-#define FORi(v) for(int i = 0; i < v; ++i)
-#define FORj(v) for(int j = 0; j < v; ++j)
-#define LOG(v) Log(#v, v)
-#define ENDL std::cout << "\n"
-#define DEBUG(v) std::cout << #v << " = " << v << "\n"
 
 template<class T>
 void Log(const char* s, T v)
@@ -724,6 +755,16 @@ struct sField : public carr<pn>
             }
         }
     }
+    void reset() //-------------------------------------------------------reset:
+    {   FORi(row)
+        {   FORj(column)
+            {   arr[i][j]->color = field[i][j];
+            }
+
+            screen_xy.X = -1;
+        }
+        build();
+    }
 
     COORD screen_xy;
     void show(int choice = 2)
@@ -761,16 +802,11 @@ struct sField : public carr<pn>
     }
 
     void send_to_game()
-    {
-        FORi(row)
+    {   FORi(row)
         {   FORj(column)
             {   field[i][j] = arr[i][j]->color;
             }
         }
-    }
-
-    void reset() //-------------------------------------------------------reset:
-    {   
     }
 
 private:
@@ -881,9 +917,8 @@ public:
     }
 
     struct sStatictics
-    {   unsigned start; /// +
+    {   unsigned start;
         unsigned add;
-        unsigned all;
     }stat_amount_mycell;
 
     void go() //-------------------------------------------------------------go:
@@ -900,10 +935,9 @@ public:
             tour_intro(next->color, next, ncolor);
         }
         if(ncolor.put_in_order())
-        {
-            ///-----------------|
-            /// Нет решений!    |
-            ///-----------------:
+        {   ///------------------------|
+            /// Нет решений!           |
+            ///------------------------:
             stat_amount_mycell.add = 0;
             newmycolor = 'Z';
             return;
@@ -921,9 +955,8 @@ public:
             {   r = m[i];
                 newmycolor = i;
             }
-            //std::cout << m[i] << " ";
         }
-        //LOG(newmycolor);
+        stat_amount_mycell.add = r;
     }
 
     char paint() //-------------------------------------------------------paint:
@@ -968,13 +1001,11 @@ private:
                 }
                 
             }
-            else if(next->color != enemycolor)    //--------------------------|
-            {   cargo.push(next);                 // Учет внешнего контура.   |
-            }                                     //--------------------------|
+            else if(next->color != enemycolor) //--------------------------|
+            {   cargo.push(next);              // Учет внешнего контура.   |
+            }                                  //--------------------------|
             
         }
-        //LOG(stat_amount_mycell.start);
-        //engine.pause(", чтобы продлолжить ...");
     }
 
     int tour_intro(char Color, pn p, cmyStack_task& cargo)
@@ -1019,21 +1050,29 @@ private:
 };
 
 char testclass_sVoyager()
-{   sVoyager bot(0, 0);
-    //system("cls");
+{   
+    
+#ifdef  MUTE_BOT_
+    {   sVoyager bot(0, 0);
+                 bot.go();
+        return   bot.newmycolor;
+    }
+#endif  
+    
+    sVoyager bot(0, 0);
     COORD xy = {0,0};
     engine.setPosCursor(xy);
 
 
     //sVoyager bot(ROW-1, COL - 1);
-    //test.show    (1);
+    //bot.show    (1);
     //engine.pause(", чтобы продлолжить ...");
 
     bot.go();
-    //test.paint();
+    //bot.paint();
 
     bot.show(2);
-    engine.pause(", чтобы продлолжить ...");
+    //engine.pause(", чтобы продлолжить ...");
 
     return bot.newmycolor;
 }
@@ -1141,7 +1180,8 @@ public:
             if( is_mess)
             {   is_mess   =  false;
                 std::cout << "У игрока One НЕТ РЕШЕНИЯ!\n";
-                engine.pause("...");
+              //engine.pause("...");
+                engine.pause_time();
             }
             else print_empty();
             Sleep(200);
@@ -1158,7 +1198,8 @@ public:
             if( is_mess)
             {   is_mess   =  false;
                 std::cout << "У игрока Two НЕТ РЕШЕНИЯ!\n";
-                engine.pause("...");
+              //engine.pause("...");
+                engine.pause_time();
             }
             else print_empty();
             Sleep(200);
