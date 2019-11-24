@@ -9,17 +9,11 @@
 ///       2. Режми ITEACHER (Тестирование ботов нашкоденных студентами.)
 ///
 ///----------------------------------------------------------------------------:
-/// (по умолчанию выбран режим игры.)
-#define GAME_ //x
-
-#ifdef  GAME_
-    const bool _MODE_ = true;
-#else
-    const bool _MODE_ = false;
-#endif
-///----------------------------------------------------------------------------|
+/// Режим работы.(по умолчанию выбран режим игры.)
+const bool MODE     = true;
+///----------------------------------------------------------------------------:
 /// Режим молчаливого бота.(выключен)
-#define MUTE_BOT_x //x
+const bool MUTE_BOT = false;
 ///----------------------------------------------------------------------------|
 
 ///-//////////////////////////////////////////////////////////////////////////-|
@@ -153,7 +147,7 @@ int main()
     ///--------------------------------|
     /// Если ИГРА, то играем.          |
     ///--------------------------------:
-    if(_MODE_)
+    if(MODE)
     {   all_test();
         return 0;
     }
@@ -693,7 +687,7 @@ struct cNode
         }
         return pn(-1);
     }
-    void reset() { status =  1; }
+    void reset() { status =  1; mark = EMPTY;}
     void stop () { status = -1; }
 
     pn contact_1;
@@ -754,15 +748,15 @@ struct sField : public carr<pn>
             }
         }
     }
-    void reset() //-------------------------------------------------------reset:
+    void load() //--------------------------------------------------------reset:
     {   FORi(row)
         {   FORj(column)
             {   arr[i][j]->color = field[i][j];
+                arr[i][j]->reset();
             }
 
             screen_xy.X = -1;
         }
-        build();
     }
 
     COORD screen_xy;
@@ -907,8 +901,11 @@ public:
         else        enemycolor = pole[0       ][0       ]->color;
     }
 
-    void reset() //-------------------------------------------------------reset:
-    {   pole.reset();
+    void load() //--------------------------------------------------------reset:
+    {   pole.load();
+
+        if(xs == 0) enemycolor = pole[ys+ROW-1][xs+COL-1]->color;
+        else        enemycolor = pole[0       ][0       ]->color;
     }
 
     void show(int n) //----------------------------------------------------show:
@@ -916,11 +913,11 @@ public:
     }
 
     struct sStatictics
-    {   unsigned start;
-        unsigned add;
+    {   unsigned start ;
+        unsigned add   ;
     }stat_amount_mycell;
 
-    void go() //-------------------------------------------------------------go:
+    char go() //-------------------------------------------------------------go:
     {   stat_amount_mycell.add = 1;
         cmyStack_task stack_border;
         tour_to_border(mycolor, pole[ys][xs], stack_border);
@@ -939,7 +936,7 @@ public:
             ///------------------------:
             stat_amount_mycell.add = 0;
             newmycolor = 'Z';
-            return;
+            return 'Z';
         }
 
         int m[256] = {0};
@@ -956,17 +953,16 @@ public:
             }
         }
         stat_amount_mycell.add = r;
+        return newmycolor;
     }
 
-    char paint() //-------------------------------------------------------paint:
-    {   if(newmycolor == 'Z') return 'Z';
+    void paint() //-------------------------------------------------------paint:
+    {   if(newmycolor == 'Z') return;
         
         pole.paint(mycolor, newmycolor);
         pole.send_to_game();
 
         mycolor    =        newmycolor;
-        newmycolor = 0;
-        return mycolor;
     }
     
 private:
@@ -1003,7 +999,6 @@ private:
             else if(next->color != enemycolor) //--------------------------|
             {   cargo.push(next);              // Учет внешнего контура.   |
             }                                  //--------------------------|
-            
         }
     }
 
@@ -1050,30 +1045,23 @@ private:
 
 char testclass_sVoyager()
 {   
-    
-#ifdef  MUTE_BOT_
+    if(MUTE_BOT)
     {   sVoyager bot(0, 0);
-                 bot.go();
-        return   bot.newmycolor;
+        return   bot.go();
     }
-#endif  
     
-    sVoyager bot(0, 0);
-    COORD xy = {0,0};
+    sVoyager bot  (0, 0);
+    COORD    xy = {0, 0};
     engine.setPosCursor(xy);
-
 
     //sVoyager bot(ROW-1, COL - 1);
     //bot.show    (1);
     //engine.pause(", чтобы продлолжить ...");
 
-    bot.go();
-    //bot.paint();
-
-    bot.show(2);
-    //engine.pause(", чтобы продлолжить ...");
-
-    return bot.newmycolor;
+    char   newmycolor = bot.go();
+                      //bot.paint();
+                        bot.show(2);
+    return newmycolor;
 }
 
 char bot_go()
@@ -1100,6 +1088,7 @@ char bot_go()
 ///
 ///-//////////////////////////////////////////////////////////////////////////-|
 
+#define START_POSION_SCREEN const COORD xy = {0,0}; engine.setPosCursor(xy)
 ///----------------------------------------------------------------------------|
 /// Класс игрока.
 ///----------------------------------------------------------------------------:
@@ -1111,18 +1100,37 @@ public:
         number_player = static_count;
     }
 
-    void step()
-    {
+    bool step() ///--------------------------------------------------------:step
+    {   bool is_miss = false;
 
+             voyager.load();
+        if(  voyager.go() == 'Z') is_miss = true;
+        else voyager.paint();
+
+            voyager.show(2);
+            if( is_miss)
+            {   std::cout << "У игрока Two НЕТ РЕШЕНИЯ!\n";
+                engine.pause_time();
+            }
+            else print_empty();
+            Sleep(200);
+            return is_miss;
     }
 
     int get_stat()
     {   return voyager.stat_amount_mycell.start;
     }
 
+    void show_color()
+    {   voyager.show(1);
+    }
+
 private:
            int number_player;
     static int static_count;
+    void print_empty()
+    {   std::cout << "                                           ";
+    }
 };
 int cPlayer::static_count = 0;
 
@@ -1130,11 +1138,11 @@ int cPlayer::static_count = 0;
 /// Класс игры.
 ///----------------------------------------------------------------------------:
 class cGame
-{   //cPlayer one;
-    //cPlayer two;
+{   cPlayer one;
+    cPlayer two;
 
 public:
-    cGame() //: one(0, 0), two(ROW-1, COL - 1)
+    cGame() : one(0, 0), two(ROW-1, COL - 1)
     {   
     }
 
@@ -1158,87 +1166,44 @@ public:
                          (one_ < two_ ? "Игрок Two!" : "ДРУЖБА!"))
                       << "\n";
         }
-
     }stat;
 
-    #define START_POSION_SCREEN engine.setPosCursor(xy)
-    void go()
-    {   const COORD xy      = {0,0};
-        int   mem     =  0   ;
-        bool  is_mess = false;
-         
-        while(arbiter())
-        {   //one.step();
-            //two.step();
-
-            ///----------------------------------------------------------------:
-            sVoyager one(0, 0);
-                     one.go();
-            if(      one.paint() == 'Z') is_mess = true;
-            
-            START_POSION_SCREEN;
-            one.show(2);
-            if( is_mess)
-            {   is_mess   =  false;
-                std::cout << "У игрока One НЕТ РЕШЕНИЯ!\n";
-              //engine.pause("...");
-                engine.pause_time();
-            }
-            else print_empty();
-            Sleep(200);
-
-            //engine.pause(" дальше two ... ");
-            
-            ///----------------------------------------------------------------:
-            sVoyager two(ROW-1, COL - 1);
-                     two.go();
-            if(      two.paint() == 'Z') is_mess = true;
-
-            START_POSION_SCREEN;
-            two.show(2);
-            if( is_mess)
-            {   is_mess   =  false;
-                std::cout << "У игрока Two НЕТ РЕШЕНИЯ!\n";
-              //engine.pause("...");
-                engine.pause_time();
-            }
-            else print_empty();
-            Sleep(200);
-            
-            //engine.pause(" дальше one ... ");
-
+    void go() ///------------------------------------------------------------:go
+    {   
+        while(true)
+        {   
             ///--------------------------------------------|
-            /// Если ТРИ ХОДА без решений то ГЕЙМОВЕР!     |
+            /// Правило - 2 : Ходы по очереди.             |
             ///--------------------------------------------:
-            if( 0   == one.stat_amount_mycell.add) mem++;
-            else                                   mem = 0;
-            if( 0   == two.stat_amount_mycell.add) mem++;
-            else                                   mem = 0;
-
-            stat.one_ = one.stat_amount_mycell.start;
-            stat.two_ = two.stat_amount_mycell.start;
-
-            if( mem == 3)
-            {   START_POSION_SCREEN;
-                two. show(1);
-                stat.show_result();
-                break;
-            }
-
-            stat.show_result();
+            if( arbiter(one))  break;
+            if( arbiter(two))  break;
         }
+
+        START_POSION_SCREEN;
+        two. show_color();
+        stat.show_result();
     }
 
 private:
+    bool arbiter(cPlayer& player)
+    {   START_POSION_SCREEN;
+        
+        static int mem =  0;
+        ///--------------------------------------------|
+        /// Если ТРИ ХОДА без решений то ГЕЙМОВЕР!     |
+        ///--------------------------------------------:
+        if( player.step())
+        {   if(++mem == 3)
+            {   return true;
+            }
+        }
+        else mem = 0;
 
-    void print_empty()
-    {   std::cout << "                                           ";
-    }
-
-    bool arbiter()
-    {   static int count = 0;
-//TODO:
-        return true;
+        stat.one_ = one.get_stat();
+        stat.two_ = two.get_stat();
+        stat.show_result();
+        
+        return false;
     }
 };
 
