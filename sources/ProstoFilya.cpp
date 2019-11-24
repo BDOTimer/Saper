@@ -1146,8 +1146,10 @@ public:
         {   COORD xy = {0, 45};
             engine.setPosCursor(xy);
 
-            std::cout << "Игрок One: " << one_ << "\n";
-            std::cout << "Игрок Two: " << two_ << "\n\n";
+            std::cout << "Игрок One: ";  engine.set_color(14);
+            std::cout << one_  << "\n";  engine.set_color(7 );
+            std::cout << "Игрок Two: ";  engine.set_color(14);
+            std::cout << two_ << "\n\n"; engine.set_color(7 );
         }
 
         void show_win()
@@ -1213,17 +1215,16 @@ public:
             if( 0   == two.stat_amount_mycell.add) mem++;
             else                                   mem = 0;
 
+            stat.one_ = one.stat_amount_mycell.start;
+            stat.two_ = two.stat_amount_mycell.start;
+
             if( mem == 3)
             {   START_POSION_SCREEN;
-                stat.one_ = one.stat_amount_mycell.start;
-                stat.two_ = two.stat_amount_mycell.start;
                 two. show(1);
                 stat.show_result();
                 break;
             }
 
-            stat.one_ = one.stat_amount_mycell.start;
-            stat.two_ = two.stat_amount_mycell.start;
             stat.show_result();
         }
     }
@@ -1239,7 +1240,6 @@ private:
 //TODO:
         return true;
     }
-    
 };
 
 void Game()
