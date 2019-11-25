@@ -162,12 +162,9 @@ int main()
     ///--------------------------------:
     send_result("filya.out", color_result);
 
-#ifdef  MUTE_BOT_
-    return 0;
-#endif
+    if (MUTE_BOT) return 0;
 
-    std::cout << "color_result = " << color_result << "\n";
-    
+    std::cout << "color_result = " << color_result    << "\n";
     std::cout <<                                          "\n" <<
     "|----------------------------------------------------|\n" <<
     "|  Программа закончила сеанс связи и ожидает выход...|\n" <<
@@ -1081,7 +1078,7 @@ char bot_go()
 ///         4. Положение Игрока-2: нижний правый угол.
 ///         5. Ходы по очереди.
 ///         6. Игрок выбирает цвет прилегающий к его области.
-///         7. Выбраным цветом область игрока перекрашивается.
+///         7. Выбранным цветом область игрока перекрашивается.
 ///         8. Игроку запрещено выбирать цвет области противника.
 ///         9. Игра заканчивается, если за 3 хода размер области не изменится.
 ///        10. Победитель определяется большим кол-вом закрашеных клеток.
@@ -1093,9 +1090,13 @@ char bot_go()
 /// Класс игрока.
 ///----------------------------------------------------------------------------:
 class cPlayer
-{   sVoyager voyager;
+{   
+    const char*  name;
+    sVoyager  voyager;
+
 public:
-    cPlayer(crd_t _x, crd_t _y) : voyager(_x, _y)
+    cPlayer(const char* _name, crd_t _x, crd_t _y) : voyager(_x, _y),
+                                                     name(_name)
     {   static_count++;
         number_player = static_count;
     }
@@ -1106,10 +1107,10 @@ public:
              voyager.load();
         if(  voyager.go() == 'Z') is_miss = true;
         else voyager.paint();
+             voyager.show(2);
 
-            voyager.show(2);
             if( is_miss)
-            {   std::cout << "У игрока Two НЕТ РЕШЕНИЯ!\n";
+            {   std::cout << "У игрока " << name << " НЕТ РЕШЕНИЯ!\n";
                 engine.pause_time();
             }
             else print_empty();
@@ -1142,12 +1143,13 @@ class cGame
     cPlayer two;
 
 public:
-    cGame() : one(0, 0), two(ROW-1, COL - 1)
+    cGame() : one("One", 0, 0), two("Two", ROW-1, COL - 1)
     {   
     }
 
     struct sResult
-    {   int one_;
+    {   sResult() : one_(0), two_(0) {}
+        int one_;
         int two_;
 
         void show_result()
