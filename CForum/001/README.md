@@ -1,4 +1,4 @@
 ﻿
-[[result.jpg]]
+<img src="result.jpg"/>
 
-[[глюки форума.jpg]]
+<img src="глюки форума.jpg"/>
