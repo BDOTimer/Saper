@@ -1,1124 +1,1251 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Elite — Neon Edition</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ELITE — Spectrum Edition</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        html, body {
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Courier New', monospace;
-            color: #0ff;
-            -webkit-tap-highlight-color: transparent;
-        }
+    html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: 'Courier New', monospace;
+        color: #ffd800;
+        -webkit-tap-highlight-color: transparent;
+    }
+    body { display: block; }
 
-        .game-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            position: relative;
-            padding: 10px;
-            touch-action: none;
-        }
+    #screen {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        overflow: hidden;
+    }
+    #cv {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        image-rendering: pixelated;
+        cursor: crosshair;
+        touch-action: none;
+    }
+    /* CRT-развёртка поверх картинки */
+    .crt {
+        position: absolute; inset: 0;
+        pointer-events: none; z-index: 5;
+        background: repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.22) 0 1px, transparent 1px 3px);
+    }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-            background: #000;
-            image-rendering: pixelated;
-            cursor: crosshair;
-        }
+    .corner {
+        position: fixed; top: 8px; z-index: 30;
+        padding: 6px 12px;
+        font: 700 12px 'Courier New', monospace;
+        background: #000;
+        border: 2px solid #ffd800;
+        color: #ffd800;
+        text-decoration: none;
+        letter-spacing: 1px;
+        cursor: pointer;
+        user-select: none;
+    }
+    .corner:active { background: #ffd800; color: #000; }
+    .corner.left { left: 8px; }
+    .corner.right { right: 8px; }
 
-        .hud {
-            position: absolute;
-            top: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 16px;
-            color: #0ff;
-            font-size: clamp(11px, 2.6vw, 14px);
-            text-shadow: 0 0 8px #0ff;
-            white-space: nowrap;
-            z-index: 10;
-            pointer-events: none;
-            letter-spacing: 1px;
-        }
+    .help {
+        position: fixed; top: 46px; left: 10px; z-index: 10;
+        color: #8a7a30; font-size: 11px; line-height: 1.5;
+        letter-spacing: 0.5px; pointer-events: none;
+        white-space: pre;
+    }
+    @media (pointer: coarse) { .help { display: none; } }
 
-        .hud .label { opacity: 0.6; }
-        .hud .val { color: #fff; }
+    /* ---------- панель торговли (стиль Speccy: чёрный + жёлтая рамка) ---------- */
+    .trade {
+        position: fixed; left: 50%; top: 50%;
+        transform: translate(-50%, -50%);
+        width: min(560px, 94vw);
+        max-height: 90vh; overflow-y: auto;
+        background: rgba(0, 2, 6, 0.94);
+        border: 3px solid #ffd800;
+        padding: 14px 16px 16px;
+        display: none; z-index: 40;
+        color: #fff;
+    }
+    .trade.show { display: block; }
+    .trade h2 {
+        font-size: 16px; letter-spacing: 2px; text-align: center;
+        color: #ffd800;
+        border-bottom: 2px solid #ffd800;
+        padding-bottom: 8px; margin-bottom: 8px;
+    }
+    .tinfo {
+        display: flex; justify-content: space-between; flex-wrap: wrap;
+        gap: 6px 14px; font-size: 12px; padding-bottom: 8px;
+        border-bottom: 1px solid #665c20;
+    }
+    .tinfo b { color: #ffd800; }
+    .goods { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+    .grow {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        font-size: 12px; padding: 4px 6px;
+        border: 1px solid #2c2610;
+    }
+    .grow .nm { flex: 1 1 90px; color: #00d4ff; }
+    .grow .pr { width: 78px; text-align: right; }
+    .grow .pr.low  { color: #40ff40; }
+    .grow .pr.high { color: #ff6060; }
+    .grow .qt { width: 52px; text-align: right; color: #fff; }
+    .tb {
+        font: 700 11px 'Courier New', monospace;
+        padding: 4px 9px; letter-spacing: 1px;
+        background: #000; border: 2px solid #ffd800;
+        color: #ffd800; cursor: pointer;
+    }
+    .tb:active { background: #ffd800; color: #000; }
+    .tb:disabled { opacity: 0.35; cursor: not-allowed; }
+    .tb.solid { background: #ffd800; color: #000; }
+    .fuelrow {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        font-size: 12px; padding: 8px 0;
+        border-top: 1px solid #665c20; color: #ffd800;
+    }
+    .acts { display: flex; justify-content: center; margin-top: 8px; }
+    .acts .tb { padding: 10px 26px; font-size: 13px; }
 
-        .corner-btn {
-            position: absolute;
-            top: 10px;
-            padding: 6px 12px;
-            font-family: inherit;
-            font-size: clamp(11px, 2.6vw, 14px);
-            background: rgba(0, 255, 255, 0.12);
-            color: #0ff;
-            border: 1px solid #0ff;
-            border-radius: 6px;
-            cursor: pointer;
-            text-decoration: none;
-            z-index: 20;
-            user-select: none;
-            line-height: 1;
-        }
-        .corner-btn:active { background: rgba(0, 255, 255, 0.4); color: #000; }
-        .back-btn { left: 10px; }
-        .fs-btn   { right: 10px; }
-
-        .status-bar {
-            position: absolute;
-            bottom: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #0ff;
-            font-size: clamp(11px, 2.6vw, 14px);
-            text-shadow: 0 0 8px #0ff;
-            white-space: nowrap;
-            z-index: 10;
-            pointer-events: none;
-            letter-spacing: 1px;
-            max-width: 96vw;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            pointer-events: none;
-            z-index: 5;
-        }
-        .crosshair::before,
-        .crosshair::after {
-            content: '';
-            position: absolute;
-            background: #0ff;
-            box-shadow: 0 0 6px #0ff;
-        }
-        .crosshair::before {
-            top: 50%; left: 0; right: 0; height: 1px;
-            transform: translateY(-50%);
-        }
-        .crosshair::after {
-            left: 50%; top: 0; bottom: 0; width: 1px;
-            transform: translateX(-50%);
-        }
-        .crosshair .dot {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 4px; height: 4px;
-            margin: -2px 0 0 -2px;
-            background: #0ff;
-            border-radius: 50%;
-            box-shadow: 0 0 8px #0ff;
-        }
-
-        /* Индикатор скорости */
-        .speed-indicator {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(220px, 50vw);
-            height: 6px;
-            background: rgba(0, 255, 255, 0.12);
-            border: 1px solid rgba(0, 255, 255, 0.4);
-            border-radius: 3px;
-            overflow: hidden;
-            z-index: 10;
-            pointer-events: none;
-        }
-        .speed-indicator .fill {
-            height: 100%;
-            background: linear-gradient(90deg, #0ff, #f0f);
-            box-shadow: 0 0 10px #0ff;
-            transition: width 0.1s linear;
-            width: 0%;
-        }
-
-        .trade-panel {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: min(520px, 92vw);
-            max-height: 86vh;
-            background: rgba(0, 10, 20, 0.96);
-            border: 2px solid #0ff;
-            border-radius: 12px;
-            box-shadow: 0 0 40px rgba(0, 255, 255, 0.5);
-            padding: 18px;
-            display: none;
-            flex-direction: column;
-            gap: 12px;
-            z-index: 50;
-            overflow-y: auto;
-        }
-        .trade-panel.show { display: flex; }
-
-        .trade-panel h2 {
-            color: #0ff;
-            text-align: center;
-            letter-spacing: 3px;
-            font-size: clamp(16px, 4vw, 22px);
-            text-shadow: 0 0 12px #0ff;
-        }
-
-        .trade-panel .info {
-            display: flex;
-            justify-content: space-between;
-            font-size: clamp(12px, 2.8vw, 15px);
-            color: #fff;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
-            padding-bottom: 8px;
-        }
-
-        .trade-panel .info .label { color: #0ff; }
-
-        .goods-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .good-row {
-            display: grid;
-            grid-template-columns: 1fr auto auto auto;
-            gap: 8px;
-            align-items: center;
-            padding: 6px 8px;
-            border-radius: 6px;
-            font-size: clamp(11px, 2.6vw, 14px);
-            background: rgba(0, 255, 255, 0.05);
-        }
-
-        .good-row .name { color: #0ff; }
-        .good-row .price { color: #0f0; text-shadow: 0 0 6px #0f0; }
-        .good-row .qty { color: #fff; min-width: 40px; text-align: right; }
-
-        .good-row button {
-            padding: 4px 10px;
-            font-family: inherit;
-            font-size: clamp(10px, 2.4vw, 13px);
-            background: rgba(0, 255, 255, 0.15);
-            color: #0ff;
-            border: 1px solid #0ff;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .good-row button:active { background: #0ff; color: #000; }
-        .good-row button:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        .trade-panel .actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .trade-panel .actions button {
-            padding: 10px 20px;
-            font-family: inherit;
-            font-size: clamp(12px, 2.8vw, 15px);
-            background: #0ff;
-            color: #000;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            letter-spacing: 2px;
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
-        }
-        .trade-panel .actions button.secondary {
-            background: transparent;
-            color: #0ff;
-            border: 2px solid #0ff;
-        }
-        .trade-panel .actions button:active { transform: scale(0.96); }
-
-        .help-block {
-            position: absolute;
-            top: 40px;
-            left: 10px;
-            color: rgba(0, 255, 255, 0.55);
-            font-size: clamp(10px, 2.2vw, 12px);
-            line-height: 1.45;
-            z-index: 10;
-            pointer-events: none;
-            letter-spacing: 0.5px;
-            text-shadow: 0 0 4px rgba(0, 255, 255, 0.4);
-        }
-
-        @media (max-width: 700px) {
-            .help-block { display: none; }
-        }
-    </style>
+    /* ---------- экранные кнопки для тача ---------- */
+    .tc {
+        position: fixed; right: 10px; bottom: 10px; z-index: 25;
+        display: none; flex-direction: column; align-items: flex-end; gap: 8px;
+    }
+    @media (pointer: coarse) { .tc { display: flex; } }
+    .tc button {
+        font: 700 12px 'Courier New', monospace;
+        background: rgba(0,0,0,0.55);
+        color: #ffd800; border: 2px solid #ffd800;
+        user-select: none; touch-action: none;
+    }
+    .tc button:active { background: #ffd800; color: #000; }
+    #tFire   { width: 84px; height: 84px; border-color: #ff4040; color: #ff4040; font-size: 13px; }
+    #tFire:active { background: #ff4040; color: #000; }
+    #tThrust { width: 84px; height: 56px; }
+    .tc .small { width: 88px; height: 34px; }
+</style>
 </head>
 <body>
 
-<a href="../index.html" class="corner-btn back-btn">← Меню</a>
-<button type="button" class="corner-btn fs-btn" id="btnFullscreen">⛶</button>
+<a href="../index.html" class="corner left">← МЕНЮ</a>
+<button type="button" class="corner right" id="fsBtn">ЭКР</button>
 
-<div class="game-wrapper">
-    <canvas id="canvas"></canvas>
+<div class="help" id="help">W/S тангаж   A/D рыскание
+Q/E крен     J тяга   X стоп
+ПРОБЕЛ / ЛКМ — лазер
+ENTER — стыковка (у станции)
+H — гиперпрыжок</div>
 
-    <div class="hud">
-        <span><span class="label">КРЕДИТЫ:</span> <span class="val" id="credits">100.0</span></span>
-        <span><span class="label">ТОПЛИВО:</span> <span class="val" id="fuel">7.0</span></span>
-        <span><span class="label">ЩИТ:</span> <span class="val" id="shield">100</span></span>
-        <span><span class="label">СКОРОСТЬ:</span> <span class="val" id="speed">0</span></span>
-        <span><span class="label">СИСТЕМА:</span> <span class="val" id="system">Lave</span></span>
+<div id="screen">
+    <canvas id="cv"></canvas>
+    <div class="crt"></div>
+</div>
+
+<div class="tc" id="tc">
+    <button type="button" class="small" id="tDock">СТЫКОВКА</button>
+    <button type="button" class="small" id="tJump">ПРЫЖОК</button>
+    <button type="button" id="tThrust">ТЯГА</button>
+    <button type="button" id="tFire">ОГОНЬ</button>
+</div>
+
+<div class="trade" id="trade">
+    <h2 id="tTitle">СТАНЦИЯ «КОРИОЛИС»</h2>
+    <div class="tinfo">
+        <span>СИСТЕМА <b id="tSys"></b></span>
+        <span>КРЕДИТЫ <b id="tCr"></b></span>
+        <span>ТРЮМ <b id="tCargo"></b></span>
+        <span>ТОПЛИВО <b id="tFuel"></b></span>
     </div>
-
-    <div class="crosshair"><div class="dot"></div></div>
-
-    <div class="help-block">
-        W / S — тангаж<br>
-        A / D — рыскание<br>
-        J — тяга (удерживать)<br>
-        ЛКМ — выстрел<br>
-        ENTER — торговля<br>
-        H — гиперпрыжок<br>
-        R — ремонт
+    <div class="goods" id="goods"></div>
+    <div class="fuelrow">
+        <span>ЗАПРАВКА 2 CR / LY</span>
+        <button type="button" class="tb" id="fuel1">+1 LY</button>
+        <button type="button" class="tb" id="fuelFull">ПОЛНЫЙ БАК</button>
     </div>
-
-    <div class="speed-indicator"><div class="fill" id="speedFill"></div></div>
-
-    <div class="status-bar" id="status">W/S — тангаж · A/D — рыскание · J — тяга · ЛКМ — выстрел</div>
-
-    <div class="trade-panel" id="tradePanel">
-        <h2>ТОРГОВЛЯ</h2>
-        <div class="info">
-            <span><span class="label">Система:</span> <span id="tradeSystem">Lave</span></span>
-            <span><span class="label">Кредиты:</span> <span id="tradeCredits">100.0</span></span>
-            <span><span class="label">Трюм:</span> <span id="tradeCargo">0/20</span></span>
-        </div>
-        <div class="goods-list" id="goodsList"></div>
-        <div class="actions">
-            <button id="btnLaunch">ВЗЛЁТ</button>
-        </div>
-    </div>
+    <div class="acts"><button type="button" class="tb solid" id="btnLaunch">ВЗЛЁТ [ESC]</button></div>
 </div>
 
 <script>
-    // ============================================================
-    //                       КОНСТАНТЫ
-    // ============================================================
-    const CANVAS_W = 640;
-    const CANVAS_H = 480;
-    const STAR_COUNT = 220;
-    const FUEL_MAX = 7.0;
+'use strict';
+// ============================================================
+//  ELITE — Spectrum Edition
+//  Векторный рендер, полноценная ориентация (тангаж/рыскание/крен),
+//  стыковка со станцией, торговля, гиперпрыжок, пираты, звук.
+//
+//  ВАЖНО: виртуальная система координат — 640×480.
+//  Canvas растягивается на весь экран, ctx.setTransform(scaleX,0,0,scaleY,0,0)
+//  применяется в начале каждого кадра. Картинка масштабируется на весь
+//  свободный экран, соотношение сторон окна может не совпадать с 4:3.
+// ============================================================
 
-    // Физика корабля
-    const PITCH_SPEED  = 1.8;    // рад/с — поворот вокруг локальной X (W/S)
-    const YAW_SPEED    = 1.6;    // рад/с — поворот вокруг локальной Z (A/D)
-    const THRUST_ACCEL = 60;     // ускорение при тяге (J)
-    const MAX_SPEED    = 280;    // максимальная скорость
-    const DRAG         = 0.6;    // торможение (доля скорости в секунду)
+const W = 640, H = 480;
+const HUD_Y = 380;            // верх приборной панели
+const VIEW_CX = 320, VIEW_CY = 190; // центр 3D-области (над панелью)
+const FOV = 310;
+const TAU = Math.PI * 2;
 
-    const GOODS = [
-        { name: 'Еда',        basePrice: 4.0,  eco: -1 },
-        { name: 'Текстиль',   basePrice: 6.0,  eco: -1 },
-        { name: 'Руды',       basePrice: 8.0,  eco: -1 },
-        { name: 'Компьютеры', basePrice: 40.0, eco: 1 },
-        { name: 'Оружие',     basePrice: 30.0, eco: 1 },
-        { name: 'Наркотики',  basePrice: 20.0, eco: 1 },
-    ];
+const FUEL_MAX = 7.0, FUEL_COST = 2;
+const MAX_SPEED = 280, THRUST = 70, DOCK_RANGE = 90;
 
-    // ============================================================
-    //                       DOM
-    // ============================================================
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const statusEl = document.getElementById('status');
-    const creditsEl = document.getElementById('credits');
-    const fuelEl = document.getElementById('fuel');
-    const shieldEl = document.getElementById('shield');
-    const speedEl = document.getElementById('speed');
-    const systemEl = document.getElementById('system');
-    const speedFill = document.getElementById('speedFill');
+const PITCH_RATE = 1.5, YAW_RATE = 1.3, ROLL_RATE = 2.2;
+const BULLET_SPEED = 760, EBULLET_SPEED = 330;
+const KILL_BOUNTY = 25;
 
-    const tradePanel = document.getElementById('tradePanel');
-    const tradeSystem = document.getElementById('tradeSystem');
-    const tradeCredits = document.getElementById('tradeCredits');
-    const tradeCargo = document.getElementById('tradeCargo');
-    const goodsList = document.getElementById('goodsList');
+const GOODS = [
+    { name: 'Еда',        base: 4.0,  eco: -1 },
+    { name: 'Текстиль',   base: 6.0,  eco: -1 },
+    { name: 'Руды',       base: 10.0, eco: -1 },
+    { name: 'Компьютеры', base: 40.0, eco: 1 },
+    { name: 'Оружие',     base: 32.0, eco: 1 },
+    { name: 'Медикаменты',base: 22.0, eco: 1 },
+];
 
-    // ============================================================
-    //                       СОСТОЯНИЕ
-    // ============================================================
-    let player = {
-        credits: 100.0,
-        fuel: FUEL_MAX,
-        shield: 100,
-        cargo: {},
-        cargoUsed: 0,
-        cargoMax: 20,
-        system: 'Lave',
+const RANKS = ['БЕЗВРЕДНЫЙ','ПОЧТИ БЕЗВРЕДНЫЙ','СЛАБЫЙ','СРЕДНИЙ','ВЫШЕ СРЕДНЕГО','УМЕЛЫЙ','ОПАСНЫЙ','СМЕРТЕЛЬНЫЙ','— ELITE —'];
+const RANK_KILLS = [0, 8, 24, 56, 120, 240, 480, 960, 2000];
 
-        // Позиция и ориентация корабля
-        x: 0, y: 0, z: 0,
-        yaw: 0,      // рыскание (вокруг мировой Y)
-        pitch: 0,    // тангаж (вокруг локальной X)
-        roll: 0,     // крен — на будущее, пока 0
-        speed: 0,    // текущая скорость
+// ============================================================
+//  DOM
+// ============================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const screenEl = document.getElementById('screen');
+const tradeEl = document.getElementById('trade');
+const tSys = document.getElementById('tSys'), tCr = document.getElementById('tCr');
+const tCargo = document.getElementById('tCargo'), tFuel = document.getElementById('tFuel');
+const goodsEl = document.getElementById('goods');
+const tcEl = document.getElementById('tc');
+
+// ============================================================
+//  ЗВУК (WebAudio, ленивая инициализация при первом вводе)
+// ============================================================
+let AC = null, master = null, noiseBuf = null, humOsc = null, humGain = null;
+
+function audio() {
+    if (!AC) {
+        try {
+            AC = new (window.AudioContext || window.webkitAudioContext)();
+            master = AC.createGain(); master.gain.value = 0.5;
+            master.connect(AC.destination);
+        } catch (e) { return null; }
+    }
+    if (AC.state === 'suspended') AC.resume();
+    return AC;
+}
+function getNoise() {
+    if (noiseBuf) return noiseBuf;
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.6 | 0, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+}
+function sfxLaser() {
+    if (!audio()) return; const t = AC.currentTime;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(1300, t);
+    o.frequency.exponentialRampToValueAtTime(180, t + 0.14);
+    g.gain.setValueAtTime(0.10, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.17);
+}
+function sfxEnemyShot() {
+    if (!audio()) return; const t = AC.currentTime;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(600, t);
+    o.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+    g.gain.setValueAtTime(0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.14);
+}
+function sfxHit() {
+    if (!audio()) return; const t = AC.currentTime;
+    const s = AC.createBufferSource(); s.buffer = getNoise();
+    const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2200;
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.13);
+}
+function sfxExpl(big) {
+    if (!audio()) return; const t = AC.currentTime;
+    const s = AC.createBufferSource(); s.buffer = getNoise();
+    const f = AC.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(big ? 1500 : 900, t);
+    f.frequency.exponentialRampToValueAtTime(80, t + 0.5);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(big ? 0.55 : 0.32, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + (big ? 0.7 : 0.45));
+    s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.8);
+    const o = AC.createOscillator(), og = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+    og.gain.setValueAtTime(0.35, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    o.connect(og); og.connect(master); o.start(t); o.stop(t + 0.55);
+}
+function sfxHyper() {
+    if (!audio()) return; const t = AC.currentTime;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.exponentialRampToValueAtTime(900, t + 1.0);
+    g.gain.setValueAtTime(0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + 1.15);
+}
+function sfxDock() {
+    if (!audio()) return; const t = AC.currentTime;
+    [660, 880].forEach((fq, i) => {
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = 'square'; o.frequency.value = fq;
+        g.gain.setValueAtTime(0.08, t + i * 0.16);
+        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.16 + 0.12);
+        o.connect(g); g.connect(master); o.start(t + i * 0.16); o.stop(t + i * 0.16 + 0.13);
+    });
+}
+function sfxAlert() {
+    if (!audio()) return; const t = AC.currentTime;
+    [0, 0.22].forEach(d => {
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = 'square'; o.frequency.value = 210;
+        g.gain.setValueAtTime(0.09, t + d);
+        g.gain.exponentialRampToValueAtTime(0.001, t + d + 0.16);
+        o.connect(g); g.connect(master); o.start(t + d); o.stop(t + d + 0.17);
+    });
+}
+function setHum(on) {
+    if (!AC || !master) return;
+    if (on && !humOsc) {
+        humOsc = AC.createOscillator(); humOsc.type = 'triangle'; humOsc.frequency.value = 46;
+        humGain = AC.createGain(); humGain.gain.value = 0;
+        humOsc.connect(humGain); humGain.connect(master); humOsc.start();
+        humGain.gain.linearRampToValueAtTime(0.07, AC.currentTime + 0.12);
+    } else if (!on && humOsc) {
+        const o = humOsc, g = humGain; humOsc = null; humGain = null;
+        g.gain.linearRampToValueAtTime(0, AC.currentTime + 0.15);
+        setTimeout(() => { try { o.stop(); } catch (e) {} }, 260);
+    }
+}
+
+// ============================================================
+//  ВЕКТОРЫ / ОРИЕНТАЦИЯ
+// ============================================================
+const v3   = (x, y, z) => ({ x, y, z });
+const add  = (a, b) => v3(a.x + b.x, a.y + b.y, a.z + b.z);
+const sub  = (a, b) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
+const mul  = (a, s) => v3(a.x * s, a.y * s, a.z * s);
+const dot  = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const cross= (a, b) => v3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+const len  = a => Math.hypot(a.x, a.y, a.z);
+const norm = a => { const l = len(a) || 1; return v3(a.x / l, a.y / l, a.z / l); };
+
+const player = {
+    credits: 100.0, fuel: FUEL_MAX, shield: 100,
+    cargo: {}, cargoUsed: 0, cargoMax: 20, kills: 0,
+    pos: v3(0, 0, 0), speed: 0,
+    r: v3(1, 0, 0), u: v3(0, 1, 0), f: v3(0, 0, 1),
+    laserHeat: 0, heatLock: false,
+};
+
+function rotPitch(a) { // +a — нос вверх (вокруг правой оси)
+    const c = Math.cos(a), s = Math.sin(a), f = player.f, u = player.u;
+    player.f = v3(f.x * c + u.x * s, f.y * c + u.y * s, f.z * c + u.z * s);
+    player.u = v3(u.x * c - f.x * s, u.y * c - f.y * s, u.z * c - f.z * s);
+}
+function rotYaw(a) {   // +a — нос влево (вокруг верхней оси)
+    const c = Math.cos(a), s = Math.sin(a), f = player.f, r = player.r;
+    player.f = v3(f.x * c - r.x * s, f.y * c - r.y * s, f.z * c - r.z * s);
+    player.r = v3(r.x * c + f.x * s, r.y * c + f.y * s, r.z * c + f.z * s);
+}
+function rotRoll(a) {  // +a — крен влево (вокруг оси взгляда)
+    const c = Math.cos(a), s = Math.sin(a), r = player.r, u = player.u;
+    player.r = v3(r.x * c + u.x * s, r.y * c + u.y * s, r.z * c + u.z * s);
+    player.u = v3(u.x * c - r.x * s, u.y * c - r.y * s, u.z * c - r.z * s);
+}
+function lookAt(t) {
+    const f = norm(sub(t, player.pos));
+    let r = cross(v3(0, 1, 0), f);
+    if (len(r) < 1e-4) r = v3(1, 0, 0); else r = norm(r);
+    player.f = f; player.r = r; player.u = cross(f, r);
+}
+
+// ============================================================
+//  ГЕНЕРАЦИЯ ГАЛАКТИКИ (детерминированная, mulberry32)
+// ============================================================
+function mulberry(a) {
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
+}
+const PLANET_COLORS = [
+    { fill: '#06303f', wire: '#00d4ff' },
+    { fill: '#3f3406', wire: '#ffd800' },
+    { fill: '#3f0634', wire: '#ff40c0' },
+    { fill: '#0a3f16', wire: '#40ff40' },
+    { fill: '#3f1406', wire: '#ff6030' },
+];
+const NAMES = ['Lave', 'Zaonce', 'Leesti', 'Diso', 'Riedquat', 'Tionisla', 'Uszaa', 'Ororra'];
+const systems = [];
+for (let i = 0; i < 10; i++) {
+    const rnd = mulberry(0x9E37 + i * 7919);
+    systems.push({
+        name: i < NAMES.length ? NAMES[i] : NAMES[i % NAMES.length] + ' ' + (Math.floor(i / NAMES.length) + 1),
+        distance: Math.round((1 + rnd() * 4) * 10) / 10,   // 1.0–5.0 LY — всё достижимо с полным баком
+        econ: Math.round((rnd() * 2 - 1) * 100) / 100,     // -1 аграрная … +1 технологичная
+        color: PLANET_COLORS[i % PLANET_COLORS.length],
+    });
+}
 
-    let stars = [];
-    let planets = [];
-    let enemies = [];
-    let bullets = [];
-    let particles = [];
+// ============================================================
+//  МИР: звёзды, планета, станция, враги
+// ============================================================
+let curIdx = 0;
+let planet = null, station = null;
+let enemies = [], bullets = [], ebullets = [], particles = [];
 
-    let mode = 'flight';
-    let keys = {};
-    let lastShot = 0;
-    let mouseDown = false;
-    let autoFireTimer = null;
-    let touchStart = null;
-
-    // ============================================================
-    //                       ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ
-    // ============================================================
-    function makeSystem(seed, index) {
-        let s = (seed * 1103515245 + index * 12345) >>> 0;
-        const rand = () => {
-            s = (s * 1664525 + 1013904223) >>> 0;
-            return s / 4294967296;
-        };
-        const names = ['Lave', 'Diso', 'Leesti', 'Riedquat', 'Zaonce', 'Tionisla', 'Oresrati', 'Uszaa'];
-        const name = names[Math.floor(rand() * names.length)] + (index > 0 ? ' ' + index : '');
-        const radius = 30 + rand() * 50;
-        const distance = rand() * 12 + 1;
-        return { name, radius, distance, seed: s };
-    }
-
-    const systems = [];
-    for (let i = 0; i < 20; i++) systems.push(makeSystem(i * 7 + 1, i));
-    player.system = systems[0].name;
-
-    // ============================================================
-    //                       ЗВЁЗДЫ И ПЛАНЕТЫ
-    // ============================================================
-    function initStars() {
-        stars = [];
-        for (let i = 0; i < STAR_COUNT; i++) {
-            stars.push({
-                x: (Math.random() - 0.5) * 2000,
-                y: (Math.random() - 0.5) * 2000,
-                z: Math.random() * 1500,
-                brightness: 0.3 + Math.random() * 0.7,
-            });
-        }
-    }
-
-    function initPlanets() {
-        planets = [{
-            x: (Math.random() - 0.5) * 300,
-            y: (Math.random() - 0.5) * 300,
-            z: 250 + Math.random() * 200,
-            radius: 40 + Math.random() * 30,
-        }];
-    }
-
-    // ============================================================
-    //                       МАТРИЦА ПОВОРОТА / ПРОЕКЦИЯ
-    // ============================================================
-    //
-    // Камера смотрит вперёд по оси +Z. Ориентация задаётся yaw и pitch.
-    // Чтобы перевести мировую точку в систему камеры:
-    //   1) повернуть вокруг Y на -yaw,
-    //   2) повернуть вокруг X на -pitch.
-    //
-    function project(wx, wy, wz, camX, camY, camZ, camYaw, camPitch) {
-        // Смещение в систему камеры
-        let x = wx - camX;
-        let y = wy - camY;
-        let z = wz - camZ;
-
-        // Поворот вокруг Y (-yaw)
-        const cosY = Math.cos(-camYaw), sinY = Math.sin(-camYaw);
-        const x1 = x * cosY - z * sinY;
-        const z1 = x * sinY + z * cosY;
-
-        // Поворот вокруг X (-pitch)
-        const cosP = Math.cos(-camPitch), sinP = Math.sin(-camPitch);
-        const y1 = y * cosP - z1 * sinP;
-        const z2 = y * sinP + z1 * cosP;
-
-        if (z2 < 1) return null;
-
-        const fov = 320;
-        const sx = CANVAS_W / 2 + (x1 * fov) / z2;
-        const sy = CANVAS_H / 2 - (y1 * fov) / z2;
-
-        return { sx, sy, z: z2 };
-    }
-
-    // ============================================================
-    //                       ОТРИСОВКА
-    // ============================================================
-    function render() {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-        // Звёзды — пролетают мимо, двигаются в мировых координатах
-        // Для простоты: звёзды «привязаны» к игроку по Z (не улетают), но
-        // смещаются по X и Y в зависимости от позиции игрока — эффект параллакса.
-        for (const s of stars) {
-            const p = project(s.x, s.y, s.z, 0, 0, 0, player.yaw, player.pitch);
-            if (!p) continue;
-            const size = Math.max(0.5, 2 - p.z / 500);
-            const alpha = Math.min(1, s.brightness * (1 - p.z / 1800));
-            ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
-            ctx.fillRect(p.sx, p.sy, size, size);
-        }
-
-        // Планеты
-        for (const pl of planets) {
-            const p = project(pl.x, pl.y, pl.z, player.x, player.y, player.z, player.yaw, player.pitch);
-            if (!p) continue;
-            const screenR = (pl.radius * 320) / p.z;
-            if (screenR < 2) continue;
-
-            ctx.strokeStyle = 'rgba(0, 200, 255, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(p.sx, p.sy, screenR, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.strokeStyle = 'rgba(0, 200, 255, 0.15)';
-            ctx.beginPath();
-            ctx.ellipse(p.sx, p.sy, screenR, screenR * 0.3, 0, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        // Враги
-        for (const e of enemies) {
-            const p = project(e.x, e.y, e.z, player.x, player.y, player.z, player.yaw, player.pitch);
-            if (!p) continue;
-            const size = Math.max(4, 2500 / p.z);
-            if (size < 3) continue;
-
-            ctx.strokeStyle = '#f0f';
-            ctx.lineWidth = 1.5;
-            ctx.shadowColor = '#f0f';
-            ctx.shadowBlur = 8;
-            ctx.beginPath();
-            ctx.moveTo(p.sx, p.sy - size);
-            ctx.lineTo(p.sx - size * 0.7, p.sy + size * 0.5);
-            ctx.lineTo(p.sx + size * 0.7, p.sy + size * 0.5);
-            ctx.closePath();
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-        }
-
-        // Пули
-        for (const b of bullets) {
-            const p = project(b.x, b.y, b.z, player.x, player.y, player.z, player.yaw, player.pitch);
-            if (!p) continue;
-            ctx.fillStyle = '#0ff';
-            ctx.shadowColor = '#0ff';
-            ctx.shadowBlur = 6;
-            ctx.fillRect(p.sx - 1.5, p.sy - 1.5, 3, 3);
-            ctx.shadowBlur = 0;
-        }
-
-        // Частицы
-        for (const pt of particles) {
-            const p = project(pt.x, pt.y, pt.z, player.x, player.y, player.z, player.yaw, player.pitch);
-            if (!p) continue;
-            ctx.fillStyle = `rgba(255, 200, 0, ${pt.life})`;
-            ctx.fillRect(p.sx - 1, p.sy - 1, 2, 2);
-        }
-    }
-
-    // ============================================================
-    //                       ИГРОВОЙ ЦИКЛ
-    // ============================================================
-    let lastTime = 0;
-
-    function loop(t) {
-        if (!lastTime) lastTime = t;
-        const dt = Math.min((t - lastTime) / 1000, 0.1);
-        lastTime = t;
-
-        if (mode === 'flight') update(dt);
-
-        render();
-        requestAnimationFrame(loop);
-    }
-
-    function update(dt) {
-        // ------------------------------------------------------------
-        // УПРАВЛЕНИЕ ОРИЕНТАЦИЕЙ
-        // ------------------------------------------------------------
-        // W / S — тангаж (поворот вокруг локальной X корабля)
-        // W — «вверх» (нос вверх), S — «вниз»
-        if (keys['w'] || keys['W'] || keys['ц'] || keys['Ц']) {
-            player.pitch += PITCH_SPEED * dt;
-        }
-        if (keys['s'] || keys['S'] || keys['ы'] || keys['Ы']) {
-            player.pitch -= PITCH_SPEED * dt;
-        }
-
-        // A / D — рыскание (поворот вокруг локальной Z корабля)
-        // A — по часовой стрелке (нос вправо), D — против часовой (нос влево)
-        if (keys['a'] || keys['A'] || keys['ф'] || keys['Ф']) {
-            player.yaw += YAW_SPEED * dt;
-        }
-        if (keys['d'] || keys['D'] || keys['в'] || keys['В']) {
-            player.yaw -= YAW_SPEED * dt;
-        }
-
-        // Ограничение тангажа, чтобы не перевернуться через полюс
-        player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch));
-
-        // ------------------------------------------------------------
-        // ТЯГА (J) И СКОРОСТЬ
-        // ------------------------------------------------------------
-        if (keys['j'] || keys['J'] || keys['о'] || keys['О']) {
-            player.speed += THRUST_ACCEL * dt;
-            if (player.speed > MAX_SPEED) player.speed = MAX_SPEED;
-        } else {
-            // Пассивное торможение
-            player.speed -= player.speed * DRAG * dt;
-            if (Math.abs(player.speed) < 0.5) player.speed = 0;
-        }
-
-        // Движение вперёд (в направлении взгляда)
-        const dirX = Math.sin(player.yaw) * Math.cos(player.pitch);
-        const dirY = -Math.sin(player.pitch);
-        const dirZ = Math.cos(player.yaw) * Math.cos(player.pitch);
-
-        player.x += dirX * player.speed * dt;
-        player.y += dirY * player.speed * dt;
-        player.z += dirZ * player.speed * dt;
-
-        // ------------------------------------------------------------
-        // ВРАГИ
-        // ------------------------------------------------------------
-        for (const e of enemies) {
-            const dx = player.x - e.x;
-            const dz = player.z - e.z;
-            const dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist > 10) {
-                e.x += (dx / dist) * e.speed * dt;
-                e.z += (dz / dist) * e.speed * dt;
-            }
-            if (dist < 150 && Math.random() < 0.01) {
-                player.shield -= 5;
-                updateHUD();
-            }
-        }
-
-        // ------------------------------------------------------------
-        // ПУЛИ
-        // ------------------------------------------------------------
-        for (let i = bullets.length - 1; i >= 0; i--) {
-            const b = bullets[i];
-            b.x += b.vx * dt;
-            b.y += b.vy * dt;
-            b.z += b.vz * dt;
-            b.life -= dt;
-
-            let hit = false;
-            for (let j = enemies.length - 1; j >= 0; j--) {
-                const e = enemies[j];
-                const dx = b.x - e.x;
-                const dy = b.y - e.y;
-                const dz = b.z - e.z;
-                if (dx * dx + dy * dy + dz * dz < 400) {
-                    e.hp -= 34;
-                    if (e.hp <= 0) {
-                        enemies.splice(j, 1);
-                        player.credits += 10;
-                        updateHUD();
-                        statusEl.textContent = 'Враг уничтожен! +10 кредитов';
-                    }
-                    hit = true;
-                    break;
-                }
-            }
-
-            if (hit || b.life <= 0) bullets.splice(i, 1);
-        }
-
-        // Частицы
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const pt = particles[i];
-            pt.x += pt.vx * dt;
-            pt.y += pt.vy * dt;
-            pt.z += pt.vz * dt;
-            pt.life -= dt * 2;
-            if (pt.life <= 0) particles.splice(i, 1);
-        }
-
-        // Спавн врагов
-        if (enemies.length < 3 && Math.random() < 0.005) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 400 + Math.random() * 300;
-            enemies.push({
-                x: player.x + Math.cos(angle) * dist,
-                y: (Math.random() - 0.5) * 100,
-                z: player.z + Math.sin(angle) * dist,
-                hp: 100,
-                speed: 30 + Math.random() * 20,
-            });
-        }
-
-        // Щит восстанавливается
-        if (player.shield < 100 && Math.random() < 0.02) {
-            player.shield = Math.min(100, player.shield + 1);
-            updateHUD();
-        }
-
-        // Смерть
-        if (player.shield <= 0) {
-            player.shield = 0;
-            statusEl.textContent = 'Корабль уничтожен! Нажмите R для рестарта';
-            mode = 'dead';
-        }
-
-        // Обновление индикатора скорости
-        speedEl.textContent = Math.round(player.speed);
-        speedFill.style.width = Math.min(100, (player.speed / MAX_SPEED) * 100) + '%';
-    }
-
-    // ============================================================
-    //                       СТРЕЛЬБА
-    // ============================================================
-    function shoot() {
-        const now = performance.now();
-        if (now - lastShot < 110) return;
-        lastShot = now;
-
-        // Пуля летит в направлении взгляда
-        const dirX = Math.sin(player.yaw) * Math.cos(player.pitch);
-        const dirY = -Math.sin(player.pitch);
-        const dirZ = Math.cos(player.yaw) * Math.cos(player.pitch);
-
-        const bulletSpeed = 900;
-        bullets.push({
-            x: player.x + dirX * 12,
-            y: player.y + dirY * 12,
-            z: player.z + dirZ * 12,
-            vx: dirX * bulletSpeed,
-            vy: dirY * bulletSpeed,
-            vz: dirZ * bulletSpeed,
-            life: 2,
+const STAR_N = 260, STAR_R = 1300;
+let stars = [];
+function initStars() {
+    stars = [];
+    for (let i = 0; i < STAR_N; i++) {
+        stars.push({
+            x: (Math.random() - 0.5) * 2 * STAR_R,
+            y: (Math.random() - 0.5) * 2 * STAR_R,
+            z: (Math.random() - 0.5) * 2 * STAR_R,
+            // палитра Спектрума: белых больше
+            c: ['255,255,255', '255,255,255', '255,255,255', '0,255,255', '255,255,0', '255,150,255'][Math.random() * 6 | 0],
+            b: 0.35 + Math.random() * 0.65,
         });
     }
+}
 
-    // ============================================================
-    //                       HUD
-    // ============================================================
-    function updateHUD() {
-        creditsEl.textContent = player.credits.toFixed(1);
-        fuelEl.textContent = player.fuel.toFixed(1);
-        shieldEl.textContent = Math.max(0, Math.round(player.shield));
-        systemEl.textContent = player.system;
+function loadSystem(i) {
+    curIdx = i;
+    const sys = systems[i];
+    const rnd = mulberry(0x1234 + i * 613);
+    const pr = 90 + rnd() * 70;
+    planet = {
+        pos: v3((rnd() - 0.5) * 500, (rnd() - 0.5) * 200, 800 + rnd() * 300),
+        r: pr,
+        fill: sys.color.fill, wire: sys.color.wire,
+    };
+    // станция на орбите планеты
+    const th = rnd() * TAU;
+    const sdir = norm(v3(Math.cos(th), 0.25 + rnd() * 0.3, Math.sin(th)));
+    station = { pos: add(planet.pos, mul(sdir, pr + 170)), ang: rnd() * TAU };
+    // игрок прибывает в 330 юнитах от станции, нос — на станцию
+    player.pos = add(station.pos, mul(sdir, 330));
+    player.speed = 0;
+    player.r = v3(1, 0, 0); player.u = v3(0, 1, 0); player.f = v3(0, 0, 1);
+    lookAt(station.pos);
+    enemies = []; bullets = []; ebullets = []; particles = [];
+    spawnT = 9;
+}
+
+// геометрия станции «Кориолис»: гранёная бочка + шлюз
+const ST_V = [], ST_E = [], ST_E_DOCK = [];
+(function () {
+    const R1 = 15, R2 = 21, L = 15;
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4;       ST_V.push([R1 * Math.cos(a), R1 * Math.sin(a),  L]); }
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + Math.PI / 8; ST_V.push([R2 * Math.cos(a), R2 * Math.sin(a), 0]); }
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4;       ST_V.push([R1 * Math.cos(a), R1 * Math.sin(a), -L]); }
+    for (let k = 0; k < 8; k++) {
+        const kf = k, kf2 = (k + 1) % 8, km = 8 + k, km2 = 8 + (k + 1) % 8, kb = 16 + k, kb2 = 16 + (k + 1) % 8;
+        ST_E.push([kf, kf2], [km, km2], [kb, kb2]);      // кольца
+        ST_E.push([kf, km], [kf2, km], [km, kb], [km, kb2]); // гранёные рёбра
+    }
+    const di = ST_V.length;
+    ST_V.push([-3.5, -3, L + 1], [3.5, -3, L + 1], [3.5, 3, L + 1], [-3.5, 3, L + 1]);
+    ST_E_DOCK.push([di, di + 1], [di + 1, di + 2], [di + 2, di + 3], [di + 3, di]);
+})();
+
+// перехватчик: нос, хвост, крылья, верх, низ
+const EN_V = [[0,0,11],[0,0,-8],[-10,0,-8],[10,0,-4],[0,4.5,-6],[0,-2.5,-6]];
+const EN_E = [[0,1],[0,2],[0,3],[0,4],[0,5],[1,2],[1,3],[1,4],[1,5],[2,4],[3,4],[2,5],[3,5]];
+
+// ============================================================
+//  ПРОЕКЦИЯ
+// ============================================================
+function project(p) { // мировая точка → экран
+    const d = sub(p, player.pos);
+    const cz = dot(d, player.f);
+    if (cz < 2) return null;
+    return {
+        x: VIEW_CX + dot(d, player.r) * FOV / cz,
+        y: VIEW_CY - dot(d, player.u) * FOV / cz,
+        z: cz,
+    };
+}
+function projectRel(rel) { // вектор в системе игрока → экран
+    const cz = dot(rel, player.f);
+    if (cz < 2) return null;
+    return {
+        x: VIEW_CX + dot(rel, player.r) * FOV / cz,
+        y: VIEW_CY - dot(rel, player.u) * FOV / cz,
+        z: cz,
+    };
+}
+function drawWire(center, r, u, f, verts, edges, color, lw) {
+    ctx.strokeStyle = color; ctx.lineWidth = lw || 1.3;
+    ctx.beginPath();
+    for (const [i, j] of edges) {
+        const a = verts[i], b = verts[j];
+        const wa = add(center, add(mul(r, a[0]), add(mul(u, a[1]), mul(f, a[2]))));
+        const wb = add(center, add(mul(r, b[0]), add(mul(u, b[1]), mul(f, b[2]))));
+        const pa = project(wa), pb = project(wb);
+        if (pa && pb) { ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); }
+    }
+    ctx.stroke();
+}
+
+// ============================================================
+//  СОСТОЯНИЕ ЦИКЛА / ВВОД
+// ============================================================
+let mode = 'flight';       // flight | dock | hyper | dead
+let keys = {};
+let mouseFire = false, touchFire = false, touchThrust = false;
+let shotCd = 0, spawnT = 9, hyperT = 0, hyperTarget = 0, flashA = 0;
+let msgText = '', msgT = 0, hintDock = '', planetCd = 0;
+
+const isDown = (...ks) => ks.some(k => keys[k]);
+
+function showMsg(t, dur) { msgText = t; msgT = dur || 4; }
+
+// ============================================================
+//  ОБНОВЛЕНИЕ
+// ============================================================
+function update(dt) {
+    // --- ориентация ---
+    if (isDown('w', 'ц', 'arrowup'))    rotPitch(PITCH_RATE * dt);
+    if (isDown('s', 'ы', 'arrowdown'))  rotPitch(-PITCH_RATE * dt);
+    if (isDown('a', 'ф', 'arrowleft'))  rotYaw(YAW_RATE * dt);
+    if (isDown('d', 'в', 'arrowright')) rotYaw(-YAW_RATE * dt);
+    if (isDown('q', 'й')) rotRoll(ROLL_RATE * dt);
+    if (isDown('e', 'у')) rotRoll(-ROLL_RATE * dt);
+
+    // --- тяга / торможение ---
+    const thrusting = isDown('j', 'о') || touchThrust;
+    if (thrusting) player.speed = Math.min(MAX_SPEED, player.speed + THRUST * dt);
+    else           player.speed = Math.max(0, player.speed - player.speed * 0.35 * dt);
+    if (isDown('x', 'ч')) player.speed = Math.max(0, player.speed - player.speed * 6 * dt);
+    setHum(thrusting);
+
+    // --- движение ---
+    player.pos = add(player.pos, mul(player.f, player.speed * dt));
+
+    // --- звёзды летят мимо (относительные координаты + заворот в куб) ---
+    const mv = mul(player.f, player.speed * dt);
+    for (const s of stars) {
+        s.x -= mv.x; s.y -= mv.y; s.z -= mv.z;
+        if (s.x < -STAR_R) s.x += 2 * STAR_R; else if (s.x > STAR_R) s.x -= 2 * STAR_R;
+        if (s.y < -STAR_R) s.y += 2 * STAR_R; else if (s.y > STAR_R) s.y -= 2 * STAR_R;
+        if (s.z < -STAR_R) s.z += 2 * STAR_R; else if (s.z > STAR_R) s.z -= 2 * STAR_R;
     }
 
-    // ============================================================
-    //                       ТОРГОВЛЯ
-    // ============================================================
-    function getPrice(good, systemName) {
-        const sys = systems.find(s => s.name === systemName) || systems[0];
-        const ecoFactor = 1 + Math.sin(sys.seed * 0.01) * 0.5;
-        return Math.max(1, Math.round(good.basePrice * ecoFactor * 10) / 10);
+    station.ang += 0.4 * dt;
+
+    // --- стрельба игрока (с перегревом лазера) ---
+    shotCd = Math.max(0, shotCd - dt);
+    player.laserHeat = Math.max(0, player.laserHeat - 0.4 * dt);
+    if (player.heatLock && player.laserHeat <= 0.35) player.heatLock = false;
+    if (mouseFire || touchFire || isDown(' ')) tryShoot();
+
+    // --- враги ---
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        const toP = sub(player.pos, e.pos), d = len(toP), dir = norm(toP);
+        let move;
+        if (d > 230) move = dir;
+        else if (d < 110) move = mul(dir, -1);
+        else move = norm(cross(dir, v3(0, 1, 0))); // кружат вокруг
+        e.pos = add(e.pos, mul(move, e.spd * dt));
+        e.flash = Math.max(0, e.flash - dt);
+        e.cd -= dt;
+        if (e.cd <= 0 && d < 360) {
+            e.cd = 1.2 + Math.random();
+            const lead = add(player.pos, mul(player.f, player.speed * 0.35));
+            const aim = norm(sub(lead, e.pos));
+            ebullets.push({ pos: add(e.pos, mul(aim, 14)), vel: mul(aim, EBULLET_SPEED), life: 3 });
+            sfxEnemyShot();
+        }
     }
 
-    function openTrade() {
-        mode = 'trade';
-        tradePanel.classList.add('show');
-        renderTrade();
-        updateHUD();
+    // --- пули игрока ---
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.pos = add(b.pos, mul(b.vel, dt));
+        b.life -= dt;
+        let dead = b.life <= 0;
+        for (let j = enemies.length - 1; j >= 0 && !dead; j--) {
+            const e = enemies[j];
+            if (len(sub(b.pos, e.pos)) < 14) {
+                e.hp -= 34; e.flash = 0.12; sfxHit();
+                if (e.hp <= 0) {
+                    explosion(e.pos, false);
+                    enemies.splice(j, 1);
+                    player.credits += KILL_BOUNTY;
+                    const oldRank = rankIdx();
+                    player.kills++;
+                    showMsg('ПИРАТ УНИЧТОЖЕН · +' + KILL_BOUNTY + ' CR' +
+                            (rankIdx() > oldRank ? ' · РЕЙТИНГ: ' + RANKS[rankIdx()] : ''));
+                }
+                dead = true;
+            }
+        }
+        if (dead) bullets.splice(i, 1);
     }
 
-    function closeTrade() {
+    // --- пули врагов ---
+    for (let i = ebullets.length - 1; i >= 0; i--) {
+        const b = ebullets[i];
+        b.pos = add(b.pos, mul(b.vel, dt));
+        b.life -= dt;
+        if (len(sub(b.pos, player.pos)) < 9) {
+            player.shield -= 9;
+            explosion(player.pos, false, 8);
+            sfxHit();
+            ebullets.splice(i, 1);
+            continue;
+        }
+        if (b.life <= 0) ebullets.splice(i, 1);
+    }
+
+    // --- частицы ---
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.pos = add(p.pos, mul(p.vel, dt));
+        p.vel = mul(p.vel, 1 - 0.7 * dt);
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // --- столкновение с планетой ---
+    planetCd = Math.max(0, planetCd - dt);
+    const pRel = sub(player.pos, planet.pos), pDist = len(pRel);
+    if (pDist < planet.r + 8) {
+        player.pos = add(planet.pos, mul(norm(pRel), planet.r + 9));
+        if (planetCd <= 0) {
+            planetCd = 0.6;
+            player.shield -= 15;
+            player.speed *= 0.25;
+            explosion(player.pos, false, 10);
+            sfxHit();
+            showMsg('СТОЛКНОВЕНИЕ С ПОВЕРХНОСТЬЮ!');
+        }
+    }
+    // мягкое отталкивание от станции
+    const sRel = sub(player.pos, station.pos), sDist = len(sRel);
+    if (sDist < 30) {
+        player.pos = add(station.pos, mul(norm(sRel), 31));
+        player.speed = 0;
+    }
+
+    // --- спавн пиратов ---
+    spawnT -= dt;
+    if (enemies.length < 3 && spawnT <= 0) {
+        spawnT = 7 + Math.random() * 6;
+        const th = Math.random() * TAU, d = 420 + Math.random() * 280;
+        enemies.push({
+            pos: add(player.pos, v3(Math.cos(th) * d, (Math.random() - 0.5) * 160, Math.sin(th) * d)),
+            hp: 100, spd: 70 + Math.random() * 55, cd: 1.5, flash: 0,
+        });
+        showMsg('ОБНАРУЖЕН ПИРАТСКИЙ КОРАБЛЬ!');
+        sfxAlert();
+    }
+
+    // --- медленная регенерация щита ---
+    player.shield = Math.min(100, player.shield + 2 * dt);
+
+    // --- подсказка стыковки ---
+    hintDock = '';
+    if (sDist < DOCK_RANGE) {
+        hintDock = player.speed <= 130 ? 'ENTER — СТЫКОВКА' : 'СНИЗЬТЕ СКОРОСТЬ ДЛЯ СТЫКОВКИ';
+    }
+
+    // --- гибель ---
+    if (player.shield <= 0) {
+        player.shield = 0;
+        explosion(player.pos, true);
+        sfxExpl(true);
+        setHum(false);
+        mode = 'dead';
+    }
+
+    if (msgT > 0) { msgT -= dt; if (msgT <= 0) msgText = ''; }
+}
+
+function rankIdx() {
+    let r = 0;
+    for (let i = 0; i < RANK_KILLS.length; i++) if (player.kills >= RANK_KILLS[i]) r = i;
+    return r;
+}
+
+function tryShoot() {
+    if (mode !== 'flight' || shotCd > 0 || player.heatLock) return;
+    shotCd = 0.24;
+    player.laserHeat = Math.min(1, player.laserHeat + 0.17);
+    if (player.laserHeat >= 1) player.heatLock = true;
+    bullets.push({
+        pos: add(player.pos, mul(player.f, 10)),
+        vel: mul(player.f, BULLET_SPEED + player.speed), // пуля наследует скорость корабля
+        life: 2.2,
+    });
+    sfxLaser();
+}
+
+function explosion(pos, big, n) {
+    n = n || (big ? 42 : 26);
+    const cols = ['#ffd800', '#ff9020', '#ff4040', '#ffffff'];
+    for (let i = 0; i < n; i++) {
+        const dir = norm(v3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5));
+        const sp = (big ? 60 : 30) + Math.random() * (big ? 200 : 130);
+        particles.push({
+            pos: v3(pos.x, pos.y, pos.z),
+            vel: mul(dir, sp),
+            life: 0.5 + Math.random() * 0.7,
+            c: cols[Math.random() * cols.length | 0],
+        });
+    }
+}
+
+// ============================================================
+//  ГИПЕРПРЫЖОК
+// ============================================================
+function startHyper() {
+    if (mode !== 'flight') return;
+    for (let k = 1; k <= systems.length; k++) {
+        const idx = (curIdx + k) % systems.length;
+        if (systems[idx].distance <= player.fuel) {
+            player.fuel -= systems[idx].distance;
+            hyperTarget = idx;
+            mode = 'hyper'; hyperT = 0;
+            enemies = []; bullets = []; ebullets = [];
+            setHum(false);
+            sfxHyper();
+            return;
+        }
+    }
+    showMsg('НЕТ ДОСТУПНЫХ СИСТЕМ — ЗАПРАВЬТЕСЬ НА СТАНЦИИ');
+}
+function updateHyper(dt) {
+    hyperT += dt / 1.15;
+    const mv = mul(player.f, (2500 + hyperT * 6000) * dt);
+    for (const s of stars) {
+        s.x -= mv.x; s.y -= mv.y; s.z -= mv.z;
+        if (s.z < -STAR_R) s.z += 2 * STAR_R;
+    }
+    if (hyperT >= 1) {
+        loadSystem(hyperTarget);
+        flashA = 0.85;
         mode = 'flight';
-        tradePanel.classList.remove('show');
+        showMsg('СИСТЕМА ' + systems[curIdx].name + ' · ТОПЛИВО ' + player.fuel.toFixed(1) + ' LY', 6);
     }
+}
 
-    function renderTrade() {
-        tradeSystem.textContent = player.system;
-        tradeCredits.textContent = player.credits.toFixed(1);
-        tradeCargo.textContent = player.cargoUsed + '/' + player.cargoMax;
+// ============================================================
+//  СТЫКОВКА / ТОРГОВЛЯ
+// ============================================================
+function tryDock() {
+    if (mode !== 'flight') return;
+    const d = len(sub(player.pos, station.pos));
+    if (d > DOCK_RANGE) { showMsg('СТЫКОВКА ВОЗМОЖНА ТОЛЬКО ВОЗЛЕ СТАНЦИИ'); return; }
+    if (player.speed > 130) { showMsg('СНИЗЬТЕ СКОРОСТЬ ДЛЯ СТЫКОВКИ'); return; }
+    mode = 'dock';
+    setHum(false);
+    sfxDock();
+    tradeEl.classList.add('show');
+    renderTrade();
+}
+function launch() {
+    mode = 'flight';
+    tradeEl.classList.remove('show');
+    const away = norm(sub(player.pos, station.pos));
+    player.pos = add(station.pos, mul(away, 320));
+    player.speed = 0;
+    lookAt(add(player.pos, away));
+    showMsg('ВЗЛЁТ ВЫПОЛНЕН · H — ГИПЕРПРЫЖОК', 6);
+}
+function priceOf(g) {
+    const s = systems[curIdx];
+    return Math.max(1, Math.round(g.base * (1 - 0.5 * s.econ * g.eco) * 10) / 10);
+}
+function renderTrade() {
+    tSys.textContent = systems[curIdx].name;
+    tCr.textContent = player.credits.toFixed(1) + ' CR';
+    tCargo.textContent = player.cargoUsed + '/' + player.cargoMax;
+    tFuel.textContent = player.fuel.toFixed(1) + ' LY';
 
-        goodsList.innerHTML = '';
-        for (const good of GOODS) {
-            const price = getPrice(good, player.system);
-            const owned = player.cargo[good.name] || 0;
+    goodsEl.innerHTML = '';
+    for (const g of GOODS) {
+        const p = priceOf(g);
+        const owned = player.cargo[g.name] || 0;
+        const row = document.createElement('div');
+        row.className = 'grow';
 
-            const row = document.createElement('div');
-            row.className = 'good-row';
-            row.innerHTML = `
-                <span class="name">${good.name}</span>
-                <span class="price">${price.toFixed(1)}₡</span>
-                <span class="qty">${owned} шт</span>
-            `;
+        const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = g.name;
+        const pr = document.createElement('span');
+        pr.className = 'pr' + (p < g.base ? ' low' : p > g.base ? ' high' : '');
+        pr.textContent = p.toFixed(1) + ' CR';
+        const qt = document.createElement('span'); qt.className = 'qt'; qt.textContent = owned + ' шт';
 
-            const buyBtn = document.createElement('button');
-            buyBtn.textContent = 'КУПИТЬ';
-            buyBtn.disabled = player.credits < price || player.cargoUsed >= player.cargoMax;
-            buyBtn.onclick = () => {
-                if (player.credits >= price && player.cargoUsed < player.cargoMax) {
-                    player.credits -= price;
-                    player.cargo[good.name] = (player.cargo[good.name] || 0) + 1;
-                    player.cargoUsed++;
-                    renderTrade();
-                    updateHUD();
-                }
-            };
-
-            const sellBtn = document.createElement('button');
-            sellBtn.textContent = 'ПРОДАТЬ';
-            sellBtn.disabled = owned === 0;
-            sellBtn.onclick = () => {
-                if (player.cargo[good.name] > 0) {
-                    player.credits += price * 0.8;
-                    player.cargo[good.name]--;
-                    if (player.cargo[good.name] === 0) delete player.cargo[good.name];
-                    player.cargoUsed--;
-                    renderTrade();
-                    updateHUD();
-                }
-            };
-
-            const btnWrap = document.createElement('div');
-            btnWrap.style.display = 'flex';
-            btnWrap.style.gap = '4px';
-            btnWrap.appendChild(buyBtn);
-            btnWrap.appendChild(sellBtn);
-            row.appendChild(btnWrap);
-
-            goodsList.appendChild(row);
-        }
-    }
-
-    // ============================================================
-    //                       ГИПЕРПРЫЖОК
-    // ============================================================
-    function hyperspace() {
-        if (player.fuel < 1) {
-            statusEl.textContent = 'Недостаточно топлива!';
-            return;
-        }
-
-        const sysIndex = systems.findIndex(s => s.name === player.system);
-        const nextIndex = (sysIndex + 1) % systems.length;
-        const nextSys = systems[nextIndex];
-
-        if (nextSys.distance > player.fuel) {
-            statusEl.textContent = `Нужно ${nextSys.distance.toFixed(1)} топлива, есть ${player.fuel.toFixed(1)}`;
-            return;
-        }
-
-        player.fuel -= nextSys.distance;
-        player.system = nextSys.name;
-
-        enemies = [];
-        bullets = [];
-        particles = [];
-        initPlanets();
-
-        statusEl.textContent = `Прыжок в ${nextSys.name} · Топливо: ${player.fuel.toFixed(1)}`;
-        updateHUD();
-    }
-
-    // ============================================================
-    //                       СОБЫТИЯ
-    // ============================================================
-    document.addEventListener('keydown', e => {
-        // Нормализуем: храним и оригинальный ключ, и нижний регистр
-        keys[e.key] = true;
-        keys[e.key.toLowerCase()] = true;
-
-        // Enter / Space — открыть торговлю
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            if (mode === 'flight') openTrade();
-            return;
-        }
-
-        // H — гиперпрыжок
-        if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
-            if (mode === 'flight') hyperspace();
-            return;
-        }
-
-        // R — ремонт / рестарт после смерти
-        if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
-            if (mode === 'dead') {
-                player.shield = 100;
-                player.speed = 0;
-                mode = 'flight';
-                statusEl.textContent = 'Корабль восстановлен · W/S — тангаж · A/D — рыскание';
-            } else {
-                player.shield = 100;
-                statusEl.textContent = 'Щит восстановлен';
+        const buy = document.createElement('button');
+        buy.className = 'tb'; buy.textContent = 'КУПИТЬ';
+        buy.disabled = player.credits < p || player.cargoUsed >= player.cargoMax;
+        buy.onclick = () => {
+            if (player.credits >= p && player.cargoUsed < player.cargoMax) {
+                player.credits -= p;
+                player.cargo[g.name] = owned + 1;
+                player.cargoUsed++;
+                renderTrade();
             }
-            updateHUD();
-            return;
-        }
-
-        // Escape — закрыть торговлю
-        if (e.key === 'Escape') {
-            if (mode === 'trade') closeTrade();
-            return;
-        }
-
-        // Пробел — тормоз (обнуляем скорость)
-        if (e.key === 'Shift') {
-            player.speed *= 0.5;
-        }
-    });
-
-    document.addEventListener('keyup', e => {
-        keys[e.key] = false;
-        keys[e.key.toLowerCase()] = false;
-    });
-
-    // Сбрасываем все клавиши при потере фокуса — иначе «залипают»
-    window.addEventListener('blur', () => {
-        keys = {};
-        mouseDown = false;
-        stopAutoFire();
-    });
-
-    // ------------------------------------------------------------
-    // ЛЕВАЯ КНОПКА МЫШИ — ОГОНЬ
-    // ------------------------------------------------------------
-    // При нажатии — стреляем сразу и запускаем авто-огонь, пока кнопка
-    // удерживается. Отпускание — останавливаем авто-огонь.
-    canvas.addEventListener('mousedown', e => {
-        if (e.button !== 0) return;               // только левая
-        if (mode !== 'flight') return;
-        e.preventDefault();
-        mouseDown = true;
-        shoot();
-        startAutoFire();
-    });
-
-    // Отпускание — на документе, чтобы поймать и вне canvas
-    document.addEventListener('mouseup', e => {
-        if (e.button !== 0) return;
-        mouseDown = false;
-        stopAutoFire();
-    });
-
-    // Защита от «залипания» при уходе курсора за пределы окна
-    document.addEventListener('mouseleave', () => {
-        mouseDown = false;
-        stopAutoFire();
-    });
-
-    // Запрет контекстного меню — иначе ПКМ мешает игре
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-    function startAutoFire() {
-        stopAutoFire();
-        autoFireTimer = setInterval(() => {
-            if (!mouseDown || mode !== 'flight') {
-                stopAutoFire();
-                return;
-            }
-            shoot();
-        }, 120);
-    }
-
-    function stopAutoFire() {
-        if (autoFireTimer) {
-            clearInterval(autoFireTimer);
-            autoFireTimer = null;
-        }
-    }
-
-    // ------------------------------------------------------------
-    // ТАЧ-УПРАВЛЕНИЕ (мобильные)
-    // ------------------------------------------------------------
-    // Свайп одной рукой — поворот, тап — выстрел.
-    // Пальцы не мешают: тап = короткий свайп < 200 мс.
-    canvas.addEventListener('touchstart', e => {
-        if (mode !== 'flight') return;
-        if (e.touches.length === 1) {
-            const t = e.touches[0];
-            touchStart = {
-                x: t.clientX,
-                y: t.clientY,
-                time: Date.now(),
-                moved: false,
-            };
-        }
-    }, { passive: true });
-
-    canvas.addEventListener('touchmove', e => {
-        if (mode !== 'flight') return;
-        if (touchStart && e.touches.length === 1) {
-            const t = e.touches[0];
-            const dx = t.clientX - touchStart.x;
-            const dy = t.clientY - touchStart.y;
-
-            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) touchStart.moved = true;
-
-            // Горизонтальный свайп — рыскание (A/D)
-            player.yaw -= dx * 0.006;
-            // Вертикальный свайп — тангаж (W/S)
-            player.pitch -= dy * 0.006;
-            player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch));
-
-            // Обновляем опорную точку, чтобы движение было плавным
-            touchStart.x = t.clientX;
-            touchStart.y = t.clientY;
-        }
-    }, { passive: true });
-
-    canvas.addEventListener('touchend', e => {
-        if (!touchStart) return;
-        const dt = Date.now() - touchStart.time;
-        const wasTap = !touchStart.moved && dt < 200;
-        touchStart = null;
-
-        if (wasTap && mode === 'flight') {
-            shoot();
-        }
-    }, { passive: true });
-
-    // ------------------------------------------------------------
-    // КНОПКА ТОРГОВЛИ
-    // ------------------------------------------------------------
-    document.getElementById('btnLaunch').addEventListener('click', () => {
-        closeTrade();
-        statusEl.textContent = `Взлёт из ${player.system} · H — гиперпрыжок`;
-    });
-
-    // ------------------------------------------------------------
-    // ПОЛНЫЙ ЭКРАН
-    // ------------------------------------------------------------
-    const fsBtn = document.getElementById('btnFullscreen');
-    const fsTarget = document.documentElement;
-
-    function isFullscreen() {
-        return document.fullscreenElement ||
-               document.webkitFullscreenElement ||
-               document.msFullscreenElement;
-    }
-
-    function toggleFullscreen() {
-        if (!isFullscreen()) {
-            const req = fsTarget.requestFullscreen ||
-                        fsTarget.webkitRequestFullscreen ||
-                        fsTarget.msRequestFullscreen;
-            if (req) {
-                const p = req.call(fsTarget);
-                if (p && p.catch) p.catch(() => {});
-            }
-        } else {
-            const exit = document.exitFullscreen ||
-                         document.webkitExitFullscreen ||
-                         document.msExitFullscreen;
-            if (exit) {
-                const p = exit.call(document);
-                if (p && p.catch) p.catch(() => {});
-            }
-        }
-    }
-
-    fsBtn.addEventListener('click', toggleFullscreen);
-    fsBtn.addEventListener('pointerdown', e => e.stopPropagation());
-
-    ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
-        .forEach(evt => document.addEventListener(evt, () => {
-            fsBtn.textContent = isFullscreen() ? '⤡' : '⛶';
-        }));
-
-    // Автовосстановление полного экрана из меню
-    (function autoFullscreenFromMenu() {
-        const KEY = 'arcade_fullscreen_pref';
-        let pref = '0';
-        try { pref = localStorage.getItem(KEY) || '0'; } catch (e) {}
-        if (pref !== '1') return;
-
-        function tryFs() {
-            if (isFullscreen()) return;
-            const req = fsTarget.requestFullscreen ||
-                        fsTarget.webkitRequestFullscreen ||
-                        fsTarget.msRequestFullscreen;
-            if (req) {
-                const p = req.call(fsTarget);
-                if (p && p.catch) p.catch(() => {});
-            }
-        }
-        const once = () => {
-            tryFs();
-            document.removeEventListener('pointerdown', once);
-            document.removeEventListener('keydown', once);
         };
-        document.addEventListener('pointerdown', once, { once: true });
-        document.addEventListener('keydown', once, { once: true });
-        tryFs();
-    })();
-
-    // ============================================================
-    //                       РЕСАЙЗ CANVAS
-    // ============================================================
-    function resizeCanvas() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        const scale = Math.min(w / CANVAS_W, h / CANVAS_H);
-        canvas.width = CANVAS_W;
-        canvas.height = CANVAS_H;
-        canvas.style.width = (CANVAS_W * scale) + 'px';
-        canvas.style.height = (CANVAS_H * scale) + 'px';
+        const sell = document.createElement('button');
+        sell.className = 'tb'; sell.textContent = 'ПРОДАТЬ';
+        sell.disabled = owned === 0;
+        sell.onclick = () => {
+            if (player.cargo[g.name] > 0) {
+                player.credits += p;
+                player.cargo[g.name]--;
+                if (player.cargo[g.name] === 0) delete player.cargo[g.name];
+                player.cargoUsed--;
+                renderTrade();
+            }
+        };
+        row.append(nm, pr, qt, buy, sell);
+        goodsEl.appendChild(row);
     }
 
-    window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('orientationchange', () => {
-        setTimeout(resizeCanvas, 200);
-    });
+    document.getElementById('fuel1').disabled = player.fuel >= FUEL_MAX || player.credits < FUEL_COST;
+    document.getElementById('fuelFull').disabled =
+        player.fuel >= FUEL_MAX || player.credits < Math.ceil((FUEL_MAX - player.fuel) * FUEL_COST);
+}
+document.getElementById('fuel1').onclick = () => {
+    if (player.fuel < FUEL_MAX && player.credits >= FUEL_COST) {
+        player.credits -= FUEL_COST;
+        player.fuel = Math.min(FUEL_MAX, player.fuel + 1);
+        renderTrade();
+    }
+};
+document.getElementById('fuelFull').onclick = () => {
+    const need = Math.ceil((FUEL_MAX - player.fuel) * FUEL_COST);
+    if (need > 0 && player.credits >= need) {
+        player.credits -= need;
+        player.fuel = FUEL_MAX;
+        renderTrade();
+    }
+};
+document.getElementById('btnLaunch').onclick = launch;
 
-    // ============================================================
-    //                       СТАРТ
-    // ============================================================
-    initStars();
-    initPlanets();
-    resizeCanvas();
-    updateHUD();
+function respawn() {
+    player.cargo = {}; player.cargoUsed = 0;
+    player.shield = 100; player.speed = 0;
+    loadSystem(curIdx);
+    mode = 'flight';
+    showMsg('СПАСАТЕЛЬНАЯ КАПСУЛА ДОСТАВЛЕНА К СТАНЦИИ · ГРУЗ ПОТЕРЯН', 6);
+}
 
-    // Первый статус
-    statusEl.textContent = 'W/S — тангаж · A/D — рыскание · J — тяга · ЛКМ — огонь · H — прыжок';
-
-    // Показываем рекордный шрифт — статус обновляем раз в 4 секунды,
-    // если ничего важного не произошло
-    setInterval(() => {
-        if (mode === 'flight' && statusEl.textContent === 'W/S — тангаж · A/D — рыскание · J — тяга · ЛКМ — огонь · H — прыжок') {
-            return;
+// ============================================================
+//  РЕНДЕР
+// ============================================================
+function renderStars() {
+    for (const s of stars) {
+        const p = projectRel(v3(s.x, s.y, s.z));
+        if (!p) continue;
+        const a = Math.min(1, s.b * (1.1 - p.z / (2 * STAR_R)));
+        if (a <= 0.04) continue;
+        ctx.fillStyle = 'rgba(' + s.c + ',' + a.toFixed(2) + ')';
+        const sz = p.z < 350 ? 2 : 1;
+        ctx.fillRect(p.x, p.y, sz, sz);
+    }
+}
+function renderHyperStars() {
+    const streak = 90 + hyperT * 620;
+    ctx.strokeStyle = 'rgba(180,255,255,0.8)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const s of stars) {
+        const p1 = projectRel(v3(s.x, s.y, s.z));
+        if (!p1) continue;
+        const p2 = projectRel(add(v3(s.x, s.y, s.z), mul(player.f, streak)));
+        if (p2) { ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); }
+    }
+    ctx.stroke();
+}
+function renderPlanet() {
+    const c = project(planet.pos);
+    if (!c) return;
+    const sr = planet.r * FOV / c.z;
+    if (sr < 2) return;
+    ctx.fillStyle = planet.fill;
+    ctx.beginPath(); ctx.arc(c.x, c.y, sr, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.arc(c.x, c.y, sr, -Math.PI / 2, Math.PI / 2); ctx.fill();
+    ctx.strokeStyle = planet.wire; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(c.x, c.y, sr, 0, TAU); ctx.stroke();
+    const viewDir = norm(sub(player.pos, planet.pos));
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    for (let k = -2; k <= 2; k++) {
+        const lat = k * Math.PI / 6;
+        const rr = planet.r * Math.cos(lat), hh = planet.r * Math.sin(lat);
+        let started = false;
+        for (let a = 0; a <= TAU + 0.001; a += TAU / 16) {
+            const w = add(planet.pos, v3(rr * Math.cos(a), hh, rr * Math.sin(a)));
+            const visible = dot(norm(sub(w, planet.pos)), viewDir) > 0;
+            const s = visible ? project(w) : null;
+            if (s) {
+                if (started) ctx.lineTo(s.x, s.y); else { ctx.moveTo(s.x, s.y); started = true; }
+            } else started = false;
         }
-        if (mode === 'flight' && !statusEl.dataset.keep) {
-            // Ничего не делаем — статус остаётся, пока игрок не сделает что-то важное
-        }
-    }, 4000);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+}
+function renderStation() {
+    const A = norm(sub(station.pos, planet.pos));
+    let h1 = cross(A, v3(0, 1, 0));
+    if (len(h1) < 0.01) h1 = v3(1, 0, 0); else h1 = norm(h1);
+    const h2 = cross(A, h1);
+    const c0 = Math.cos(station.ang), s0 = Math.sin(station.ang);
+    const r = add(mul(h1, c0), mul(h2, s0));
+    const u = add(mul(h1, -s0), mul(h2, c0));
+    drawWire(station.pos, r, u, A, ST_V, ST_E, '#00d4ff', 1.2);
+    drawWire(station.pos, r, u, A, ST_V, ST_E_DOCK, '#ffd800', 1.4);
+}
+function renderEnemies() {
+    for (const e of enemies) {
+        const dir = norm(sub(player.pos, e.pos));
+        const fe = dir;
+        let re = cross(v3(0, 1, 0), fe);
+        if (len(re) < 0.01) re = v3(1, 0, 0); else re = norm(re);
+        const ue = cross(fe, re);
+        drawWire(e.pos, re, ue, fe, EN_V, EN_E, e.flash > 0 ? '#ffffff' : '#ff40c0', 1.4);
+    }
+}
+function renderBullets() {
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#00ffff';
+    ctx.beginPath();
+    for (const b of bullets) {
+        const p1 = project(b.pos), p2 = project(sub(b.pos, mul(b.vel, 0.025)));
+        if (p1 && p2) { ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); }
+    }
+    ctx.stroke();
+    ctx.strokeStyle = '#ff4040';
+    ctx.beginPath();
+    for (const b of ebullets) {
+        const p1 = project(b.pos), p2 = project(sub(b.pos, mul(b.vel, 0.025)));
+        if (p1 && p2) { ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); }
+    }
+    ctx.stroke();
+}
+function renderParticles() {
+    for (const p of particles) {
+        const s = project(p.pos);
+        if (!s) continue;
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+        ctx.fillStyle = p.c;
+        ctx.fillRect(s.x - 1.5, s.y - 1.5, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+}
+function renderCrosshair() {
+    const x = VIEW_CX, y = VIEW_CY;
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x - 14, y); ctx.lineTo(x - 5, y);
+    ctx.moveTo(x + 5, y);  ctx.lineTo(x + 14, y);
+    ctx.moveTo(x, y - 14); ctx.lineTo(x, y - 5);
+    ctx.moveTo(x, y + 5);  ctx.lineTo(x, y + 14);
+    ctx.stroke();
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillRect(x - 1, y - 1, 2, 2);
+}
 
+// ---------- приборная панель ----------
+function bar(x, y, w, h, frac, color, label, val) {
+    ctx.fillStyle = '#ffd800';
+    ctx.fillText(label, x, y + 9);
+    ctx.strokeStyle = '#ffd800'; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 74.5, y + 0.5, w, h);
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 75, y + 1, Math.max(0, (w - 1) * Math.min(1, Math.max(0, frac))), h - 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(val, x + 74 + w + 6, y + 9);
+}
+function renderHUD() {
+    const Y = HUD_Y;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, Y, W, H - Y);
+    ctx.strokeStyle = '#ffd800'; ctx.lineWidth = 2;
+    ctx.strokeRect(2.5, Y + 2.5, W - 5, H - Y - 5);
+
+    ctx.font = 'bold 12px "Courier New", monospace';
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    const msg = hintDock || msgText;
+    if (msg) ctx.fillText(msg, W / 2, Y + 18);
+
+    ctx.textAlign = 'left';
+    const rows = [
+        ['НАЛИЧНЫЕ', player.credits.toFixed(1) + ' CR'],
+        ['ТРЮМ', player.cargoUsed + '/' + player.cargoMax],
+        ['СИСТЕМА', systems[curIdx].name],
+        ['РЕЙТИНГ', RANKS[rankIdx()]],
+    ];
+    for (let i = 0; i < rows.length; i++) {
+        const y = Y + 38 + i * 15;
+        ctx.fillStyle = '#ffd800'; ctx.fillText(rows[i][0], 12, y);
+        ctx.fillStyle = '#fff';     ctx.fillText(rows[i][1], 112, y);
+    }
+
+    const ccx = 224, ccy = Y + 60;
+    ctx.strokeStyle = '#ffd800'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(ccx - 26, ccy - 26, 52, 52);
+    ctx.fillStyle = '#8a7a30';
+    ctx.font = 'bold 9px "Courier New", monospace';
+    ctx.fillText('КОМПАС', ccx - 22, ccy - 30);
+    const rel = sub(station.pos, player.pos), d = len(rel) || 1;
+    let px = dot(rel, player.r) / d * 22, py = -dot(rel, player.u) / d * 22;
+    const pl = Math.hypot(px, py);
+    if (pl > 22) { px = px / pl * 22; py = py / pl * 22; }
+    const dockable = d < DOCK_RANGE;
+    ctx.fillStyle = dockable ? '#ffd800' : (dot(rel, player.f) > 0 ? '#40ff40' : '#ff4040');
+    ctx.fillRect(ccx + px - 2, ccy + py - 2, 4, 4);
+
+    ctx.font = 'bold 12px "Courier New", monospace';
+    ctx.fillStyle = '#ffd800';
+    ctx.fillText('ЛАЗЕР', 266, ccy - 14);
+    ctx.strokeStyle = '#ffd800'; ctx.lineWidth = 1;
+    ctx.strokeRect(266.5, ccy - 8.5, 88, 10);
+    const laserCol = player.heatLock
+        ? ((performance.now() / 180 | 0) % 2 ? '#ff4040' : '#551111')
+        : '#ff40c0';
+    ctx.fillStyle = laserCol;
+    ctx.fillRect(267, ccy - 8, 87 * player.laserHeat, 9);
+    if (player.heatLock) {
+        ctx.font = 'bold 9px "Courier New", monospace';
+        ctx.fillStyle = '#ff4040';
+        ctx.fillText('ПЕРЕГРЕВ', 266, ccy + 16);
+        ctx.font = 'bold 12px "Courier New", monospace';
+    }
+
+    bar(386, Y + 28, 120, 10, player.shield / 100, player.shield < 30 ? '#ff4040' : '#00d4ff', 'ЩИТ', Math.round(player.shield) + '');
+    bar(386, Y + 48, 120, 10, player.fuel / FUEL_MAX, '#ffd800', 'ТОПЛИВО', player.fuel.toFixed(1));
+    bar(386, Y + 68, 120, 10, player.speed / MAX_SPEED, '#40ff40', 'СКОРОСТЬ', Math.round(player.speed) + '');
+}
+function renderDead() {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, W, HUD_Y);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd800';
+    ctx.font = 'bold 30px "Courier New", monospace';
+    ctx.fillText('ПИЛОТ ПОГИБ', W / 2, 165);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px "Courier New", monospace';
+    ctx.fillText('ГРУЗ ПОТЕРЯН · R — НОВАЯ ПОПЫТКА', W / 2, 200);
+    ctx.textAlign = 'left';
+}
+
+function render() {
+    // Применяем масштаб: рисуем в виртуальных 640×480,
+    // canvas растянет картинку на весь экран.
+    ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    if (mode === 'hyper') renderHyperStars(); else renderStars();
+    renderPlanet();
+    renderStation();
+    renderEnemies();
+    renderBullets();
+    renderParticles();
+    if (mode === 'flight') renderCrosshair();
+    renderHUD();
+    if (mode === 'dead') renderDead();
+    if (flashA > 0) {
+        ctx.fillStyle = 'rgba(255,255,255,' + flashA.toFixed(2) + ')';
+        ctx.fillRect(0, 0, W, H);
+    }
+}
+
+// ============================================================
+//  ЦИКЛ
+// ============================================================
+let lastTime = 0;
+function loop(t) {
+    if (!lastTime) lastTime = t;
+    const dt = Math.min((t - lastTime) / 1000, 0.05);
+    lastTime = t;
+
+    if (mode === 'flight') update(dt);
+    else if (mode === 'hyper') updateHyper(dt);
+    else if (mode === 'dead' && msgT > 0) msgT -= dt;
+
+    flashA = Math.max(0, flashA - dt * 1.8);
+    render();
     requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  ВВОД: КЛАВИАТУРА
+// ============================================================
+document.addEventListener('keydown', e => {
+    audio();
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+
+    if (k === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
+
+    if (e.key === 'Enter') {
+        if (mode === 'flight') tryDock();
+        else if (mode === 'dock') launch();
+        return;
+    }
+    if (e.key === 'Escape' && mode === 'dock') { launch(); return; }
+
+    if (k === 'h' || k === 'р') { startHyper(); return; }
+
+    if (k === 'r' || k === 'к') {
+        if (mode === 'dead') respawn();
+        return;
+    }
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('blur', () => {
+    keys = {}; mouseFire = false; touchFire = false; touchThrust = false; setHum(false);
+});
+
+// ============================================================
+//  ВВОД: МЫШЬ
+// ============================================================
+cv.addEventListener('mousedown', e => {
+    if (e.button !== 0 || mode !== 'flight') return;
+    e.preventDefault();
+    audio();
+    mouseFire = true;
+    tryShoot();
+});
+document.addEventListener('mouseup', e => { if (e.button === 0) mouseFire = false; });
+document.addEventListener('mouseleave', () => { mouseFire = false; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+
+// ============================================================
+//  ВВОД: ТАЧ
+// ============================================================
+let touchStart = null;
+cv.addEventListener('touchstart', e => {
+    if (mode !== 'flight' || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY, time: Date.now(), moved: false };
+}, { passive: true });
+cv.addEventListener('touchmove', e => {
+    if (mode !== 'flight' || !touchStart || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) touchStart.moved = true;
+    rotYaw(-dx * 0.006);
+    rotPitch(-dy * 0.006);
+    touchStart.x = t.clientX; touchStart.y = t.clientY;
+}, { passive: true });
+cv.addEventListener('touchend', () => {
+    if (!touchStart) return;
+    const wasTap = !touchStart.moved && Date.now() - touchStart.time < 220;
+    touchStart = null;
+    if (wasTap && mode === 'flight') { audio(); tryShoot(); }
+}, { passive: true });
+window.addEventListener('touchstart', () => { tcEl.style.display = 'flex'; }, { once: true });
+
+function holdBtn(el, on, off) {
+    el.addEventListener('pointerdown', e => {
+        e.preventDefault(); audio();
+        el.setPointerCapture(e.pointerId);
+        on();
+    });
+    const stop = () => off();
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+}
+holdBtn(document.getElementById('tFire'), () => { touchFire = true; tryShoot(); }, () => { touchFire = false; });
+holdBtn(document.getElementById('tThrust'), () => { touchThrust = true; }, () => { touchThrust = false; });
+document.getElementById('tJump').addEventListener('click', startHyper);
+document.getElementById('tDock').addEventListener('click', tryDock);
+
+// ============================================================
+//  ПОЛНЫЙ ЭКРАН
+// ============================================================
+const fsBtn = document.getElementById('fsBtn');
+const fsTarget = document.documentElement;
+function isFullscreen() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+}
+function toggleFullscreen() {
+    if (!isFullscreen()) {
+        const req = fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen || fsTarget.msRequestFullscreen;
+        if (req) { const p = req.call(fsTarget); if (p && p.catch) p.catch(() => {}); }
+    } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (exit) { const p = exit.call(document); if (p && p.catch) p.catch(() => {}); }
+    }
+}
+fsBtn.addEventListener('click', toggleFullscreen);
+['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
+    .forEach(ev => document.addEventListener(ev, () => {
+        fsBtn.textContent = isFullscreen() ? 'ОБЫЧН' : 'ЭКР';
+    }));
+
+// ============================================================
+//  РЕСАЙЗ — canvas всегда во весь экран
+// ============================================================
+let scaleX = 1, scaleY = 1;
+
+function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const cw = window.innerWidth;
+    const ch = window.innerHeight;
+
+    // Физический размер canvas = размер окна × DPR
+    cv.width  = Math.round(cw * dpr);
+    cv.height = Math.round(ch * dpr);
+
+    // Виртуальная система координат — 640×480.
+    // scaleX и scaleY могут различаться — картинка растянется на весь экран.
+    scaleX = cv.width  / W;
+    scaleY = cv.height / H;
+
+    // CSS-размер canvas — ровно по окну
+    cv.style.width  = cw + 'px';
+    cv.style.height = ch + 'px';
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+
+// ============================================================
+//  СТАРТ
+// ============================================================
+initStars();
+loadSystem(0);
+resize();
+showMsg('J — ТЯГА · ЛЕТЯЙТЕ К СТАНЦИИ (КОМПАС) · ENTER — СТЫКОВКА', 9);
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
