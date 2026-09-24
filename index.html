@@ -133,13 +133,34 @@
             letter-spacing: 2px;
             z-index: 2;
         }
+        
+        /* Декоративная картинка справа */
+        .side-art {
+            position: absolute;
+            right: clamp(0px, 10vw, 200px);
+            top: 50%;
+            transform: translateY(-50%);
+            height: min(70vh, 520px);
+            width: auto;
+            opacity: 0.5;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            filter: drop-shadow(0 0 24px rgba(0, 255, 255, 0.5));
+            z-index: 1;
+        }
+
+        /* На узких экранах прячем, чтобы не мешала */
+        @media (max-width: 700px) {
+            .side-art { display: none; }
+        }
     </style>
 </head>
 <body>
 
 <div class="menu-wrapper">
     <h1>ARCADE</h1>
-    <div class="subtitle">NEON EDITION 0.2.5</div>
+    <div class="subtitle">NEON EDITION 0.2.7</div>
 
     <div class="menu-buttons">
     
@@ -171,6 +192,9 @@
     </div>
 
     <div class="footer">ВЫБЕРИ ИГРУ</div>
+    
+    <!-- >>> ДОБАВЛЕНО: декоративная картинка справа -->
+    <img src="mg/res/123.png" alt="" class="side-art">
 </div>
 
 </body>
