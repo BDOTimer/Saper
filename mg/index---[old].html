@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Arcade Neon — Меню</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a14;
+            font-family: 'Courier New', monospace;
+        }
+
+        .menu-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            gap: clamp(20px, 5vh, 40px);
+            padding: 20px;
+            position: relative;
+        }
+
+        .menu-wrapper::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
+            -webkit-mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
+        }
+
+        h1 {
+            color: #0ff;
+            font-size: clamp(28px, 9vw, 56px);
+            letter-spacing: clamp(3px, 1.5vw, 10px);
+            text-shadow:
+                0 0 10px #0ff,
+                0 0 30px #0ff,
+                0 0 60px rgba(0, 255, 255, 0.5);
+            text-align: center;
+            z-index: 2;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.75; }
+        }
+
+        .subtitle {
+            color: #fff;
+            opacity: 0.5;
+            font-size: clamp(11px, 3vw, 15px);
+            letter-spacing: 4px;
+            z-index: 2;
+            margin-top: -10px;
+        }
+
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(15px, 3vh, 25px);
+            width: min(340px, 82vw);
+            z-index: 2;
+        }
+
+        .menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: clamp(15px, 3.5vh, 22px) clamp(20px, 5vw, 30px);
+            background: rgba(0, 255, 255, 0.08);
+            border: 2px solid #0ff;
+            color: #0ff;
+            font-family: inherit;
+            font-size: clamp(16px, 4.5vw, 22px);
+            letter-spacing: 3px;
+            text-decoration: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+
+        .menu-btn .num {
+            color: #fff;
+            opacity: 0.6;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+
+        .menu-btn .arrow {
+            transition: transform 0.2s ease;
+        }
+
+        .menu-btn:hover,
+        .menu-btn:active {
+            background: rgba(0, 255, 255, 0.25);
+            color: #fff;
+            box-shadow:
+                0 0 25px rgba(0, 255, 255, 0.6),
+                inset 0 0 20px rgba(0, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .menu-btn:hover .arrow {
+            transform: translateX(6px);
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 15px;
+            color: #0ff;
+            opacity: 0.35;
+            font-size: clamp(10px, 2.5vw, 12px);
+            letter-spacing: 2px;
+            z-index: 2;
+        }
+
+        /* Кнопка полного экрана */
+        .fs-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 8px 14px;
+            font-family: inherit;
+            font-size: clamp(12px, 3vw, 15px);
+            letter-spacing: 1px;
+            background: rgba(0, 255, 255, 0.15);
+            color: #0ff;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 25;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+            user-select: none;
+            -webkit-user-select: none;
+            transition: all 0.15s ease;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fs-btn:active {
+            background: rgba(0, 255, 255, 0.4);
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+<button type="button" class="fs-btn" id="btnFullscreen">
+    <span id="fsIcon">⛶</span><span id="fsLabel">На весь экран</span>
+</button>
+
+<div class="menu-wrapper">
+    <h1>ARCADE</h1>
+    <div class="subtitle">NEON EDITION</div>
+
+    <div class="menu-buttons">
+        <a href="pong.html" class="menu-btn" data-game="pong">
+            <span><span class="num">01</span>PONG</span>
+            <span class="arrow">▶</span>
+        </a>
+        <a href="tetris.html" class="menu-btn" data-game="tetris">
+            <span><span class="num">02</span>TETRIS</span>
+            <span class="arrow">▶</span>
+        </a>
+    </div>
+
+    <div class="footer">ВЫБЕРИ ИГРУ</div>
+</div>
+
+<script>
+    const fsBtn = document.getElementById('btnFullscreen');
+    const fsIcon = document.getElementById('fsIcon');
+    const fsLabel = document.getElementById('fsLabel');
+    const fsTarget = document.documentElement;
+
+    const STORAGE_KEY = 'arcade_fullscreen_pref';
+
+    function isFullscreen() {
+        return document.fullscreenElement ||
+               document.webkitFullscreenElement ||
+               document.msFullscreenElement;
+    }
+
+    function updateFsUI() {
+        if (isFullscreen()) {
+            fsIcon.textContent = '⤡';
+            fsLabel.textContent = 'Выйти';
+        } else {
+            fsIcon.textContent = '⛶';
+            fsLabel.textContent = 'На весь экран';
+        }
+    }
+
+    function toggleFullscreen() {
+        if (!isFullscreen()) {
+            const req = fsTarget.requestFullscreen ||
+                        fsTarget.webkitRequestFullscreen ||
+                        fsTarget.msRequestFullscreen;
+            if (req) {
+                const p = req.call(fsTarget);
+                if (p && p.catch) p.catch(() => {});
+            }
+        } else {
+            const exit = document.exitFullscreen ||
+                         document.webkitExitFullscreen ||
+                         document.msExitFullscreen;
+            if (exit) {
+                const p = exit.call(document);
+                if (p && p.catch) p.catch(() => {});
+            }
+        }
+    }
+
+    fsBtn.addEventListener('click', toggleFullscreen);
+    fsBtn.addEventListener('pointerdown', e => e.stopPropagation());
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
+        .forEach(evt => document.addEventListener(evt, () => {
+            updateFsUI();
+            // Запоминаем, что пользователь хочет играть в полном экране
+            try {
+                localStorage.setItem(STORAGE_KEY, isFullscreen() ? '1' : '0');
+            } catch (e) {}
+        }));
+
+    // При клике на игру — сохраняем текущее состояние полного экрана
+    document.querySelectorAll('.menu-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            try {
+                localStorage.setItem(STORAGE_KEY, isFullscreen() ? '1' : '0');
+            } catch (e) {}
+        });
+    });
+
+    // При загрузке меню — восстановим желаемое состояние
+    try {
+        const pref = localStorage.getItem(STORAGE_KEY);
+        if (pref === '1' && !isFullscreen()) {
+            // Не вызываем сразу — некоторые браузеры блокируют без действия.
+            // Пробуем "мягко" после первого тапа.
+            const once = () => {
+                if (!isFullscreen()) toggleFullscreen();
+                document.removeEventListener('pointerdown', once);
+                document.removeEventListener('keydown', once);
+            };
+            document.addEventListener('pointerdown', once, { once: true });
+            document.addEventListener('keydown', once, { once: true });
+        }
+    } catch (e) {}
+
+    updateFsUI();
+</script>
+
+</body>
+</html>
