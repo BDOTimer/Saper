@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Пятнашки 15</title>
+    <title>Пятнашки 15 + Solver (IDA*)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -51,15 +51,26 @@
             left: 50%;
             transform: translateX(-50%);
             color: #0ff;
-            font-size: clamp(13px, 3.4vw, 18px);
-            letter-spacing: 2px;
+            font-size: clamp(11px, 3vw, 16px);
+            letter-spacing: 1.5px;
             text-shadow: 0 0 12px #0ff;
             white-space: nowrap;
             z-index: 20;
             pointer-events: none;
+            max-width: 96vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        /* Игровое поле 4×4 */
+        .status.thinking {
+            animation: statusPulse 1.1s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.4; }
+        }
+
         .board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -115,7 +126,6 @@
             box-shadow: inset 0 0 22px rgba(0, 255, 255, 0.3);
         }
 
-        /* Правильная фишка (на своём месте) */
         .cell.correct {
             color: #0f0;
             text-shadow: 0 0 10px #0f0, 0 0 22px #0f0;
@@ -123,7 +133,6 @@
             background: rgba(0, 255, 0, 0.1);
         }
 
-        /* Анимация "толчка" при сдвиге */
         .cell.pushed {
             animation: push 0.16s ease-out;
         }
@@ -133,7 +142,26 @@
             100% { transform: scale(1); }
         }
 
-        /* Победная пульсация поля */
+        .cell.auto {
+            background: rgba(255, 200, 0, 0.25);
+            border-color: #fc0;
+            box-shadow: inset 0 0 22px rgba(255, 200, 0, 0.5), 0 0 20px rgba(255, 200, 0, 0.6);
+            color: #fc0;
+            text-shadow: 0 0 10px #fc0, 0 0 22px #fc0;
+        }
+
+        .cell.hintcell {
+            color: #fc0;
+            text-shadow: 0 0 10px #fc0, 0 0 22px #fc0;
+            border-color: #fc0;
+            animation: hintPulse 0.6s ease-in-out 3;
+        }
+
+        @keyframes hintPulse {
+            0%, 100% { box-shadow: inset 0 0 14px rgba(255, 200, 0, 0.25), 0 0 10px rgba(255, 200, 0, 0.35); }
+            50%      { box-shadow: inset 0 0 26px rgba(255, 200, 0, 0.7),  0 0 28px rgba(255, 200, 0, 0.85); }
+        }
+
         .board.win {
             animation: boardWin 0.9s ease-in-out infinite alternate;
         }
@@ -143,7 +171,6 @@
             to   { box-shadow: 0 0 50px rgba(0, 255, 255, 1),   inset 0 0 40px rgba(0, 255, 255, 0.3); }
         }
 
-        /* Кнопки в углах */
         .corner-btn {
             position: absolute;
             top: 10px;
@@ -172,19 +199,19 @@
         .back-btn { left: 10px; }
         .fs-btn   { right: 10px; display: inline-flex; align-items: center; gap: 6px; }
 
-        /* Нижние кнопки */
         .controls {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             margin-top: clamp(14px, 3vh, 24px);
             flex-wrap: wrap;
             justify-content: center;
+            max-width: 96vw;
         }
 
         .btn {
-            padding: clamp(10px, 2.5vh, 14px) clamp(16px, 4vw, 24px);
+            padding: clamp(10px, 2.5vh, 14px) clamp(14px, 3.6vw, 22px);
             font-family: inherit;
-            font-size: clamp(13px, 3.4vw, 17px);
+            font-size: clamp(12px, 3.2vw, 16px);
             letter-spacing: 2px;
             background: #0ff;
             color: #000;
@@ -208,7 +235,26 @@
             box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
         }
 
-        /* Экран результата */
+        .btn.warn {
+            background: transparent;
+            color: #fc0;
+            border: 2px solid #fc0;
+            box-shadow: 0 0 12px rgba(255, 200, 0, 0.4);
+        }
+
+        .btn.danger {
+            background: transparent;
+            color: #f0f;
+            border: 2px solid #f0f;
+            box-shadow: 0 0 12px rgba(255, 0, 255, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .result-screen {
             position: absolute;
             inset: 0;
@@ -269,6 +315,8 @@
     <div class="controls">
         <button class="btn" id="newGame">НОВАЯ ИГРА</button>
         <button class="btn secondary" id="solveHint">ПОДСКАЗКА</button>
+        <button class="btn warn" id="autoSolve">ПОКАЗАТЬ РЕШЕНИЕ</button>
+        <button class="btn danger" id="stopSolve" style="display:none;">СТОП</button>
     </div>
 
     <div class="result-screen" id="resultScreen">
@@ -279,25 +327,62 @@
 </div>
 
 <script>
+    // ============================================================
+    //                       КОНСТАНТЫ
+    // ============================================================
     const SIZE = 4;
-    const N = SIZE * SIZE;          // 16
-    const SOLVED = [...Array(N - 1).keys()].map(i => i + 1).concat(0); // [1..15, 0]
+    const N = SIZE * SIZE;                                              // 16
+    const SOLVED = [...Array(N - 1).keys()].map(i => i + 1).concat(0);  // [1..15, 0]
 
-    const boardEl   = document.getElementById('board');
-    const movesEl   = document.getElementById('moves');
-    const timerEl   = document.getElementById('timer');
-    const statusEl  = document.getElementById('status');
-    const resultScr = document.getElementById('resultScreen');
+    const DEFAULT_STATUS  = 'Соберите числа по порядку';
+    const SEARCH_LIMIT_MS = 30000;   // лимит поиска полного решения
+    const HINT_LIMIT_MS   = 15000;   // лимит поиска подсказки
+
+    // Склонение: plural(5, ['ход', 'хода', 'ходов']) -> 'ходов'
+    function plural(n, forms) {
+        const n10 = n % 10, n100 = n % 100;
+        if (n10 === 1 && n100 !== 11) return forms[0];
+        if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return forms[1];
+        return forms[2];
+    }
+
+    // ============================================================
+    //                       DOM
+    // ============================================================
+    const boardEl     = document.getElementById('board');
+    const movesEl     = document.getElementById('moves');
+    const timerEl     = document.getElementById('timer');
+    const statusEl    = document.getElementById('status');
+    const resultScr   = document.getElementById('resultScreen');
     const resultStats = document.getElementById('resultStats');
+    const solveBtn    = document.getElementById('autoSolve');
+    const stopBtn     = document.getElementById('stopSolve');
+    const hintBtn     = document.getElementById('solveHint');
 
-    let state = [];        // массив длиной 16: 1..15 и 0 (пустая клетка)
-    let cells = [];        // DOM-узлы
+    // ============================================================
+    //                       СОСТОЯНИЕ
+    // ============================================================
+    let state = [];              // 16 клеток: значения 1..15 и 0 (пустая)
+    let cells = [];              // DOM-узлы
     let moves = 0;
     let startTime = 0;
     let timerInterval = null;
     let finished = false;
 
-    // ---- Построение поля ----
+    // Авторешение / подсказка
+    let solving = false;         // идёт поиск или демонстрация
+    let searching = false;       // фаза поиска (а не воспроизведения)
+    let hintBusy = false;
+    let searchEpoch = 0;         // инвалидирует «висящие» подсказки
+    let solveTimer = null;
+    let savedState = null;
+    let savedMoves = 0;
+    let activeWorker = null;
+    let statusResetTimer = null;
+
+    // ============================================================
+    //                       ПОЛЕ
+    // ============================================================
     function buildBoard() {
         boardEl.innerHTML = '';
         cells = [];
@@ -311,12 +396,11 @@
         }
     }
 
-    // ---- Отрисовка ----
     function render() {
         for (let i = 0; i < N; i++) {
             const v = state[i];
             const cell = cells[i];
-            cell.classList.remove('empty', 'correct', 'pushed');
+            cell.classList.remove('empty', 'correct', 'pushed', 'auto', 'hintcell');
             if (v === 0) {
                 cell.classList.add('empty');
                 cell.textContent = '';
@@ -327,9 +411,11 @@
         }
     }
 
-    // ---- Ход игрока ----
+    // ============================================================
+    //                       ХОДЫ
+    // ============================================================
     function onCellClick(i) {
-        if (finished) return;
+        if (finished || solving) return;
         if (!tryMove(i)) return;
         moves++;
         movesEl.textContent = moves;
@@ -337,30 +423,24 @@
         checkSolved();
     }
 
-    // Попытка сдвинуть фишку в пустую клетку. Возвращает true при успехе.
+    function areAdjacent(a, b) {
+        return Math.abs((a >> 2) - (b >> 2)) + Math.abs((a & 3) - (b & 3)) === 1;
+    }
+
     function tryMove(i) {
         const emptyIdx = state.indexOf(0);
-        const r1 = Math.floor(i / SIZE), c1 = i % SIZE;
-        const r2 = Math.floor(emptyIdx / SIZE), c2 = emptyIdx % SIZE;
-        const dist = Math.abs(r1 - r2) + Math.abs(c1 - c2);
-        if (dist !== 1) return false;
+        if (!areAdjacent(i, emptyIdx)) return false;
 
-        // Меняем местами
         state[emptyIdx] = state[i];
         state[i] = 0;
 
-        // Анимация толчка
         cells[emptyIdx].classList.add('pushed');
         setTimeout(() => cells[emptyIdx].classList.remove('pushed'), 180);
         return true;
     }
 
-    // ---- Проверка победы ----
     function checkSolved() {
-        for (let i = 0; i < N - 1; i++) {
-            if (state[i] !== i + 1) return false;
-        }
-        if (state[N - 1] !== 0) return false;
+        if (!isSolved(state)) return false;
         finishGame();
         return true;
     }
@@ -369,13 +449,15 @@
         finished = true;
         stopTimer();
         boardEl.classList.add('win');
-        statusEl.textContent = 'Собрано!';
+        showStatus('Собрано!', 0);
         const t = formatTime(Date.now() - startTime);
         resultStats.textContent = `Ходов: ${moves} · Время: ${t}`;
         setTimeout(() => { resultScr.style.display = 'flex'; }, 600);
     }
 
-    // ---- Таймер ----
+    // ============================================================
+    //                       ТАЙМЕР
+    // ============================================================
     function startTimer() {
         stopTimer();
         startTime = Date.now();
@@ -399,24 +481,32 @@
         return `${m}:${s}`;
     }
 
-    // ---- Проверка решаемости ----
-    // Пятнашки разрешимы, если число инверсий чётное (для поля 4×4).
-    function isSolvable(arr) {
-        const a = arr.filter(v => v !== 0);
+    // ============================================================
+    //                       РЕШАЕМОСТЬ (ИСПРАВЛЕНО)
+    // ============================================================
+    // Для поля чётной ширины (4×4) чётности инверсий МАЛО — нужно ещё
+    // учитывать строку пустой клетки:
+    //     решаемо ⇔ (инверсии + строка пустой клетки снизу, 1-based) нечётно.
+    // Старая проверка (только inv % 2 === 0) была верна лишь когда пустая
+    // клетка лежала во 2-й или 4-й строке сверху, поэтому НОВАЯ ИГРА
+    // порождала нерешаемые расклады примерно в половине случаев — и решатель
+    // честно «не находил решение» за отведённое время.
+    function isSolvable(a) {
         let inv = 0;
-        for (let i = 0; i < a.length; i++) {
-            for (let j = i + 1; j < a.length; j++) {
-                if (a[i] > a[j]) inv++;
+        const tiles = [];
+        for (let i = 0; i < N; i++) if (a[i] !== 0) tiles.push(a[i]);
+        for (let i = 0; i < tiles.length; i++) {
+            for (let j = i + 1; j < tiles.length; j++) {
+                if (tiles[i] > tiles[j]) inv++;
             }
         }
-        return inv % 2 === 0;
+        const blankRowFromBottom = SIZE - Math.floor(a.indexOf(0) / SIZE);
+        return (inv + blankRowFromBottom) % 2 === 1;
     }
 
-    // ---- Перемешивание ----
     function shuffle() {
         do {
             const arr = [...SOLVED];
-            // Тасование Фишера–Йетса
             for (let i = arr.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -425,49 +515,538 @@
         } while (!isSolvable(state) || isSolved(state));
     }
 
-    function isSolved(arr) {
+    function isSolved(a) {
         for (let i = 0; i < N - 1; i++) {
-            if (arr[i] !== i + 1) return false;
+            if (a[i] !== i + 1) return false;
         }
-        return arr[N - 1] === 0;
+        return a[N - 1] === 0;
     }
 
-    // ---- Новая игра ----
+    // ============================================================
+    //                  IDA* SOLVER (переписан)
+    // ============================================================
+    //
+    // Что было не так в старой версии:
+    //   1) поиск шёл по живому массиву state, а при нахождении решения
+    //      рекурсия возвращалась ДО отката — поле «самособиралось»,
+    //      и демонстрация потом применяла ходы к уже собранному полю;
+    //   2) эвристика — чистый манхэттен: на дальних позициях не хватало 15 c.
+    //
+    // Теперь:
+    //   • работаем с КОПИЕЙ поля — исходное состояние не трогаем вообще;
+    //   • эвристика: манхэттен + линейные конфликты (допустимая, поэтому
+    //     решение остаётся оптимальным, но поиск в разы быстрее);
+    //   • функция полностью автономна (не видит внешних переменных),
+    //     поэтому её можно сериализовать и запустить в Web Worker.
+    //
+    function solveIDA(startBoard, timeLimitMs) {
+        timeLimitMs = timeLimitMs || 30000;
+
+        var now = function () {
+            return (typeof performance !== 'undefined' && performance.now)
+                ? performance.now() : Date.now();
+        };
+        var t0 = now();
+
+        // Целевые координаты фишек: GOAL_R[v], GOAL_C[v] для v = 1..15
+        var GOAL_R = [-1, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];
+        var GOAL_C = [-1, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2];
+
+        // ГЛАВНОЕ ИСПРАВЛЕНИЕ: работаем с копией, а не с живым state.
+        var arr = startBoard.slice();
+
+        function isGoal() {
+            for (var i = 0; i < 15; i++) if (arr[i] !== i + 1) return false;
+            return arr[15] === 0;
+        }
+        if (isGoal()) return { path: [], nodes: 0, timeMs: 0 };
+
+        // ---------- эвристика: манхэттен + линейные конфликты ----------
+
+        var rlc = [0, 0, 0, 0];  // сколько фишек обязаны покинуть строку r
+        var clc = [0, 0, 0, 0];  // сколько фишек обязаны покинуть столбец c
+        var curH = 0;            // h = манхэттен + 2 * (конфликты)
+
+        // Минимум фишек, которые надо вывести из линии, чтобы убрать все
+        // конфликты = (число фишек) − (наибольшая возрастающая подпоследовательность
+        // их целевых позиций). Корректная (допустимая) версия линейного конфликта.
+        function removals(g) {
+            var m = g.length;
+            if (m < 2) return 0;
+            var lis = [1, 1, 1, 1];
+            var best = 1;
+            for (var i = 1; i < m; i++) {
+                lis[i] = 1;
+                for (var j = 0; j < i; j++) {
+                    if (g[j] < g[i] && lis[j] + 1 > lis[i]) lis[i] = lis[j] + 1;
+                }
+                if (lis[i] > best) best = lis[i];
+            }
+            return m - best;
+        }
+
+        function rowConflicts(r) {
+            var g = [];
+            for (var c = 0; c < 4; c++) {
+                var v = arr[r * 4 + c];
+                if (v !== 0 && GOAL_R[v] === r) g.push(GOAL_C[v]);
+            }
+            return removals(g);
+        }
+
+        function colConflicts(c) {
+            var g = [];
+            for (var r = 0; r < 4; r++) {
+                var v = arr[r * 4 + c];
+                if (v !== 0 && GOAL_C[v] === c) g.push(GOAL_R[v]);
+            }
+            return removals(g);
+        }
+
+        (function computeH() {
+            var man = 0;
+            for (var i = 0; i < 16; i++) {
+                var v = arr[i];
+                if (v === 0) continue;
+                man += Math.abs((i >> 2) - GOAL_R[v]) + Math.abs((i & 3) - GOAL_C[v]);
+            }
+            var lc = 0;
+            for (var k = 0; k < 4; k++) {
+                rlc[k] = rowConflicts(k);
+                clc[k] = colConflicts(k);
+                lc += rlc[k] + clc[k];
+            }
+            curH = man + 2 * lc;
+        })();
+
+        // Ход «фишка из from → пустая клетка to» с инкрементальным
+        // пересчётом h. Откат хода — это doMove(to, from).
+        function doMove(from, to) {
+            var v = arr[from];
+            var rF = from >> 2, cF = from & 3;
+            var rT = to >> 2,   cT = to & 3;
+
+            var oldD = Math.abs(rF - GOAL_R[v]) + Math.abs(cF - GOAL_C[v]);
+            var newD = Math.abs(rT - GOAL_R[v]) + Math.abs(cT - GOAL_C[v]);
+
+            arr[to] = v;
+            arr[from] = 0;
+
+            var dlc = 0, x;
+
+            // строка, из которой ушла фишка, пересчитывается всегда;
+            // строка, в которую пришла, — только если это другая строка
+            x = rowConflicts(rF); dlc += x - rlc[rF]; rlc[rF] = x;
+            if (rT !== rF) { x = rowConflicts(rT); dlc += x - rlc[rT]; rlc[rT] = x; }
+
+            x = colConflicts(cF); dlc += x - clc[cF]; clc[cF] = x;
+            if (cT !== cF) { x = colConflicts(cT); dlc += x - clc[cT]; clc[cT] = x; }
+
+            curH += (newD - oldD) + 2 * dlc;
+        }
+
+        // ---------- поиск с итеративным углублением ----------
+
+        var path = [];          // значения фишек в порядке ходов
+        var nodes = 0;
+        var timedOut = false;
+
+        var curEmpty = 0;       // чтобы сортировка не создавала замыкание на каждый узел
+
+        function nbCompare(a, b) {
+            var va = arr[a], vb = arr[b];
+            var er = curEmpty >> 2, ec = curEmpty & 3;
+            var ia = Math.abs((a >> 2) - GOAL_R[va]) + Math.abs((a & 3) - GOAL_C[va])
+                   - Math.abs(er - GOAL_R[va]) - Math.abs(ec - GOAL_C[va]);
+            var ib = Math.abs((b >> 2) - GOAL_R[vb]) + Math.abs((b & 3) - GOAL_C[vb])
+                   - Math.abs(er - GOAL_R[vb]) - Math.abs(ec - GOAL_C[vb]);
+            return ib - ia;     // ходы, сильнее уменьшающие манхэттен, — первыми
+        }
+
+        function search(g, bound, emptyIdx, prevEmpty) {
+            var f = g + curH;
+            if (f > bound) return f;
+            if (curH === 0) return -1;              // цель достигнута
+
+            nodes++;
+            if ((nodes & 1023) === 0 && now() - t0 > timeLimitMs) {
+                timedOut = true;
+                return Infinity;
+            }
+
+            var r = emptyIdx >> 2, c = emptyIdx & 3;
+            var nb = [];
+            if (r > 0) nb.push(emptyIdx - 4);
+            if (r < 3) nb.push(emptyIdx + 4);
+            if (c > 0) nb.push(emptyIdx - 1);
+            if (c < 3) nb.push(emptyIdx + 1);
+            if (nb.length > 1) {
+                curEmpty = emptyIdx;
+                nb.sort(nbCompare);
+            }
+
+            var minExcess = Infinity;
+            for (var k = 0; k < nb.length; k++) {
+                var nIdx = nb[k];
+                if (nIdx === prevEmpty) continue;   // не откатываем предыдущий ход
+
+                path.push(arr[nIdx]);
+                doMove(nIdx, emptyIdx);
+
+                var t = search(g + 1, bound, nIdx, emptyIdx);
+                if (t === -1) return -1;            // решение найдено (path уже готов)
+                if (t < minExcess) minExcess = t;
+
+                doMove(emptyIdx, nIdx);             // откат
+                path.pop();
+
+                if (timedOut) return Infinity;
+            }
+            return minExcess;
+        }
+
+        var bound = curH;
+        while (true) {
+            var t = search(0, bound, arr.indexOf(0), -1);
+            if (t === -1) {
+                return { path: path.slice(), nodes: nodes, timeMs: now() - t0 };
+            }
+            if (timedOut || !isFinite(t)) return null;  // не хватило времени / нерешаемо
+            bound = t;                                  // следующая итерация углубления
+        }
+    }
+
+    // ============================================================
+    //        ПОИСК БЕЗ ЗАВИСАНИЯ (Web Worker + запасной вариант)
+    // ============================================================
+    //
+    // solveIDA полностью автономна, поэтому её исходник сериализуется
+    // и запускается в Web Worker — интерфейс не замирает даже на сложных
+    // позициях. Если воркер недоступен (старый браузер, ограничения
+    // безопасности) — считаем синхронно, как раньше.
+
+    function cancelSearch() {
+        if (activeWorker) {
+            try { activeWorker.terminate(); } catch (e) {}
+            activeWorker = null;
+        }
+    }
+
+    function solveAsync(board, limit) {
+        return new Promise(resolve => {
+            let worker = null;
+            let url = null;
+
+            try {
+                const src = solveIDA.toString() +
+                    '\nself.onmessage = function (e) {' +
+                    ' self.postMessage(solveIDA(e.data.board, e.data.limit)); };';
+                url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+                worker = new Worker(url);
+            } catch (e) {
+                worker = null;
+            }
+
+            function solveSync() {
+                setTimeout(() => {
+                    let res = null;
+                    try { res = solveIDA(board, limit); } catch (e) { res = null; }
+                    resolve(res);
+                }, 40);
+            }
+
+            if (!worker) { solveSync(); return; }
+
+            activeWorker = worker;
+            let settled = false;
+            let guard = null;
+
+            function killWorker() {
+                try { worker.terminate(); } catch (e) {}
+                try { if (url) URL.revokeObjectURL(url); } catch (e) {}
+                if (activeWorker === worker) activeWorker = null;
+            }
+
+            function finish(res) {
+                if (settled) return;
+                settled = true;
+                if (guard) clearTimeout(guard);
+                killWorker();
+                resolve(res);
+            }
+
+            // Страховка: воркер обязан ответить не позже limit + 5 c
+            guard = setTimeout(() => finish(null), limit + 5000);
+
+            worker.onmessage = e => finish(e.data);
+            worker.onerror = () => {
+                if (settled) return;
+                settled = true;
+                if (guard) clearTimeout(guard);
+                killWorker();
+                solveSync();                        // воркер не завёлся — считаем сами
+            };
+
+            worker.postMessage({ board: board, limit: limit });
+        });
+    }
+
+    // ============================================================
+    //                       СТАТУС
+    // ============================================================
+    function showStatus(text, autoResetMs) {
+        statusEl.textContent = text;
+        if (statusResetTimer) {
+            clearTimeout(statusResetTimer);
+            statusResetTimer = null;
+        }
+        if (autoResetMs > 0) {
+            statusResetTimer = setTimeout(() => {
+                statusResetTimer = null;
+                if (!finished && !solving) statusEl.textContent = DEFAULT_STATUS;
+            }, autoResetMs);
+        }
+    }
+
+    function setThinking(on) {
+        statusEl.classList.toggle('thinking', !!on);
+    }
+
+    // ============================================================
+    //                  АВТОРЕШЕНИЕ («ПОКАЗАТЬ РЕШЕНИЕ»)
+    // ============================================================
+    function startAutoSolve() {
+        if (finished || solving) return;
+        if (hintBusy) { showStatus('Подождите: считаю подсказку…', 2000); return; }
+
+        if (isSolved(state)) {
+            showStatus('Уже собрано — нажмите НОВАЯ ИГРА', 2500);
+            return;
+        }
+        if (!isSolvable(state)) {
+            showStatus('Этот расклад нерешаем — нажмите НОВАЯ ИГРА', 3000);
+            return;
+        }
+
+        // ИСПРАВЛЕНО: позицию сохраняем ДО поиска (раньше сохраняли уже
+        // испорченную). Она нужна для СТОПа и восстановления после демо.
+        savedState = state.slice();
+        savedMoves = moves;
+
+        solving = true;
+        searching = true;
+        solveBtn.disabled = true;
+        stopBtn.style.display = 'inline-block';
+        setThinking(true);
+        showStatus('Ищу оптимальное решение (IDA*)…', 0);
+
+        solveAsync(state.slice(), SEARCH_LIMIT_MS).then(result => {
+            setThinking(false);
+            if (!solving || !searching) return;     // отменили (СТОП / новая игра)
+            searching = false;
+
+            if (!result || !result.path || result.path.length === 0) {
+                solving = false;
+                solveBtn.disabled = false;
+                stopBtn.style.display = 'none';
+                showStatus('Не удалось найти решение за ' +
+                           Math.round(SEARCH_LIMIT_MS / 1000) + ' с', 3000);
+                return;
+            }
+
+            showStatus('Оптимум: ' + result.path.length + ' ' +
+                       plural(result.path.length, ['ход', 'хода', 'ходов']) +
+                       ' · ' + result.nodes.toLocaleString('ru-RU') + ' ' +
+                       plural(result.nodes, ['узел', 'узла', 'узлов']) +
+                       ' · ' + Math.round(result.timeMs) + ' мс', 0);
+
+            playSolution(result.path);
+        });
+    }
+
+    // path — значения фишек (1..15) в порядке ходов оптимального решения.
+    function playSolution(path) {
+        let idx = 0;
+
+        function endDemo(msg) {
+            solving = false;
+            searching = false;
+            clearTimeout(solveTimer);
+            solveTimer = null;
+            solveBtn.disabled = false;
+            stopBtn.style.display = 'none';
+            showStatus(msg, 6000);
+        }
+
+        function step() {
+            if (!solving) return;                   // нажали СТОП
+
+            if (idx >= path.length) {
+                // Демонстрация доиграна: даём секунду посмотреть на
+                // собранное поле и возвращаем игроку его позицию
+                // (демонстрация не засчитывается как победа).
+                boardEl.classList.add('win');
+                solveTimer = setTimeout(() => {
+                    boardEl.classList.remove('win');
+                    if (!solving) return;           // успели нажать СТОП
+                    restoreSavedPosition();
+                    endDemo('Демонстрация завершена — позиция восстановлена, попробуйте сами!');
+                }, 1300);
+                return;
+            }
+
+            const v = path[idx];
+            const from = state.indexOf(v);
+            const to = state.indexOf(0);
+
+            if (from < 0 || !areAdjacent(from, to)) {
+                // Практически недостижимо — страховка от рассинхронизации.
+                restoreSavedPosition();
+                endDemo('Демонстрация прервана');
+                return;
+            }
+
+            state[to] = v;
+            state[from] = 0;
+            moves++;
+            movesEl.textContent = moves;
+            render();
+
+            const cell = cells[to];
+            cell.classList.add('auto');
+            setTimeout(() => cell.classList.remove('auto'), 240);
+
+            idx++;
+            solveTimer = setTimeout(step, 160);
+        }
+
+        step();
+    }
+
+    function restoreSavedPosition() {
+        if (savedState) {
+            state = savedState.slice();
+            moves = savedMoves;
+            movesEl.textContent = moves;
+            savedState = null;
+        }
+        render();
+    }
+
+    function stopAutoSolve() {
+        const wasActive = solving;
+        const wasSearching = searching;
+
+        solving = false;
+        searching = false;
+        setThinking(false);
+        boardEl.classList.remove('win');
+        clearTimeout(solveTimer);
+        solveTimer = null;
+        cancelSearch();                             // прерываем и фазу расчёта тоже
+
+        if (wasActive) {
+            restoreSavedPosition();
+            solveBtn.disabled = false;
+            stopBtn.style.display = 'none';
+            showStatus(wasSearching
+                ? 'Поиск отменён'
+                : 'Демонстрация остановлена — позиция восстановлена', 2500);
+        }
+    }
+
+    // ============================================================
+    //                       ПОДСКАЗКА
+    // ============================================================
+    // ИСПРАВЛЕНО: раньше «подсказка» просто подсвечивала все фишки,
+    // которыми вообще можно походить. Теперь считается оптимальное
+    // решение и подсвечивается фишка, которой нужно сходить сейчас.
+    function hint() {
+        if (finished || solving || hintBusy) return;
+
+        if (isSolved(state)) {
+            showStatus('Уже собрано!', 2000);
+            return;
+        }
+        if (!isSolvable(state)) {
+            showStatus('Этот расклад нерешаем — нажмите НОВАЯ ИГРА', 3000);
+            return;
+        }
+
+        hintBusy = true;
+        hintBtn.disabled = true;
+        setThinking(true);
+        showStatus('Считаю подсказку (IDA*)…', 0);
+
+        const myEpoch = ++searchEpoch;
+        const snapshot = state.join(',');
+
+        solveAsync(state.slice(), HINT_LIMIT_MS).then(result => {
+            if (myEpoch !== searchEpoch) return;    // отменили новой игрой
+            hintBusy = false;
+            hintBtn.disabled = false;
+            setThinking(false);
+
+            if (finished || solving) return;
+            if (state.join(',') !== snapshot) {     // позиция успела измениться
+                statusEl.textContent = DEFAULT_STATUS;
+                return;
+            }
+
+            if (!result || !result.path || result.path.length === 0) {
+                showStatus('Подсказка недоступна — попробуйте ещё раз', 2500);
+                return;
+            }
+
+            const v = result.path[0];
+            const cellIdx = state.indexOf(v);
+            if (cellIdx >= 0) {
+                cells[cellIdx].classList.add('hintcell');
+                setTimeout(() => cells[cellIdx].classList.remove('hintcell'), 1900);
+            }
+
+            showStatus('Подсказка: двигайте фишку ' + v +
+                       ' · до победы минимум ' + result.path.length + ' ' +
+                       plural(result.path.length, ['ход', 'хода', 'ходов']), 5000);
+        });
+    }
+
+    // ============================================================
+    //                  НОВАЯ ИГРА
+    // ============================================================
     function newGame() {
+        stopAutoSolve();
+        searchEpoch++;               // отменяем висящие подсказки
+        hintBusy = false;
+        hintBtn.disabled = false;
+        cancelSearch();
         shuffle();
         moves = 0;
         movesEl.textContent = '0';
         finished = false;
+        savedState = null;
+        savedMoves = 0;
         resultScr.style.display = 'none';
         boardEl.classList.remove('win');
-        statusEl.textContent = 'Соберите числа по порядку';
+        setThinking(false);
+        showStatus(DEFAULT_STATUS, 0);
+        solveBtn.disabled = false;
+        stopBtn.style.display = 'none';
         render();
         startTimer();
     }
 
-    // ---- Подсказка: подсветить фишку, которую можно двигать ----
-    function hint() {
-        if (finished) return;
-        const emptyIdx = state.indexOf(0);
-        const r = Math.floor(emptyIdx / SIZE), c = emptyIdx % SIZE;
-        const neighbors = [];
-        if (r > 0) neighbors.push(emptyIdx - SIZE);
-        if (r < SIZE - 1) neighbors.push(emptyIdx + SIZE);
-        if (c > 0) neighbors.push(emptyIdx - 1);
-        if (c < SIZE - 1) neighbors.push(emptyIdx + 1);
-
-        // Подсветим всех соседей пустой клетки
-        neighbors.forEach(i => {
-            cells[i].classList.add('pushed');
-            setTimeout(() => cells[i].classList.remove('pushed'), 400);
-        });
-    }
-
-    // ---- Кнопки ----
+    // ============================================================
+    //                  КНОПКИ
+    // ============================================================
     document.getElementById('newGame').addEventListener('click', newGame);
-    document.getElementById('solveHint').addEventListener('click', hint);
+    hintBtn.addEventListener('click', hint);
+    solveBtn.addEventListener('click', startAutoSolve);
+    stopBtn.addEventListener('click', stopAutoSolve);
 
-    // ---- Полный экран ----
+    // ============================================================
+    //                  ПОЛНЫЙ ЭКРАН
+    // ============================================================
     const fsBtn   = document.getElementById('btnFullscreen');
     const fsIcon  = document.getElementById('fsIcon');
     const fsTarget = document.documentElement;
@@ -505,7 +1084,6 @@
     ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
         .forEach(evt => document.addEventListener(evt, updateFsIcon));
 
-    // ---- Автовосстановление полного экрана ----
     (function autoFullscreenFromMenu() {
         const KEY = 'arcade_fullscreen_pref';
         let pref = '0';
@@ -532,14 +1110,15 @@
         tryFs();
     })();
 
-    // ---- Управление с клавиатуры (стрелки) ----
+    // ============================================================
+    //                  КЛАВИАТУРА
+    // ============================================================
     document.addEventListener('keydown', e => {
-        if (finished) return;
+        if (finished || solving) return;
         const emptyIdx = state.indexOf(0);
-        const r = Math.floor(emptyIdx / SIZE), c = emptyIdx % SIZE;
+        const r = (emptyIdx / SIZE) | 0, c = emptyIdx % SIZE;
         let target = -1;
 
-        // Стрелка "вверх" — двигаем фишку, которая НИЖЕ пустой, вверх
         if (e.key === 'ArrowUp'    && r < SIZE - 1) target = emptyIdx + SIZE;
         if (e.key === 'ArrowDown'  && r > 0)        target = emptyIdx - SIZE;
         if (e.key === 'ArrowLeft'  && c < SIZE - 1) target = emptyIdx + 1;
@@ -547,15 +1126,18 @@
 
         if (target >= 0) {
             e.preventDefault();
-            tryMove(target);
-            moves++;
-            movesEl.textContent = moves;
-            render();
-            checkSolved();
+            if (tryMove(target)) {
+                moves++;
+                movesEl.textContent = moves;
+                render();
+                checkSolved();
+            }
         }
     });
 
-    // ---- Старт ----
+    // ============================================================
+    //                  СТАРТ
+    // ============================================================
     buildBoard();
     newGame();
     updateFsIcon();
