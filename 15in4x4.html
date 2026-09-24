@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Пятнашки 15</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a14;
+            font-family: 'Courier New', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            padding: 70px 10px 30px;
+            touch-action: none;
+        }
+
+        .hud {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: clamp(12px, 3.4vw, 17px);
+            text-shadow: 0 0 10px #0ff;
+            white-space: nowrap;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+        }
+
+        .hud .val { color: #0ff; text-shadow: 0 0 10px #0ff; }
+
+        .status {
+            position: absolute;
+            top: 46px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0ff;
+            font-size: clamp(13px, 3.4vw, 18px);
+            letter-spacing: 2px;
+            text-shadow: 0 0 12px #0ff;
+            white-space: nowrap;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* Игровое поле 4×4 */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: clamp(6px, 1.6vw, 10px);
+            width: min(88vw, 60vh, 480px);
+            aspect-ratio: 1 / 1;
+            padding: clamp(6px, 1.6vw, 10px);
+            background: rgba(0, 255, 255, 0.04);
+            border: 2px solid #0ff;
+            border-radius: 14px;
+            box-shadow:
+                0 0 30px rgba(0, 255, 255, 0.4),
+                inset 0 0 30px rgba(0, 255, 255, 0.08);
+            position: relative;
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: clamp(22px, 7vw, 46px);
+            font-weight: bold;
+            user-select: none;
+            -webkit-user-select: none;
+            color: #0ff;
+            text-shadow: 0 0 10px #0ff, 0 0 22px #0ff;
+            background: rgba(0, 255, 255, 0.12);
+            border: 2px solid rgba(0, 255, 255, 0.45);
+            box-shadow: inset 0 0 18px rgba(0, 255, 255, 0.15);
+            cursor: pointer;
+            transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.2s ease;
+            will-change: transform;
+        }
+
+        .cell.empty {
+            background: transparent;
+            border: 2px dashed rgba(0, 255, 255, 0.2);
+            box-shadow: none;
+            cursor: default;
+            color: transparent;
+            text-shadow: none;
+        }
+
+        .cell:not(.empty):active {
+            transform: scale(0.94);
+        }
+
+        .cell:not(.empty):hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: inset 0 0 22px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Правильная фишка (на своём месте) */
+        .cell.correct {
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0, 0 0 22px #0f0;
+            border-color: rgba(0, 255, 0, 0.6);
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        /* Анимация "толчка" при сдвиге */
+        .cell.pushed {
+            animation: push 0.16s ease-out;
+        }
+
+        @keyframes push {
+            0%   { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+
+        /* Победная пульсация поля */
+        .board.win {
+            animation: boardWin 0.9s ease-in-out infinite alternate;
+        }
+
+        @keyframes boardWin {
+            from { box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(0, 255, 255, 0.1); }
+            to   { box-shadow: 0 0 50px rgba(0, 255, 255, 1),   inset 0 0 40px rgba(0, 255, 255, 0.3); }
+        }
+
+        /* Кнопки в углах */
+        .corner-btn {
+            position: absolute;
+            top: 10px;
+            padding: 7px 14px;
+            font-family: inherit;
+            font-size: clamp(12px, 3vw, 15px);
+            background: rgba(0, 255, 255, 0.15);
+            color: #0ff;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+            text-decoration: none;
+            z-index: 25;
+            user-select: none;
+            -webkit-user-select: none;
+            line-height: 1;
+            transition: all 0.15s ease;
+        }
+
+        .corner-btn:active {
+            background: rgba(0, 255, 255, 0.4);
+            color: #000;
+        }
+
+        .back-btn { left: 10px; }
+        .fs-btn   { right: 10px; display: inline-flex; align-items: center; gap: 6px; }
+
+        /* Нижние кнопки */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: clamp(14px, 3vh, 24px);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: clamp(10px, 2.5vh, 14px) clamp(16px, 4vw, 24px);
+            font-family: inherit;
+            font-size: clamp(13px, 3.4vw, 17px);
+            letter-spacing: 2px;
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+            transition: all 0.15s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.9);
+        }
+
+        .btn.secondary {
+            background: transparent;
+            color: #0ff;
+            border: 2px solid #0ff;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+        }
+
+        /* Экран результата */
+        .result-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 30;
+            text-align: center;
+            padding: 20px;
+            gap: 18px;
+        }
+
+        .result-screen h2 {
+            color: #0ff;
+            font-size: clamp(22px, 7vw, 34px);
+            text-shadow: 0 0 20px #0ff;
+            letter-spacing: 3px;
+        }
+
+        .result-screen p {
+            color: #fff;
+            font-size: clamp(14px, 4vw, 18px);
+            text-shadow: 0 0 10px #0ff;
+        }
+
+        .result-screen button {
+            padding: 14px 30px;
+            font-family: inherit;
+            font-size: clamp(15px, 4vw, 19px);
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+<a href="index.html" class="corner-btn back-btn">← Меню</a>
+<button type="button" class="corner-btn fs-btn" id="btnFullscreen">
+    <span id="fsIcon">⛶</span>
+</button>
+
+<div class="game-wrapper">
+    <div class="hud">
+        <span>Ходы: <span class="val" id="moves">0</span></span>
+        <span>Время: <span class="val" id="timer">00:00</span></span>
+    </div>
+    <div class="status" id="status">Соберите числа по порядку</div>
+
+    <div class="board" id="board"></div>
+
+    <div class="controls">
+        <button class="btn" id="newGame">НОВАЯ ИГРА</button>
+        <button class="btn secondary" id="solveHint">ПОДСКАЗКА</button>
+    </div>
+
+    <div class="result-screen" id="resultScreen">
+        <h2>ПОБЕДА!</h2>
+        <p id="resultStats"></p>
+        <button onclick="newGame()">Играть снова</button>
+    </div>
+</div>
+
+<script>
+    const SIZE = 4;
+    const N = SIZE * SIZE;          // 16
+    const SOLVED = [...Array(N - 1).keys()].map(i => i + 1).concat(0); // [1..15, 0]
+
+    const boardEl   = document.getElementById('board');
+    const movesEl   = document.getElementById('moves');
+    const timerEl   = document.getElementById('timer');
+    const statusEl  = document.getElementById('status');
+    const resultScr = document.getElementById('resultScreen');
+    const resultStats = document.getElementById('resultStats');
+
+    let state = [];        // массив длиной 16: 1..15 и 0 (пустая клетка)
+    let cells = [];        // DOM-узлы
+    let moves = 0;
+    let startTime = 0;
+    let timerInterval = null;
+    let finished = false;
+
+    // ---- Построение поля ----
+    function buildBoard() {
+        boardEl.innerHTML = '';
+        cells = [];
+        for (let i = 0; i < N; i++) {
+            const c = document.createElement('div');
+            c.className = 'cell';
+            c.dataset.i = i;
+            c.addEventListener('click', () => onCellClick(i));
+            boardEl.appendChild(c);
+            cells.push(c);
+        }
+    }
+
+    // ---- Отрисовка ----
+    function render() {
+        for (let i = 0; i < N; i++) {
+            const v = state[i];
+            const cell = cells[i];
+            cell.classList.remove('empty', 'correct', 'pushed');
+            if (v === 0) {
+                cell.classList.add('empty');
+                cell.textContent = '';
+            } else {
+                cell.textContent = v;
+                if (v === i + 1) cell.classList.add('correct');
+            }
+        }
+    }
+
+    // ---- Ход игрока ----
+    function onCellClick(i) {
+        if (finished) return;
+        if (!tryMove(i)) return;
+        moves++;
+        movesEl.textContent = moves;
+        render();
+        checkSolved();
+    }
+
+    // Попытка сдвинуть фишку в пустую клетку. Возвращает true при успехе.
+    function tryMove(i) {
+        const emptyIdx = state.indexOf(0);
+        const r1 = Math.floor(i / SIZE), c1 = i % SIZE;
+        const r2 = Math.floor(emptyIdx / SIZE), c2 = emptyIdx % SIZE;
+        const dist = Math.abs(r1 - r2) + Math.abs(c1 - c2);
+        if (dist !== 1) return false;
+
+        // Меняем местами
+        state[emptyIdx] = state[i];
+        state[i] = 0;
+
+        // Анимация толчка
+        cells[emptyIdx].classList.add('pushed');
+        setTimeout(() => cells[emptyIdx].classList.remove('pushed'), 180);
+        return true;
+    }
+
+    // ---- Проверка победы ----
+    function checkSolved() {
+        for (let i = 0; i < N - 1; i++) {
+            if (state[i] !== i + 1) return false;
+        }
+        if (state[N - 1] !== 0) return false;
+        finishGame();
+        return true;
+    }
+
+    function finishGame() {
+        finished = true;
+        stopTimer();
+        boardEl.classList.add('win');
+        statusEl.textContent = 'Собрано!';
+        const t = formatTime(Date.now() - startTime);
+        resultStats.textContent = `Ходов: ${moves} · Время: ${t}`;
+        setTimeout(() => { resultScr.style.display = 'flex'; }, 600);
+    }
+
+    // ---- Таймер ----
+    function startTimer() {
+        stopTimer();
+        startTime = Date.now();
+        timerEl.textContent = '00:00';
+        timerInterval = setInterval(() => {
+            timerEl.textContent = formatTime(Date.now() - startTime);
+        }, 250);
+    }
+
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+
+    function formatTime(ms) {
+        const total = Math.floor(ms / 1000);
+        const m = String(Math.floor(total / 60)).padStart(2, '0');
+        const s = String(total % 60).padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    // ---- Проверка решаемости ----
+    // Пятнашки разрешимы, если число инверсий чётное (для поля 4×4).
+    function isSolvable(arr) {
+        const a = arr.filter(v => v !== 0);
+        let inv = 0;
+        for (let i = 0; i < a.length; i++) {
+            for (let j = i + 1; j < a.length; j++) {
+                if (a[i] > a[j]) inv++;
+            }
+        }
+        return inv % 2 === 0;
+    }
+
+    // ---- Перемешивание ----
+    function shuffle() {
+        do {
+            const arr = [...SOLVED];
+            // Тасование Фишера–Йетса
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            state = arr;
+        } while (!isSolvable(state) || isSolved(state));
+    }
+
+    function isSolved(arr) {
+        for (let i = 0; i < N - 1; i++) {
+            if (arr[i] !== i + 1) return false;
+        }
+        return arr[N - 1] === 0;
+    }
+
+    // ---- Новая игра ----
+    function newGame() {
+        shuffle();
+        moves = 0;
+        movesEl.textContent = '0';
+        finished = false;
+        resultScr.style.display = 'none';
+        boardEl.classList.remove('win');
+        statusEl.textContent = 'Соберите числа по порядку';
+        render();
+        startTimer();
+    }
+
+    // ---- Подсказка: подсветить фишку, которую можно двигать ----
+    function hint() {
+        if (finished) return;
+        const emptyIdx = state.indexOf(0);
+        const r = Math.floor(emptyIdx / SIZE), c = emptyIdx % SIZE;
+        const neighbors = [];
+        if (r > 0) neighbors.push(emptyIdx - SIZE);
+        if (r < SIZE - 1) neighbors.push(emptyIdx + SIZE);
+        if (c > 0) neighbors.push(emptyIdx - 1);
+        if (c < SIZE - 1) neighbors.push(emptyIdx + 1);
+
+        // Подсветим всех соседей пустой клетки
+        neighbors.forEach(i => {
+            cells[i].classList.add('pushed');
+            setTimeout(() => cells[i].classList.remove('pushed'), 400);
+        });
+    }
+
+    // ---- Кнопки ----
+    document.getElementById('newGame').addEventListener('click', newGame);
+    document.getElementById('solveHint').addEventListener('click', hint);
+
+    // ---- Полный экран ----
+    const fsBtn   = document.getElementById('btnFullscreen');
+    const fsIcon  = document.getElementById('fsIcon');
+    const fsTarget = document.documentElement;
+
+    function isFullscreen() {
+        return document.fullscreenElement ||
+               document.webkitFullscreenElement ||
+               document.msFullscreenElement;
+    }
+    function updateFsIcon() {
+        fsIcon.textContent = isFullscreen() ? '⤡' : '⛶';
+    }
+    function toggleFullscreen() {
+        if (!isFullscreen()) {
+            const req = fsTarget.requestFullscreen ||
+                        fsTarget.webkitRequestFullscreen ||
+                        fsTarget.msRequestFullscreen;
+            if (req) {
+                const p = req.call(fsTarget);
+                if (p && p.catch) p.catch(() => {});
+            }
+        } else {
+            const exit = document.exitFullscreen ||
+                         document.webkitExitFullscreen ||
+                         document.msExitFullscreen;
+            if (exit) {
+                const p = exit.call(document);
+                if (p && p.catch) p.catch(() => {});
+            }
+        }
+    }
+    fsBtn.addEventListener('click', toggleFullscreen);
+    fsBtn.addEventListener('pointerdown', e => e.stopPropagation());
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
+        .forEach(evt => document.addEventListener(evt, updateFsIcon));
+
+    // ---- Автовосстановление полного экрана ----
+    (function autoFullscreenFromMenu() {
+        const KEY = 'arcade_fullscreen_pref';
+        let pref = '0';
+        try { pref = localStorage.getItem(KEY) || '0'; } catch (e) {}
+        if (pref !== '1') return;
+
+        function tryFs() {
+            if (isFullscreen()) return;
+            const req = fsTarget.requestFullscreen ||
+                        fsTarget.webkitRequestFullscreen ||
+                        fsTarget.msRequestFullscreen;
+            if (req) {
+                const p = req.call(fsTarget);
+                if (p && p.catch) p.catch(() => {});
+            }
+        }
+        const once = () => {
+            tryFs();
+            document.removeEventListener('pointerdown', once);
+            document.removeEventListener('keydown', once);
+        };
+        document.addEventListener('pointerdown', once, { once: true });
+        document.addEventListener('keydown', once, { once: true });
+        tryFs();
+    })();
+
+    // ---- Управление с клавиатуры (стрелки) ----
+    document.addEventListener('keydown', e => {
+        if (finished) return;
+        const emptyIdx = state.indexOf(0);
+        const r = Math.floor(emptyIdx / SIZE), c = emptyIdx % SIZE;
+        let target = -1;
+
+        // Стрелка "вверх" — двигаем фишку, которая НИЖЕ пустой, вверх
+        if (e.key === 'ArrowUp'    && r < SIZE - 1) target = emptyIdx + SIZE;
+        if (e.key === 'ArrowDown'  && r > 0)        target = emptyIdx - SIZE;
+        if (e.key === 'ArrowLeft'  && c < SIZE - 1) target = emptyIdx + 1;
+        if (e.key === 'ArrowRight' && c > 0)        target = emptyIdx - 1;
+
+        if (target >= 0) {
+            e.preventDefault();
+            tryMove(target);
+            moves++;
+            movesEl.textContent = moves;
+            render();
+            checkSolved();
+        }
+    });
+
+    // ---- Старт ----
+    buildBoard();
+    newGame();
+    updateFsIcon();
+</script>
+</body>
+</html>
