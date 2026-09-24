@@ -352,6 +352,63 @@
     //                       ХРАНИЛИЩЕ ПЕРЕМЕННЫХ
     // ============================================================
     const vars = new Map();     // name -> число
+    
+    // ============================================================
+    //                    ЗВУК НАЖАТИЙ
+    // ============================================================
+    const CLICK_SRC = 'mg/res/click.mp3';
+    const CLICK_POOL_SIZE = 4;             // сколько копий звука держать
+    const clickPool = [];
+    let clickPoolIdx = 0;
+    let audioUnlocked = false;
+
+    function initClickSound() {
+        for (let i = 0; i < CLICK_POOL_SIZE; i++) {
+            const a = new Audio(CLICK_SRC);
+            a.preload = 'auto';
+            a.volume = 0.35;               // приглушим, чтобы не било по ушам
+            clickPool.push(a);
+        }
+    }
+
+    function playClick() {
+        if (!audioUnlocked) return;
+        const a = clickPool[clickPoolIdx];
+        clickPoolIdx = (clickPoolIdx + 1) % CLICK_POOL_SIZE;
+        try {
+            a.currentTime = 0;
+            // play() возвращает промис — на всякий случай гасим ошибки
+            const p = a.play();
+            if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* игнорируем */ }
+    }
+
+    // Разблокировка звука при первом взаимодействии (нужно для iOS/Chrome)
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        audioUnlocked = true;
+        // Проиграем «тишину» — это разблокирует аудио-контекст на мобильных
+        const a = new Audio(CLICK_SRC);
+        a.volume = 0;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => {});
+        // Останавливаем сразу
+        setTimeout(() => { try { a.pause(); } catch (e) {} }, 50);
+    }
+
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+
+    // Инициализация пула
+    initClickSound();
+    
+    function isTypingKey(e) {
+        // Печатная клавиша — это клавиша, которая вставляет символ в поле.
+        // e.key для букв/цифр/символов имеет длину 1, кроме спец-случаев.
+        if (e.ctrlKey || e.metaKey || e.altKey) return false;   // не Ctrl+C, не Cmd+V
+        if (e.key.length !== 1) return false;                    // Shift, Enter, Arrow, Tab, Esc
+        return true;
+    }
 
     // ============================================================
     //                       ЛОГ
@@ -1286,6 +1343,12 @@
     // Переназначаем обработчик Enter (иначе старый handleSubmit закешируется)
     inputEl.removeEventListener('keydown', handleSubmit);
     inputEl.addEventListener('keydown', e => {
+    
+        // Играем звук только для «печатных» клавиш
+        if (isTypingKey(e)) {
+            playClick();
+        }
+    
         if (e.key === 'Enter') {
             e.preventDefault();
             handleSubmit();
