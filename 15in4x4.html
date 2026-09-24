@@ -106,6 +106,8 @@
             cursor: pointer;
             transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.2s ease;
             will-change: transform;
+            position: relative;
+            z-index: 1;
         }
 
         .cell.empty {
@@ -133,13 +135,23 @@
             background: rgba(0, 255, 0, 0.1);
         }
 
-        .cell.pushed {
-            animation: push 0.16s ease-out;
+        /* --- Анимация скольжения --- */
+
+        /* «Едущая» фишка поднимается над сеткой и едет к цели */
+        .cell.sliding {
+            z-index: 5;
+            transition: transform 0.15s cubic-bezier(0.25, 0.8, 0.35, 1),
+                        box-shadow 0.15s ease;
+            box-shadow:
+                inset 0 0 22px rgba(0, 255, 255, 0.35),
+                0 0 18px rgba(0, 255, 255, 0.55);
+            pointer-events: none;
         }
 
-        @keyframes push {
-            0%   { transform: scale(0.9); }
-            100% { transform: scale(1); }
+        /* Пока идёт анимация — сетка не должна дёргаться от hover */
+        .board.animating .cell:not(.empty):hover {
+            background: rgba(0, 255, 255, 0.12);
+            box-shadow: inset 0 0 18px rgba(0, 255, 255, 0.15);
         }
 
         .cell.auto {
@@ -337,6 +349,7 @@
     const DEFAULT_STATUS  = 'Соберите числа по порядку';
     const SEARCH_LIMIT_MS = 30000;   // лимит поиска полного решения
     const HINT_LIMIT_MS   = 15000;   // лимит поиска подсказки
+    const SLIDE_MS        = 500;     // длительность анимации скольжения
 
     // Склонение: plural(5, ['ход', 'хода', 'ходов']) -> 'ходов'
     function plural(n, forms) {
@@ -368,6 +381,7 @@
     let startTime = 0;
     let timerInterval = null;
     let finished = false;
+    let animLock = false;        // блокировка ввода на время анимации
 
     // Авторешение / подсказка
     let solving = false;         // идёт поиск или демонстрация
@@ -400,7 +414,7 @@
         for (let i = 0; i < N; i++) {
             const v = state[i];
             const cell = cells[i];
-            cell.classList.remove('empty', 'correct', 'pushed', 'auto', 'hintcell');
+            cell.classList.remove('empty', 'correct', 'auto', 'hintcell');
             if (v === 0) {
                 cell.classList.add('empty');
                 cell.textContent = '';
@@ -415,7 +429,7 @@
     //                       ХОДЫ
     // ============================================================
     function onCellClick(i) {
-        if (finished || solving) return;
+        if (finished || solving || animLock) return;
         if (!tryMove(i)) return;
         moves++;
         movesEl.textContent = moves;
@@ -427,15 +441,64 @@
         return Math.abs((a >> 2) - (b >> 2)) + Math.abs((a & 3) - (b & 3)) === 1;
     }
 
+    // ============================================================
+    //                  АНИМАЦИЯ СКОЛЬЖЕНИЯ
+    // ============================================================
+    // Плавно двигает фишку из клетки from в клетку to.
+    // Логическое состояние (state) уже обновлено — здесь только визуал.
+    function animateSlide(from, to) {
+        const fromRect = cells[from].getBoundingClientRect();
+        const toRect   = cells[to].getBoundingClientRect();
+
+        const dx = fromRect.left - toRect.left;
+        const dy = fromRect.top  - toRect.top;
+
+        const el = cells[to];        // теперь «едущая» фишка живёт в клетке to
+        el.classList.add('sliding');
+        el.style.transform = `translate(${dx}px, ${dy}px)`;
+
+        animLock = true;
+        boardEl.classList.add('animating');
+
+        // Форсируем пересчёт стилей, затем — плавный переход к нулю
+        void el.offsetWidth;
+
+        requestAnimationFrame(() => {
+            el.style.transform = 'translate(0, 0)';
+        });
+
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            el.classList.remove('sliding');
+            el.style.transform = '';
+            boardEl.classList.remove('animating');
+            animLock = false;
+        };
+
+        el.addEventListener('transitionend', finish, { once: true });
+        // Страховка на случай, если transitionend не придёт
+        setTimeout(finish, SLIDE_MS + 60);
+    }
+
     function tryMove(i) {
+        if (animLock) return false;
+
         const emptyIdx = state.indexOf(0);
         if (!areAdjacent(i, emptyIdx)) return false;
 
-        state[emptyIdx] = state[i];
+        const moving = state[i];
+
+        // 1) Обновляем логику
+        state[emptyIdx] = moving;
         state[i] = 0;
 
-        cells[emptyIdx].classList.add('pushed');
-        setTimeout(() => cells[emptyIdx].classList.remove('pushed'), 180);
+        // 2) Перерисовываем сетку (номер уже в новой клетке),
+        //    но визуально «откатываем» его назад и едем вперёд
+        render();
+        animateSlide(i, emptyIdx);
+
         return true;
     }
 
@@ -482,15 +545,10 @@
     }
 
     // ============================================================
-    //                       РЕШАЕМОСТЬ (ИСПРАВЛЕНО)
+    //                       РЕШАЕМОСТЬ
     // ============================================================
-    // Для поля чётной ширины (4×4) чётности инверсий МАЛО — нужно ещё
-    // учитывать строку пустой клетки:
+    // Для поля чётной ширины (4×4):
     //     решаемо ⇔ (инверсии + строка пустой клетки снизу, 1-based) нечётно.
-    // Старая проверка (только inv % 2 === 0) была верна лишь когда пустая
-    // клетка лежала во 2-й или 4-й строке сверху, поэтому НОВАЯ ИГРА
-    // порождала нерешаемые расклады примерно в половине случаев — и решатель
-    // честно «не находил решение» за отведённое время.
     function isSolvable(a) {
         let inv = 0;
         const tiles = [];
@@ -523,22 +581,8 @@
     }
 
     // ============================================================
-    //                  IDA* SOLVER (переписан)
+    //                  IDA* SOLVER
     // ============================================================
-    //
-    // Что было не так в старой версии:
-    //   1) поиск шёл по живому массиву state, а при нахождении решения
-    //      рекурсия возвращалась ДО отката — поле «самособиралось»,
-    //      и демонстрация потом применяла ходы к уже собранному полю;
-    //   2) эвристика — чистый манхэттен: на дальних позициях не хватало 15 c.
-    //
-    // Теперь:
-    //   • работаем с КОПИЕЙ поля — исходное состояние не трогаем вообще;
-    //   • эвристика: манхэттен + линейные конфликты (допустимая, поэтому
-    //     решение остаётся оптимальным, но поиск в разы быстрее);
-    //   • функция полностью автономна (не видит внешних переменных),
-    //     поэтому её можно сериализовать и запустить в Web Worker.
-    //
     function solveIDA(startBoard, timeLimitMs) {
         timeLimitMs = timeLimitMs || 30000;
 
@@ -552,7 +596,7 @@
         var GOAL_R = [-1, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];
         var GOAL_C = [-1, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2];
 
-        // ГЛАВНОЕ ИСПРАВЛЕНИЕ: работаем с копией, а не с живым state.
+        // Работаем с копией, а не с живым state
         var arr = startBoard.slice();
 
         function isGoal() {
@@ -563,13 +607,10 @@
 
         // ---------- эвристика: манхэттен + линейные конфликты ----------
 
-        var rlc = [0, 0, 0, 0];  // сколько фишек обязаны покинуть строку r
-        var clc = [0, 0, 0, 0];  // сколько фишек обязаны покинуть столбец c
-        var curH = 0;            // h = манхэттен + 2 * (конфликты)
+        var rlc = [0, 0, 0, 0];
+        var clc = [0, 0, 0, 0];
+        var curH = 0;
 
-        // Минимум фишек, которые надо вывести из линии, чтобы убрать все
-        // конфликты = (число фишек) − (наибольшая возрастающая подпоследовательность
-        // их целевых позиций). Корректная (допустимая) версия линейного конфликта.
         function removals(g) {
             var m = g.length;
             if (m < 2) return 0;
@@ -619,8 +660,6 @@
             curH = man + 2 * lc;
         })();
 
-        // Ход «фишка из from → пустая клетка to» с инкрементальным
-        // пересчётом h. Откат хода — это doMove(to, from).
         function doMove(from, to) {
             var v = arr[from];
             var rF = from >> 2, cF = from & 3;
@@ -634,8 +673,6 @@
 
             var dlc = 0, x;
 
-            // строка, из которой ушла фишка, пересчитывается всегда;
-            // строка, в которую пришла, — только если это другая строка
             x = rowConflicts(rF); dlc += x - rlc[rF]; rlc[rF] = x;
             if (rT !== rF) { x = rowConflicts(rT); dlc += x - rlc[rT]; rlc[rT] = x; }
 
@@ -647,11 +684,10 @@
 
         // ---------- поиск с итеративным углублением ----------
 
-        var path = [];          // значения фишек в порядке ходов
+        var path = [];
         var nodes = 0;
         var timedOut = false;
-
-        var curEmpty = 0;       // чтобы сортировка не создавала замыкание на каждый узел
+        var curEmpty = 0;
 
         function nbCompare(a, b) {
             var va = arr[a], vb = arr[b];
@@ -660,13 +696,13 @@
                    - Math.abs(er - GOAL_R[va]) - Math.abs(ec - GOAL_C[va]);
             var ib = Math.abs((b >> 2) - GOAL_R[vb]) + Math.abs((b & 3) - GOAL_C[vb])
                    - Math.abs(er - GOAL_R[vb]) - Math.abs(ec - GOAL_C[vb]);
-            return ib - ia;     // ходы, сильнее уменьшающие манхэттен, — первыми
+            return ib - ia;
         }
 
         function search(g, bound, emptyIdx, prevEmpty) {
             var f = g + curH;
             if (f > bound) return f;
-            if (curH === 0) return -1;              // цель достигнута
+            if (curH === 0) return -1;
 
             nodes++;
             if ((nodes & 1023) === 0 && now() - t0 > timeLimitMs) {
@@ -688,16 +724,16 @@
             var minExcess = Infinity;
             for (var k = 0; k < nb.length; k++) {
                 var nIdx = nb[k];
-                if (nIdx === prevEmpty) continue;   // не откатываем предыдущий ход
+                if (nIdx === prevEmpty) continue;
 
                 path.push(arr[nIdx]);
                 doMove(nIdx, emptyIdx);
 
                 var t = search(g + 1, bound, nIdx, emptyIdx);
-                if (t === -1) return -1;            // решение найдено (path уже готов)
+                if (t === -1) return -1;
                 if (t < minExcess) minExcess = t;
 
-                doMove(emptyIdx, nIdx);             // откат
+                doMove(emptyIdx, nIdx);
                 path.pop();
 
                 if (timedOut) return Infinity;
@@ -711,20 +747,14 @@
             if (t === -1) {
                 return { path: path.slice(), nodes: nodes, timeMs: now() - t0 };
             }
-            if (timedOut || !isFinite(t)) return null;  // не хватило времени / нерешаемо
-            bound = t;                                  // следующая итерация углубления
+            if (timedOut || !isFinite(t)) return null;
+            bound = t;
         }
     }
 
     // ============================================================
     //        ПОИСК БЕЗ ЗАВИСАНИЯ (Web Worker + запасной вариант)
     // ============================================================
-    //
-    // solveIDA полностью автономна, поэтому её исходник сериализуется
-    // и запускается в Web Worker — интерфейс не замирает даже на сложных
-    // позициях. Если воркер недоступен (старый браузер, ограничения
-    // безопасности) — считаем синхронно, как раньше.
-
     function cancelSearch() {
         if (activeWorker) {
             try { activeWorker.terminate(); } catch (e) {}
@@ -775,7 +805,6 @@
                 resolve(res);
             }
 
-            // Страховка: воркер обязан ответить не позже limit + 5 c
             guard = setTimeout(() => finish(null), limit + 5000);
 
             worker.onmessage = e => finish(e.data);
@@ -784,7 +813,7 @@
                 settled = true;
                 if (guard) clearTimeout(guard);
                 killWorker();
-                solveSync();                        // воркер не завёлся — считаем сами
+                solveSync();
             };
 
             worker.postMessage({ board: board, limit: limit });
@@ -828,8 +857,6 @@
             return;
         }
 
-        // ИСПРАВЛЕНО: позицию сохраняем ДО поиска (раньше сохраняли уже
-        // испорченную). Она нужна для СТОПа и восстановления после демо.
         savedState = state.slice();
         savedMoves = moves;
 
@@ -842,7 +869,7 @@
 
         solveAsync(state.slice(), SEARCH_LIMIT_MS).then(result => {
             setThinking(false);
-            if (!solving || !searching) return;     // отменили (СТОП / новая игра)
+            if (!solving || !searching) return;
             searching = false;
 
             if (!result || !result.path || result.path.length === 0) {
@@ -879,16 +906,13 @@
         }
 
         function step() {
-            if (!solving) return;                   // нажали СТОП
+            if (!solving) return;
 
             if (idx >= path.length) {
-                // Демонстрация доиграна: даём секунду посмотреть на
-                // собранное поле и возвращаем игроку его позицию
-                // (демонстрация не засчитывается как победа).
                 boardEl.classList.add('win');
                 solveTimer = setTimeout(() => {
                     boardEl.classList.remove('win');
-                    if (!solving) return;           // успели нажать СТОП
+                    if (!solving) return;
                     restoreSavedPosition();
                     endDemo('Демонстрация завершена — позиция восстановлена, попробуйте сами!');
                 }, 1300);
@@ -900,30 +924,36 @@
             const to = state.indexOf(0);
 
             if (from < 0 || !areAdjacent(from, to)) {
-                // Практически недостижимо — страховка от рассинхронизации.
                 restoreSavedPosition();
                 endDemo('Демонстрация прервана');
                 return;
             }
 
+            // Обновляем логику и рисуем
             state[to] = v;
             state[from] = 0;
             moves++;
             movesEl.textContent = moves;
             render();
 
+            // Подсветка «авто-фишки» + скольжение
             const cell = cells[to];
             cell.classList.add('auto');
             setTimeout(() => cell.classList.remove('auto'), 240);
 
+            animateSlide(from, to);
+
             idx++;
-            solveTimer = setTimeout(step, 160);
+            // Пауза между ходами должна быть больше длительности анимации
+            solveTimer = setTimeout(step, Math.max(160, SLIDE_MS + 30));
         }
 
         step();
     }
 
     function restoreSavedPosition() {
+        animLock = false;
+        boardEl.classList.remove('animating');
         if (savedState) {
             state = savedState.slice();
             moves = savedMoves;
@@ -943,7 +973,7 @@
         boardEl.classList.remove('win');
         clearTimeout(solveTimer);
         solveTimer = null;
-        cancelSearch();                             // прерываем и фазу расчёта тоже
+        cancelSearch();
 
         if (wasActive) {
             restoreSavedPosition();
@@ -958,9 +988,6 @@
     // ============================================================
     //                       ПОДСКАЗКА
     // ============================================================
-    // ИСПРАВЛЕНО: раньше «подсказка» просто подсвечивала все фишки,
-    // которыми вообще можно походить. Теперь считается оптимальное
-    // решение и подсвечивается фишка, которой нужно сходить сейчас.
     function hint() {
         if (finished || solving || hintBusy) return;
 
@@ -982,13 +1009,13 @@
         const snapshot = state.join(',');
 
         solveAsync(state.slice(), HINT_LIMIT_MS).then(result => {
-            if (myEpoch !== searchEpoch) return;    // отменили новой игрой
+            if (myEpoch !== searchEpoch) return;
             hintBusy = false;
             hintBtn.disabled = false;
             setThinking(false);
 
             if (finished || solving) return;
-            if (state.join(',') !== snapshot) {     // позиция успела измениться
+            if (state.join(',') !== snapshot) {
                 statusEl.textContent = DEFAULT_STATUS;
                 return;
             }
@@ -1016,10 +1043,12 @@
     // ============================================================
     function newGame() {
         stopAutoSolve();
-        searchEpoch++;               // отменяем висящие подсказки
+        searchEpoch++;
         hintBusy = false;
         hintBtn.disabled = false;
         cancelSearch();
+        animLock = false;
+        boardEl.classList.remove('animating');
         shuffle();
         moves = 0;
         movesEl.textContent = '0';
@@ -1114,7 +1143,7 @@
     //                  КЛАВИАТУРА
     // ============================================================
     document.addEventListener('keydown', e => {
-        if (finished || solving) return;
+        if (finished || solving || animLock) return;
         const emptyIdx = state.indexOf(0);
         const r = (emptyIdx / SIZE) | 0, c = emptyIdx % SIZE;
         let target = -1;
