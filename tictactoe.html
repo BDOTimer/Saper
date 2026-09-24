@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Крестики-нолики 4×4</title>
+    <title>Крестики-нолики 4×4 (3 в ряд)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -264,6 +264,7 @@
 
 <script>
     const SIZE = 4;
+    const WIN_LEN = 3;          // <-- правило победы: 3 в ряд
     const PLAYER = 'X';
     const BOT    = 'O';
 
@@ -306,38 +307,44 @@
         resultScr.style.display = 'none';
     }
 
-    // ---- Проверка победы ----
-    // Возвращает { winner: 'X'|'O', line: [i1,i2,i3,i4] } или null
+    // ---- Проверка победы (3 в ряд) ----
+    // Ищем любые линии длиной ровно 3 (или более) одинаковых символов
+    // по горизонтали, вертикали и обеим диагоналям.
+    // Возвращает { winner: 'X'|'O', line: [...] } или null.
     function checkWin(g) {
-        // Горизонтали
+        // Все направления: вправо, вниз, вниз-вправо, вниз-влево
+        const dirs = [
+            [0, 1],   // горизонталь
+            [1, 0],   // вертикаль
+            [1, 1],   // главная диагональ
+            [1, -1]   // побочная диагональ
+        ];
+
         for (let r = 0; r < SIZE; r++) {
-            const start = r * SIZE;
-            const v = g[start];
-            if (v && [1,2,3].every(k => g[start + k] === v)) {
-                return { winner: v, line: [start, start+1, start+2, start+3] };
-            }
-        }
-        // Вертикали
-        for (let c = 0; c < SIZE; c++) {
-            const v = g[c];
-            if (v && [1,2,3].every(k => g[c + k * SIZE] === v)) {
-                return { winner: v, line: [c, c+SIZE, c+2*SIZE, c+3*SIZE] };
-            }
-        }
-        // Главная диагональ
-        {
-            const v = g[0];
-            if (v && [1,2,3].every(k => g[k * (SIZE + 1)] === v)) {
-                const line = [0,1,2,3].map(k => k * (SIZE + 1));
-                return { winner: v, line };
-            }
-        }
-        // Побочная диагональ
-        {
-            const v = g[SIZE - 1];
-            if (v && [1,2,3].every(k => g[(SIZE - 1) + k * (SIZE - 1)] === v)) {
-                const line = [0,1,2,3].map(k => (SIZE - 1) + k * (SIZE - 1));
-                return { winner: v, line };
+            for (let c = 0; c < SIZE; c++) {
+                const startIdx = r * SIZE + c;
+                const v = g[startIdx];
+                if (!v) continue;
+
+                for (const [dr, dc] of dirs) {
+                    // Проверяем, что линия из WIN_LEN клеток не выходит за границы
+                    const endR = r + dr * (WIN_LEN - 1);
+                    const endC = c + dc * (WIN_LEN - 1);
+                    if (endR < 0 || endR >= SIZE || endC < 0 || endC >= SIZE) continue;
+
+                    const line = [];
+                    let ok = true;
+                    for (let k = 0; k < WIN_LEN; k++) {
+                        const rr = r + dr * k;
+                        const cc = c + dc * k;
+                        const idx = rr * SIZE + cc;
+                        if (g[idx] !== v) { ok = false; break; }
+                        line.push(idx);
+                    }
+                    if (ok) {
+                        return { winner: v, line };
+                    }
+                }
             }
         }
         return null;
@@ -401,9 +408,8 @@
             const test = grid.slice(); test[i] = PLAYER;
             if (checkWin(test)) return i;
         }
-        // 3. Центр (если свободен) — стратегически важно на 4×4
+        // 3. Центр (если свободен) — стратегически важно
         const center = [];
-        // для 4×4 «центр» — четыре центральные клетки
         const mid = [SIZE/2 - 1, SIZE/2];
         for (const r of mid) for (const c of mid) center.push(r * SIZE + c);
         const freeCenter = center.filter(i => !grid[i]);
