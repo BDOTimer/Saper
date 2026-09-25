@@ -138,6 +138,11 @@
             background: rgba(0, 255, 255, 0.4);
             color: #000;
         }
+        
+        body.hide-cursor,
+        body.hide-cursor * {
+            cursor: none !important;
+        }
     </style>
 </head>
 <body>
@@ -163,6 +168,108 @@
 </div>
 
 <script>
+
+// ============================================================
+//  Скрытие курсора через 3 секунды бездействия
+// ============================================================
+
+    let cursorTimer = null;
+
+    function hideCursor() {
+        document.body.classList.add('hide-cursor');
+    }
+
+    function showCursor() {
+        document.body.classList.remove('hide-cursor');
+        clearTimeout(cursorTimer);
+        cursorTimer = setTimeout(hideCursor, 3000);
+    }
+
+    // Любое движение мыши/тап/нажатие клавиши — показать и перезапустить таймер
+    // 'mousemove', 
+    ['mousedown', 'pointerdown', 'touchstart', 'keydown', 'wheel']
+        .forEach(evt => document.addEventListener(evt, showCursor, { passive: true }));
+
+    // Запускаем таймер сразу при загрузке
+    showCursor();
+
+// ============================================================
+//                    ЗВУК НАЖАТИЙ
+// ============================================================
+const SOUNDS = {
+    kick: { src: 'res/kickball-1.mp3', volume: 0.45, pool: 2 },
+    goal: { src: 'res/gol-1.mp3',      volume: 0.35, pool: 2 },
+};
+
+const audioUnlocked = { value: false };
+
+/**
+ * Создаёт объект-плеер: пул Audio + метод play().
+ * @param {string} src
+ * @param {number} volume
+ * @param {number} poolSize
+ */
+function createSound(src, volume, poolSize = 2) {
+    const pool = Array.from({ length: poolSize }, () => {
+        const a = new Audio(src);
+        a.preload = 'auto';
+        a.volume = volume;
+        return a;
+    });
+    let idx = 0;
+
+    return {
+        play() {
+            if (!audioUnlocked.value) return;
+            const a = pool[idx];
+            idx = (idx + 1) % poolSize;
+            try {
+                a.currentTime = 0;
+                const p = a.play();
+                if (p && p.catch) p.catch(() => {});
+            } catch (_) {}
+        },
+        // «Прогрев» для разблокировки аудио на мобильных
+        warmup() {
+            const a = pool[0];
+            const prev = a.volume;
+            a.volume = 0;
+            const p = a.play();
+            if (p && p.catch) p.catch(() => {});
+            setTimeout(() => {
+                try { a.pause(); a.currentTime = 0; } catch (_) {}
+                a.volume = prev;
+            }, 60);
+        },
+    };
+}
+
+// Создаём звуки
+const sounds = Object.fromEntries(
+    Object.entries(SOUNDS).map(([name, cfg]) => [
+        name,
+        createSound(cfg.src, cfg.volume, cfg.pool),
+    ])
+);
+
+// Удобные обёртки
+const playClick = () => sounds.kick.play();
+const playGoal  = () => sounds.goal.play();
+
+// ---------- Разблокировка аудио (нужен жест пользователя) ----------
+function unlockAudio() {
+    if (audioUnlocked.value) return;
+    audioUnlocked.value = true;
+    Object.values(sounds).forEach(s => s.warmup());
+}
+
+//unlockAudio();
+
+['mousemove', 'pointerdown', 'touchstart', 'keydown', 'mousemove'].forEach(evt => {
+    document.addEventListener(evt, unlockAudio, { passive: true });
+});
+    
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
@@ -293,23 +400,29 @@
             ball.dx = Math.abs(ball.dx);
             ball.dx += 0.3;
             ball.dy += (ball.y - (player.y + player.height / 2)) * 0.1;
+            
+            playClick(); 
         }
 
         if (collides(ball, computer)) {
             ball.dx = -Math.abs(ball.dx);
             ball.dx -= 0.3;
             ball.dy += (ball.y - (computer.y + computer.height / 2)) * 0.1;
+            
+            playClick(); 
         }
 
         if (ball.x - ball.radius < 0) {
             computerScore++;
             computerScoreSpan.textContent = computerScore;
+            playGoal();
             resetBall(false);
         }
 
         if (ball.x + ball.radius > canvas.width) {
             playerScore++;
             playerScoreSpan.textContent = playerScore;
+            playGoal();
             resetBall(true);
         }
 
