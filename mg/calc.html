@@ -544,15 +544,37 @@
                 continue;
             }
 
-            // Идентификаторы (переменные, функции, константы)
-            if (/[A-Za-z_]/.test(c)) {
-                let j = i;
-                while (j < n && /[A-Za-z0-9_]/.test(src[j])) j++;
-                const text = src.slice(i, j);
-                tokens.push({ type: TT.IDENT, value: text });
-                i = j;
-                continue;
-            }
+
+// Идентификаторы (переменные, функции, константы)
+// Идентификаторы (переменные, функции, константы) — Unicode-aware
+// Разрешаем: буквы (в т.ч. кириллица, греческий, CJK), цифры, _
+// Эмодзи — отдельным классом Extended_Pictographic.
+const IDENT_START = /[\p{L}\p{Nl}_]/u;                     // буква или _
+const IDENT_PART  = /[\p{L}\p{Nl}\p{Nd}\p{Mn}\p{Mc}_]/u;   // буква, цифра, диакритика, _
+const EMOJI       = /\p{Extended_Pictographic}/u;          // эмодзи
+const ZWJ         = /\u200D/u;                             // zero-width joiner (для 👨‍👩‍👧)
+const VS16        = /\uFE0F/u;                             // variation selector-16 (для ☺️)
+
+if (IDENT_START.test(c) || EMOJI.test(c)) {
+    let j = i;
+    // Первый «символ» (может быть эмодзи из нескольких code points)
+    j += (EMOJI.test(c) ? c.length : 1);
+
+    while (j < n) {
+        const ch = src[j];
+        if (IDENT_PART.test(ch)) { j++; continue; }
+        // Эмодзи внутри имени (например, "счёт_🔥")
+        const rest = src.slice(j, j + 2);
+        if (EMOJI.test(ch)) { j += ch.length; continue; }
+        // ZWJ-последовательности и variation selectors
+        if (ZWJ.test(ch) || VS16.test(ch)) { j++; continue; }
+        break;
+    }
+    const text = src.slice(i, j);
+    tokens.push({ type: TT.IDENT, value: text });
+    i = j;
+    continue;
+}
 
             // Скобки и запятая
             if (c === '(') { tokens.push({ type: TT.LPAREN, value: '(' }); i++; continue; }
