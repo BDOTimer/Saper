@@ -205,6 +205,7 @@
         linedel : { src: 'res/tetris/1/linedel-1.mp3'  , volume: 0.55, pool: 2 }, /// удаление линии
         move    : { src: 'res/tetris/1/move-1.mp3'     , volume: 0.35, pool: 3 }, /// смещение
         rot     : { src: 'res/tetris/1/rot-1.mp3'      , volume: 0.35, pool: 3 }, /// вращение
+        death   : { src: 'res/tetris/1/death.mp3'      , volume: 0.55, pool: 1 }, /// вращение
     };
 
     const audioUnlocked = { value: false };
@@ -264,6 +265,7 @@
     // sounds.linedel.play();
     // sounds.move.play();
     // sounds.rot.play();
+    // sounds.death.play();
     
     // ---------- Разблокировка аудио (нужен жест пользователя) ----------
     function unlockAudio() {
@@ -627,7 +629,7 @@
 
     function endGame() {
         gameOver = true;
-        sounds.linedel.play();
+        sounds.death.play();
         
         document.getElementById('winnerText').textContent = 'Игра окончена! Очки: ' + score;
         document.getElementById('winScreen').style.display = 'flex';
