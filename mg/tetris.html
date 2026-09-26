@@ -166,7 +166,7 @@
 </head>
 <body>
 
-<a href="../index.html" class="back-btn">← Меню</a>
+<a href="../index.html" class="back-btn" id="backBtn">← Меню</a>
 
 <div class="game-wrapper">
     <div class="scoreboard">
@@ -195,91 +195,38 @@
     </div>
 </div>
 
+<script src="js/sound-lib.js"></script>
 <script>
     // ============================================================
     //                    ЗВУК НАЖАТИЙ
     // ============================================================
-    const SOUNDS = {
-        kickFig : { src: 'res/tetris/1/kick-fig-1.mp3' , volume: 0.45, pool: 2 }, /// удар об фигуры
-        kickSide: { src: 'res/tetris/1/kick-side-1.mp3', volume: 0.45, pool: 2 }, /// удар об стенки и дно
-        linedel : { src: 'res/tetris/1/linedel-1.mp3'  , volume: 0.55, pool: 2 }, /// удаление линии
-        move    : { src: 'res/tetris/1/move-1.mp3'     , volume: 0.35, pool: 3 }, /// смещение
-        rot     : { src: 'res/tetris/1/rot-1.mp3'      , volume: 0.35, pool: 3 }, /// вращение
-        death   : { src: 'res/tetris/1/death.mp3'      , volume: 0.55, pool: 1 }, /// вращение
-    };
+    
+    const kit = SoundKit.createSoundKit({
+      kickFig : { src: 'res/tetris/1/kick-fig-1.mp3' , volume: 0.45, pool: 2 },
+      kickSide: { src: 'res/tetris/1/kick-side-1.mp3', volume: 0.45, pool: 2 },
+      linedel : { src: 'res/tetris/1/linedel-1.mp3'  , volume: 0.55, pool: 2 },
+      move    : { src: 'res/tetris/1/move-1.mp3'     , volume: 0.35, pool: 3 },
+      rot     : { src: 'res/tetris/1/rot-1.mp3'      , volume: 0.35, pool: 3 },
+      death   : { src: 'res/tetris/1/death.mp3'      , volume: 0.55, pool: 1 },
+    });
 
-    const audioUnlocked = { value: false };
+    kit.autoUnlock();
 
-    /**
-     * Создаёт объект-плеер: пул Audio + метод play().
-     * @param {string} src
-     * @param {number} volume
-     * @param {number} poolSize
-     */
-    function createSound(src, volume, poolSize = 2) {
-        const pool = Array.from({ length: poolSize }, () => {
-            const a = new Audio(src);
-            a.preload = 'auto';
-            a.volume = volume;
-            return a;
-        });
-        let idx = 0;
+    // kit.sounds.move.play();
+    // kit.sounds.rot.play();
 
-        return {
-            play() {
-                if (!audioUnlocked.value) return;
-                const a = pool[idx];
-                idx = (idx + 1) % poolSize;
-                try {
-                    a.currentTime = 0;
-                    const p = a.play();
-                    if (p && p.catch) p.catch(() => {});
-                } catch (_) {}
-            },
-            // «Прогрев» для разблокировки аудио на мобильных
-            warmup() {
-                const a = pool[0];
-                const prev = a.volume;
-                a.volume = 0;
-                const p = a.play();
-                if (p && p.catch) p.catch(() => {});
-                setTimeout(() => {
-                    try { a.pause(); a.currentTime = 0; } catch (_) {}
-                    a.volume = prev;
-                }, 60);
-            },
-        };
-    }
-
-    // Создаём звуки
-    const sounds = Object.fromEntries(
-        Object.entries(SOUNDS).map(([name, cfg]) => [
-            name,
-            createSound(cfg.src, cfg.volume, cfg.pool),
-        ])
-    );
+    // kit.setMuted(true);
+    // kit.setMuted(false);
 
     // Играем звуи:
-    // sounds.kickFig.play();
-    // sounds.kickSide.play();
-    // sounds.linedel.play();
-    // sounds.move.play();
-    // sounds.rot.play();
-    // sounds.death.play();
+    // kit.sounds.kickFig.play();
+    // kit.sounds.kickSide.play();
+    // kit.sounds.linedel.play();
+    // kit.sounds.move.play();
+    // kit.sounds.rot.play();
+    // kit.sounds.death.play();
     
-    // ---------- Разблокировка аудио (нужен жест пользователя) ----------
-    function unlockAudio() {
-        if (audioUnlocked.value) return;
-        audioUnlocked.value = true;
-        Object.values(sounds).forEach(s => s.warmup());
-    }
-
-    ['mousemove', 'pointerdown', 'touchstart', 'keydown', 'mousemove'].forEach(evt => {
-        document.addEventListener(evt, unlockAudio, { passive: true });
-    });
         
-
-
     // ============================================================
     // ...
     // ============================================================
@@ -430,7 +377,7 @@
         }
         currentPiece.shape = rotated;
         currentPiece.x += offset;
-        sounds.rot.play();               // ← звук успешного вращения
+        kit.sounds.rot.play();               // ← звук успешного вращения
         draw();
     }
 
@@ -438,7 +385,7 @@
         if (!currentPiece || gameOver) return;
         if (!collides(currentPiece.shape, currentPiece.x + dir, currentPiece.y)) {
             currentPiece.x += dir;
-            sounds.move.play();          // ← звук успешного сдвига
+            kit.sounds.move.play();          // ← звук успешного сдвига
             draw();
         } else {
             playBlockedSound(dir, 0);    // ← удар о стенку/фигуру
@@ -471,8 +418,8 @@
 
     function playBlockedSound(dx, dy) {
         const cause = checkBlockedBy(dx, dy);
-        if (cause === 'fig')  sounds.kickFig.play();
-        if (cause === 'side') sounds.kickSide.play();
+        if (cause === 'fig')  kit.sounds.kickFig.play();
+        if (cause === 'side') kit.sounds.kickSide.play();
     }
 
     function softDrop() {
@@ -514,7 +461,7 @@
             }
         }
         if (cleared > 0) {
-            sounds.linedel.play();    // ← звук удаления линии(й)
+            kit.sounds.linedel.play();    // ← звук удаления линии(й)
             const points = [0, 100, 300, 500, 800];
             score += points[cleared] * level;
             lines += cleared;
@@ -629,7 +576,7 @@
 
     function endGame() {
         gameOver = true;
-        sounds.death.play();
+        kit.sounds.death.play();
         
         document.getElementById('winnerText').textContent = 'Игра окончена! Очки: ' + score;
         document.getElementById('winScreen').style.display = 'flex';
@@ -675,6 +622,11 @@
 
     // ---------- СТАРТ ----------
     resetGame();
+    
+    // ---------- ОЧИСТКА РЕСУРСОВ ПРИ УХОДЕ ----------
+    document.getElementById('backBtn').addEventListener('click', () => {
+        kit.dispose();
+    });
 </script>
 </body>
 </html>
