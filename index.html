@@ -98,6 +98,10 @@
         overflow: hidden;
         box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
     }
+    
+    .menu-btn[hidden] {
+        display: none;
+    }
 
         .menu-btn .num {
             color: #fff;
@@ -168,6 +172,15 @@
             <span><span class="num">01</span>ELITE-2[🪒]</span>
             <span class="arrow">▶</span>
         </a>
+        
+        <!--
+        ... Новое ...
+        -->
+        <a href="mg/3lines.html" class="menu-btn" data-game="3lines">
+            <span><span class="num">07</span>ТРИ В ЛИНИЮ</span>
+            <span class="arrow">▶</span>
+        </a>
+        
         <a href="mg/calc.html" class="menu-btn" data-game="calc">
             <span><span class="num">02</span>Калькулятор</span>
             <span class="arrow">▶</span>
@@ -188,7 +201,11 @@
             <span><span class="num">06</span>TETRIS</span>
             <span class="arrow">▶</span>
         </a>
-        <a href="mg/tictactoe.html" class="menu-btn" data-game="tictactoe">
+        
+        <!--
+        ... Скрыто ...
+        -->
+        <a href="mg/tictactoe.html" class="menu-btn" data-game="tictactoe" hidden>
             <span><span class="num">07</span>КРЕСТИКИ 4×4</span>
             <span class="arrow">▶</span>
         </a>

@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Три в ряд</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a14;
+            font-family: 'Courier New', monospace;
+        }
+
+        .game-wrapper {
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            touch-action: none;
+        }
+
+        canvas {
+            max-width: 95vw;
+            max-height: 72vh;
+            width: auto;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            image-rendering: pixelated;
+            background-color: #000;
+            border: 2px solid #0ff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.4);
+        }
+
+        .scoreboard {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: clamp(16px, 4vw, 24px);
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 0 0 10px #0ff;
+            white-space: nowrap;
+        }
+
+        .winner-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.95);
+            color: #fff;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 30;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .winner-screen h2 {
+            margin-bottom: 20px;
+            font-size: clamp(22px, 7vw, 32px);
+            text-shadow: 0 0 15px #0ff;
+        }
+
+        .winner-screen button,
+        .back-btn {
+            padding: 15px 30px;
+            font-size: clamp(16px, 4vw, 20px);
+            background: #0ff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            border-radius: 10px;
+            font-weight: bold;
+            font-family: inherit;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 8px 16px;
+            font-size: clamp(13px, 3vw, 16px);
+            background: rgba(0, 255, 255, 0.15);
+            color: #0ff;
+            border: 2px solid #0ff;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+            z-index: 25;
+        }
+
+        .back-btn:active {
+            background: rgba(0, 255, 255, 0.4);
+            color: #000;
+        }
+
+        body.hide-cursor,
+        body.hide-cursor * { cursor: none !important; }
+    </style>
+</head>
+<body>
+
+<a href="../index.html" class="back-btn">← Меню</a>
+
+<div class="game-wrapper">
+    <div class="scoreboard">
+        Очки: <span id="score">0</span> | Ходы: <span id="moves">30</span> | Цель: <span id="target">1000</span>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="winner-screen" id="winScreen">
+        <h2 id="winnerText"></h2>
+        <button onclick="resetGame()">Играть снова</button>
+    </div>
+</div>
+
+<script>
+
+// ============================================================
+//  Скрытие курсора через 3 секунды бездействия
+// ============================================================
+    let cursorTimer = null;
+    function hideCursor() { document.body.classList.add('hide-cursor'); }
+    function showCursor() {
+        document.body.classList.remove('hide-cursor');
+        clearTimeout(cursorTimer);
+        cursorTimer = setTimeout(hideCursor, 3000);
+    }
+    ['mousedown', 'pointerdown', 'touchstart', 'keydown', 'wheel', 'mousemove']
+        .forEach(evt => document.addEventListener(evt, showCursor, { passive: true }));
+    showCursor();
+
+// ============================================================
+//                    ЗВУК
+// ============================================================
+const SOUNDS = {
+    kick: { src: 'res/kickball-1.mp3', volume: 0.45, pool: 3 },
+    goal: { src: 'res/gol-1.mp3',      volume: 0.35, pool: 2 },
+};
+
+const audioUnlocked = { value: false };
+
+function createSound(src, volume, poolSize = 2) {
+    const pool = Array.from({ length: poolSize }, () => {
+        const a = new Audio(src);
+        a.preload = 'auto';
+        a.volume = volume;
+        return a;
+    });
+    let idx = 0;
+
+    return {
+        play() {
+            if (!audioUnlocked.value) return;
+            const a = pool[idx];
+            idx = (idx + 1) % poolSize;
+            try {
+                a.currentTime = 0;
+                const p = a.play();
+                if (p && p.catch) p.catch(() => {});
+            } catch (_) {}
+        },
+        warmup() {
+            const a = pool[0];
+            const prev = a.volume;
+            a.volume = 0;
+            const p = a.play();
+            if (p && p.catch) p.catch(() => {});
+            setTimeout(() => {
+                try { a.pause(); a.currentTime = 0; } catch (_) {}
+                a.volume = prev;
+            }, 60);
+        },
+    };
+}
+
+const sounds = Object.fromEntries(
+    Object.entries(SOUNDS).map(([name, cfg]) => [
+        name, createSound(cfg.src, cfg.volume, cfg.pool),
+    ])
+);
+
+const playClick = () => sounds.kick.play();
+const playGoal  = () => sounds.goal.play();
+
+function unlockAudio() {
+    if (audioUnlocked.value) return;
+    audioUnlocked.value = true;
+    Object.values(sounds).forEach(s => s.warmup());
+}
+
+['mousemove', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+    document.addEventListener(evt, unlockAudio, { passive: true });
+});
+
+// ============================================================
+//                    ЛОГИКА ИГРЫ
+// ============================================================
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const baseSize = 600;
+    const ROWS = 8;
+    const COLS = 8;
+    const COLORS = [
+        { main: '#0ff', glow: 'rgba(0,255,255,0.8)' },
+        { main: '#f0f', glow: 'rgba(255,0,255,0.8)' },
+        { main: '#ff0', glow: 'rgba(255,255,0,0.8)' },
+        { main: '#0f0', glow: 'rgba(0,255,0,0.8)' },
+        { main: '#f80', glow: 'rgba(255,136,0,0.8)' },
+        { main: '#a0f', glow: 'rgba(160,0,255,0.8)' },
+    ];
+
+    // Длительности анимаций (мс)
+    const SWAP_DURATION  = 180;
+    const FALL_DURATION  = 260;
+    const POP_DURATION   = 220;
+
+    function resizeCanvas() {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        let targetSize = Math.min(vw * 0.95, vh * 0.72, baseSize);
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', () => { resizeCanvas(); });
+
+    const scoreSpan = document.getElementById('score');
+    const movesSpan = document.getElementById('moves');
+    const targetSpan = document.getElementById('target');
+
+    let score = 0;
+    let moves = 30;
+    let target = 1000;
+
+    // Логическое поле: board[r][c] = { color, x, y } или null (пусто)
+    let board = [];
+    let cellSize = 0;
+
+    // FIX (баг 2): animating теперь означает «идёт весь каскад целиком»
+    // (от начала свапа до полного успокоения поля), а не «идёт одна анимация».
+    let animating = false;
+    let animations = [];  // { type, ... }
+
+    // FIX (баг 3): храним таймер отложенного шага каскада,
+    // чтобы его можно было отменить при сбросе игры.
+    let cascadeTimer = null;
+
+    // Выделение / свайп
+    let selected = null;
+    let swipeStart = null;
+    let hoverCell = null;
+
+    function randColor() {
+        return Math.floor(Math.random() * COLORS.length);
+    }
+
+    // Инициализация поля: каждая клетка — объект { color, x, y }
+    function createBoard() {
+        board = [];
+        for (let r = 0; r < ROWS; r++) {
+            board[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                board[r][c] = { color: randColor(), x: c, y: r };
+            }
+        }
+        // Убираем стартовые совпадения
+        let guard = 0;
+        while (findMatches().length > 0 && guard++ < 200) {
+            const matches = findMatches();
+            for (const m of matches) {
+                board[m.r][m.c].color = randColor();
+            }
+        }
+        if (!hasPossibleMove()) {
+            createBoard();
+        }
+    }
+
+    function findMatches() {
+        const matches = [];
+        const mark = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+
+        // Горизонтали
+        for (let r = 0; r < ROWS; r++) {
+            let runStart = 0;
+            for (let c = 1; c <= COLS; c++) {
+                if (c < COLS && board[r][c] && board[r][runStart] &&
+                    board[r][c].color === board[r][runStart].color &&
+                    board[r][c].color >= 0) continue;
+                const runLen = c - runStart;
+                if (runLen >= 3 && board[r][runStart] && board[r][runStart].color >= 0) {
+                    for (let k = runStart; k < c; k++) mark[r][k] = true;
+                }
+                runStart = c;
+            }
+        }
+
+        // Вертикали
+        for (let c = 0; c < COLS; c++) {
+            let runStart = 0;
+            for (let r = 1; r <= ROWS; r++) {
+                if (r < ROWS && board[r][c] && board[runStart][c] &&
+                    board[r][c].color === board[runStart][c].color &&
+                    board[r][c].color >= 0) continue;
+                const runLen = r - runStart;
+                if (runLen >= 3 && board[runStart][c] && board[runStart][c].color >= 0) {
+                    for (let k = runStart; k < r; k++) mark[k][c] = true;
+                }
+                runStart = r;
+            }
+        }
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (mark[r][c]) matches.push({ r, c });
+            }
+        }
+        return matches;
+    }
+
+    function isAdjacent(a, b) {
+        return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
+    }
+
+    function hasPossibleMove() {
+        const swap = (a, b) => {
+            const tmp = board[a.r][a.c];
+            board[a.r][a.c] = board[b.r][b.c];
+            board[b.r][b.c] = tmp;
+        };
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (c + 1 < COLS) {
+                    swap({r, c}, {r, c: c+1});
+                    if (findMatches().length > 0) { swap({r, c}, {r, c: c+1}); return true; }
+                    swap({r, c}, {r, c: c+1});
+                }
+                if (r + 1 < ROWS) {
+                    swap({r, c}, {r: r+1, c});
+                    if (findMatches().length > 0) { swap({r, c}, {r: r+1, c}); return true; }
+                    swap({r, c}, {r: r+1, c});
+                }
+            }
+        }
+        return false;
+    }
+
+    // ---------- Анимации ----------
+
+    // Свап двух клеток: плавное смещение плиток
+    function animateSwap(a, b, onDone) {
+        const tileA = board[a.r][a.c];
+        const tileB = board[b.r][b.c];
+
+        const aStartX = tileA.x, aStartY = tileA.y;
+        const bStartX = tileB.x, bStartY = tileB.y;
+
+        // Логически меняем местами
+        board[a.r][a.c] = tileB;
+        board[b.r][b.c] = tileA;
+
+        const anim = {
+            type: 'swap',
+            t: 0,
+            duration: SWAP_DURATION,
+            apply(p) {
+                tileA.x = aStartX + (b.c - aStartX) * p;
+                tileA.y = aStartY + (b.r - aStartY) * p;
+                tileB.x = bStartX + (a.c - bStartX) * p;
+                tileB.y = bStartY + (a.r - bStartY) * p;
+            },
+            finish() {
+                tileA.x = b.c; tileA.y = b.r;
+                tileB.x = a.c; tileB.y = a.r;
+                if (onDone) onDone();
+            }
+        };
+        animations.push(anim);
+    }
+
+    // Анимация исчезновения: плитки уменьшаются и исчезают
+    function animatePop(cells, onDone) {
+        const list = cells.map(({r, c}) => ({ tile: board[r][c], r, c }));
+        const anim = {
+            type: 'pop',
+            t: 0,
+            duration: POP_DURATION,
+            apply(p) {
+                for (const it of list) {
+                    it.tile.popProgress = p;
+                }
+            },
+            finish() {
+                for (const it of list) {
+                    if (board[it.r] && board[it.r][it.c] === it.tile) {
+                        board[it.r][it.c] = null;
+                    }
+                }
+                if (onDone) onDone();
+            }
+        };
+        animations.push(anim);
+    }
+
+    // Анимация падения
+    function animateFall(moves, onDone) {
+        const anim = {
+            type: 'fall',
+            t: 0,
+            duration: FALL_DURATION,
+            apply(p) {
+                for (const m of moves) {
+                    const local = Math.max(0, Math.min(1, (p - (m.delay || 0)) / (1 - (m.delay || 0))));
+                    const e = 1 - Math.pow(1 - local, 3); // ease-out cubic
+                    m.tile.x = m.fromX + (m.toX - m.fromX) * e;
+                    m.tile.y = m.fromY + (m.toY - m.fromY) * e;
+                }
+            },
+            finish() {
+                for (const m of moves) {
+                    m.tile.x = m.toX;
+                    m.tile.y = m.toY;
+                }
+                if (onDone) onDone();
+            }
+        };
+        animations.push(anim);
+    }
+
+    // FIX (баг 2): здесь больше НЕТ сброса animating и вызова checkGameEnd.
+    // Кончилась отдельная анимация — не значит, что закончился ход:
+    // цепочка каскада склеена через setTimeout, и раньше в этих «дырах»
+    // ввод открывался, а итоги проверялись преждевременно.
+    function updateAnimations(dt) {
+        for (let i = animations.length - 1; i >= 0; i--) {
+            const a = animations[i];
+            a.t += dt;
+            const p = Math.min(1, a.t / a.duration);
+            a.apply(p);
+            if (p >= 1) {
+                a.finish();
+                animations.splice(i, 1);
+            }
+        }
+    }
+
+    // FIX (баг 3): единая точка планирования продолжения каскада —
+    // таймер всегда под контролем и отменяется при сбросе.
+    function scheduleResolve(delay) {
+        clearTimeout(cascadeTimer);
+        cascadeTimer = setTimeout(resolveMatches, delay);
+    }
+
+    // ---------- Игровой цикл разрешения совпадений ----------
+
+    function resolveMatches() {
+        cascadeTimer = null;
+        const matches = findMatches();
+        if (matches.length === 0) {
+            if (!hasPossibleMove()) {
+                shuffleBoard();
+                scheduleResolve(350);
+                return;
+            }
+            // FIX (баг 2): каскад полностью закончился — только теперь
+            // открываем ввод и проверяем итоги хода (очки за весь каскад
+            // уже начислены). Раньше «Ходы кончились» могло выскочить
+            // ещё до подсчёта последнего каскада.
+            animating = false;
+            checkGameEnd();
+            return;
+        }
+
+        const gained = matches.length * 10 + Math.max(0, matches.length - 3) * 15;
+        score += gained;
+        scoreSpan.textContent = score;
+        playClick();
+
+        animating = true;
+        animatePop(matches, () => {
+            const fallMoves = applyGravityWithAnimation();
+            if (fallMoves.length > 0) {
+                animateFall(fallMoves, () => scheduleResolve(40));
+            } else {
+                scheduleResolve(40);
+            }
+        });
+    }
+
+    // Падение: возвращает список движений для анимации
+    function applyGravityWithAnimation() {
+        const moves = [];
+
+        for (let c = 0; c < COLS; c++) {
+            let writeRow = ROWS - 1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][c] !== null) {
+                    if (writeRow !== r) {
+                        const tile = board[r][c];
+                        board[r][c] = null;
+                        board[writeRow][c] = tile;
+                        moves.push({
+                            tile,
+                            fromX: tile.x,
+                            fromY: tile.y,
+                            toX: c,
+                            toY: writeRow,
+                            delay: 0,
+                        });
+                    }
+                    writeRow--;
+                }
+            }
+
+            // Заполняем верх новыми плитками, которые «прилетают» сверху
+            let newIndex = 0;
+            for (let r = writeRow; r >= 0; r--) {
+                const tile = {
+                    color: randColor(),
+                    x: c,
+                    y: r - (writeRow + 1) - 1, // стартуем выше поля
+                };
+                board[r][c] = tile;
+                moves.push({
+                    tile,
+                    fromX: c,
+                    fromY: tile.y,
+                    toX: c,
+                    toY: r,
+                    delay: Math.min(0.35, newIndex * 0.05),
+                });
+                newIndex++;
+            }
+        }
+
+        return moves;
+    }
+
+    function shuffleBoard() {
+        const all = [];
+        for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++)
+                if (board[r][c]) all.push(board[r][c].color);
+
+        let guard = 0;
+        do {
+            for (let i = all.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [all[i], all[j]] = [all[j], all[i]];
+            }
+            let k = 0;
+            for (let r = 0; r < ROWS; r++)
+                for (let c = 0; c < COLS; c++)
+                    if (board[r][c]) board[r][c].color = all[k++];
+        } while ((findMatches().length > 0 || !hasPossibleMove()) && guard++ < 100);
+    }
+
+    function checkGameEnd() {
+        if (score >= target) {
+            showWin('Победа! 🎉');
+        } else if (moves <= 0) {
+            showWin('Ходы кончились!');
+        }
+    }
+
+    function showWin(text) {
+        document.getElementById('winnerText').textContent = text;
+        document.getElementById('winScreen').style.display = 'flex';
+        playGoal();
+    }
+
+    function resetGame() {
+        // FIX (баг 3): отменяем висящий шаг каскада,
+        // иначе он запустится поверх нового поля.
+        clearTimeout(cascadeTimer);
+        cascadeTimer = null;
+
+        score = 0;
+        moves = 30;
+        scoreSpan.textContent = '0';
+        movesSpan.textContent = moves;
+        targetSpan.textContent = target;
+        selected = null;
+        swipeStart = null;
+        hoverCell = null;
+        animating = false;
+        animations = [];
+        createBoard();
+        document.getElementById('winScreen').style.display = 'none';
+    }
+
+    // ---------- Отрисовка ----------
+    function computeCell() {
+        cellSize = canvas.width / COLS;
+    }
+
+    function drawGem(cx, cy, size, colorIdx, alpha = 1, scale = 1, popProgress = 0) {
+        const color = COLORS[colorIdx];
+        const r = size * 0.38 * scale;
+
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = color.main;
+        ctx.shadowBlur = size * 0.35;
+
+        ctx.strokeStyle = color.main;
+        ctx.lineWidth = Math.max(2, size * 0.06);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        g.addColorStop(0, color.main);
+        g.addColorStop(0.5, color.glow);
+        g.addColorStop(1, 'rgba(0,0,0,0.1)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.85, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath();
+        ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 1;
+    }
+
+    function drawBoard() {
+        computeCell();
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= COLS; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * cellSize, 0);
+            ctx.lineTo(i * cellSize, canvas.height);
+            ctx.stroke();
+        }
+        for (let i = 0; i <= ROWS; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, i * cellSize);
+            ctx.lineTo(canvas.width, i * cellSize);
+            ctx.stroke();
+        }
+
+        if (hoverCell) {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
+            ctx.fillRect(hoverCell.c * cellSize + 2, hoverCell.r * cellSize + 2,
+                         cellSize - 4, cellSize - 4);
+        }
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const tile = board[r][c];
+                if (!tile) continue;
+
+                const cx = (tile.x + 0.5) * cellSize;
+                const cy = (tile.y + 0.5) * cellSize;
+
+                let alpha = 1;
+                let scale = 1;
+                if (tile.popProgress !== undefined) {
+                    alpha = 1 - tile.popProgress;
+                    scale = 1 + tile.popProgress * 0.8;
+                }
+                drawGem(cx, cy, cellSize, tile.color, alpha, scale, tile.popProgress || 0);
+            }
+        }
+
+        if (selected) {
+            const r = selected.r, c = selected.c;
+            ctx.strokeStyle = '#fff';
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 15;
+            ctx.lineWidth = Math.max(2, cellSize * 0.06);
+            ctx.strokeRect(c * cellSize + 3, r * cellSize + 3, cellSize - 6, cellSize - 6);
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    // ---------- Ввод ----------
+    function getCanvasPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+
+    function posToCell(pos) {
+        const c = Math.floor(pos.x / cellSize);
+        const r = Math.floor(pos.y / cellSize);
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+        return { r, c };
+    }
+
+    function trySwap(a, b) {
+        if (!a || !b) return;
+        if (!isAdjacent(a, b)) return;
+        if (!board[a.r][a.c] || !board[b.r][b.c]) return;
+
+        // FIX (баг 1): раньше здесь был «временный свап» с битым откатом:
+        //     board[a] = tmp;
+        //     board[b] = board[a];   // <- в обеих клетках одна и та же плитка,
+        //                             //    вторая плитка терялась навсегда
+        // и все последующие проверки работали с испорченным полем.
+        // Теперь ровно одна аккуратная проверка: свап → поиск совпадений → откат.
+        const tileA = board[a.r][a.c];
+        const tileB = board[b.r][b.c];
+        board[a.r][a.c] = tileB;
+        board[b.r][b.c] = tileA;
+        const hasMatch = findMatches().length > 0;
+        board[a.r][a.c] = tileA;
+        board[b.r][b.c] = tileB;
+
+        if (!hasMatch) {
+            // Не даём сделать бессмысленный свап
+            selected = null;
+            return;
+        }
+
+        moves--;
+        movesSpan.textContent = moves;
+        selected = null;
+        animating = true;   // держим true до самого конца каскада
+        playClick();
+
+        animateSwap(a, b, () => scheduleResolve(40));
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (animating) return;
+        const pos = getCanvasPos(e);
+        const cell = posToCell(pos);
+        if (!cell) return;
+        if (!board[cell.r][cell.c]) return;
+
+        swipeStart = { ...cell, x: pos.x, y: pos.y };
+
+        if (selected) {
+            if (selected.r === cell.r && selected.c === cell.c) {
+                selected = null;
+            } else if (isAdjacent(selected, cell)) {
+                trySwap(selected, cell);
+            } else {
+                selected = cell;
+            }
+        } else {
+            selected = cell;
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        if (animating) return;
+        const pos = getCanvasPos(e);
+        const cell = posToCell(pos);
+
+        if (swipeStart && cell) {
+            const dx = pos.x - swipeStart.x;
+            const dy = pos.y - swipeStart.y;
+            const threshold = cellSize * 0.35;
+
+            if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                let target;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    target = { r: swipeStart.r, c: swipeStart.c + (dx > 0 ? 1 : -1) };
+                } else {
+                    target = { r: swipeStart.r + (dy > 0 ? 1 : -1), c: swipeStart.c };
+                }
+                if (target.r >= 0 && target.r < ROWS && target.c >= 0 && target.c < COLS) {
+                    const start = { r: swipeStart.r, c: swipeStart.c };
+                    swipeStart = null;
+                    selected = null;
+                    trySwap(start, target);
+                } else {
+                    swipeStart = null;
+                }
+            }
+        }
+
+        if (hoverCell?.r !== cell?.r || hoverCell?.c !== cell?.c) {
+            hoverCell = cell;
+        }
+    });
+
+    canvas.addEventListener('pointerup', () => { swipeStart = null; });
+    canvas.addEventListener('pointerleave', () => {
+        hoverCell = null;
+        swipeStart = null;
+    });
+
+    // ---------- Игровой цикл ----------
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+        const dt = Math.min(50, now - lastTime);
+        lastTime = now;
+
+        updateAnimations(dt);
+        drawBoard();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // ---------- Старт ----------
+    createBoard();
+    scoreSpan.textContent = score;
+    movesSpan.textContent = moves;
+    targetSpan.textContent = target;
+    requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
