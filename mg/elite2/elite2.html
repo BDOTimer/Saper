@@ -156,13 +156,13 @@
 </script>
 
 <script src="./galaxy/galaxy.js"></script>
+<script src="./js/help.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass }from 'three/addons/postprocessing/UnrealBloomPass.js';
-//import GALAXY from './galaxy/galaxy.js';
 
 // ============================================================
 //  Скрытие курсора через 3 секунды бездействия
@@ -711,7 +711,26 @@ const keys = {};
 addEventListener('keyup', e => keys[e.code] = false);
 
 addEventListener('keydown', e => {
-  // M — карта
+  // --- F1: справка (работает всегда) ---
+  if (e.code === 'F1') {
+    e.preventDefault();     // иначе браузер откроет свою справку
+    HELP.toggle();
+    return;
+  }
+
+  // --- ESC: закрыть активный оверлей ---
+  if (e.code === 'Escape') {
+    if (HELP.isOpen())  { HELP.close();  e.preventDefault(); return; }
+    if (GALAXY.isOpen()){ GALAXY.setOpen(false); e.preventDefault(); return; }
+  }
+
+  // --- Пока открыта справка — игнорируем всё остальное ---
+  if (HELP.isOpen()) {
+    e.preventDefault();
+    return;
+  }
+
+  // --- Карта галактики ---
   if (e.code === 'KeyM') {
     GALAXY.toggle();
     e.preventDefault();
@@ -728,11 +747,14 @@ addEventListener('keydown', e => {
     return;
   }
 
+  // --- Игра ---
   keys[e.code] = true;
   if (e.code === 'Space') e.preventDefault();
   if (e.code === 'ArrowUp' || e.code === 'ArrowDown') e.preventDefault();
   if (e.code === 'Enter' && state.dead) resetGame();
 });
+
+addEventListener('keyup', e => keys[e.code] = false);
 
 // ------------------------------------------------------------------
 //  Состояние
@@ -753,7 +775,12 @@ const state = {
 };
 
 // ------------------------------------------------------------------
-//  Инициализация карты 
+//  Инициализация HELP 
+// ------------------------------------------------------------------
+HELP.init();
+
+// ------------------------------------------------------------------
+//  Инициализация карты GALAXY
 // ------------------------------------------------------------------
 GALAXY.init();
 GALAXY.setPlayerStar(state.starIndex);
@@ -877,13 +904,14 @@ function animate() {
   
   GALAXY.update(dt);
   
-  /// Пауза в игре, которая не нужна)
-  ///  if (GALAXY.isOpen()) {
-  ///  // мир заморожен, рендерим только карту (HUD всё равно сверху)
-  ///  composer.render();
-  ///  requestAnimationFrame(animate);
-  ///  return;
-  ///}
+  /**/
+  if (HELP.isOpen() /* || GALAXY.isOpen() */) {
+    // мир заморожен, но рендер идёт — чтобы под оверлеем не было пустоты
+    composer.render();
+    requestAnimationFrame(animate);
+    return;
+  }
+  /**/
 
   if (!state.dead) {
     // ---- Тяга ----
