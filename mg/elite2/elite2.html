@@ -144,13 +144,10 @@
         left: 50%;
         top: 18px;
         transform: translateX(-50%);
-
         display: inline-flex;
         align-items: center;
         gap: 10px;
-
         padding: 6px 14px 6px 8px;
-
         font-family: "Courier New", monospace;
         font-size: 12px;
         letter-spacing: 2px;
@@ -158,7 +155,6 @@
         text-shadow:
           0 0 6px #00ff88,
           0 0 2px #00ff88;
-
         background: linear-gradient(
           180deg,
           rgba(0, 40, 20, 0.55),
@@ -166,20 +162,16 @@
         );
         border: 1px solid rgba(51, 255, 136, 0.55);
         border-radius: 999px;
-
         box-shadow:
           0 0 0 1px rgba(0, 255, 136, 0.15) inset,
           0 0 12px rgba(0, 255, 136, 0.35),
           0 0 24px rgba(0, 255, 136, 0.15);
-
         cursor: pointer;
-        pointer-events: auto; /* важно: #hud имеет pointer-events: none */
-
+        pointer-events: auto;
         opacity: 0;
         animation:
           hint-appear 0.6s ease-out 0.8s forwards,
           hint-pulse 2.6s ease-in-out 1.6s infinite;
-
         transition:
           background 0.2s,
           box-shadow 0.2s,
@@ -210,29 +202,23 @@
           0 0 10px rgba(0, 255, 136, 0.6);
       }
 
-      /* «Кейкап» для клавиши F1 */
       .hint-key {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-
         min-width: 26px;
         height: 20px;
         padding: 0 6px;
-
         font-size: 11px;
         font-weight: bold;
         letter-spacing: 1px;
         color: #002a14;
-
         background: linear-gradient(180deg, #7dffb0, #33ff88);
         border-radius: 5px;
-
         box-shadow:
           0 1px 0 rgba(0, 0, 0, 0.5),
           0 0 8px rgba(0, 255, 136, 0.8),
           0 0 2px rgba(255, 255, 255, 0.6) inset;
-
         text-shadow: none;
         transform: translateY(-1px);
       }
@@ -241,7 +227,6 @@
         padding-right: 4px;
       }
 
-      /* Появление и мягкое «дыхание» */
       @keyframes hint-appear {
         from {
           opacity: 0;
@@ -387,11 +372,17 @@
       }
     </script>
 
+    <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
     <script src="./galaxy/galaxy.js"></script>
+    <script src="./galaxy/star.js"></script>
+    <script src="./galaxy/planet.js"></script>
+    <script src="../js/sound-lib.js"></script>
     <script src="./js/help.js"></script>
 
     <script type="module">
       import * as THREE from "three";
+      window.THREE = THREE;
+
       import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
       import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
@@ -400,7 +391,6 @@
       //  Скрытие курсора через 3 секунды бездействия
       // ============================================================
       let cursorTimer = null;
-
       function hideCursor() {
         document.body.classList.add("hide-cursor");
       }
@@ -409,92 +399,25 @@
         clearTimeout(cursorTimer);
         cursorTimer = setTimeout(hideCursor, 3000);
       }
-
       ["mousedown", "pointerdown", "touchstart", "keydown", "wheel"].forEach(
         (evt) => document.addEventListener(evt, showCursor, { passive: true }),
       );
       showCursor();
 
       // ============================================================
-      //                    ЗВУК НАЖАТИЙ
+      //  Звук
       // ============================================================
-      const SOUNDS = {
+    const kit = SoundKit.createSoundKit({
         laser: { src: "snd/laser-1.mp3", volume: 0.45, pool: 3 },
         death: { src: "snd/ship-death-1.mp3", volume: 0.35, pool: 1 },
         damag: { src: "snd/damag-1.mp3", volume: 0.35, pool: 3 },
-      };
+    });
 
-      const audioUnlocked = { value: false };
-
-      /**
-       * Создаёт объект-плеер: пул Audio + метод play().d
-       * @param {string} src
-       * @param {number} volume
-       * @param {number} poolSize
-       */
-      function createSound(src, volume, poolSize = 2) {
-        const pool = Array.from({ length: poolSize }, () => {
-          const a = new Audio(src);
-          a.preload = "auto";
-          a.volume = volume;
-          return a;
-        });
-        let idx = 0;
-
-        return {
-          play() {
-            if (!audioUnlocked.value) return;
-            const a = pool[idx];
-            idx = (idx + 1) % poolSize;
-            try {
-              a.currentTime = 0;
-              const p = a.play();
-              if (p && p.catch) p.catch(() => {});
-            } catch (_) {}
-          },
-          // «Прогрев» для разблокировки аудио на мобильных
-          warmup() {
-            const a = pool[0];
-            const prev = a.volume;
-            a.volume = 0;
-            const p = a.play();
-            if (p && p.catch) p.catch(() => {});
-            setTimeout(() => {
-              try {
-                a.pause();
-                a.currentTime = 0;
-              } catch (_) {}
-              a.volume = prev;
-            }, 60);
-          },
-        };
-      }
-
-      // Создаём звуки
-      const sounds = Object.fromEntries(
-        Object.entries(SOUNDS).map(([name, cfg]) => [
-          name,
-          createSound(cfg.src, cfg.volume, cfg.pool),
-        ]),
-      );
-
-      // Удобные обёртки
-      const playLaser = () => sounds.laser.play();
-      const playDeath = () => sounds.death.play();
-      const playDamag = () => sounds.damag.play();
-
-      // ---------- Разблокировка аудио (нужен жест пользователя) ----------
-      function unlockAudio() {
-        if (audioUnlocked.value) return;
-        audioUnlocked.value = true;
-        Object.values(sounds).forEach((s) => s.warmup());
-      }
-
-      unlockAudio();
-
-      ["pointerdown", "touchstart", "keydown", "mousemove"].forEach((evt) => {
-        document.addEventListener(evt, unlockAudio, { passive: true });
-      });
+    kit.autoUnlock();
+    
+      const playLaser = () => kit.sounds.laser.play();
+      const playDeath = () => kit.sounds.death.play();
+      const playDamag = () => kit.sounds.damag.play();
 
       // ------------------------------------------------------------------
       //  Утилиты
@@ -522,84 +445,7 @@
       }
 
       // ------------------------------------------------------------------
-      //  Планеты — шейдеры
-      // ------------------------------------------------------------------
-      const planetVert = /* glsl */ `
-  varying vec3 vPos;
-  varying vec3 vNormal;
-  void main() {
-    vPos = position;
-    vNormal = normal;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-      const planetFrag = /* glsl */ `
-  varying vec3 vPos;
-  varying vec3 vNormal;
-  uniform vec3  uColorA, uColorB, uColorC;
-  uniform float uSeed;
-
-  float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-  }
-  float noise(vec3 x) {
-    vec3 i = floor(x), f = fract(x);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
-                   mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
-               mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
-                   mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
-  }
-  float fbm(vec3 p) {
-    float v = 0.0, a = 0.5;
-    for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
-    return v;
-  }
-  void main() {
-    vec3 n = normalize(vPos + uSeed);
-    float n1 = fbm(n * 3.0);
-    float n2 = fbm(n * 6.0 + 10.0);
-    float m = smoothstep(0.35, 0.65, n1 + n2 * 0.3);
-    vec3 col = mix(uColorA, uColorB, m);
-    col = mix(col, uColorC, smoothstep(0.7, 0.95, n2));
-    vec3 L = normalize(vec3(1.0, 0.5, 0.7));
-    float d = max(dot(normalize(vNormal), L), 0.0);
-    gl_FragColor = vec4(col * (0.15 + 0.85 * d), 1.0);
-  }
-`;
-
-      function makePlanet(seed) {
-        const rng = mulberry32(seed);
-        const radius = 200 + rng() * 300;
-        const geo = new THREE.SphereGeometry(radius, 64, 64);
-        const mat = new THREE.ShaderMaterial({
-          vertexShader: planetVert,
-          fragmentShader: planetFrag,
-          uniforms: {
-            uColorA: {
-              value: new THREE.Color().setHSL(
-                rng(),
-                0.5 + rng() * 0.4,
-                0.25 + rng() * 0.2,
-              ),
-            },
-            uColorB: {
-              value: new THREE.Color().setHSL(rng(), 0.6, 0.45 + rng() * 0.2),
-            },
-            uColorC: { value: new THREE.Color().setHSL(rng(), 0.7, 0.7) },
-            uSeed: { value: rng() * 100.0 },
-          },
-        });
-        const m = new THREE.Mesh(geo, mat);
-        m.userData.radius = radius;
-        return m;
-      }
-
-      // ------------------------------------------------------------------
-      //  Звёзды
+      //  Звёздное небо (дальний фон)
       // ------------------------------------------------------------------
       function makeStarfield(seed) {
         const rng = mulberry32(seed);
@@ -607,10 +453,10 @@
         const pos = new Float32Array(count * 3);
         const col = new Float32Array(count * 3);
         for (let i = 0; i < count; i++) {
-          const u = rng() * 2 - 1,
-            t = rng() * Math.PI * 2;
-          const r = 4000,
-            s = Math.sqrt(1 - u * u);
+          const u = rng() * 2 - 1;
+          const t = rng() * Math.PI * 2;
+          const r = 4000;
+          const s = Math.sqrt(1 - u * u);
           pos[i * 3 + 0] = r * s * Math.cos(t);
           pos[i * 3 + 1] = r * u;
           pos[i * 3 + 2] = r * s * Math.sin(t);
@@ -804,7 +650,6 @@
       const stars = makeStarfield(12345);
       scene.add(stars);
 
-      // Игрок — добавляем к камере, чтобы всегда была перед глазами
       const player = makePlayerShip();
       camera.add(player);
       player.position.set(0, -6, 12);
@@ -812,29 +657,62 @@
       scene.add(camera);
 
       // ------------------------------------------------------------------
-      //  Планеты
+      //  Система текущей звезды: светило + планеты
+      //  Использует STAR и PLANET из ./galaxy/star.js и ./galaxy/planet.js
       // ------------------------------------------------------------------
-      const planets = [];
-      function spawnPlanet(seed) {
-        const p = makePlanet(seed);
-        const rng = mulberry32(seed ^ 0x9e3779b9);
-        // Дистанция должна быть минимум в 4 раза больше радиуса планеты
-        const minDist = p.userData.radius * 4;
-        const dist = minDist + rng() * 2500;
-        const ang = rng() * Math.PI * 2;
-        p.position.set(
-          Math.cos(ang) * dist,
-          (rng() - 0.5) * 800,
-          Math.sin(ang) * dist,
-        );
-        scene.add(p);
-        planets.push(p);
+      const planets = []; // массив хэндлов PLANET.generate(...)
+      let currentStarHandle = null;
+
+      function clearSystem() {
+        for (const p of planets) {
+          scene.remove(p.mesh);
+          if (p.atmosphere) scene.remove(p.atmosphere);
+          if (p.rings) scene.remove(p.rings);
+          PLANET.dispose(p);
+        }
+        planets.length = 0;
+
+        if (currentStarHandle) {
+          scene.remove(currentStarHandle.mesh);
+          scene.remove(currentStarHandle.corona);
+          scene.remove(currentStarHandle.light);
+          STAR.dispose(currentStarHandle);
+          currentStarHandle = null;
+        }
       }
-      spawnPlanet(1);
-      spawnPlanet(2);
+
+      function buildSystemFromStar(star) {
+        if (!star) return;
+
+        // Светило — висит далеко впереди
+        currentStarHandle = STAR.generate(star);
+        const starPos = new THREE.Vector3(0, 0, -3000);
+        currentStarHandle.mesh.position.copy(starPos);
+        currentStarHandle.corona.position.copy(starPos);
+        currentStarHandle.light.position.copy(starPos);
+        scene.add(currentStarHandle.mesh);
+        scene.add(currentStarHandle.corona);
+        scene.add(currentStarHandle.light);
+
+        // Планеты: число зависит от tech
+        const n = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
+        for (let i = 0; i < n; i++) {
+          const p = PLANET.generate(star);
+          const rng = mulberry32(star.id * 1000 + i);
+          const dist = 800 + i * 900 + rng() * 400;
+          const ang = rng() * Math.PI * 2;
+          p.mesh.position.set(
+            Math.cos(ang) * dist,
+            (rng() - 0.5) * 400,
+            Math.sin(ang) * dist - 1500,
+          );
+          scene.add(p.mesh);
+          planets.push(p);
+        }
+      }
 
       // ------------------------------------------------------------------
-      //  Враги
+      //  Враги / лазеры / эффекты
       // ------------------------------------------------------------------
       const enemies = [];
       const lasers = [];
@@ -853,6 +731,8 @@
         scene.add(e);
         enemies.push(e);
       }
+
+      let shotCounter = 0;
 
       function spawnLaser() {
         const pos = new THREE.Vector3();
@@ -873,19 +753,11 @@
         scene.add(mesh);
         return mesh;
       }
-      let shotCounter = 0;
 
-      // ------------------------------------------------------------------
-      //  Эффекты попадания (пурпурное сияние)
-      // ------------------------------------------------------------------
       const hitEffects = [];
-
-      // Общая сфера-вспышка. Используем простую геометрию и переиспользуем
-      // её между эффектами, чтобы не плодить мусор в GPU.
       const hitFlashGeo = new THREE.SphereGeometry(1, 12, 12);
 
       function spawnHitFlash(position, scale = 1) {
-        // Сфера-вспышка пурпурного цвета с additive blending
         const mat = new THREE.MeshBasicMaterial({
           color: 0xff44ff,
           toneMapped: false,
@@ -899,7 +771,6 @@
         mesh.scale.setScalar(scale);
         scene.add(mesh);
 
-        // Пурпурный PointLight — добавит сияния и подсветит близкие объекты
         const light = new THREE.PointLight(0xff22ff, 4, 80, 2);
         light.position.copy(position);
         scene.add(light);
@@ -918,14 +789,9 @@
           const e = hitEffects[i];
           e.life -= dt;
           const k = Math.max(0, e.life / e.maxLife);
-
-          // Сфера расширяется и гаснет
           e.mesh.scale.setScalar(e.baseScale * (1 + (1 - k) * 2.5));
           e.mesh.material.opacity = k;
-
-          // Свет затухает быстрее
           e.light.intensity = 4 * k * k;
-
           if (e.life <= 0) {
             scene.remove(e.mesh);
             scene.remove(e.light);
@@ -936,7 +802,7 @@
       }
 
       // ------------------------------------------------------------------
-      //  Космическая пыль (points вокруг камеры, wrap-around)
+      //  Космическая пыль
       // ------------------------------------------------------------------
       const DUST_COUNT = 3000;
       const DUST_RADIUS = 800;
@@ -953,7 +819,6 @@
         }
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-
         const mat = new THREE.PointsMaterial({
           color: 0xaaccff,
           size: 2.0,
@@ -963,7 +828,6 @@
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         });
-
         const points = new THREE.Points(geo, mat);
         points.frustumCulled = false;
         return points;
@@ -1025,17 +889,15 @@
       // ------------------------------------------------------------------
       const keys = {};
 
-      addEventListener("keyup", (e) => (keys[e.code] = false));
-
       addEventListener("keydown", (e) => {
-        // --- F1: справка (работает всегда) ---
+        // F1: справка
         if (e.code === "F1") {
-          e.preventDefault(); // иначе браузер откроет свою справку
+          e.preventDefault();
           HELP.toggle();
           return;
         }
 
-        // --- ESC: закрыть активный оверлей ---
+        // ESC: закрыть оверлей
         if (e.code === "Escape") {
           if (HELP.isOpen()) {
             HELP.close();
@@ -1049,13 +911,13 @@
           }
         }
 
-        // --- Пока открыта справка — игнорируем всё остальное ---
+        // Справка открыта — глушим остальное
         if (HELP.isOpen()) {
           e.preventDefault();
           return;
         }
 
-        // --- Карта Галактики ---
+        // Карта галактики
         if (e.code === "KeyM") {
           GALAXY.toggle();
           e.preventDefault();
@@ -1072,7 +934,7 @@
           return;
         }
 
-        // --- Игра ---
+        // Игра
         keys[e.code] = true;
         if (e.code === "Space") e.preventDefault();
         if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
@@ -1085,7 +947,8 @@
       //  Состояние
       // ------------------------------------------------------------------
       const state = {
-        starIndex: 0, // где мы сейчас
+        starIndex: 0,
+        currentStar: null,
 
         speed: 0,
         maxSpeed: 320,
@@ -1098,25 +961,45 @@
         dead: false,
       };
 
+      function updateSectorFromStar(star) {
+        if (!star) return;
+        state.sector.x = Math.round((star.x + 1) * 50);
+        state.sector.y = Math.round((star.y + 1) * 50);
+      }
+
       // ------------------------------------------------------------------
-      //  Инициализация HELP
+      //  Инициализация HELP и GALAXY
       // ------------------------------------------------------------------
       HELP.init();
 
-      // ------------------------------------------------------------------
-      //  Инициализация карты GALAXY
-      // ------------------------------------------------------------------
       GALAXY.init();
       GALAXY.setPlayerStar(state.starIndex);
 
+      state.currentStar = GALAXY.getCurrentStar();
+      updateSectorFromStar(state.currentStar);
+
+      // Лог текущей звезды
+      const s = state.currentStar;
+      console.log(
+        "STAR:",
+        s.name,
+        s.tech,
+        s.dangerLabel,
+        s.economy,
+        s.population,
+      );
+
+      // Стартовая система
+      buildSystemFromStar(state.currentStar);
+
+      // Прыжок
       GALAXY.onJumpRequest((idx, star) => {
-        // Пока просто переставляем игрока на выбранную звезду.
-        // Позже тут будет гиперпрыжок с топливом, временем и т.п.
         state.starIndex = idx;
+        state.currentStar = star;
+        updateSectorFromStar(star);
         GALAXY.setPlayerStar(idx);
         GALAXY.setOpen(false);
 
-        // пример: телепорт камеры + сброс врагов, чтобы «начать» на новой звезде
         camera.position.set(0, 0, 0);
         camera.quaternion.set(0, 0, 0, 1);
         state.speed = 0;
@@ -1125,7 +1008,19 @@
         enemies.length = 0;
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
+
         reseedDustAndMeteors();
+        clearSystem();
+        buildSystemFromStar(star);
+
+        console.log(
+          "JUMP →",
+          star.name,
+          star.tech,
+          star.dangerLabel,
+          star.economy,
+          star.population,
+        );
       });
 
       function resetGame() {
@@ -1144,7 +1039,6 @@
         camera.position.set(0, 0, 0);
         camera.quaternion.set(0, 0, 0, 1);
 
-        // Пересеять пыль и метеоры вокруг новой позиции
         reseedDustAndMeteors();
 
         document.getElementById("gameover").style.display = "none";
@@ -1224,26 +1118,22 @@
       // ------------------------------------------------------------------
       const clock = new THREE.Clock();
       const tmpVec = new THREE.Vector3();
+      const playerWorldPos = new THREE.Vector3();
 
       function animate() {
         const dt = Math.min(clock.getDelta(), 0.05);
+        const time = clock.elapsedTime;
 
         GALAXY.update(dt);
 
-        /**/
-        if (HELP.isOpen() /* || GALAXY.isOpen() */) {
-          // мир заморожен, но рендер идёт — чтобы под оверлеем не было пустоты
+        if (HELP.isOpen()) {
           composer.render();
           requestAnimationFrame(animate);
           return;
         }
-        /**/
 
         if (!state.dead) {
-          // ---- Тяга ----
-          // if (keys['KeyR']) state.speed += 220 * dt;
-          // if (keys['KeyF']) state.speed -= 220 * dt;
-
+          // Тяга
           if (keys["ArrowUp"]) state.speed += 220 * dt;
           if (keys["ArrowDown"]) state.speed -= 220 * dt;
 
@@ -1253,7 +1143,7 @@
             Math.min(state.maxSpeed, state.speed),
           );
 
-          // ---- Ориентация ----
+          // Ориентация
           const rotSpeed = 1.2 * dt;
           if (keys["KeyW"]) camera.rotateX(rotSpeed);
           if (keys["KeyS"]) camera.rotateX(-rotSpeed);
@@ -1262,17 +1152,17 @@
           if (keys["ArrowLeft"]) camera.rotateY(rotSpeed);
           if (keys["ArrowRight"]) camera.rotateY(-rotSpeed);
 
-          // ---- Движение вперёд ----
+          // Движение вперёд
           const forward = tmpVec
             .set(0, 0, -1)
             .applyQuaternion(camera.quaternion)
             .clone();
           camera.position.addScaledVector(forward, state.speed * dt);
 
-          // ---- Пыль и метеоры: летят назад со скоростью корабля ----
+          // Дрейф пыли и метеоров
           const drift = forward.multiplyScalar(-state.speed * dt);
 
-          // ---- Пыль ----
+          // Пыль
           {
             const attr = dust.geometry.attributes.position;
             const arr = attr.array;
@@ -1287,9 +1177,9 @@
               arr[ix + 1] += drift.y;
               arr[ix + 2] += drift.z;
 
-              let dx = arr[ix + 0] - cx;
-              let dy = arr[ix + 1] - cy;
-              let dz = arr[ix + 2] - cz;
+              const dx = arr[ix + 0] - cx;
+              const dy = arr[ix + 1] - cy;
+              const dz = arr[ix + 2] - cz;
               if (dx > H) arr[ix + 0] -= H * 2;
               if (dx < -H) arr[ix + 0] += H * 2;
               if (dy > H) arr[ix + 1] -= H * 2;
@@ -1299,7 +1189,6 @@
             }
             attr.needsUpdate = true;
 
-            // Чем больше скорость — тем ярче и крупнее пыль
             const speedFactor = Math.min(
               1,
               Math.abs(state.speed) / state.maxSpeed,
@@ -1308,9 +1197,8 @@
             dust.material.size = 1.2 + speedFactor * 2.0;
           }
 
-          // ---- Метеоры ----
-          const playerPos = new THREE.Vector3();
-          player.getWorldPosition(playerPos);
+          // Метеоры
+          player.getWorldPosition(playerWorldPos);
 
           for (const m of meteors) {
             m.position.x += drift.x;
@@ -1323,7 +1211,7 @@
 
             wrapAround(m.position, camera.position, METEOR_RADIUS);
 
-            const d = m.position.distanceTo(playerPos);
+            const d = m.position.distanceTo(playerWorldPos);
             if (d < m.userData.size + 12) {
               state.shield -= 200 * dt;
               flashDamage(0.6);
@@ -1336,11 +1224,11 @@
             }
           }
 
-          // ---- Стрельба ----
+          // Стрельба
           fireCooldown -= dt;
           if (keys["Space"]) fire();
 
-          // ---- Расход топлива ----
+          // Топливо
           if (state.speed !== 0) {
             state.fuel -= Math.abs(state.speed) * dt * 0.005;
             if (state.fuel <= 0) {
@@ -1352,12 +1240,12 @@
           fireCooldown -= dt;
         }
 
-        // ---- Вспышки дула гаснут ----
+        // Дульные вспышки гаснут
         for (const m of player.userData.muzzles) {
           m.material.opacity = Math.max(0, m.material.opacity - dt * 12);
         }
 
-        // ---- Лазеры ----
+        // Лазеры
         for (let i = lasers.length - 1; i >= 0; i--) {
           const l = lasers[i];
           l.position.addScaledVector(l.userData.velocity, dt);
@@ -1371,58 +1259,53 @@
             continue;
           }
 
-          // Столкновение лазера с врагом
+          // Лазер vs враг
           for (let j = enemies.length - 1; j >= 0; j--) {
             const e = enemies[j];
             if (l.position.distanceTo(e.position) < 30) {
               e.userData.hp -= 1;
-
-              // Пурпурная вспышка в точке попадания
               spawnHitFlash(l.position.clone(), 2.5);
-
               playDamag();
 
               scene.remove(l);
               l.material.dispose();
               lasers.splice(i, 1);
+
               if (e.userData.hp <= 0) {
                 scene.remove(e);
                 enemies.splice(j, 1);
                 state.kills++;
                 state.credits += 100;
-                // Большая вспышка при уничтожении
                 spawnHitFlash(e.position.clone(), 6);
               }
               break;
             }
           }
 
-          // Столкновение лазера с метеором
+          // Лазер vs метеор
           for (let k = meteors.length - 1; k >= 0; k--) {
             const m = meteors[k];
             if (l.position.distanceTo(m.position) < m.userData.size) {
               scene.remove(l);
               l.material.dispose();
               lasers.splice(i, 1);
-              // Метеор разлетается: уменьшаем и перекидываем
               m.userData.size = Math.max(1, m.userData.size * 0.5);
-              m.scale.setScalar(m.userData.size / (m.userData.size * 2));
+              m.scale.setScalar(0.5);
               break;
             }
           }
         }
 
-        // ---- Спавн врагов ----
+        // Спавн врагов
         if (!state.dead && enemies.length < 5 && Math.random() < 0.005)
           spawnEnemy();
 
-        // ---- ИИ врагов ----
-        const playerPos = new THREE.Vector3();
-        player.getWorldPosition(playerPos);
+        // ИИ врагов
+        player.getWorldPosition(playerWorldPos);
 
         for (const e of enemies) {
           const toPlayer = new THREE.Vector3().subVectors(
-            playerPos,
+            playerWorldPos,
             e.position,
           );
           const dist = toPlayer.length();
@@ -1443,25 +1326,27 @@
           }
         }
 
-        // ---- Планеты ----
-        for (const p of planets) p.rotation.y += dt * 0.05;
+        // Светило и планеты текущей системы
+        if (currentStarHandle && currentStarHandle.update) {
+          currentStarHandle.update(dt, time);
+        }
+        for (const p of planets) p.update(dt);
 
-        // ---- Звёзды следуют за камерой ----
+        // Звёздное небо следует за камерой
         stars.position.copy(camera.position);
 
-        // ---- Пульсация двигателей ----
+        // Пульсация двигателей
         const engMat = player.userData.engines[0].material;
         const intensity = 0.6 + (Math.abs(state.speed) / state.maxSpeed) * 0.8;
         engMat.color.setRGB(0.4 * intensity, 0.8 * intensity, 1.0 * intensity);
 
-        // ---- Damage flash fade ----
+        // Затухание damage flash
         if (damageTimer > 0) {
           damageTimer -= dt;
           if (damageTimer <= 0) elDamage.style.opacity = "0";
         }
 
         updateHitEffects(dt);
-
         updateHUD();
         composer.render();
         requestAnimationFrame(animate);
