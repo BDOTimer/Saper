@@ -480,6 +480,7 @@
         laser: { src: "snd/laser-1.mp3", volume: 0.45, pool: 3 },
         death: { src: "snd/ship-death-1.mp3", volume: 0.35, pool: 1 },
         damag: { src: "snd/damag-1.mp3", volume: 0.35, pool: 3 },
+        hjump: { src: "snd/ship-HJ-1.mp3", volume: 0.35, pool: 1 },
       });
 
       kit.autoUnlock();
@@ -487,6 +488,7 @@
       const playLaser = () => kit.sounds.laser.play();
       const playDeath = () => kit.sounds.death.play();
       const playDamag = () => kit.sounds.damag.play();
+      // kit.sounds.hjump.play();
 
       // ------------------------------------------------------------------
       //  Утилиты
@@ -1065,7 +1067,7 @@
       // ------------------------------------------------------------------
       const HYPER_FUEL_PER_UNIT = 40; // топлива на 1.0 расстояния между звёздами
       const HYPER_MIN_FUEL = 5; // минимум, чтобы вообще стартовать
-      const HYPER_DURATION = 2.2; // сек
+      const HYPER_DURATION = 6; // сек
 
       function distanceBetweenStars(a, b) {
         if (!a || !b) return 0;
@@ -1119,6 +1121,8 @@
         elHyperProgress.style.width = "0%";
         elHyper.style.display = "flex";
 
+        kit.sounds.hjump.play();
+
         GALAXY.setOpen(false);
       }
 
@@ -1162,6 +1166,8 @@
           star.economy,
           `(-${state.hyper.fuelCost} fuel)`,
         );
+
+        // kit.sounds.hjump.stop(); // ★ звук прибытия
 
         // Завершаем
         state.hyper.active = false;
