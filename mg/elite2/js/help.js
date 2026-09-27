@@ -13,35 +13,36 @@ const HELP = (() => {
   // Каждая группа: { title, rows: [[keys, description], ...] }
   const KEYMAP = [
     {
-      title: 'НАВИГАЦИЯ',
+      title: "НАВИГАЦИЯ",
       rows: [
-        ['W / S',       'Тангаж — нос вверх / вниз'],
-        ['A / D',       'Крен — влево / вправо'],
-        ['← / →',       'Рыскание — поворот влево / вправо'],
-        ['R',           'Тяга — разгон вперёд'],
-        ['F',           'Тормоз — сброс скорости'],
+        ["W / S", "Тангаж — нос вверх / вниз"],
+        ["A / D", "Крен — влево / вправо"],
+        ["⬅️➡️", "Рыскание — поворот влево / вправо"],
+        ["⬆️", "Тяга — разгон вперёд"],
+        ["⬇️", "Тормоз — сброс скорости"],
+        ["J", "Гипер-Прыжок в кротовую нору"],
       ],
     },
     {
-      title: 'БОЙ',
+      title: "БОЙ",
       rows: [
-        ['SPACE',       'Огонь из лазеров'],
-        ['ENTER',       'Подтверждение / рестарт после смерти'],
+        ["SPACE", "Огонь из лазеров"],
+        ["ENTER", "Подтверждение / рестарт после смерти"],
       ],
     },
     {
-      title: 'КАРТА ГАЛАКТИКИ',
+      title: "КАРТА ГАЛАКТИКИ",
       rows: [
-        ['M',           'Открыть / закрыть карту'],
-        ['↑ ↓ ← →',     'Двигать выбор звезды'],
-        ['ENTER',       'Прыжок к выбранной звезде'],
+        ["M", "Открыть / закрыть карту"],
+        ["↑ ↓ ← →", "Двигать выбор звезды"],
+        ["ENTER", "Прыжок к выбранной звезде"],
       ],
     },
     {
-      title: 'ПРОЧЕЕ',
+      title: "ПРОЧЕЕ",
       rows: [
-        ['F1',          'Эта справка'],
-        ['ESC',         'Закрыть справку / карту'],
+        ["F1", "Эта справка"],
+        ["ESC", "Закрыть справку / карту"],
       ],
     },
   ];
@@ -57,8 +58,8 @@ const HELP = (() => {
     if (state.root) return;
 
     // затемняющий фон + центрирование
-    const root = document.createElement('div');
-    root.id = 'help-overlay';
+    const root = document.createElement("div");
+    root.id = "help-overlay";
     root.style.cssText = `
       position: fixed; inset: 0;
       display: none;
@@ -73,7 +74,7 @@ const HELP = (() => {
     `;
 
     // «бумага» — панель со справкой
-    const paper = document.createElement('div');
+    const paper = document.createElement("div");
     paper.style.cssText = `
       position: relative;
       padding: 44px 64px 40px 64px;
@@ -95,7 +96,7 @@ const HELP = (() => {
     `;
 
     // внутренние «уголки» — как в терминалах
-    const corners = document.createElement('div');
+    const corners = document.createElement("div");
     corners.style.cssText = `
       position: absolute; inset: 8px; pointer-events: none;
       border: 1px solid rgba(51, 255, 136, 0.18);
@@ -104,8 +105,8 @@ const HELP = (() => {
     paper.appendChild(corners);
 
     // заголовок
-    const title = document.createElement('div');
-    title.textContent = 'ELITE — ПУЛЬТ УПРАВЛЕНИЯ';
+    const title = document.createElement("div");
+    title.textContent = "ELITE — ПУЛЬТ УПРАВЛЕНИЯ";
     title.style.cssText = `
       text-align: center;
       font-size: 20px;
@@ -117,8 +118,8 @@ const HELP = (() => {
     paper.appendChild(title);
 
     // подзаголовок
-    const sub = document.createElement('div');
-    sub.textContent = '─ справочник пилота ─';
+    const sub = document.createElement("div");
+    sub.textContent = "─ справочник пилота ─";
     sub.style.cssText = `
       text-align: center;
       font-size: 11px;
@@ -130,7 +131,7 @@ const HELP = (() => {
 
     // контент — группы
     for (const group of KEYMAP) {
-      const h = document.createElement('div');
+      const h = document.createElement("div");
       h.textContent = group.title;
       h.style.cssText = `
         font-size: 12px;
@@ -143,7 +144,7 @@ const HELP = (() => {
       paper.appendChild(h);
 
       for (const [keys, desc] of group.rows) {
-        const row = document.createElement('div');
+        const row = document.createElement("div");
         row.style.cssText = `
           display: grid;
           grid-template-columns: 120px 1fr;
@@ -154,7 +155,7 @@ const HELP = (() => {
           line-height: 1.5;
         `;
 
-        const k = document.createElement('div');
+        const k = document.createElement("div");
         k.textContent = keys;
         k.style.cssText = `
           color: #ffff88;
@@ -164,7 +165,7 @@ const HELP = (() => {
           white-space: nowrap;
         `;
 
-        const d = document.createElement('div');
+        const d = document.createElement("div");
         d.textContent = desc;
         d.style.cssText = `
           color: #bfffd6;
@@ -178,8 +179,8 @@ const HELP = (() => {
     }
 
     // нижняя подсказка
-    const hint = document.createElement('div');
-    hint.textContent = 'F1 или ESC — закрыть';
+    const hint = document.createElement("div");
+    hint.textContent = "F1 или ESC — закрыть";
     hint.style.cssText = `
       text-align: center;
       font-size: 11px;
@@ -199,14 +200,16 @@ const HELP = (() => {
   function setOpen(v) {
     ensureDOM();
     state.open = v;
-    state.root.style.display = v ? 'flex' : 'none';
+    state.root.style.display = v ? "flex" : "none";
   }
   const toggle = () => setOpen(!state.open);
-  const close  = () => setOpen(false);
+  const close = () => setOpen(false);
   const isOpen = () => state.open;
 
   return {
-    init() { ensureDOM(); },
+    init() {
+      ensureDOM();
+    },
     toggle,
     close,
     isOpen,
