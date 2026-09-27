@@ -283,8 +283,62 @@
         margin-top: 20px;
         letter-spacing: 2px;
       }
+
+      #hyper {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(0, 60, 30, 0.55),
+          rgba(0, 0, 0, 0.95)
+        );
+        color: #b6ffd2;
+        font-family: "Courier New", monospace;
+        letter-spacing: 3px;
+        text-shadow: 0 0 12px #00ff88;
+        z-index: 40;
+        pointer-events: none;
+      }
+      #hyper .hyper-title {
+        font-size: 28px;
+        margin-bottom: 12px;
+        animation: hyper-flicker 0.6s infinite alternate;
+      }
+      #hyper .hyper-sub {
+        font-size: 16px;
+        opacity: 0.85;
+        margin-bottom: 18px;
+      }
+      #hyper .hyper-bar {
+        width: 260px;
+        height: 8px;
+        border: 1px solid #33ff88;
+        position: relative;
+      }
+      #hyper .hyper-bar > i {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0%;
+        background: #33ff88;
+        box-shadow: 0 0 10px #00ff88;
+      }
+      @keyframes hyper-flicker {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0.55;
+        }
+      }
     </style>
   </head>
+
   <body>
     <div id="hud">
       <svg id="cockpit-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -361,6 +415,12 @@
         GAME OVER
         <small>нажми ENTER чтобы начать заново</small>
       </div>
+
+      <div id="hyper">
+        <div class="hyper-title">HYPERSPACE</div>
+        <div class="hyper-sub" id="hyper-target">— — —</div>
+        <div class="hyper-bar"><i id="hyper-progress"></i></div>
+      </div>
     </div>
 
     <script type="importmap">
@@ -387,6 +447,15 @@
       import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+      // ------------------------------------------------------------------
+      //  Отладочные переключатели
+      // ------------------------------------------------------------------
+      const DEBUG = {
+        isSpawnEnemies: false, // ← временно выключено для дебага
+        //isSpawnMeteors: true,
+        //isLogJumps: true,
+      };
+
       // ============================================================
       //  Скрытие курсора через 3 секунды бездействия
       // ============================================================
@@ -407,14 +476,14 @@
       // ============================================================
       //  Звук
       // ============================================================
-    const kit = SoundKit.createSoundKit({
+      const kit = SoundKit.createSoundKit({
         laser: { src: "snd/laser-1.mp3", volume: 0.45, pool: 3 },
         death: { src: "snd/ship-death-1.mp3", volume: 0.35, pool: 1 },
         damag: { src: "snd/damag-1.mp3", volume: 0.35, pool: 3 },
-    });
+      });
 
-    kit.autoUnlock();
-    
+      kit.autoUnlock();
+
       const playLaser = () => kit.sounds.laser.play();
       const playDeath = () => kit.sounds.death.play();
       const playDamag = () => kit.sounds.damag.play();
@@ -718,6 +787,8 @@
       const lasers = [];
 
       function spawnEnemy() {
+        if (!DEBUG.isSpawnEnemies) return; // дебаг-выключатель
+
         const e = makeEnemyShip();
         const ang = Math.random() * Math.PI * 2;
         const dist = 400 + Math.random() * 600;
@@ -917,6 +988,13 @@
           return;
         }
 
+        // Гиперпрыжок — работает и с открытой картой, и в полёте
+        if (e.code === "KeyJ") {
+          tryHyperJump();
+          e.preventDefault();
+          return;
+        }
+
         // Карта галактики
         if (e.code === "KeyM") {
           GALAXY.toggle();
@@ -959,12 +1037,145 @@
         kills: 0,
         sector: { x: 0, y: 0 },
         dead: false,
+
+        // гиперпрыжок
+        hyper: {
+          active: false,
+          t: 0, // прошло секунд
+          duration: 2.2, // длительность анимации
+          targetIdx: -1, // куда прыгаем
+          fuelCost: 0, // сколько топлива спишет
+        },
       };
 
       function updateSectorFromStar(star) {
         if (!star) return;
         state.sector.x = Math.round((star.x + 1) * 50);
         state.sector.y = Math.round((star.y + 1) * 50);
+      }
+
+      // ★ HUD-элементы, нужные гиперпрыжку
+      const $ = (id) => document.getElementById(id);
+      const elHyper = $("hyper");
+      const elHyperTarget = $("hyper-target");
+      const elHyperProgress = $("hyper-progress");
+
+      // ------------------------------------------------------------------
+      //  Гиперпрыжок
+      // ------------------------------------------------------------------
+      const HYPER_FUEL_PER_UNIT = 40; // топлива на 1.0 расстояния между звёздами
+      const HYPER_MIN_FUEL = 5; // минимум, чтобы вообще стартовать
+      const HYPER_DURATION = 2.2; // сек
+
+      function distanceBetweenStars(a, b) {
+        if (!a || !b) return 0;
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return Math.hypot(dx, dy);
+      }
+
+      function tryHyperJump() {
+        if (state.dead || state.hyper.active) return;
+
+        // Если карта закрыта — откроем её, чтобы игрок выбрал цель
+        if (!GALAXY.isOpen()) {
+          GALAXY.toggle();
+          return;
+        }
+
+        const curIdx = GALAXY.currentIndex;
+        const targetIdx = GALAXY.selectedIndex;
+
+        if (targetIdx === curIdx) {
+          console.log("HYPER: цель совпадает с текущей звездой");
+          return;
+        }
+
+        const cur = GALAXY.getCurrentStar();
+        const dst = GALAXY.getStar(targetIdx);
+        if (!cur || !dst) return;
+
+        const dist = distanceBetweenStars(cur, dst);
+        const fuelCost = Math.max(
+          HYPER_MIN_FUEL,
+          Math.round(dist * HYPER_FUEL_PER_UNIT),
+        );
+
+        if (state.fuel < fuelCost) {
+          console.log(
+            `HYPER: недостаточно топлива (нужно ${fuelCost}, есть ${Math.round(state.fuel)})`,
+          );
+          return;
+        }
+
+        // Запускаем анимацию
+        state.hyper.active = true;
+        state.hyper.t = 0;
+        state.hyper.duration = HYPER_DURATION;
+        state.hyper.targetIdx = targetIdx;
+        state.hyper.fuelCost = fuelCost;
+
+        elHyperTarget.textContent = `${cur.name} → ${dst.name}`;
+        elHyperProgress.style.width = "0%";
+        elHyper.style.display = "flex";
+
+        GALAXY.setOpen(false);
+      }
+
+      function completeHyperJump() {
+        const targetIdx = state.hyper.targetIdx;
+        const star = GALAXY.getStar(targetIdx);
+        if (!star) {
+          state.hyper.active = false;
+          elHyper.style.display = "none";
+          return;
+        }
+
+        // Списываем топливо
+        state.fuel = Math.max(0, state.fuel - state.hyper.fuelCost);
+
+        // Обновляем состояние игрока
+        state.starIndex = targetIdx;
+        state.currentStar = star;
+        updateSectorFromStar(star);
+        GALAXY.setPlayerStar(targetIdx);
+
+        // Сброс сцены
+        camera.position.set(0, 0, 0);
+        camera.quaternion.set(0, 0, 0, 1);
+        state.speed = 0;
+
+        for (const e of enemies) scene.remove(e);
+        enemies.length = 0;
+        for (const l of lasers) scene.remove(l);
+        lasers.length = 0;
+
+        reseedDustAndMeteors();
+        clearSystem();
+        buildSystemFromStar(star);
+
+        console.log(
+          "HYPER →",
+          star.name,
+          star.tech,
+          star.dangerLabel,
+          star.economy,
+          `(-${state.hyper.fuelCost} fuel)`,
+        );
+
+        // Завершаем
+        state.hyper.active = false;
+        elHyper.style.display = "none";
+      }
+
+      function updateHyper(dt) {
+        if (!state.hyper.active) return;
+
+        state.hyper.t += dt;
+        const k = Math.min(1, state.hyper.t / state.hyper.duration);
+        elHyperProgress.style.width = (k * 100).toFixed(1) + "%";
+
+        if (k >= 1) completeHyperJump();
       }
 
       // ------------------------------------------------------------------
@@ -993,35 +1204,35 @@
       buildSystemFromStar(state.currentStar);
 
       // Прыжок
-      GALAXY.onJumpRequest((idx, star) => {
-        state.starIndex = idx;
-        state.currentStar = star;
-        updateSectorFromStar(star);
-        GALAXY.setPlayerStar(idx);
-        GALAXY.setOpen(false);
+      // GALAXY.onJumpRequest((idx, star) => {
+      //   state.starIndex = idx;
+      //   state.currentStar = star;
+      //   updateSectorFromStar(star);
+      //   GALAXY.setPlayerStar(idx);
+      //   GALAXY.setOpen(false);
 
-        camera.position.set(0, 0, 0);
-        camera.quaternion.set(0, 0, 0, 1);
-        state.speed = 0;
+      //   camera.position.set(0, 0, 0);
+      //   camera.quaternion.set(0, 0, 0, 1);
+      //   state.speed = 0;
 
-        for (const e of enemies) scene.remove(e);
-        enemies.length = 0;
-        for (const l of lasers) scene.remove(l);
-        lasers.length = 0;
+      //   for (const e of enemies) scene.remove(e);
+      //   enemies.length = 0;
+      //   for (const l of lasers) scene.remove(l);
+      //   lasers.length = 0;
 
-        reseedDustAndMeteors();
-        clearSystem();
-        buildSystemFromStar(star);
+      //   reseedDustAndMeteors();
+      //   clearSystem();
+      //   buildSystemFromStar(star);
 
-        console.log(
-          "JUMP →",
-          star.name,
-          star.tech,
-          star.dangerLabel,
-          star.economy,
-          star.population,
-        );
-      });
+      //   console.log(
+      //     "JUMP →",
+      //     star.name,
+      //     star.tech,
+      //     star.dangerLabel,
+      //     star.economy,
+      //     star.population,
+      //   );
+      // });
 
       function resetGame() {
         state.speed = 0;
@@ -1068,7 +1279,7 @@
       // ------------------------------------------------------------------
       //  HUD
       // ------------------------------------------------------------------
-      const $ = (id) => document.getElementById(id);
+      //const $ = (id) => document.getElementById(id);
       const elSpeed = $("speed");
       const elSpeedBar = $("speed-bar");
       const elShield = $("shield");
@@ -1098,6 +1309,9 @@
         elCredits.textContent = state.credits;
         elKills.textContent = state.kills;
         elSector.textContent = `${state.sector.x},${state.sector.y}`;
+
+        // подсветка, когда топлива мало:
+        elFuel.style.color = state.fuel < 10 ? "#ff6666" : "";
       }
 
       // ------------------------------------------------------------------
@@ -1125,6 +1339,18 @@
         const time = clock.elapsedTime;
 
         GALAXY.update(dt);
+        updateHyper(dt);
+
+        // Пока идёт гиперпрыжок — мир заморожен, но рендер идёт
+        if (state.hyper.active) {
+          // Светило текущей системы можно продолжать анимировать для красоты
+          if (currentStarHandle && currentStarHandle.update) {
+            currentStarHandle.update(dt, clock.elapsedTime);
+          }
+          composer.render();
+          requestAnimationFrame(animate);
+          return;
+        }
 
         if (HELP.isOpen()) {
           composer.render();

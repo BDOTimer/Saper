@@ -427,9 +427,9 @@ const GALAXY = (() => {
     },
     moveSelection,
     confirmJump,
-    onJumpRequest(cb) {
-      state.jumpCb = cb;
-    },
+    // onJumpRequest(cb) {
+    //   state.jumpCb = cb;
+    // },
     update(dt) {
       state.time += dt;
       if (state.open) draw();
