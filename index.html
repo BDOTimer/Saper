@@ -1,88 +1,106 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
-    <link rel="icon" type="image/png" href="mg/res/favicon-64.png" sizes="64x64">
-    
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+
+    <link
+      rel="icon"
+      type="image/png"
+      href="mg/res/favicon-64.png"
+      sizes="64x64"
+    />
+
     <title>Arcade Neon — Меню</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        html, body {
-            height: 100%;
-            overflow: hidden;
-            background-color: #0a0a14;
-            font-family: 'Courier New', monospace;
-        }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background-color: #0a0a14;
+        font-family: "Courier New", monospace;
+      }
 
-        .menu-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            gap: clamp(20px, 5vh, 40px);
-            padding: 20px;
-            position: relative;
-        }
+      .menu-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        gap: clamp(20px, 5vh, 40px);
+        padding: 20px;
+        position: relative;
+      }
 
-        /* Декоративная неоновая сетка на фоне */
-        .menu-wrapper::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
-            background-size: 40px 40px;
-            pointer-events: none;
-            mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
-            -webkit-mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
-        }
+      /* Декоративная неоновая сетка на фоне */
+      .menu-wrapper::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
+        -webkit-mask-image: radial-gradient(
+          circle at center,
+          #000 0%,
+          transparent 75%
+        );
+      }
 
-        h1 {
-            color: #0ff;
-            font-size: clamp(28px, 9vw, 56px);
-            letter-spacing: clamp(3px, 1.5vw, 10px);
-            text-shadow:
-                0 0 10px #0ff,
-                0 0 30px #0ff,
-                0 0 60px rgba(0, 255, 255, 0.5);
-            text-align: center;
-            z-index: 2;
-            animation: pulse 2.5s ease-in-out infinite;
-        }
+      h1 {
+        color: #0ff;
+        font-size: clamp(28px, 9vw, 56px);
+        letter-spacing: clamp(3px, 1.5vw, 10px);
+        text-shadow:
+          0 0 10px #0ff,
+          0 0 30px #0ff,
+          0 0 60px rgba(0, 255, 255, 0.5);
+        text-align: center;
+        z-index: 2;
+        animation: pulse 2.5s ease-in-out infinite;
+      }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50%      { opacity: 0.75; }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
-
-        .subtitle {
-            color: #fff;
-            opacity: 0.5;
-            font-size: clamp(11px, 3vw, 15px);
-            letter-spacing: 4px;
-            z-index: 2;
-            margin-top: -10px;
+        50% {
+          opacity: 0.75;
         }
+      }
 
-    .menu-buttons {
+      .subtitle {
+        color: #fff;
+        opacity: 0.5;
+        font-size: clamp(11px, 3vw, 15px);
+        letter-spacing: 4px;
+        z-index: 2;
+        margin-top: -10px;
+      }
+
+      .menu-buttons {
         display: flex;
         flex-direction: column;
         gap: clamp(10px, 2vh, 16px);
         width: min(340px, 82vw);
         z-index: 2;
-    }
+      }
 
-    .menu-btn {
+      .menu-btn {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -100,117 +118,126 @@
         position: relative;
         overflow: hidden;
         box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
-    }
-    
-    .menu-btn[hidden] {
+      }
+
+      .menu-btn[hidden] {
         display: none;
-    }
+      }
 
-        .menu-btn .num {
-            color: #fff;
-            opacity: 0.6;
-            font-size: 0.85em;
-            margin-right: 10px;
-        }
+      .menu-btn .num {
+        color: #fff;
+        opacity: 0.6;
+        font-size: 0.85em;
+        margin-right: 10px;
+      }
 
-        .menu-btn .arrow {
-            transition: transform 0.2s ease;
-        }
+      .menu-btn .arrow {
+        transition: transform 0.2s ease;
+      }
 
-        .menu-btn:hover,
-        .menu-btn:active {
-            background: rgba(0, 255, 255, 0.25);
-            color: #fff;
-            box-shadow:
-                0 0 25px rgba(0, 255, 255, 0.6),
-                inset 0 0 20px rgba(0, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
+      .menu-btn:hover,
+      .menu-btn:active {
+        background: rgba(0, 255, 255, 0.25);
+        color: #fff;
+        box-shadow:
+          0 0 25px rgba(0, 255, 255, 0.6),
+          inset 0 0 20px rgba(0, 255, 255, 0.2);
+        transform: translateY(-2px);
+      }
 
-        .menu-btn:hover .arrow {
-            transform: translateX(6px);
-        }
+      .menu-btn:hover .arrow {
+        transform: translateX(6px);
+      }
 
-        .footer {
-            position: absolute;
-            bottom: 15px;
-            color: #0ff;
-            opacity: 0.35;
-            font-size: clamp(10px, 2.5vw, 12px);
-            letter-spacing: 2px;
-            z-index: 2;
-        }
-        
-        /* Декоративная картинка справа */
+      .footer {
+        position: absolute;
+        bottom: 15px;
+        color: #0ff;
+        opacity: 0.35;
+        font-size: clamp(10px, 2.5vw, 12px);
+        letter-spacing: 2px;
+        z-index: 2;
+      }
+
+      /* Декоративная картинка справа */
+      .side-art {
+        position: absolute;
+        right: clamp(0px, 9vw, 60px);
+        top: 50%;
+        transform: translateY(-50%);
+        height: min(70vh, 520px);
+        width: auto;
+        opacity: 0.5;
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+        filter: drop-shadow(0 0 24px rgba(0, 255, 255, 0.5));
+        z-index: 1;
+      }
+
+      /* На узких экранах прячем, чтобы не мешала */
+      @media (max-width: 700px) {
         .side-art {
-            position: absolute;
-            right: clamp(0px, 9vw, 60px);
-            top: 50%;
-            transform: translateY(-50%);
-            height: min(70vh, 520px);
-            width: auto;
-            opacity: 0.5;
-            pointer-events: none;
-            user-select: none;
-            -webkit-user-select: none;
-            filter: drop-shadow(0 0 24px rgba(0, 255, 255, 0.5));
-            z-index: 1;
+          display: none;
         }
-
-        /* На узких экранах прячем, чтобы не мешала */
-        @media (max-width: 700px) {
-            .side-art { display: none; }
-        }
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
+    <script src="mg/res/click-sound.js"></script>
 
-<script src="mg/res/click-sound.js"></script>
+    <div class="menu-wrapper">
+      <h1>ARCADE</h1>
+      <div class="subtitle">NEON EDITION 0.3.4+</div>
 
-<div class="menu-wrapper">
-    <h1>ARCADE</h1>
-    <div class="subtitle">NEON EDITION 0.3.4+</div>
-
-    <div class="menu-buttons">
-
-        <a href="mg/elite2/elite2.html" class="menu-btn" data-game="elite" target="_blank">
-            <span><span class="num">01</span>ELITE-2[🪒]</span>
-            <span class="arrow">▶</span>
+      <div class="menu-buttons">
+        <a
+          href="mg/elite2/elite2.html"
+          class="menu-btn"
+          data-game="elite"
+          target="_blank"
+        >
+          <span><span class="num">01</span>ELITE-2[🪒]</span>
+          <span class="arrow">▶</span>
         </a>
-        
+
         <!--
         ... Новое ...
         -->
         <a href="mg/3lines.html" class="menu-btn" data-game="3lines">
-            <span><span class="num">02</span>ТРИ В ЛИНИЮ</span>
-            <span class="arrow">▶</span>
+          <span><span class="num">02</span>ТРИ В ЛИНИЮ</span>
+          <span class="arrow">▶</span>
         </a>
-        
+
         <a href="mg/calc.html" class="menu-btn" data-game="calc">
-            <span><span class="num">03</span>Калькулятор</span>
-            <span class="arrow">▶</span>
+          <span><span class="num">03</span>Калькулятор</span>
+          <span class="arrow">▶</span>
         </a>
-        
+
         <!--
         ... Скрыто ...
         -->
-        <a href="mg/tictactoe.html" class="menu-btn" data-game="tictactoe" hidden>
-            <span><span class="num">04</span>КРЕСТИКИ 4×4</span>
-            <span class="arrow">▶</span>
+        <a
+          href="mg/tictactoe.html"
+          class="menu-btn"
+          data-game="tictactoe"
+          hidden
+        >
+          <span><span class="num">04</span>КРЕСТИКИ 4×4</span>
+          <span class="arrow">▶</span>
         </a>
-        
-        <a href="mg/index-games-2.html" class="menu-btn">
-            <span><span class="num">99</span>... etc</span>
-            <span class="arrow">▶</span>
-        </a>
-        
-    </div>
 
-    <div class="footer">ВЫБЕРИ ИГРУ</div>
-    
-    <!-- >>> ДОБАВЛЕНО: декоративная картинка справа -->
-    <img src="mg/res/123.png" alt="" class="side-art">
-</div>
-</body>
+        <a href="mg/index-games-2.html" class="menu-btn">
+          <span><span class="num">99</span>... etc</span>
+          <span class="arrow">▶</span>
+        </a>
+      </div>
+
+      <div class="footer">ВЫБЕРИ ИГРУ</div>
+
+      <!-- >>> ДОБАВЛЕНО: декоративная картинка справа -->
+      <img src="mg/res/123.png" alt="" class="side-art" />
+    </div>
+  </body>
 </html>
