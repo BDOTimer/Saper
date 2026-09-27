@@ -75,25 +75,138 @@
     pointer-events: none;
   }
 
-  #hint {
-    position: absolute; left: 50%; top: 20px;
-    transform: translateX(-50%);
-    font-size: 12px; opacity: 0.6;
-    letter-spacing: 1px;
-  }
+#hint {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
 
-  #gameover {
-    position: absolute; inset: 0;
-    display: none;
-    align-items: center; justify-content: center;
-    flex-direction: column;
-    background: rgba(0,0,0,0.75);
-    color: #ff4444;
-    font-size: 32px;
-    text-shadow: 0 0 12px #f00;
-    letter-spacing: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 6px 14px 6px 8px;
+
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #33ff88;
+  text-shadow: 0 0 6px #00ff88, 0 0 2px #00ff88;
+
+  background:
+    linear-gradient(180deg, rgba(0, 40, 20, 0.55), rgba(0, 20, 10, 0.75));
+  border: 1px solid rgba(51, 255, 136, 0.55);
+  border-radius: 999px;
+
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 136, 0.15) inset,
+    0 0 12px rgba(0, 255, 136, 0.35),
+    0 0 24px rgba(0, 255, 136, 0.15);
+
+  cursor: pointer;
+  pointer-events: auto;   /* важно: #hud имеет pointer-events: none */
+
+  opacity: 0;
+  animation:
+    hint-appear 0.6s ease-out 0.8s forwards,
+    hint-pulse  2.6s ease-in-out 1.6s infinite;
+
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.15s,
+    color 0.2s;
+}
+
+#hint:hover,
+#hint:focus-visible {
+  color: #b6ffd2;
+  background:
+    linear-gradient(180deg, rgba(0, 70, 35, 0.7), rgba(0, 30, 15, 0.85));
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 136, 0.35) inset,
+    0 0 18px rgba(0, 255, 136, 0.7),
+    0 0 36px rgba(0, 255, 136, 0.35);
+  transform: translateX(-50%) translateY(-1px);
+  outline: none;
+}
+
+#hint:active {
+  transform: translateX(-50%) translateY(0);
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 136, 0.4) inset,
+    0 0 10px rgba(0, 255, 136, 0.6);
+}
+
+/* «Кейкап» для клавиши F1 */
+.hint-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 26px;
+  height: 20px;
+  padding: 0 6px;
+
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #002a14;
+
+  background: linear-gradient(180deg, #7dffb0, #33ff88);
+  border-radius: 5px;
+
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.5),
+    0 0 8px rgba(0, 255, 136, 0.8),
+    0 0 2px rgba(255, 255, 255, 0.6) inset;
+
+  text-shadow: none;
+  transform: translateY(-1px);
+}
+
+.hint-text {
+  padding-right: 4px;
+}
+
+/* Появление и мягкое «дыхание» */
+@keyframes hint-appear {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes hint-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(0, 255, 136, 0.15) inset,
+      0 0 12px rgba(0, 255, 136, 0.35),
+      0 0 24px rgba(0, 255, 136, 0.15);
   }
-  #gameover small { font-size: 14px; color: #33ff88; margin-top: 20px; letter-spacing: 2px; }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(0, 255, 136, 0.25) inset,
+      0 0 20px rgba(0, 255, 136, 0.55),
+      0 0 40px rgba(0, 255, 136, 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hint { animation: hint-appear 0.4s ease-out forwards; }
+  #hint:hover, #hint:focus-visible { transform: translateX(-50%); }
+}
+
+    #gameover {
+        position: absolute; inset: 0;
+        display: none;
+        align-items: center; justify-content: center;
+        flex-direction: column;
+        background: rgba(0,0,0,0.75);
+        color: #ff4444;
+        font-size: 32px;
+        text-shadow: 0 0 12px #f00;
+        letter-spacing: 3px;
+    }
+    #gameover small { font-size: 14px; color: #33ff88; margin-top: 20px; letter-spacing: 2px; }
 </style>
 </head>
 <body>
@@ -140,12 +253,15 @@
 
   <div id="damage-flash"></div>
 
-  <div id="hint">W/S — тангаж | A/D — крен | ←/→ — рыскание | R — тяга | F — тормоз | SPACE — огонь</div>
+    <button id="hint" type="button" aria-label="Открыть справку">
+      <span class="hint-key">F1</span>
+      <span class="hint-text">ПОМОЩЬ</span>
+    </button>
 
-  <div id="gameover">
+    <div id="gameover">
     GAME OVER
     <small>нажми ENTER чтобы начать заново</small>
-  </div>
+    </div>
 </div>
 
 <script type="importmap">
