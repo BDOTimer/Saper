@@ -436,6 +436,7 @@
     <script src="./galaxy/galaxy.js"></script>
     <script src="./galaxy/star.js"></script>
     <script src="./galaxy/planet.js"></script>
+    <script src="./galaxy/hyperfx.js"></script>
     <script src="./js/help.js"></script>
     <script src="../js/sound-lib.js"></script>
 
@@ -712,6 +713,18 @@
         0.15,
       );
       composer.addPass(bloom);
+      
+      // Визуал эффекта туннеля Гиперпрыжка
+      HYPERFX.attach({ THREE, scene, camera, bloom,
+        composer,
+        chromatic: {
+            enabled: true,
+            maxOffset: 0.012,
+            vignette: 0.6,
+            baseIntensity: 0.15,
+            boostDuringJump: 0.85,
+          },
+      });
 
       const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
       sunLight.position.set(1, 0.5, 0.7);
@@ -1122,6 +1135,7 @@
         elHyper.style.display = "flex";
 
         kit.sounds.hjump.play();
+        HYPERFX.start(state.hyper.duration); // визуал Гиперпрыжка
 
         GALAXY.setOpen(false);
       }
@@ -1131,6 +1145,9 @@
         const star = GALAXY.getStar(targetIdx);
         if (!star) {
           state.hyper.active = false;
+          
+          HYPERFX.stop(); // Остановка Гиперпрыжка.
+          
           elHyper.style.display = "none";
           return;
         }
@@ -1346,6 +1363,7 @@
 
         GALAXY.update(dt);
         updateHyper(dt);
+        HYPERFX.update(dt, clock.elapsedTime);
 
         // Пока идёт гиперпрыжок — мир заморожен, но рендер идёт
         if (state.hyper.active) {
@@ -1601,3 +1619,5 @@
     </script>
   </body>
 </html>
+
+
