@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Elite Remake — Prototype v2</title>
+    <link
+      rel="icon"
+      type="image/png"
+      href="../res/favicon-64.png"
+      sizes="64x64"
+    />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    
+    <link rel="stylesheet" href="./css/main.css" />
+  </head>
+
+  <body>
+    <!-- Просто canvas, чтобы имитировать игровой рендер -->
+    <canvas id="test-canvas"></canvas>
+
+<div id="hud">
+  <svg id="cockpit-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <path
+      d="M 8 0 L 8 14 L 22 26 L 78 26 L 92 14 L 92 0"
+      vector-effect="non-scaling-stroke"
+    />
+    <path
+      d="M 8 100 L 8 86 L 20 74 L 26 74"
+      vector-effect="non-scaling-stroke"
+    />
+    <path
+      d="M 92 100 L 92 86 L 80 74 L 74 74"
+      vector-effect="non-scaling-stroke"
+    />
+    <path d="M 26 74 L 74 74" vector-effect="non-scaling-stroke" />
+    <line
+      x1="6"
+      y1="50"
+      x2="12"
+      y2="50"
+      vector-effect="non-scaling-stroke"
+    />
+    <line
+      x1="88"
+      y1="50"
+      x2="94"
+      y2="50"
+      vector-effect="non-scaling-stroke"
+    />
+  </svg>
+
+  <div id="reticle">
+    <svg viewBox="0 0 70 70">
+      <line class="rh" x1="35" y1="0" x2="35" y2="20" />
+      <line class="rh" x1="35" y1="50" x2="35" y2="70" />
+      <line class="rh" x1="0" y1="35" x2="20" y2="35" />
+      <line class="rh" x1="50" y1="35" x2="70" y2="35" />
+      <circle class="rh" cx="35" cy="35" r="2" fill="#33ff88" />
+    </svg>
+  </div>
+
+  <!-- ================= ЛЕВАЯ КОНСОЛЬ ================= -->
+  <div class="console console-left">
+    <!-- SPEED -->
+    <div class="indicator" id="ind-speed">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">SPEED</span>
+          <span class="panel-tag">THR</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="speed">0</span>
+            <span class="unit">M/S</span>
+          </div>
+          <div class="bar">
+            <i id="speed-bar" style="width: 0%"></i>
+            <b class="zone right"></b>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHIELD -->
+    <div class="indicator" id="ind-shield">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">SHIELD</span>
+          <span class="panel-tag">DEF</span>
+        </div>
+        <div class="panel-body">
+          <div class="gauge">
+            <div class="gauge-ring" id="shield-ring"></div>
+            <div class="gauge-hub">
+              <span class="gauge-num" id="shield">100</span>
+              <span class="gauge-sub">SHD</span>
+            </div>
+          </div>
+          <div class="side-col">
+            <div class="status">
+              <span class="status-lamp"></span>
+              <span class="status-text"></span>
+            </div>
+            <div class="bar slim">
+              <i id="shield-bar" style="width: 100%"></i>
+            </div>
+            <div class="micro">FORE · AFT GRID</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUEL -->
+    <div class="indicator" id="ind-fuel">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">FUEL</span>
+          <span class="panel-tag">PWR</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="fuel">100</span>
+            <span class="unit">%</span>
+          </div>
+          <div class="bar">
+            <i id="fuel-bar" style="width: 100%"></i>
+            <b class="zone left"></b>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ПРАВАЯ КОНСОЛЬ ================= -->
+  <div class="console console-right">
+    <!-- CREDITS -->
+    <div class="indicator" id="ind-credits">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">CREDITS</span>
+          <span class="panel-tag">FIN</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="credits">1000</span>
+            <span class="unit">CR</span>
+          </div>
+          <div class="eq-wrap">
+            <div class="eq">
+              <i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="micro">BANK LINK</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KILLS -->
+    <div class="indicator" id="ind-kills">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">KILLS</span>
+          <span class="panel-tag">CTR</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="kills">0</span>
+            <span class="unit">FRG</span>
+          </div>
+          <div class="side-col">
+            <div class="bar pips">
+              <i id="kills-bar" style="width: 0%"></i>
+            </div>
+            <div class="micro">RATING</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTOR + компас -->
+    <div class="indicator" id="ind-sector">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">SECTOR</span>
+          <span class="panel-tag">NAV</span>
+        </div>
+        <div class="panel-body">
+          <div class="compass">
+            <b class="cN">N</b><b class="cE">E</b><b class="cS">S</b><b class="cW">W</b>
+            <div class="needle" id="compass-needle"></div>
+            <div class="compass-dot"></div>
+          </div>
+          <div class="side-col">
+            <div class="value-block">
+              <span class="value value-s" id="sector">0,0</span>
+            </div>
+            <div class="hdg-row">
+              <span class="micro">HDG</span>
+              <span class="hdg-val" id="hdg">000°</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="damage-flash"></div>
+
+  <button id="hint" type="button" aria-label="Открыть справку">
+    <span class="hint-key">F1</span>
+    <span class="hint-text">ПОМОЩЬ</span>
+  </button>
+
+  <div id="gameover">
+    GAME OVER
+    <small>нажми ENTER чтобы начать заново</small>
+  </div>
+
+  <div id="hyper">
+    <div class="hyper-title">HYPERSPACE</div>
+    <div class="hyper-sub" id="hyper-target">— — —</div>
+    <div class="hyper-bar"><i id="hyper-progress"></i></div>
+  </div>
+</div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script src="./galaxy/galaxy.js"></script>
+    <script src="./galaxy/star.js"></script>
+    <script src="./galaxy/planet.js"></script>
+    <script src="./galaxy/hyperfx.js"></script>
+    <script src="./galaxy/skystar.js"></script>
+    <script src="./station/station.js"></script>
+    <script src="./station/station-trade.js"></script>
+    
+    <script src="./js/help.js"></script>
+    <script src="../js/sound-lib.js"></script>
+
+    <script type="module">
+    
+      import * as THREE from "three";
+      window.THREE = THREE;
+
+      import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+      import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+      import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+      
+      HELP.init();
+      TRADE.init();
+    
+      // Рисуем на canvas что-то простое,
+      // чтобы визуально видеть, растянут ли он на весь экран
+      const canvas = document.getElementById('test-canvas');
+      const ctx = canvas.getContext('2d');
+
+      function resize() {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // фон
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // сетка-«мишень», чтобы оценить, где края
+        ctx.strokeStyle = '#33ff88';
+        ctx.lineWidth = 2;
+
+        // рамка по краям (если виден бордюр — рамка не у края)
+        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+
+        // крест по центру
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+
+        // подписываем размеры
+        document.getElementById('diag-size').textContent =
+          window.innerWidth + '×' + window.innerHeight;
+      }
+
+      window.addEventListener('resize', resize);
+      resize();
+    </script>
+  </body>
+</html>

@@ -10,14 +10,14 @@
       sizes="64x64"
     />
     
-    <link rel="stylesheet" href="./css/main.css" />
-
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Share+Tech+Mono&display=swap"
       rel="stylesheet"
     />
+    
+    <link rel="stylesheet" href="./css/main.css" />
 
   </head>
 
@@ -1139,14 +1139,15 @@
         playLaser();
       }
 
-      // ------------------------------------------------------------------
-      //  Цикл
-      // ------------------------------------------------------------------
-      const clock = new THREE.Clock();
-      const tmpVec = new THREE.Vector3();
-      const playerWorldPos = new THREE.Vector3();
+    ///------------------------------------------------------------------------|
+    /// Игровой цикл
+    ///------------------------------------------------------------------------:
+    const clock = new THREE.Clock();
+    const tmpVec = new THREE.Vector3();
+    const playerWorldPos = new THREE.Vector3();
 
-      function animate() {
+    function animate() 
+    {
         const dt = Math.min(clock.getDelta(), 0.05);
         const time = clock.elapsedTime;
 
@@ -1501,17 +1502,15 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
         updateHUD();
         composer.render();
         requestAnimationFrame(animate);
-      }
+    }
 
-      // ------------------------------------------------------------------
-      //  Игровой цикл
-      // ------------------------------------------------------------------
-      animate();
+    animate();
 
-      // ------------------------------------------------------------------
-      //  Resize
-      // ------------------------------------------------------------------
-      addEventListener("resize", () => {
+    ///------------------------------------------------------------------------|
+    /// Resize.
+    ///------------------------------------------------------------------------:    
+    function resize() {
+    
         camera.aspect = innerWidth / innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(innerWidth, innerHeight);
@@ -1520,8 +1519,12 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
         if (skystars.userData.setPixelRatio) {
             skystars.userData.setPixelRatio(devicePixelRatio);
         }
-      });
-      
+          
+    /// console.log("🚩 resize OK");
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
     </script>
   </body>
 </html>
