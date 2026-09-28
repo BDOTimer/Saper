@@ -280,8 +280,40 @@ const STAR = (() => {
         corona.scale.setScalar(p);
         light.intensity = params.lightIntensity * (0.9 + 0.1 * p);
       };
+      
+      // Уровень опасности от 0.0 до 1.0 в зависимости от расстояния
+      // от игрока до центра Звезды.
+      //   dist <= radius       -> 1.0
+      //   dist >= radius * 2   -> 0.0
+      //   между ними — линейная интерполяция.
+      const getDangerLevel = (playerPosition) => {
+        if (!playerPosition) return 0;
+        
+        const DangerRangeFactor = 2;
 
-      return { mesh, corona, light, params, update };
+        const worldPos = new THREE.Vector3();
+        mesh.getWorldPosition(worldPos); // ← заполняем реальной мировой позицией планеты
+
+        const dx = playerPosition.x - worldPos.x;
+        const dy = playerPosition.y - worldPos.y;
+        const dz = playerPosition.z - worldPos.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        const r = params.radius;
+        const outer = r * DangerRangeFactor;
+
+        if (dist <= r) return 1.0;
+        if (dist >= outer) return 0.0;
+
+        // 1.0 у поверхности -> 0.0 на границе зоны
+        //return 1.0 - (dist - r) / (outer - r);
+        
+        const t = (dist - r) / (outer - r); // 0..1
+        const s = t * t * (3 - 2 * t);      // smoothstep
+        return 1.0 - s;
+      };
+
+      return { mesh, corona, light, params, update, getDangerLevel };
     },
 
     // Освободить ресурсы

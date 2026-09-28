@@ -118,6 +118,10 @@ const PLANET = (() => {
 
     // Вращение
     const spinSpeed = 0.02 + rng() * 0.06;
+    
+    // Радиус зоны опасности (в радиусах планеты).
+    // Чем больше — тем дальше планета начинает "ощущаться" опасной.
+    const dangerRangeFactor = 2 + rng() * 2; // 2 .. 4
 
     // Шум-сид для шейдера
     const noiseSeed = (seed >>> 0) % 10000;
@@ -140,6 +144,7 @@ const PLANET = (() => {
       ringTilt,
       spinSpeed,
       noiseSeed,
+      dangerRangeFactor,
     };
   }
 
@@ -266,7 +271,37 @@ const PLANET = (() => {
         mesh.rotation.y += params.spinSpeed * dt;
       };
 
-      return { mesh, atmosphere, rings, params, update };
+      // Уровень опасности от 0.0 до 1.0 в зависимости от расстояния
+      // от игрока до центра планеты.
+      //   dist <= radius                       -> 1.0
+      //   dist >= radius * dangerRangeFactor   -> 0.0
+      //   между ними — линейная интерполяция.
+      const getDangerLevel = (playerPosition) => {
+        if (!playerPosition) return 0;
+
+        const worldPos = new THREE.Vector3();
+        mesh.getWorldPosition(worldPos); // ← заполняем реальной мировой позицией планеты
+
+        const dx = playerPosition.x - worldPos.x;
+        const dy = playerPosition.y - worldPos.y;
+        const dz = playerPosition.z - worldPos.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        const r = params.radius;
+        const outer = r * params.dangerRangeFactor;
+
+        if (dist <= r) return 1.0;
+        if (dist >= outer) return 0.0;
+
+        // 1.0 у поверхности -> 0.0 на границе зоны
+        //return 1.0 - (dist - r) / (outer - r);
+        
+        const t = (dist - r) / (outer - r); // 0..1
+        const s = t * t * (3 - 2 * t);      // smoothstep
+        return 1.0 - s;
+      };
+
+      return { mesh, atmosphere, rings, params, update, getDangerLevel };
     },
 
     dispose(handle) {

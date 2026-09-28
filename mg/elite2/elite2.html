@@ -770,6 +770,7 @@
 
         // Планеты: число зависит от tech
         const n = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
+        
         for (let i = 0; i < n; i++) {
           const p = PLANET.generate(star);
           const rng = mulberry32(star.id * 1000 + i);
@@ -1400,17 +1401,17 @@
             .clone();
           camera.position.addScaledVector(forward, state.speed * dt);
 
-          // Дрейф метеоров (мир летит на игрока — минус корректный)
-          //const drift = forward.multiplyScalar(-state.speed * dt);
+        // Дрейф метеоров (мир летит на игрока — минус корректный)
+        //const drift = forward.multiplyScalar(-state.speed * dt);
 
-            // Пыль частично «догоняет» камеру.
-            //   0.0 = пыль стоит в мире → летит на игрока на полной скорости
-            //   0.8 = пыль почти «прилипла» к камере → почти не набегает
-            //   1.0 = пыль движется вместе с кораблём → стоит на месте визуально
-            const DUST_FOLLOW = 0.7;
-            const dustDrift = forward
-              .clone()
-              .multiplyScalar(state.speed * dt * DUST_FOLLOW);
+        // Пыль частично «догоняет» камеру.
+        //   0.0 = пыль стоит в мире → летит на игрока на полной скорости
+        //   0.8 = пыль почти «прилипла» к камере → почти не набегает
+        //   1.0 = пыль движется вместе с кораблём → стоит на месте визуально
+        const DUST_FOLLOW = 0.7;
+        const dustDrift = forward
+          .clone()
+          .multiplyScalar(state.speed * dt * DUST_FOLLOW);
 
           // Пыль
           {
@@ -1473,7 +1474,49 @@
               }
             }
           }
+          
+        ///-----------------------------------|
+        /// Проверка столкновения с Планетами.|
+        ///-----------------------------------:
+        for (const p of planets)
+        {
+            const dangerLevel = p.getDangerLevel(playerWorldPos);
+            
+            if(dangerLevel > 0.99)
+            {
+                state.shield = 0;
+                state.dead = true;
+                elGameover.style.display = "flex";
+                playDeath();
+            }
+            else if(dangerLevel > 0.1)
+            {
+                state.shield -= 0.001 * dt;
+                flashDamage(dangerLevel);
+            }
+        }
+        
+        ///-----------------------------------|
+        /// Проверка столкновения со Звездой. |
+        ///-----------------------------------:
+        if (currentStarHandle && currentStarHandle.getDangerLevel)
+        {
+            const starDanger = currentStarHandle.getDangerLevel(playerWorldPos);
 
+            if (starDanger > 0.99)
+            {
+                state.shield = 0;
+                state.dead = true;
+                elGameover.style.display = "flex";
+                playDeath();
+            }
+            else if (starDanger > 0.1)
+            {
+                state.shield -= 0.001 * dt;
+                flashDamage(starDanger);
+            }
+        }
+        
           // Стрельба
           fireCooldown -= dt;
           if (keys["Space"]) fire();
