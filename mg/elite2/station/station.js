@@ -221,12 +221,26 @@ const STATION = (() => {
     gateGroup.add(gateDisk);
 
     group.add(gateGroup);
-
+    
+    // Лампочка над шлюзом
+    const topMarker = new THREE.Mesh(
+      new THREE.CircleGeometry(params.gateRadius * 0.18, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        toneMapped: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+        
+    topMarker.position.set(0, params.gateRadius * 1.05, -params.gateLength / 2);
+    gateGroup.add(topMarker);
+    
     // Сохраняем ссылки для анимации/проверок
     group.userData.ring = ring;
     group.userData.spokes = spokes;
     group.userData.gateGroup = gateGroup;
     group.userData.gateRing = gateRing;
+    group.userData.topMarker = topMarker;
 
     return group;
   }
@@ -252,6 +266,11 @@ const STATION = (() => {
         // Пульсация обода шлюза
         const pulse = 0.85 + 0.15 * Math.sin(time * 3);
         group.userData.gateRing.scale.setScalar(pulse);
+        
+        // Мигание лампочки над шлюзом
+        const blink = 0.4 + 0.4 * Math.sin(time * 4);
+        group.userData.topMarker.material.opacity = blink;
+        group.userData.topMarker.material.transparent = true;
       };
 
       // ---- Опасность (как у планет): 1.0 в шаре радиуса radius ----
@@ -361,7 +380,17 @@ const STATION = (() => {
         const UP_OK     = 0.5;   // ~60°
 
         // Всё хорошо — успешная посадка
-        if (noseDot >= NOSE_GOOD && upDot >= UP_GOOD) return 1;
+        if (noseDot >= NOSE_GOOD && upDot >= UP_GOOD)
+        {
+            // ★ Если стыковка запрещена — не разрешаем успешную посадку.
+            //   Возвращаем 0 (ничего), чтобы игрок не умирал, а просто не мог сесть.
+            if (!dockingEnabled) {
+                // Но если он всё равно в створе — считаем это аварией (врезался в закрытый шлюз)
+                // Если хочешь мягкий вариант — оставь только `return 0;`
+                return 0;
+            }
+            return 1;
+        }
 
         // Влетел в шлюз, но криво — авария
         if (noseDot >= NOSE_OK && upDot >= UP_OK) return 2;
@@ -369,8 +398,34 @@ const STATION = (() => {
         // В створе, но совсем не туда — считаем аварией (врезался в стенку)
         return 2;
       };
+      
+        // ---- Разрешение/запрет входа ----
+        let dockingEnabled = true;
 
-      return { group, params, update, getDangerLevel, getLandingStatus };
+        const COLORS = {
+          enabled:  { marker: 0x00ff00, ring: 0x00ff88 }, // зелёный
+          disabled: { marker: 0xff2222, ring: 0xff3333 }, // красный
+        };
+
+        function applyDockingColors() {
+          const c = dockingEnabled ? COLORS.enabled : COLORS.disabled;
+          group.userData.topMarker.material.color.setHex(c.marker);
+          group.userData.gateRing.material.color.setHex(c.ring);
+        }
+        applyDockingColors(); // применяем сразу при создании
+
+        const setDockingEnabled = (enabled) => {
+          dockingEnabled = !!enabled;
+          applyDockingColors();
+        };
+
+        const isDockingEnabled = () => dockingEnabled;
+
+        return {
+            group, params, update, getDangerLevel, getLandingStatus,
+            setDockingEnabled,   // ← новое
+            isDockingEnabled,    // ← новое
+        };
     },
 
     dispose(handle) {

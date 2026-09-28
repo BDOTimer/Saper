@@ -1360,6 +1360,7 @@
           return;
         }
 
+/////////////////////////////////////////////////////////////////// - ИГРОК ЖИВ!
     if (!state.dead)
     {
           // Тяга
@@ -1398,7 +1399,7 @@
         const DUST_FOLLOW = 0.7;
         const dustDrift = forward
           .clone()
-          .multiplyScalar(state.speed * dt * DUST_FOLLOW);
+          .multiplyScalar((state.speed - 5) * dt * DUST_FOLLOW);
 
           // Пыль
           {
@@ -1517,10 +1518,10 @@ const nose = new THREE.Vector3(0,0,-1).applyQuaternion(playerWorldQuat);
 const gateUp = new THREE.Vector3(0,1,0); // станция не повёрнута
 const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
 
-console.log(
-  "up dot gateUp:", up.dot(gateUp).toFixed(3),
-  "nose dot gateIn:", nose.dot(gateIn).toFixed(3),
-);
+//console.log(
+//"up dot gateUp:", up.dot(gateUp).toFixed(3),
+//"nose dot gateIn:", nose.dot(gateIn).toFixed(3),
+//);
 /// Интерпретация:
 /// up dot gateUp ≈ +1 — корабль «стоит на киле» относительно станции, верх совпадает.
 /// up dot gateUp ≈ −1 — корабль вверх ногами относительно станции.
@@ -1566,6 +1567,7 @@ console.log(
     } else
     {   fireCooldown -= dt;
     }
+////////////////////////////////////////////////////////////////////////////////
 
         // Дульные вспышки гаснут
         for (const m of player.userData.muzzles) {
