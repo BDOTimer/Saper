@@ -13,7 +13,7 @@
 //   STAR.getParams(star) -> params   // без создания мешей
 //   STAR.dispose(handle)              // освободить ресурсы
 
-const STAR = (() => {
+const STAR = (() =>  {
   // --- RNG (mulberry32) ---
   function mulberry32(seed) {
     return function () {
@@ -46,7 +46,8 @@ const STAR = (() => {
     const rng = mulberry32(seed >>> 0);
 
     // hue уже есть в star (0..1). Если нет — вытащим из id
-    const baseHue = typeof star.hue === "number" ? star.hue : ((star.id * 0.137) % 1);
+    const baseHue =
+      typeof star.hue === "number" ? star.hue : (star.id * 0.137) % 1;
 
     // Класс светила зависит от hue и tech:
     //   hue < 0.15  -> красный карлик
@@ -83,12 +84,15 @@ const STAR = (() => {
     // Пульсация: у красных карликов чаще и заметнее
     const pulseSpeed =
       klass === "red-dwarf" ? 3.0 + rng() * 2.0 : 0.8 + rng() * 1.2;
-    const pulseAmp = klass === "red-dwarf" ? 0.08 + rng() * 0.06 : 0.03 + rng() * 0.03;
+    const pulseAmp =
+      klass === "red-dwarf" ? 0.08 + rng() * 0.06 : 0.03 + rng() * 0.03;
 
     // Цвет ядра и короны — из hue, но подкрученный под класс
     const coreHue = baseHue;
-    const coreSat = klass === "white-blue" || klass === "blue-giant" ? 0.9 : 0.8;
-    const coreLum = klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
+    const coreSat =
+      klass === "white-blue" || klass === "blue-giant" ? 0.9 : 0.8;
+    const coreLum =
+      klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
 
     const coronaHue = (coreHue + 0.03) % 1;
     const coronaSat = coreSat * 0.9;
@@ -228,7 +232,11 @@ const STAR = (() => {
 
   // --- Создание короны (аддитивная сфера) ---
   function makeCorona(params) {
-    const geo = new THREE.SphereGeometry(params.radius * params.coronaScale, 32, 32);
+    const geo = new THREE.SphereGeometry(
+      params.radius * params.coronaScale,
+      32,
+      32,
+    );
     const col = new THREE.Color().setHSL(
       params.coronaHue,
       params.coronaSat,
@@ -276,11 +284,12 @@ const STAR = (() => {
       // Анимация пульсации — вызывающий код должен дергать это в update(dt)
       const update = (dt, time) => {
         mesh.material.uniforms.uTime.value = time;
-        const p = 1 + Math.sin(time * params.pulseSpeed) * params.pulseAmp * 0.5;
+        const p =
+          1 + Math.sin(time * params.pulseSpeed) * params.pulseAmp * 0.5;
         corona.scale.setScalar(p);
         light.intensity = params.lightIntensity * (0.9 + 0.1 * p);
       };
-      
+
       // Уровень опасности от 0.0 до 1.0 в зависимости от расстояния
       // от игрока до центра Звезды.
       //   dist <= radius       -> 1.0
@@ -288,7 +297,7 @@ const STAR = (() => {
       //   между ними — линейная интерполяция.
       const getDangerLevel = (playerPosition) => {
         if (!playerPosition) return 0;
-        
+
         const DangerRangeFactor = 2;
 
         const worldPos = new THREE.Vector3();
@@ -307,9 +316,9 @@ const STAR = (() => {
 
         // 1.0 у поверхности -> 0.0 на границе зоны
         //return 1.0 - (dist - r) / (outer - r);
-        
+
         const t = (dist - r) / (outer - r); // 0..1
-        const s = t * t * (3 - 2 * t);      // smoothstep
+        const s = t * t * (3 - 2 * t); // smoothstep
         return 1.0 - s;
       };
 
@@ -322,7 +331,8 @@ const STAR = (() => {
       for (const obj of [handle.mesh, handle.corona]) {
         if (!obj) continue;
         obj.geometry?.dispose?.();
-        if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose?.());
+        if (Array.isArray(obj.material))
+          obj.material.forEach((m) => m.dispose?.());
         else obj.material?.dispose?.();
       }
     },
