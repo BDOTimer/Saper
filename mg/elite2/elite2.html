@@ -10,418 +10,228 @@
       sizes="64x64"
     />
 
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: #000;
-      }
-      canvas {
-        display: block;
-      }
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
 
-      body.hide-cursor {
-        cursor: none;
-      }
-
-      /* ---------- HUD в стиле оригинальной Elite ---------- */
-      #hud {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        font-family: "Courier New", monospace;
-        color: #33ff88;
-        text-shadow:
-          0 0 6px #00ff88,
-          0 0 2px #00ff88;
-        user-select: none;
-      }
-
-      #cockpit-svg {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-      }
-      #cockpit-svg path,
-      #cockpit-svg line,
-      #cockpit-svg polyline {
-        fill: none;
-        stroke: #33ff88;
-        stroke-width: 2;
-        filter: drop-shadow(0 0 4px #00ff88);
-      }
-
-      .indicator {
-        position: absolute;
-        font-size: 13px;
-        line-height: 1.35;
-        letter-spacing: 1px;
-      }
-      #ind-speed {
-        left: 110px;
-        bottom: 90px;
-      }
-      #ind-shield {
-        left: 110px;
-        bottom: 150px;
-      }
-      #ind-fuel {
-        left: 110px;
-        bottom: 210px;
-      }
-      #ind-credits {
-        right: 110px;
-        bottom: 90px;
-        text-align: right;
-      }
-      #ind-kills {
-        right: 110px;
-        bottom: 150px;
-        text-align: right;
-      }
-      #ind-sector {
-        right: 110px;
-        bottom: 210px;
-        text-align: right;
-      }
-
-      .bar {
-        display: inline-block;
-        width: 90px;
-        height: 8px;
-        border: 1px solid #33ff88;
-        margin-left: 6px;
-        vertical-align: middle;
-        position: relative;
-      }
-      .bar > i {
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        background: #33ff88;
-        box-shadow: 0 0 6px #00ff88;
-        display: block;
-      }
-
-      #reticle {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 70px;
-        height: 70px;
-        transform: translate(-50%, -50%);
-      }
-      #reticle svg {
-        width: 100%;
-        height: 100%;
-      }
-      #reticle .rh {
-        stroke: #33ff88;
-        stroke-width: 2;
-        filter: drop-shadow(0 0 4px #00ff88);
-      }
-
-      #damage-flash {
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(
-          ellipse at center,
-          transparent 40%,
-          rgba(255, 40, 40, 0.55)
-        );
-        opacity: 0;
-        transition: opacity 0.15s;
-        pointer-events: none;
-      }
-
-      #hint {
-        position: absolute;
-        left: 50%;
-        top: 18px;
-        transform: translateX(-50%);
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 14px 6px 8px;
-        font-family: "Courier New", monospace;
-        font-size: 12px;
-        letter-spacing: 2px;
-        color: #33ff88;
-        text-shadow:
-          0 0 6px #00ff88,
-          0 0 2px #00ff88;
-        background: linear-gradient(
-          180deg,
-          rgba(0, 40, 20, 0.55),
-          rgba(0, 20, 10, 0.75)
-        );
-        border: 1px solid rgba(51, 255, 136, 0.55);
-        border-radius: 999px;
-        box-shadow:
-          0 0 0 1px rgba(0, 255, 136, 0.15) inset,
-          0 0 12px rgba(0, 255, 136, 0.35),
-          0 0 24px rgba(0, 255, 136, 0.15);
-        cursor: pointer;
-        pointer-events: auto;
-        opacity: 0;
-        animation:
-          hint-appear 0.6s ease-out 0.8s forwards,
-          hint-pulse 2.6s ease-in-out 1.6s infinite;
-        transition:
-          background 0.2s,
-          box-shadow 0.2s,
-          transform 0.15s,
-          color 0.2s;
-      }
-
-      #hint:hover,
-      #hint:focus-visible {
-        color: #b6ffd2;
-        background: linear-gradient(
-          180deg,
-          rgba(0, 70, 35, 0.7),
-          rgba(0, 30, 15, 0.85)
-        );
-        box-shadow:
-          0 0 0 1px rgba(0, 255, 136, 0.35) inset,
-          0 0 18px rgba(0, 255, 136, 0.7),
-          0 0 36px rgba(0, 255, 136, 0.35);
-        transform: translateX(-50%) translateY(-1px);
-        outline: none;
-      }
-
-      #hint:active {
-        transform: translateX(-50%) translateY(0);
-        box-shadow:
-          0 0 0 1px rgba(0, 255, 136, 0.4) inset,
-          0 0 10px rgba(0, 255, 136, 0.6);
-      }
-
-      .hint-key {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 26px;
-        height: 20px;
-        padding: 0 6px;
-        font-size: 11px;
-        font-weight: bold;
-        letter-spacing: 1px;
-        color: #002a14;
-        background: linear-gradient(180deg, #7dffb0, #33ff88);
-        border-radius: 5px;
-        box-shadow:
-          0 1px 0 rgba(0, 0, 0, 0.5),
-          0 0 8px rgba(0, 255, 136, 0.8),
-          0 0 2px rgba(255, 255, 255, 0.6) inset;
-        text-shadow: none;
-        transform: translateY(-1px);
-      }
-
-      .hint-text {
-        padding-right: 4px;
-      }
-
-      @keyframes hint-appear {
-        from {
-          opacity: 0;
-          transform: translateX(-50%) translateY(-8px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-        }
-      }
-
-      @keyframes hint-pulse {
-        0%,
-        100% {
-          box-shadow:
-            0 0 0 1px rgba(0, 255, 136, 0.15) inset,
-            0 0 12px rgba(0, 255, 136, 0.35),
-            0 0 24px rgba(0, 255, 136, 0.15);
-        }
-        50% {
-          box-shadow:
-            0 0 0 1px rgba(0, 255, 136, 0.25) inset,
-            0 0 20px rgba(0, 255, 136, 0.55),
-            0 0 40px rgba(0, 255, 136, 0.25);
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        #hint {
-          animation: hint-appear 0.4s ease-out forwards;
-        }
-        #hint:hover,
-        #hint:focus-visible {
-          transform: translateX(-50%);
-        }
-      }
-
-      #gameover {
-        position: absolute;
-        inset: 0;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        background: rgba(0, 0, 0, 0.75);
-        color: #ff4444;
-        font-size: 32px;
-        text-shadow: 0 0 12px #f00;
-        letter-spacing: 3px;
-      }
-      #gameover small {
-        font-size: 14px;
-        color: #33ff88;
-        margin-top: 20px;
-        letter-spacing: 2px;
-      }
-
-      #hyper {
-        position: absolute;
-        inset: 0;
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: radial-gradient(
-          ellipse at center,
-          rgba(0, 60, 30, 0.55),
-          rgba(0, 0, 0, 0.95)
-        );
-        color: #b6ffd2;
-        font-family: "Courier New", monospace;
-        letter-spacing: 3px;
-        text-shadow: 0 0 12px #00ff88;
-        z-index: 40;
-        pointer-events: none;
-      }
-      #hyper .hyper-title {
-        font-size: 28px;
-        margin-bottom: 12px;
-        animation: hyper-flicker 0.6s infinite alternate;
-      }
-      #hyper .hyper-sub {
-        font-size: 16px;
-        opacity: 0.85;
-        margin-bottom: 18px;
-      }
-      #hyper .hyper-bar {
-        width: 260px;
-        height: 8px;
-        border: 1px solid #33ff88;
-        position: relative;
-      }
-      #hyper .hyper-bar > i {
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 0%;
-        background: #33ff88;
-        box-shadow: 0 0 10px #00ff88;
-      }
-      @keyframes hyper-flicker {
-        from {
-          opacity: 1;
-        }
-        to {
-          opacity: 0.55;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="./css/main.css" />
   </head>
 
   <body>
-    <div id="hud">
-      <svg id="cockpit-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <path
-          d="M 8 0 L 8 14 L 22 26 L 78 26 L 92 14 L 92 0"
-          vector-effect="non-scaling-stroke"
-        />
-        <path
-          d="M 8 100 L 8 86 L 20 74 L 26 74"
-          vector-effect="non-scaling-stroke"
-        />
-        <path
-          d="M 92 100 L 92 86 L 80 74 L 74 74"
-          vector-effect="non-scaling-stroke"
-        />
-        <path d="M 26 74 L 74 74" vector-effect="non-scaling-stroke" />
-        <line
-          x1="6"
-          y1="50"
-          x2="12"
-          y2="50"
-          vector-effect="non-scaling-stroke"
-        />
-        <line
-          x1="88"
-          y1="50"
-          x2="94"
-          y2="50"
-          vector-effect="non-scaling-stroke"
-        />
-      </svg>
 
-      <div id="reticle">
-        <svg viewBox="0 0 70 70">
-          <line class="rh" x1="35" y1="0" x2="35" y2="20" />
-          <line class="rh" x1="35" y1="50" x2="35" y2="70" />
-          <line class="rh" x1="0" y1="35" x2="20" y2="35" />
-          <line class="rh" x1="50" y1="35" x2="70" y2="35" />
-          <circle class="rh" cx="35" cy="35" r="2" fill="#33ff88" />
-        </svg>
-      </div>
+<div id="hud">
+  <svg id="cockpit-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <path
+      d="M 8 0 L 8 14 L 22 26 L 78 26 L 92 14 L 92 0"
+      vector-effect="non-scaling-stroke"
+    />
+    <path
+      d="M 8 100 L 8 86 L 20 74 L 26 74"
+      vector-effect="non-scaling-stroke"
+    />
+    <path
+      d="M 92 100 L 92 86 L 80 74 L 74 74"
+      vector-effect="non-scaling-stroke"
+    />
+    <path d="M 26 74 L 74 74" vector-effect="non-scaling-stroke" />
+    <line
+      x1="6"
+      y1="50"
+      x2="12"
+      y2="50"
+      vector-effect="non-scaling-stroke"
+    />
+    <line
+      x1="88"
+      y1="50"
+      x2="94"
+      y2="50"
+      vector-effect="non-scaling-stroke"
+    />
+  </svg>
 
-      <div class="indicator" id="ind-speed">
-        SPEED <span id="speed">0</span>
-        <span class="bar"><i id="speed-bar" style="width: 0%"></i></span>
-      </div>
-      <div class="indicator" id="ind-shield">
-        SHIELD <span id="shield">100</span>
-        <span class="bar"><i id="shield-bar" style="width: 100%"></i></span>
-      </div>
-      <div class="indicator" id="ind-fuel">
-        FUEL <span id="fuel">100</span>
-        <span class="bar"><i id="fuel-bar" style="width: 100%"></i></span>
-      </div>
+  <div id="reticle">
+    <svg viewBox="0 0 70 70">
+      <line class="rh" x1="35" y1="0" x2="35" y2="20" />
+      <line class="rh" x1="35" y1="50" x2="35" y2="70" />
+      <line class="rh" x1="0" y1="35" x2="20" y2="35" />
+      <line class="rh" x1="50" y1="35" x2="70" y2="35" />
+      <circle class="rh" cx="35" cy="35" r="2" fill="#33ff88" />
+    </svg>
+  </div>
 
-      <div class="indicator" id="ind-credits">
-        <span id="credits">1000</span> CR
-      </div>
-      <div class="indicator" id="ind-kills">
-        KILLS <span id="kills">0</span>
-      </div>
-      <div class="indicator" id="ind-sector">
-        SECTOR <span id="sector">0,0</span>
-      </div>
-
-      <div id="damage-flash"></div>
-
-      <button id="hint" type="button" aria-label="Открыть справку">
-        <span class="hint-key">F1</span>
-        <span class="hint-text">ПОМОЩЬ</span>
-      </button>
-
-      <div id="gameover">
-        GAME OVER
-        <small>нажми ENTER чтобы начать заново</small>
-      </div>
-
-      <div id="hyper">
-        <div class="hyper-title">HYPERSPACE</div>
-        <div class="hyper-sub" id="hyper-target">— — —</div>
-        <div class="hyper-bar"><i id="hyper-progress"></i></div>
+  <!-- ================= ЛЕВАЯ КОНСОЛЬ ================= -->
+  <div class="console console-left">
+    <!-- SPEED -->
+    <div class="indicator" id="ind-speed">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">SPEED</span>
+          <span class="panel-tag">THR</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="speed">0</span>
+            <span class="unit">M/S</span>
+          </div>
+          <div class="bar">
+            <i id="speed-bar" style="width: 0%"></i>
+            <b class="zone right"></b>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- SHIELD -->
+    <div class="indicator" id="ind-shield">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">SHIELD</span>
+          <span class="panel-tag">DEF</span>
+        </div>
+        <div class="panel-body">
+          <div class="gauge">
+            <div class="gauge-ring" id="shield-ring"></div>
+            <div class="gauge-hub">
+              <span class="gauge-num" id="shield">100</span>
+              <span class="gauge-sub">SHD</span>
+            </div>
+          </div>
+          <div class="side-col">
+            <div class="status">
+              <span class="status-lamp"></span>
+              <span class="status-text"></span>
+            </div>
+            <div class="bar slim">
+              <i id="shield-bar" style="width: 100%"></i>
+            </div>
+            <div class="micro">FORE · AFT GRID</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUEL -->
+    <div class="indicator" id="ind-fuel">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">FUEL</span>
+          <span class="panel-tag">PWR</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="fuel">100</span>
+            <span class="unit">%</span>
+          </div>
+          <div class="bar">
+            <i id="fuel-bar" style="width: 100%"></i>
+            <b class="zone left"></b>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ПРАВАЯ КОНСОЛЬ ================= -->
+  <div class="console console-right">
+    <!-- CREDITS -->
+    <div class="indicator" id="ind-credits">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">CREDITS</span>
+          <span class="panel-tag">FIN</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="credits">1000</span>
+            <span class="unit">CR</span>
+          </div>
+          <div class="eq-wrap">
+            <div class="eq">
+              <i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="micro">BANK LINK</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KILLS -->
+    <div class="indicator" id="ind-kills">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">KILLS</span>
+          <span class="panel-tag">CTR</span>
+        </div>
+        <div class="panel-body">
+          <div class="value-block">
+            <span class="value" id="kills">0</span>
+            <span class="unit">FRG</span>
+          </div>
+          <div class="side-col">
+            <div class="bar pips">
+              <i id="kills-bar" style="width: 0%"></i>
+            </div>
+            <div class="micro">RATING</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTOR + компас -->
+    <div class="indicator" id="ind-sector">
+      <div class="panel">
+        <div class="panel-head">
+          <i class="led"></i>
+          <span class="panel-title">SECTOR</span>
+          <span class="panel-tag">NAV</span>
+        </div>
+        <div class="panel-body">
+          <div class="compass">
+            <b class="cN">N</b><b class="cE">E</b><b class="cS">S</b><b class="cW">W</b>
+            <div class="needle" id="compass-needle"></div>
+            <div class="compass-dot"></div>
+          </div>
+          <div class="side-col">
+            <div class="value-block">
+              <span class="value value-s" id="sector">0,0</span>
+            </div>
+            <div class="hdg-row">
+              <span class="micro">HDG</span>
+              <span class="hdg-val" id="hdg">000°</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="damage-flash"></div>
+
+  <button id="hint" type="button" aria-label="Открыть справку">
+    <span class="hint-key">F1</span>
+    <span class="hint-text">ПОМОЩЬ</span>
+  </button>
+
+  <div id="gameover">
+    GAME OVER
+    <small>нажми ENTER чтобы начать заново</small>
+  </div>
+
+  <div id="hyper">
+    <div class="hyper-title">HYPERSPACE</div>
+    <div class="hyper-sub" id="hyper-target">— — —</div>
+    <div class="hyper-bar"><i id="hyper-progress"></i></div>
+  </div>
+</div>
 
     <script type="importmap">
       {
