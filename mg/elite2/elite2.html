@@ -530,47 +530,6 @@
       }
 
       // ------------------------------------------------------------------
-      //  Звёздное небо (дальний фон)
-      // ------------------------------------------------------------------
-      function makeStarfield(seed) {
-        const rng = mulberry32(seed);
-        const count = 4000;
-        const pos = new Float32Array(count * 3);
-        const col = new Float32Array(count * 3);
-        for (let i = 0; i < count; i++) {
-          const u = rng() * 2 - 1;
-          const t = rng() * Math.PI * 2;
-          const r = 4000;
-          const s = Math.sqrt(1 - u * u);
-          pos[i * 3 + 0] = r * s * Math.cos(t);
-          pos[i * 3 + 1] = r * u;
-          pos[i * 3 + 2] = r * s * Math.sin(t);
-          const c = new THREE.Color().setHSL(
-            0.55 + rng() * 0.15,
-            0.3,
-            0.7 + rng() * 0.3,
-          );
-          col[i * 3 + 0] = c.r;
-          col[i * 3 + 1] = c.g;
-          col[i * 3 + 2] = c.b;
-        }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-        g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-        const m = new THREE.PointsMaterial({
-          size: 4,
-          sizeAttenuation: false,
-          vertexColors: true,
-          transparent: true,
-          opacity: 0.9,
-          depthWrite: false,
-        });
-        const p = new THREE.Points(g, m);
-        p.frustumCulled = false;
-        return p;
-      }
-
-      // ------------------------------------------------------------------
       //  Корабль игрока
       // ------------------------------------------------------------------
       function makePlayerShip() {
@@ -744,8 +703,16 @@
       scene.add(sunLight);
       scene.add(new THREE.AmbientLight(0x334455, 0.6));
 
-      const stars = makeStarfield(12345);
-      scene.add(stars);
+      // ---------------------------------------|
+      //  Звёздное небо (дальний фон).
+      // ---------------------------------------:
+      const skystars = SKYSTAR.makeStarfield(12345, {
+          count: 4000,
+          radius: 4000,
+          size: 4,
+          opacity: 0.9,
+        });
+      scene.add(skystars);
 
       const player = makePlayerShip();
       camera.add(player);
@@ -1598,7 +1565,7 @@
         for (const p of planets) p.update(dt);
 
         // Звёздное небо следует за камерой
-        stars.position.copy(camera.position);
+        skystars.position.copy(camera.position);
 
         // Пульсация двигателей
         const engMat = player.userData.engines[0].material;
