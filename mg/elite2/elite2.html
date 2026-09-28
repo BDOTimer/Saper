@@ -438,6 +438,8 @@
     <script src="./galaxy/planet.js"></script>
     <script src="./galaxy/hyperfx.js"></script>
     <script src="./galaxy/skystar.js"></script>
+    <script src="./station/station.js"></script>
+    
     <script src="./js/help.js"></script>
     <script src="../js/sound-lib.js"></script>
 
@@ -730,15 +732,16 @@
       player.scale.set(3, 0.1, 3);
       scene.add(camera);
 
-      // ------------------------------------------------------------------
-      //  Система текущей звезды: светило + планеты
-      //  Использует STAR и PLANET из ./galaxy/star.js и ./galaxy/planet.js
-      // ------------------------------------------------------------------
-      const planets = []; // массив хэндлов PLANET.generate(...)
-      let currentStarHandle = null;
+    // ------------------------------------------------------------------------|
+    //  Система текущей звезды: светило + планеты
+    //  Использует STAR и PLANET из ./galaxy/star.js и ./galaxy/planet.js
+    // ------------------------------------------------------------------------:
+    const planets = []; // массив хэндлов PLANET.generate(...)
+    let currentStarHandle = null;
+    let currentStationHandle = null;
 
-      function clearSystem() {
-        for (const p of planets) {
+    function clearSystem()
+    {   for (const p of planets) {
           scene.remove(p.mesh);
           if (p.atmosphere) scene.remove(p.atmosphere);
           if (p.rings) scene.remove(p.rings);
@@ -753,10 +756,16 @@
           STAR.dispose(currentStarHandle);
           currentStarHandle = null;
         }
-      }
 
-      function buildSystemFromStar(star) {
-        if (!star) return;
+        if (currentStationHandle) {
+            scene.remove(currentStationHandle.group);
+            STATION.dispose(currentStationHandle);
+            currentStationHandle = null;
+        }
+    }
+
+    function buildSystemFromStar(star)
+    {   if (!star) return;
 
         // Светило — висит далеко впереди
         currentStarHandle = STAR.generate(star);
@@ -784,13 +793,21 @@
           scene.add(p.mesh);
           planets.push(p);
         }
-      }
+        
+        // Станция — где-то в стороне, не на пути планет
+        currentStationHandle = STATION.generate(star);
+        
+        currentStationHandle.group.position.set(0, 200, -600);
+        scene.add(currentStationHandle.group);
+    }
+    
 
-      // ------------------------------------------------------------------
-      //  Враги / лазеры / эффекты
-      // ------------------------------------------------------------------
-      const enemies = [];
-      const lasers = [];
+
+    // ------------------------------------------------------------------------|
+    //  Враги / лазеры / эффекты
+    // ------------------------------------------------------------------------:
+    const enemies = [];
+    const lasers = [];
 
       function spawnEnemy() {
         if (!DEBUG.isSpawnEnemies) return; // дебаг-выключатель
@@ -1209,40 +1226,9 @@
         s.economy,
         s.population,
       );
-
+      
       // Стартовая система
       buildSystemFromStar(state.currentStar);
-
-      // Прыжок
-      // GALAXY.onJumpRequest((idx, star) => {
-      //   state.starIndex = idx;
-      //   state.currentStar = star;
-      //   updateSectorFromStar(star);
-      //   GALAXY.setPlayerStar(idx);
-      //   GALAXY.setOpen(false);
-
-      //   camera.position.set(0, 0, 0);
-      //   camera.quaternion.set(0, 0, 0, 1);
-      //   state.speed = 0;
-
-      //   for (const e of enemies) scene.remove(e);
-      //   enemies.length = 0;
-      //   for (const l of lasers) scene.remove(l);
-      //   lasers.length = 0;
-
-      //   reseedDustAndMeteors();
-      //   clearSystem();
-      //   buildSystemFromStar(star);
-
-      //   console.log(
-      //     "JUMP →",
-      //     star.name,
-      //     star.tech,
-      //     star.dangerLabel,
-      //     star.economy,
-      //     star.population,
-      //   );
-      // });
 
       function resetGame() {
         state.speed = 0;
@@ -1374,7 +1360,8 @@
           return;
         }
 
-        if (!state.dead) {
+    if (!state.dead)
+    {
           // Тяга
           if (keys["ArrowUp"]) state.speed += 220 * dt;
           if (keys["ArrowDown"]) state.speed -= 220 * dt;
@@ -1517,22 +1504,51 @@
             }
         }
         
-          // Стрельба
-          fireCooldown -= dt;
-          if (keys["Space"]) fire();
+        ///-------------------------------------|
+        /// Cтанция в системе[СТЫКОВКА].
+        ///-------------------------------------:
+        const playerWorldQuat = new THREE.Quaternion();
+        player.getWorldQuaternion(playerWorldQuat);
+        // playerWorldPos уже вычислен выше
+        
+        if (currentStationHandle) {
+          const status = currentStationHandle.getLandingStatus(
+            playerWorldPos,
+            playerWorldQuat,
+          );
 
-            // Топливо
-            if (state.speed !== 0)
-            {
-                state.fuel -= Math.abs(state.speed) * dt * TUNING_SHIP.fuel_rate;
-                if (state.fuel <= 0)
-                {   state.fuel  = 0;
-                    state.speed *= 0.98;
-                }
-            }
-        } else {
-          fireCooldown -= dt;
+          if (status === 2) {
+            // авария
+            state.shield = 0;
+            state.dead = true;
+            elGameover.style.display = "flex";
+            playDeath();
+          } else if (status === 1) {
+            // успешная посадка — например, пополнить топливо/щит,
+            // показать сообщение, отключить управление и т.п.
+            state.fuel = 100;
+            state.shield = 100;
+            console.log("LANDED OK");
+          }
         }
+        
+        // Стрельба
+        fireCooldown -= dt;
+        if (keys["Space"]) fire();
+
+        // Топливо
+        if (state.speed !== 0)
+        {
+            state.fuel -= Math.abs(state.speed) * dt * TUNING_SHIP.fuel_rate;
+            if (state.fuel <= 0)
+            {   state.fuel  = 0;
+                state.speed *= 0.98;
+            }
+        }
+            
+    } else
+    {   fireCooldown -= dt;
+    }
 
         // Дульные вспышки гаснут
         for (const m of player.userData.muzzles) {
@@ -1625,6 +1641,13 @@
           currentStarHandle.update(dt, time);
         }
         for (const p of planets) p.update(dt);
+        
+        ///-------------------------------------|
+        /// Cтанция в системе.
+        ///-------------------------------------:
+        if (currentStationHandle) {
+            currentStationHandle.update(dt, time);
+        }
 
         // Звёздное небо следует за камерой
         skystars.position.copy(camera.position);
