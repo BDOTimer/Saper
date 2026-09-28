@@ -1511,6 +1511,23 @@
         player.getWorldQuaternion(playerWorldQuat);
         // playerWorldPos уже вычислен выше
         
+        
+const up = new THREE.Vector3(0,1,0).applyQuaternion(playerWorldQuat);
+const nose = new THREE.Vector3(0,0,-1).applyQuaternion(playerWorldQuat);
+const gateUp = new THREE.Vector3(0,1,0); // станция не повёрнута
+const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
+
+console.log(
+  "up dot gateUp:", up.dot(gateUp).toFixed(3),
+  "nose dot gateIn:", nose.dot(gateIn).toFixed(3),
+);
+/// Интерпретация:
+/// up dot gateUp ≈ +1 — корабль «стоит на киле» относительно станции, верх совпадает.
+/// up dot gateUp ≈ −1 — корабль вверх ногами относительно станции.
+/// up dot gateUp ≈  0 — корабль «лежит на боку» (крен ±90°).
+/// nose dot gateIn ≈ +1 — нос смотрит внутрь станции, всё правильно.
+/// nose dot gateIn ≈ −1 — нос смотрит наружу, ты летишь «задом наперёд».
+        
         if (currentStationHandle) {
           const status = currentStationHandle.getLandingStatus(
             playerWorldPos,
