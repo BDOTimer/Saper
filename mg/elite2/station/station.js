@@ -115,6 +115,8 @@ const STATION = (() => {
   function makeStationGroup(params) {
     const group = new THREE.Group();
 
+    const PI2 = Math.PI / 2;
+
     // ---- Корпус-ядро (сфера) ----
     const coreMat = new THREE.MeshStandardMaterial({
       color: params.hullColor,
@@ -137,7 +139,7 @@ const STATION = (() => {
       new THREE.TorusGeometry(params.ringRadius, params.ringTube, 12, 48),
       ringMat,
     );
-    ring.rotation.x = Math.PI / 2; // тор в плоскости XY
+    ring.rotation.x = PI2; // тор в плоскости XY
     group.add(ring);
 
     // ---- Спицы, соединяющие ядро и кольцо ----
@@ -148,8 +150,8 @@ const STATION = (() => {
       emissive: params.accentColor.clone().multiplyScalar(0.25),
     });
     const spokes = new THREE.Group();
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
+    for (let i = 0; i < 4; i++)
+    {
       const spoke = new THREE.Mesh(
         new THREE.CylinderGeometry(
           params.ringTube * 0.4,
@@ -159,7 +161,10 @@ const STATION = (() => {
         ),
         spokeMat,
       );
-      spoke.rotation.z = Math.PI / 2;
+
+      const a  = i * PI2;
+      spoke.rotation.z = a + PI2;
+
       spoke.position.set(
         Math.cos(a) * (params.coreRadius + (params.ringRadius - params.coreRadius) / 2),
         Math.sin(a) * (params.coreRadius + (params.ringRadius - params.coreRadius) / 2),
@@ -191,7 +196,7 @@ const STATION = (() => {
       ),
       gateMat,
     );
-    tunnel.rotation.x = Math.PI / 2; // ось цилиндра вдоль Z
+    tunnel.rotation.x = PI2; // ось цилиндра вдоль Z
     gateGroup.add(tunnel);
 
     // Светящееся кольцо-обод на входе шлюза (маркер «сюда»)
