@@ -709,8 +709,18 @@
       const skystars = SKYSTAR.makeStarfield(12345, {
           count: 4000,
           radius: 4000,
-          size: 4,
+          sizeMax: 8,
           opacity: 0.9,
+          starPoints: 6,
+          
+            // Цвет
+            hueBase: 0.10,   // центр спектра (0..1): 0.55 ≈ голубой
+            hueRange: 0.20,  // насколько широко разбрасывать вокруг него.
+            saturation: 0.8, // насыщенность 0..1
+            saturationJitter: 0.25, // добавочный разброс насыщенности
+            
+            lightnessMin: 0.7, lightnessRange: 0.25,
+          shapeWeights: { star: 40, sparkle: 20, disc: 40 },
         });
       scene.add(skystars);
 
@@ -870,7 +880,7 @@
       // ------------------------------------------------------------------
       //  Космическая пыль
       // ------------------------------------------------------------------
-      const DUST_COUNT = 3000;
+      const DUST_COUNT  = 3000;
       const DUST_RADIUS = 800;
 
       function makeDust() {
@@ -1390,8 +1400,17 @@
             .clone();
           camera.position.addScaledVector(forward, state.speed * dt);
 
-          // Дрейф пыли и метеоров
-          const drift = forward.multiplyScalar(-state.speed * dt);
+          // Дрейф метеоров (мир летит на игрока — минус корректный)
+          //const drift = forward.multiplyScalar(-state.speed * dt);
+
+            // Пыль частично «догоняет» камеру.
+            //   0.0 = пыль стоит в мире → летит на игрока на полной скорости
+            //   0.8 = пыль почти «прилипла» к камере → почти не набегает
+            //   1.0 = пыль движется вместе с кораблём → стоит на месте визуально
+            const DUST_FOLLOW = 0.7;
+            const dustDrift = forward
+              .clone()
+              .multiplyScalar(state.speed * dt * DUST_FOLLOW);
 
           // Пыль
           {
@@ -1404,9 +1423,9 @@
 
             for (let i = 0; i < DUST_COUNT; i++) {
               const ix = i * 3;
-              arr[ix + 0] += drift.x;
-              arr[ix + 1] += drift.y;
-              arr[ix + 2] += drift.z;
+              arr[ix + 0] += dustDrift.x;
+              arr[ix + 1] += dustDrift.y;
+              arr[ix + 2] += dustDrift.z;
 
               const dx = arr[ix + 0] - cx;
               const dy = arr[ix + 1] - cy;
@@ -1432,9 +1451,9 @@
           player.getWorldPosition(playerWorldPos);
 
           for (const m of meteors) {
-            m.position.x += drift.x;
-            m.position.y += drift.y;
-            m.position.z += drift.z;
+            m.position.x += dustDrift.x;
+            m.position.y += dustDrift.y;
+            m.position.z += dustDrift.z;
 
             m.rotation.x += m.userData.spin.x * dt;
             m.rotation.y += m.userData.spin.y * dt;
@@ -1566,6 +1585,7 @@
 
         // Звёздное небо следует за камерой
         skystars.position.copy(camera.position);
+        if (skystars.userData.update) skystars.userData.update(dt, clock.elapsedTime);
 
         // Пульсация двигателей
         const engMat = player.userData.engines[0].material;
@@ -1597,6 +1617,10 @@
         camera.updateProjectionMatrix();
         renderer.setSize(innerWidth, innerHeight);
         composer.setSize(innerWidth, innerHeight);
+        
+        if (skystars.userData.setPixelRatio) {
+            skystars.userData.setPixelRatio(devicePixelRatio);
+        }
       });
     </script>
   </body>
