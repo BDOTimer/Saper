@@ -9,6 +9,8 @@
       href="../res/favicon-64.png"
       sizes="64x64"
     />
+    
+    <link rel="stylesheet" href="./css/main.css" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,7 +19,6 @@
       rel="stylesheet"
     />
 
-    <link rel="stylesheet" href="./css/main.css" />
   </head>
 
   <body>
@@ -249,6 +250,7 @@
     <script src="./galaxy/hyperfx.js"></script>
     <script src="./galaxy/skystar.js"></script>
     <script src="./station/station.js"></script>
+    <script src="./station/station-trade.js"></script>
     
     <script src="./js/help.js"></script>
     <script src="../js/sound-lib.js"></script>
@@ -260,6 +262,9 @@
       import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
       import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+      
+      HELP.init();
+      TRADE.init();
       
         const FUEL_BURN_PER_SPEED = 0;//0.005; // топливо/сек на единицу скорости
         const HYPER_FUEL_PER_UNIT = 0;//40;    // топлива на 1.0 расстояния между звёздами
@@ -611,8 +616,6 @@
         scene.add(currentStationHandle.group);
     }
     
-
-
     // ------------------------------------------------------------------------|
     //  Враги / лазеры / эффекты
     // ------------------------------------------------------------------------:
@@ -1016,10 +1019,8 @@
       }
 
       // ------------------------------------------------------------------
-      //  Инициализация HELP и GALAXY
+      //  Инициализация GALAXY
       // ------------------------------------------------------------------
-      HELP.init();
-
       GALAXY.init();
       GALAXY.setPlayerStar(state.starIndex);
 
@@ -1356,7 +1357,10 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             // показать сообщение, отключить управление и т.п.
             state.fuel = 100;
             state.shield = 100;
-            console.log("LANDED OK");
+            state.speed  = 0.5;
+            // console.log("LANDED OK");
+            
+            TRADE.open(); 
           }
         }
         
@@ -1517,6 +1521,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             skystars.userData.setPixelRatio(devicePixelRatio);
         }
       });
+      
     </script>
   </body>
 </html>
