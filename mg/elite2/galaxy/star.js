@@ -1,4 +1,4 @@
-// star.js — генератор уникального светила для Elite-подобной игры
+// star.js — генератор уникального светила с анимированным гало
 // Зависимости: THREE должен быть доступен глобально (window.THREE)
 
 const STAR = (() => {
@@ -47,7 +47,9 @@ const STAR = (() => {
     }[klass];
 
     const radius = radiusBase + rng() * 40;
-    const coronaScale = 1.8 + danger * 2.2 + rng() * 0.4;
+    
+    // Гало становится массивнее и ярче при высокой опасности/активности
+    const coronaScale = 2.0 + danger * 2.5 + rng() * 0.5;
     const coronaIntensity = 0.6 + danger * 1.8;
 
     const pulseSpeed = klass === "red-dwarf" ? 3.0 + rng() * 2.0 : 0.8 + rng() * 1.2;
@@ -57,9 +59,9 @@ const STAR = (() => {
     const coreSat = klass === "white-blue" || klass === "blue-giant" ? 0.9 : 0.8;
     const coreLum = klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
 
-    const coronaHue = (coreHue + 0.03) % 1;
-    const coronaSat = coreSat * 0.9;
-    const coronaLum = Math.min(0.95, coreLum + 0.15);
+    const coronaHue = (coreHue + 0.05) % 1; // Слегка смещаем оттенок для гало
+    const coronaSat = coreSat * 0.8;
+    const coronaLum = Math.min(0.95, coreLum + 0.1);
 
     const lightColor = new THREE.Color().setHSL(coreHue, coreSat, coreLum);
     const lightIntensity = 1.2 + tech * 0.05 + danger * 0.5;
@@ -72,7 +74,7 @@ const STAR = (() => {
     };
   }
 
-  // --- Шейдер светила (ИСПРАВЛЕННЫЙ) ---
+  // --- Шейдер поверхности звезды ---
   const starVert = /* glsl */ `
     varying vec3 vPos;
     varying vec3 vNormalW;
@@ -89,7 +91,6 @@ const STAR = (() => {
 
   const starFrag = /* glsl */ `
     precision highp float;
-
     varying vec3 vPos;
     varying vec3 vNormalW;
     varying vec3 vViewDir;
@@ -102,7 +103,6 @@ const STAR = (() => {
     uniform float uPulseSpeed;
     uniform float uActivity;
 
-    // --- Простой и надежный 3D шум (Value Noise) ---
     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
     vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
     vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
@@ -148,66 +148,107 @@ const STAR = (() => {
       return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
     }
 
-    // Фрактальный шум (FBM) для детализации
     float fbm(vec3 p) {
-      float v = 0.0;
-      float a = 0.5;
+      float v = 0.0; float a = 0.5;
       for (int i = 0; i < 5; i++) {
         v += a * snoise(p);
-        p *= 2.0;
-        a *= 0.5;
+        p *= 2.0; a *= 0.5;
       }
-      return v; // возвращает значение примерно от -1.0 до 1.0
+      return v;
     }
 
     void main() {
       vec3 n = normalize(vPos);
-
-      // Анимация: смещаем координаты шума со временем для эффекта "кипения" плазмы
       float timeScaled = uTime * 0.15 * uPulseSpeed;
       vec3 noiseCoord = n * 2.5 + vec3(timeScaled, timeScaled * 0.5, 0.0) + uSeed;
 
-      // Базовая текстура поверхности (приводим диапазон -1..1 к 0..1)
       float noiseVal = fbm(noiseCoord) * 0.5 + 0.5;
-
-      // Добавляем мелкую детализацию (грануляцию)
       float detailNoise = snoise(n * 6.0 + vec3(timeScaled * 2.0)) * 0.5 + 0.5;
       noiseVal = mix(noiseVal, detailNoise, 0.3);
 
-      // Пульсация общей яркости
       float pulse = 1.0 + sin(uTime * uPulseSpeed + uSeed) * uPulseAmp;
-
-      // Эффект Френеля для свечения по краям (переход в корону)
       float fresnel = pow(1.0 - max(dot(vNormalW, vViewDir), 0.0), 3.0);
 
-      // Формирование цвета
-      vec3 darkBase = uCoreColor * 0.25;          // Темные участки (пятна)
-      vec3 brightSpot = uCoronaColor * 1.8;       // Ярчайшие вспышки (почти белые)
+      vec3 darkBase = uCoreColor * 0.25;
+      vec3 brightSpot = uCoronaColor * 1.8;
 
       vec3 finalColor = mix(darkBase, uCoreColor, noiseVal);
-      // Добавляем яркие вспышки только на самых высоких значениях шума
       finalColor = mix(finalColor, brightSpot, pow(noiseVal, 5.0) * uActivity);
-
-      // Добавляем свечение по краям (корона)
-      finalColor = mix(finalColor, uCoronaColor * 1.3, fresnel * (0.6 + uActivity * 0.4));
-
-      // Применяем общую пульсацию
+      
+      // Плавный переход в цвет короны по краям самой звезды
+      finalColor = mix(finalColor, uCoronaColor * 1.4, fresnel * (0.5 + uActivity * 0.5));
       finalColor *= pulse;
 
-      // === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Мягкое ограничение яркости ===
-      // Вместо жесткого умножения, которое дает пересвет в белый цвет,
-      // используем асимптотическую функцию, которая сохраняет детали.
+      // Мягкое ограничение яркости (защита от белого диска)
       finalColor = finalColor / (finalColor + vec3(1.0));
-      finalColor *= 1.8; // Компенсация общего затемнения для сочности цвета
+      finalColor *= 1.8;
 
       gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
 
+  // --- Шейдер анимированного гало (короны) ---
+  const haloVert = /* glsl */ `
+    varying vec3 vNormalW;
+    varying vec3 vViewDirW;
+    varying vec3 vWorldPos;
+
+    void main() {
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPos = worldPos.xyz;
+      vViewDirW = normalize(cameraPosition - worldPos.xyz);
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `;
+
+  const haloFrag = /* glsl */ `
+    precision highp float;
+    varying vec3 vNormalW;
+    varying vec3 vViewDirW;
+    varying vec3 vWorldPos;
+
+    uniform vec3 uColor;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform float uSeed;
+
+    float hash(vec3 p) {
+      p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+      p *= 17.0;
+      return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+    }
+
+    float noise(vec3 x) {
+      vec3 i = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+                     mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                 mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                     mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y),
+                 f.z);
+    }
+
+    void main() {
+      // Эффект Френеля: свечение усиливается к краям сферы
+      float viewDot = max(dot(vNormalW, vViewDirW), 0.0);
+      float glow = pow(1.0 - viewDot, 2.5);
+
+      // Органичное "дыхание" и переливы гало
+      float shimmer = noise(vWorldPos * 0.015 + vec3(uTime * 0.15, uTime * 0.1, 0.0) + uSeed) * 0.4 + 0.6;
+
+      // Итоговая прозрачность и цвет
+      float alpha = glow * uIntensity * shimmer;
+      vec3 finalColor = uColor * alpha * 2.5; // Усиление цвета для эффекта свечения
+
+      gl_FragColor = vec4(finalColor, clamp(alpha, 0.0, 1.0));
+    }
+  `;
+
   // --- Создание меша светила ---
   function makeMesh(params) {
-    const geo = new THREE.SphereGeometry(params.radius, 64, 64); // Увеличено до 64 для гладкости
-
+    const geo = new THREE.SphereGeometry(params.radius, 64, 64);
     const coreColor = new THREE.Color().setHSL(params.coreHue, params.coreSat, params.coreLum);
     const coronaColor = new THREE.Color().setHSL(params.coronaHue, params.coronaSat, params.coronaLum);
 
@@ -218,13 +259,12 @@ const STAR = (() => {
         uCoreColor: { value: coreColor },
         uCoronaColor: { value: coronaColor },
         uTime: { value: 0 },
-        uSeed: { value: (params.seed % 1000) * 0.01 }, // Нормализованный сид
+        uSeed: { value: (params.seed % 1000) * 0.01 },
         uPulseAmp: { value: params.pulseAmp },
         uPulseSpeed: { value: params.pulseSpeed },
-        // Гарантируем минимальную активность, чтобы звезда не выглядела "мертвой"
         uActivity: { value: Math.max(0.3, Math.min(1.0, params.coronaIntensity / 2.5)) },
       },
-      toneMapped: false, // Оставляем false, так как мы сами контролируем диапазон в шейдере
+      toneMapped: false,
     });
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -232,24 +272,30 @@ const STAR = (() => {
     return mesh;
   }
 
-  // --- Создание короны (аддитивная сфера) ---
-  function makeCorona(params) {
-    // Увеличено количество сегментов до 48 для идеально гладкого градиента свечения
-    const geo = new THREE.SphereGeometry(params.radius * params.coronaScale, 48, 48);
+  // --- Создание анимированного гало ---
+  function makeHalo(params) {
+    // 64 сегмента для идеально гладкого градиента свечения
+    const geo = new THREE.SphereGeometry(params.radius * params.coronaScale, 64, 64);
     const col = new THREE.Color().setHSL(params.coronaHue, params.coronaSat, params.coronaLum);
-    
-    const mat = new THREE.MeshBasicMaterial({
-      color: col,
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: haloVert,
+      fragmentShader: haloFrag,
+      uniforms: {
+        uColor: { value: col },
+        uTime: { value: 0 },
+        uIntensity: { value: Math.min(1.5, 0.4 + params.coronaIntensity * 0.3) },
+        uSeed: { value: (params.seed % 1000) * 0.01 },
+      },
       transparent: true,
-      opacity: Math.min(0.35, 0.12 * params.coronaIntensity), // Сделал мягче, чтобы не перекрывать звезду
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
+      blending: THREE.AdditiveBlending, // Ключевой момент для эффекта свечения
+      depthWrite: false,                // Не перекрывает другие объекты невидимыми гранями
       toneMapped: false,
-      side: THREE.BackSide,
+      side: THREE.BackSide,             // Рендерим внутреннюю сторону сферы для эффекта объема
     });
-    
+
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData.isCorona = true;
+    mesh.userData.isHalo = true;
     return mesh;
   }
 
@@ -262,7 +308,7 @@ const STAR = (() => {
     generate(star, opts = {}) {
       const params = computeParams(star);
       const mesh = makeMesh(params);
-      const corona = makeCorona(params);
+      const corona = makeHalo(params); // Используем новый шейдер гало
 
       const pos = opts.position || new THREE.Vector3(0, 0, 0);
       mesh.position.copy(pos);
@@ -278,9 +324,11 @@ const STAR = (() => {
 
       mesh.userData.klass = params.klass;
 
-      // Анимация пульсации
+      // Анимация: обновляем время в ОБОИХ шейдерах
       const update = (dt, time) => {
         mesh.material.uniforms.uTime.value = time;
+        corona.material.uniforms.uTime.value = time; // <-- Двигаем гало
+
         const p = 1 + Math.sin(time * params.pulseSpeed) * params.pulseAmp * 0.5;
         corona.scale.setScalar(p);
         light.intensity = params.lightIntensity * (0.9 + 0.1 * p);

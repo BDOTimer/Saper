@@ -516,8 +516,8 @@
           },
       });
 
-      const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
-      sunLight.position.set(1, 0.5, 0.7);
+      //const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
+      const sunLight = new THREE.PointLight(0xffffff, 5.0, 8000, 1.0);
       scene.add(sunLight);
       scene.add(new THREE.AmbientLight(0x334455, 0.6));
 
@@ -593,7 +593,7 @@
     {   if (!star) return;
 
         sun.rebuild(state.dataStar);
-        sun.setPosition(0, 500, 3000);
+        sun.setPosition(0, 2000, 8000);
 
         // Светило — висит далеко впереди
         currentStarHandle = STAR.generate(star);
@@ -604,6 +604,8 @@
         scene.add(currentStarHandle.mesh);
         scene.add(currentStarHandle.corona);
         scene.add(currentStarHandle.light);
+
+        sunLight.position.set(0, 0, -3000);
 
         //sun.rebuild(star);
         //sun.setPosition(0, 100, -1000);
