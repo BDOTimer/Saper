@@ -1,0 +1,250 @@
+<svg id="cockpit-svg" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Градиенты для металлических поверхностей -->
+    <linearGradient id="frameGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#16213e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f0f1e;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="panelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2a2a3e;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:0.95" />
+    </linearGradient>
+    
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#00ffff;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#00ffff;stop-opacity:0" />
+    </radialGradient>
+    
+    <!-- Фильтры для свечения и теней -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.7"/>
+    </filter>
+    
+    <filter id="innerShadow">
+      <feOffset dx="0" dy="2"/>
+      <feGaussianBlur stdDeviation="2" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="black" flood-opacity="0.5" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <!-- === ОСНОВНАЯ РАМА КАБИНЫ === -->
+  <!-- Верхняя арка -->
+  <path
+    d="M 5 0 L 5 18 Q 5 25 12 28 L 25 32 Q 50 36 75 32 L 88 28 Q 95 25 95 18 L 95 0 Z"
+    fill="url(#frameGrad)"
+    stroke="#0a0a1a"
+    stroke-width="1.5"
+    filter="url(#shadow)"
+    vector-effect="non-scaling-stroke"
+  />
+  
+  <!-- Левая стойка -->
+  <path
+    d="M 0 0 L 0 100 L 8 100 L 8 85 L 10 78 L 12 70 L 12 30 L 10 22 L 8 15 L 8 0 Z"
+    fill="url(#frameGrad)"
+    stroke="#0a0a1a"
+    stroke-width="1"
+    filter="url(#shadow)"
+    vector-effect="non-scaling-stroke"
+  />
+  
+  <!-- Правая стойка -->
+  <path
+    d="M 100 0 L 100 100 L 92 100 L 92 85 L 90 78 L 88 70 L 88 30 L 90 22 L 92 15 L 92 0 Z"
+    fill="url(#frameGrad)"
+    stroke="#0a0a1a"
+    stroke-width="1"
+    filter="url(#shadow)"
+    vector-effect="non-scaling-stroke"
+  />
+
+  <!-- === БОКОВЫЕ ПАНЕЛИ УПРАВЛЕНИЯ === -->
+  <!-- Левая панель -->
+  <g filter="url(#innerShadow)">
+    <rect x="2" y="40" width="14" height="35" rx="1" fill="url(#panelGrad)" stroke="#00ffff" stroke-width="0.3" opacity="0.9" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Индикаторы на левой панели -->
+    <circle cx="6" cy="45" r="1.5" fill="#00ff00" filter="url(#glow)" opacity="0.9">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="10" cy="45" r="1.5" fill="#00ffff" filter="url(#glow)" opacity="0.8"/>
+    <circle cx="14" cy="45" r="1.5" fill="#ffaa00" filter="url(#glow)" opacity="0.7">
+      <animate attributeName="opacity" values="0.4;0.9;0.4" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Полоски на панели -->
+    <line x1="4" y1="52" x2="14" y2="52" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke"/>
+    <line x1="4" y1="55" x2="14" y2="55" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke"/>
+    <line x1="4" y1="58" x2="14" y2="58" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Маленький экранчик -->
+    <rect x="4" y="62" width="12" height="8" rx="0.5" fill="#0a0a1a" stroke="#00ffff" stroke-width="0.3" opacity="0.8" vector-effect="non-scaling-stroke"/>
+    <text x="10" y="67" text-anchor="middle" font-family="monospace" font-size="2.5" fill="#00ffff" opacity="0.8">SYS</text>
+  </g>
+
+  <!-- Правая панель -->
+  <g filter="url(#innerShadow)">
+    <rect x="84" y="40" width="14" height="35" rx="1" fill="url(#panelGrad)" stroke="#00ffff" stroke-width="0.3" opacity="0.9" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Индикаторы на правой панели -->
+    <circle cx="88" cy="45" r="1.5" fill="#ff0055" filter="url(#glow)" opacity="0.8">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="92" cy="45" r="1.5" fill="#00ffff" filter="url(#glow)" opacity="0.8"/>
+    <circle cx="96" cy="45" r="1.5" fill="#00ff00" filter="url(#glow)" opacity="0.9"/>
+    
+    <!-- Полоски на панели -->
+    <line x1="86" y1="52" x2="96" y2="52" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke"/>
+    <line x1="86" y1="55" x2="96" y2="55" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke"/>
+    <line x1="86" y1="58" x2="96" y2="58" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Маленький экранчик -->
+    <rect x="86" y="62" width="12" height="8" rx="0.5" fill="#0a0a1a" stroke="#00ffff" stroke-width="0.3" opacity="0.8" vector-effect="non-scaling-stroke"/>
+    <text x="92" y="67" text-anchor="middle" font-family="monospace" font-size="2.5" fill="#00ffff" opacity="0.8">NAV</text>
+  </g>
+
+  <!-- === НИЖНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ === -->
+  <g filter="url(#shadow)">
+    <path
+      d="M 20 85 L 20 78 Q 20 75 23 74 L 35 72 L 65 72 L 77 74 Q 80 75 80 78 L 80 85 Z"
+      fill="url(#panelGrad)"
+      stroke="#00ffff"
+      stroke-width="0.4"
+      opacity="0.95"
+      vector-effect="non-scaling-stroke"
+    />
+    
+    <!-- Кнопки на нижней панели -->
+    <circle cx="30" cy="79" r="2" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.5" filter="url(#glow)" vector-effect="non-scaling-stroke">
+      <animate attributeName="fill" values="#1a1a2e;#00ffff;#1a1a2e" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="40" cy="79" r="2" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <circle cx="50" cy="79" r="2" fill="#1a1a2e" stroke="#ff0055" stroke-width="0.5" filter="url(#glow)" vector-effect="non-scaling-stroke">
+      <animate attributeName="fill" values="#1a1a2e;#ff0055;#1a1a2e" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="60" cy="79" r="2" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <circle cx="70" cy="79" r="2" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.5" filter="url(#glow)" vector-effect="non-scaling-stroke">
+      <animate attributeName="fill" values="#1a1a2e;#00ffff;#1a1a2e" dur="3.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- === HUD ПРИЦЕЛ (ЦЕНТР) === -->
+  <g opacity="0.9" filter="url(#glow)">
+    <!-- Внешнее кольцо прицела -->
+    <circle cx="50" cy="50" r="8" fill="none" stroke="#00ffff" stroke-width="0.6" opacity="0.7" vector-effect="non-scaling-stroke">
+      <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="20s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Внутреннее кольцо прицела -->
+    <circle cx="50" cy="50" r="5" fill="none" stroke="#00ffff" stroke-width="0.4" opacity="0.8" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Перекрестие -->
+    <line x1="50" y1="42" x2="50" y2="46" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <line x1="50" y1="54" x2="50" y2="58" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <line x1="42" y1="50" x2="46" y2="50" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <line x1="54" y1="50" x2="58" y2="50" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Центральная точка -->
+    <circle cx="50" cy="50" r="1" fill="#00ffff" opacity="0.9">
+      <animate attributeName="r" values="0.8;1.2;0.8" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Угловые маркеры -->
+    <path d="M 44 44 L 46 44 L 46 46" fill="none" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <path d="M 56 44 L 54 44 L 54 46" fill="none" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <path d="M 44 56 L 46 56 L 46 54" fill="none" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+    <path d="M 56 56 L 54 56 L 54 54" fill="none" stroke="#00ffff" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+  </g>
+
+  <!-- === РАДАР (мини-карта) === -->
+  <g transform="translate(15, 15)" filter="url(#glow)">
+    <circle cx="0" cy="0" r="6" fill="#0a0a1a" stroke="#00ffff" stroke-width="0.4" opacity="0.7" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Сетка радара -->
+    <circle cx="0" cy="0" r="4" fill="none" stroke="#00ffff" stroke-width="0.2" opacity="0.4" vector-effect="non-scaling-stroke"/>
+    <circle cx="0" cy="0" r="2" fill="none" stroke="#00ffff" stroke-width="0.2" opacity="0.4" vector-effect="non-scaling-stroke"/>
+    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00ffff" stroke-width="0.2" opacity="0.3" vector-effect="non-scaling-stroke"/>
+    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00ffff" stroke-width="0.2" opacity="0.3" vector-effect="non-scaling-stroke"/>
+    
+    <!-- Центральная точка (игрок) -->
+    <circle cx="0" cy="0" r="0.5" fill="#00ff00" opacity="0.9"/>
+    
+    <!-- Вращающаяся линия сканирования -->
+    <line x1="0" y1="0" x2="6" y2="0" stroke="#00ffff" stroke-width="0.5" opacity="0.6" vector-effect="non-scaling-stroke">
+      <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="4s" repeatCount="indefinite"/>
+    </line>
+    
+    <!-- Точки-цели -->
+    <circle cx="3" cy="2" r="0.4" fill="#ff0055" opacity="0.8">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="-2" cy="-3" r="0.3" fill="#ffaa00" opacity="0.7"/>
+  </g>
+
+  <!-- === ИНДИКАТОРЫ ВЕРХНЕЙ ПАНЕЛИ === -->
+  <g opacity="0.85">
+    <!-- Левый верхний индикатор -->
+    <rect x="18" y="8" width="12" height="6" rx="0.5" fill="#0a0a1a" stroke="#00ffff" stroke-width="0.3" opacity="0.8" vector-effect="non-scaling-stroke"/>
+    <text x="24" y="12" text-anchor="middle" font-family="monospace" font-size="2" fill="#00ffff" opacity="0.9">SHIELD</text>
+    <rect x="19" y="13" width="10" height="0.8" fill="#00ff00" opacity="0.8">
+      <animate attributeName="width" values="10;8;10" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    
+    <!-- Правый верхний индикатор -->
+    <rect x="70" y="8" width="12" height="6" rx="0.5" fill="#0a0a1a" stroke="#00ffff" stroke-width="0.3" opacity="0.8" vector-effect="non-scaling-stroke"/>
+    <text x="76" y="12" text-anchor="middle" font-family="monospace" font-size="2" fill="#00ffff" opacity="0.9">ENERGY</text>
+    <rect x="71" y="13" width="10" height="0.8" fill="#00ffff" opacity="0.8">
+      <animate attributeName="width" values="10;7;10" dur="4s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <!-- === ДЕКОРАТИВНЫЕ ЛИНИИ И ДЕТАЛИ === -->
+  <!-- Линии на верхней арке -->
+  <path
+    d="M 15 20 Q 50 24 85 20"
+    fill="none"
+    stroke="#00ffff"
+    stroke-width="0.3"
+    opacity="0.5"
+    vector-effect="non-scaling-stroke"
+  />
+  <path
+    d="M 18 22 Q 50 26 82 22"
+    fill="none"
+    stroke="#00ffff"
+    stroke-width="0.2"
+    opacity="0.4"
+    vector-effect="non-scaling-stroke"
+  />
+
+  <!-- Вертикальные линии на стойках -->
+  <line x1="6" y1="25" x2="6" y2="35" stroke="#00ffff" stroke-width="0.3" opacity="0.4" vector-effect="non-scaling-stroke"/>
+  <line x1="94" y1="25" x2="94" y2="35" stroke="#00ffff" stroke-width="0.3" opacity="0.4" vector-effect="non-scaling-stroke"/>
+
+  <!-- Точки крепления -->
+  <circle cx="10" cy="20" r="0.8" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.3" opacity="0.7" vector-effect="non-scaling-stroke"/>
+  <circle cx="90" cy="20" r="0.8" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.3" opacity="0.7" vector-effect="non-scaling-stroke"/>
+  <circle cx="10" cy="80" r="0.8" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.3" opacity="0.7" vector-effect="non-scaling-stroke"/>
+  <circle cx="90" cy="80" r="0.8" fill="#1a1a2e" stroke="#00ffff" stroke-width="0.3" opacity="0.7" vector-effect="non-scaling-stroke"/>
+
+  <!-- === ЭФФЕКТЫ СВЕЧЕНИЯ === -->
+  <!-- Свечение вокруг прицела -->
+  <circle cx="50" cy="50" r="12" fill="url(#glowGrad)" opacity="0.3"/>
+  
+  <!-- Свечение на стойках -->
+  <ellipse cx="8" cy="50" rx="2" ry="8" fill="url(#glowGrad)" opacity="0.2"/>
+  <ellipse cx="92" cy="50" rx="2" ry="8" fill="url(#glowGrad)" opacity="0.2"/>
+</svg>

@@ -24,35 +24,8 @@
   <body>
 
 <div id="hud">
-  <svg id="cockpit-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-    <path
-      d="M 8 0 L 8 14 L 22 26 L 78 26 L 92 14 L 92 0"
-      vector-effect="non-scaling-stroke"
-    />
-    <path
-      d="M 8 100 L 8 86 L 20 74 L 26 74"
-      vector-effect="non-scaling-stroke"
-    />
-    <path
-      d="M 92 100 L 92 86 L 80 74 L 74 74"
-      vector-effect="non-scaling-stroke"
-    />
-    <path d="M 26 74 L 74 74" vector-effect="non-scaling-stroke" />
-    <line
-      x1="6"
-      y1="50"
-      x2="12"
-      y2="50"
-      vector-effect="non-scaling-stroke"
-    />
-    <line
-      x1="88"
-      y1="50"
-      x2="94"
-      y2="50"
-      vector-effect="non-scaling-stroke"
-    />
-  </svg>
+
+<img id="cockpit-svg" src="ships/cockpit-1.svg" alt="">
 
   <div id="reticle">
     <svg viewBox="0 0 70 70">
@@ -355,7 +328,7 @@
         const body = new THREE.Mesh(
           new THREE.ConeGeometry(6, 22, 8),
           new THREE.MeshStandardMaterial({
-            color: 0x8899aa,
+            color: 0x337744,
             metalness: 0.7,
             roughness: 0.4,
           }),
@@ -367,7 +340,7 @@
         const wing = new THREE.Mesh(
           new THREE.BoxGeometry(20, 1, 6),
           new THREE.MeshStandardMaterial({
-            color: 0x556677,
+            color: 0x446633,
             metalness: 0.8,
             roughness: 0.5,
           }),
@@ -378,10 +351,10 @@
         const cockpit = new THREE.Mesh(
           new THREE.SphereGeometry(3, 12, 8),
           new THREE.MeshStandardMaterial({
-            color: 0x224466,
+            color: 0x227711, /// 🍈
             metalness: 0.9,
             roughness: 0.1,
-            emissive: 0x113355,
+            emissive: 0x223311, /// 🍈
             emissiveIntensity: 0.6,
           }),
         );
@@ -390,7 +363,7 @@
         group.add(cockpit);
 
         const engMat = new THREE.MeshBasicMaterial({
-          color: 0x66ccff,
+          color: 0x666666,
           toneMapped: false,
         });
         const eng1 = new THREE.Mesh(
@@ -405,7 +378,7 @@
         group.add(eng2);
 
         const muzzleMat = new THREE.MeshBasicMaterial({
-          color: 0xffffaa,
+          color: 0x666666,
           toneMapped: false,
           transparent: true,
           opacity: 0,
