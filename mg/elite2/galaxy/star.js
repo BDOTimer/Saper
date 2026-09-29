@@ -65,6 +65,7 @@ const STAR = (() => {
 
     const lightColor = new THREE.Color().setHSL(coreHue, coreSat, coreLum);
     const lightIntensity = 1.2 + tech * 0.05 + danger * 0.5;
+    //const lightIntensity = 0;
     const lightDistance = radius * 20;
 
     return {

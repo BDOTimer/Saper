@@ -517,7 +517,7 @@
       });
 
       //const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
-      const sunLight = new THREE.PointLight(0xffffff, 5.0, 8000, 1.0);
+      const sunLight = new THREE.PointLight(0xffffff, 1.0, 8000, 1.0);
       scene.add(sunLight);
       scene.add(new THREE.AmbientLight(0x334455, 0.6));
 
@@ -581,19 +581,20 @@
     }
 
     // Создаем экземпляр звезды
-    const sun = new StarG(scene, camera, {
-        size: 8,
-        color: 0xfcc200,
-        pulseSpeed: 0.3,
-        rotationSpeed: 0.02,
-        haloScale: 20
-    });
+    // const sun = new StarG(scene, camera, {
+    //     size: 8,
+    //     color: 0xfcc200,
+    //     pulseSpeed: 0.3,
+    //     rotationSpeed: 0.02,
+    //     haloScale: 20
+    // });
 
     function buildSystemFromStar(star)
     {   if (!star) return;
 
-        sun.rebuild(state.dataStar);
-        sun.setPosition(0, 2000, 8000);
+        // sun.rebuild(state.dataStar);
+        // sun.setPosition(0, 2000, 8000);
+        // sun.setVisible(false);
 
         // Светило — висит далеко впереди
         currentStarHandle = STAR.generate(star);
@@ -607,24 +608,29 @@
 
         sunLight.position.set(0, 0, -3000);
 
-        //sun.rebuild(star);
-        //sun.setPosition(0, 100, -1000);
-
         // Планеты: число зависит от tech
         const n = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
         
         for (let i = 0; i < n; i++) {
-          const p = PLANET.generate(star);
-          const rng = mulberry32(star.id * 1000 + i);
-          const dist = 800 + i * 900 + rng() * 400;
-          const ang = rng() * Math.PI * 2;
-          p.mesh.position.set(
-            Math.cos(ang) * dist,
-            (rng() - 0.5) * 400,
-            Math.sin(ang) * dist - 1500,
-          );
-          scene.add(p.mesh);
-          planets.push(p);
+            const rng = mulberry32(star.id * 1000 + i);
+            const dist = 800 + i * 900 + rng() * 400;
+            const ang  = rng() * Math.PI * 2;
+            const pos = new THREE.Vector3(
+                Math.cos(ang) * dist,
+                (rng() - 0.5) * 400,
+                Math.sin(ang) * dist - 1500,
+            );
+
+            const p = PLANET.generate(star, {
+                planetIndex:        i, // ★ уникализирует текстуру между планетами
+                position:         pos, // ★ (по желанию) для направления света
+                starPosition: starPos, // ★ если хочешь, чтобы свет шёл от звезды
+                textureSize:      512, // ★ опционально; можно 256 для экономии
+            });
+
+            p.mesh.position.copy(pos);
+            scene.add(p.mesh);
+            planets.push(p);
         }
         
         // Станция — где-то в стороне, не на пути планет
@@ -1169,7 +1175,7 @@
         const dt = Math.min(clock.getDelta(), 0.05);
         const time = clock.elapsedTime;
 
-        sun.update(dt * 0.1); 
+        //sun.update(dt * 0.1); 
 
         currentStarHandle.update(dt, clock.elapsedTime);
 
