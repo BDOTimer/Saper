@@ -1,19 +1,7 @@
 // star.js — генератор уникального светила для Elite-подобной игры
-// Зависимости: THREE должен быть доступен глобально (window.THREE),
-// либо этот скрипт вызывается ПОСЛЕ подключения three через importmap
-// в модульном скрипте. См. пояснение в конце.
-//
-// Публичное API:
-//   STAR.generate(star, opts) -> {
-//     mesh,           // THREE.Mesh — само светило
-//     corona,         // THREE.Mesh — сфера-корона (additive)
-//     light,          // THREE.PointLight / DirectionalLight
-//     params          // все вычисленные параметры (для HUD/логов)
-//   }
-//   STAR.getParams(star) -> params   // без создания мешей
-//   STAR.dispose(handle)              // освободить ресурсы
+// Зависимости: THREE должен быть доступен глобально (window.THREE)
 
-const STAR = (() =>  {
+const STAR = (() => {
   // --- RNG (mulberry32) ---
   function mulberry32(seed) {
     return function () {
@@ -36,25 +24,14 @@ const STAR = (() =>  {
   }
 
   // --- Параметры светила из статов звезды ---
-  // star: { id, name, color, hue, tech, danger, dangerLabel, techLabel,
-  //         economy, population, government, r, x, y, links }
   function computeParams(star) {
     if (!star) throw new Error("STAR.computeParams: star is required");
 
-    // Детерминированный сид: id + хэш имени, чтобы имена тоже влияли
     const seed = ((star.id | 0) * 2654435761) ^ strHash(star.name || "");
     const rng = mulberry32(seed >>> 0);
 
-    // hue уже есть в star (0..1). Если нет — вытащим из id
-    const baseHue =
-      typeof star.hue === "number" ? star.hue : (star.id * 0.137) % 1;
+    const baseHue = typeof star.hue === "number" ? star.hue : (star.id * 0.137) % 1;
 
-    // Класс светила зависит от hue и tech:
-    //   hue < 0.15  -> красный карлик
-    //   hue < 0.35  -> оранжевый/жёлтый
-    //   hue < 0.65  -> жёлто-белый (как Солнце)
-    //   hue < 0.85  -> бело-голубой
-    //   иначе       -> голубой гигант
     let klass;
     if (baseHue < 0.15) klass = "red-dwarf";
     else if (baseHue < 0.35) klass = "orange";
@@ -62,153 +39,177 @@ const STAR = (() =>  {
     else if (baseHue < 0.85) klass = "white-blue";
     else klass = "blue-giant";
 
-    // tech и danger влияют на "активность" и размер короны
     const tech = Math.max(1, Math.min(15, star.tech | 0));
     const danger = typeof star.danger === "number" ? star.danger : 0;
 
-    // Радиус светила (условные единицы; подбирается под сцену)
     const radiusBase = {
-      "red-dwarf": 60,
-      orange: 90,
-      yellow: 120,
-      "white-blue": 140,
-      "blue-giant": 180,
+      "red-dwarf": 60, orange: 90, yellow: 120, "white-blue": 140, "blue-giant": 180,
     }[klass];
 
     const radius = radiusBase + rng() * 40;
-
-    // Корона: чем выше danger, тем больше и ярче
     const coronaScale = 1.8 + danger * 2.2 + rng() * 0.4;
     const coronaIntensity = 0.6 + danger * 1.8;
 
-    // Пульсация: у красных карликов чаще и заметнее
-    const pulseSpeed =
-      klass === "red-dwarf" ? 3.0 + rng() * 2.0 : 0.8 + rng() * 1.2;
-    const pulseAmp =
-      klass === "red-dwarf" ? 0.08 + rng() * 0.06 : 0.03 + rng() * 0.03;
+    const pulseSpeed = klass === "red-dwarf" ? 3.0 + rng() * 2.0 : 0.8 + rng() * 1.2;
+    const pulseAmp = klass === "red-dwarf" ? 0.08 + rng() * 0.06 : 0.03 + rng() * 0.03;
 
-    // Цвет ядра и короны — из hue, но подкрученный под класс
     const coreHue = baseHue;
-    const coreSat =
-      klass === "white-blue" || klass === "blue-giant" ? 0.9 : 0.8;
-    const coreLum =
-      klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
+    const coreSat = klass === "white-blue" || klass === "blue-giant" ? 0.9 : 0.8;
+    const coreLum = klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
 
     const coronaHue = (coreHue + 0.03) % 1;
     const coronaSat = coreSat * 0.9;
     const coronaLum = Math.min(0.95, coreLum + 0.15);
 
-    // Свет: температура от класса
     const lightColor = new THREE.Color().setHSL(coreHue, coreSat, coreLum);
     const lightIntensity = 1.2 + tech * 0.05 + danger * 0.5;
     const lightDistance = radius * 20;
 
     return {
-      seed,
-      klass,
-      radius,
-      baseHue,
-      coreHue,
-      coreSat,
-      coreLum,
-      coronaHue,
-      coronaSat,
-      coronaLum,
-      coronaScale,
-      coronaIntensity,
-      pulseSpeed,
-      pulseAmp,
-      lightColor,
-      lightIntensity,
-      lightDistance,
+      seed, klass, radius, baseHue, coreHue, coreSat, coreLum,
+      coronaHue, coronaSat, coronaLum, coronaScale, coronaIntensity,
+      pulseSpeed, pulseAmp, lightColor, lightIntensity, lightDistance,
     };
   }
 
-  // --- Шейдер светила (простой, без внешних зависимостей) ---
+  // --- Шейдер светила (ИСПРАВЛЕННЫЙ) ---
   const starVert = /* glsl */ `
     varying vec3 vPos;
-    varying vec3 vNormal;
+    varying vec3 vNormalW;
+    varying vec3 vViewDir;
+
     void main() {
       vPos = position;
-      vNormal = normal;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vViewDir = normalize(cameraPosition - worldPos.xyz);
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
     }
   `;
 
   const starFrag = /* glsl */ `
+    precision highp float;
+
     varying vec3 vPos;
-    varying vec3 vNormal;
+    varying vec3 vNormalW;
+    varying vec3 vViewDir;
+
     uniform vec3  uCoreColor;
     uniform vec3  uCoronaColor;
     uniform float uTime;
     uniform float uSeed;
     uniform float uPulseAmp;
     uniform float uPulseSpeed;
-    uniform float uActivity;   // 0..1, из danger
+    uniform float uActivity;
 
-    // Простой шум
-    float hash(vec3 p) {
-      p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
-      p *= 17.0;
-      return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+    // --- Простой и надежный 3D шум (Value Noise) ---
+    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+    vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+    float snoise(vec3 v) {
+      const vec2  C = vec2(1.0/6.0, 1.0/3.0);
+      const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+      vec3 i  = floor(v + dot(v, C.yyy));
+      vec3 x0 = v - i + dot(i, C.xxx);
+      vec3 g = step(x0.yzx, x0.xyz);
+      vec3 l = 1.0 - g;
+      vec3 i1 = min(g.xyz, l.zxy);
+      vec3 i2 = max(g.xyz, l.zxy);
+      vec3 x1 = x0 - i1 + C.xxx;
+      vec3 x2 = x0 - i2 + C.yyy;
+      vec3 x3 = x0 - D.yyy;
+      i = mod289(i);
+      vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+      float n_ = 0.142857142857;
+      vec3 ns = n_ * D.wyz - D.xzx;
+      vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+      vec4 x_ = floor(j * ns.z);
+      vec4 y_ = floor(j - 7.0 * x_);
+      vec4 x = x_ * ns.x + ns.yyyy;
+      vec4 y = y_ * ns.x + ns.yyyy;
+      vec4 h = 1.0 - abs(x) - abs(y);
+      vec4 b0 = vec4(x.xy, y.xy);
+      vec4 b1 = vec4(x.zw, y.zw);
+      vec4 s0 = floor(b0)*2.0 + 1.0;
+      vec4 s1 = floor(b1)*2.0 + 1.0;
+      vec4 sh = -step(h, vec4(0.0));
+      vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+      vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+      vec3 p0 = vec3(a0.xy, h.x);
+      vec3 p1 = vec3(a0.zw, h.y);
+      vec3 p2 = vec3(a1.xy, h.z);
+      vec3 p3 = vec3(a1.zw, h.w);
+      vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+      p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+      vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+      m = m * m;
+      return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
     }
-    float noise(vec3 x) {
-      vec3 i = floor(x), f = fract(x);
-      f = f * f * (3.0 - 2.0 * f);
-      return mix(mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
-                     mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
-                 mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
-                     mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
-    }
+
+    // Фрактальный шум (FBM) для детализации
     float fbm(vec3 p) {
-      float v = 0.0, a = 0.5;
-      for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
-      return v;
+      float v = 0.0;
+      float a = 0.5;
+      for (int i = 0; i < 5; i++) {
+        v += a * snoise(p);
+        p *= 2.0;
+        a *= 0.5;
+      }
+      return v; // возвращает значение примерно от -1.0 до 1.0
     }
 
     void main() {
-      vec3 n = normalize(vPos + uSeed * 0.01);
+      vec3 n = normalize(vPos);
 
-      // Пульсация радиуса
+      // Анимация: смещаем координаты шума со временем для эффекта "кипения" плазмы
+      float timeScaled = uTime * 0.15 * uPulseSpeed;
+      vec3 noiseCoord = n * 2.5 + vec3(timeScaled, timeScaled * 0.5, 0.0) + uSeed;
+
+      // Базовая текстура поверхности (приводим диапазон -1..1 к 0..1)
+      float noiseVal = fbm(noiseCoord) * 0.5 + 0.5;
+
+      // Добавляем мелкую детализацию (грануляцию)
+      float detailNoise = snoise(n * 6.0 + vec3(timeScaled * 2.0)) * 0.5 + 0.5;
+      noiseVal = mix(noiseVal, detailNoise, 0.3);
+
+      // Пульсация общей яркости
       float pulse = 1.0 + sin(uTime * uPulseSpeed + uSeed) * uPulseAmp;
 
-      // Грануляция поверхности + активность от danger
-      float g1 = fbm(n * 4.0 + uTime * 0.15);
-      float g2 = fbm(n * 9.0 - uTime * 0.25);
-      float gran = mix(g1, g2, uActivity);
+      // Эффект Френеля для свечения по краям (переход в корону)
+      float fresnel = pow(1.0 - max(dot(vNormalW, vViewDir), 0.0), 3.0);
 
-      // Френель по нормали — «кипящая» кромка
-      float fres = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 2.0);
+      // Формирование цвета
+      vec3 darkBase = uCoreColor * 0.25;          // Темные участки (пятна)
+      vec3 brightSpot = uCoronaColor * 1.8;       // Ярчайшие вспышки (почти белые)
 
-      // Ядро
-      vec3 core = mix(uCoreColor, vec3(1.0), gran * 0.35 + fres * 0.25);
-      core *= pulse;
+      vec3 finalColor = mix(darkBase, uCoreColor, noiseVal);
+      // Добавляем яркие вспышки только на самых высоких значениях шума
+      finalColor = mix(finalColor, brightSpot, pow(noiseVal, 5.0) * uActivity);
 
-      // Корона по краю
-      vec3 col = mix(core, uCoronaColor, fres * 0.7);
+      // Добавляем свечение по краям (корона)
+      finalColor = mix(finalColor, uCoronaColor * 1.3, fresnel * (0.6 + uActivity * 0.4));
 
-      // «Кипение» — яркие всполохи при высокой активности
-      float flare = smoothstep(0.75, 0.95, gran) * uActivity;
-      col += uCoronaColor * flare * 0.8;
+      // Применяем общую пульсацию
+      finalColor *= pulse;
 
-      gl_FragColor = vec4(col, 1.0);
+      // === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Мягкое ограничение яркости ===
+      // Вместо жесткого умножения, которое дает пересвет в белый цвет,
+      // используем асимптотическую функцию, которая сохраняет детали.
+      finalColor = finalColor / (finalColor + vec3(1.0));
+      finalColor *= 1.8; // Компенсация общего затемнения для сочности цвета
+
+      gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
 
   // --- Создание меша светила ---
   function makeMesh(params) {
-    const geo = new THREE.SphereGeometry(params.radius, 48, 48);
+    const geo = new THREE.SphereGeometry(params.radius, 64, 64); // Увеличено до 64 для гладкости
 
-    const coreColor = new THREE.Color().setHSL(
-      params.coreHue,
-      params.coreSat,
-      params.coreLum,
-    );
-    const coronaColor = new THREE.Color().setHSL(
-      params.coronaHue,
-      params.coronaSat,
-      params.coronaLum,
-    );
+    const coreColor = new THREE.Color().setHSL(params.coreHue, params.coreSat, params.coreLum);
+    const coronaColor = new THREE.Color().setHSL(params.coronaHue, params.coronaSat, params.coronaLum);
 
     const mat = new THREE.ShaderMaterial({
       vertexShader: starVert,
@@ -217,12 +218,13 @@ const STAR = (() =>  {
         uCoreColor: { value: coreColor },
         uCoronaColor: { value: coronaColor },
         uTime: { value: 0 },
-        uSeed: { value: params.seed % 1000 },
+        uSeed: { value: (params.seed % 1000) * 0.01 }, // Нормализованный сид
         uPulseAmp: { value: params.pulseAmp },
         uPulseSpeed: { value: params.pulseSpeed },
-        uActivity: { value: Math.min(1, params.coronaIntensity / 2.5) },
+        // Гарантируем минимальную активность, чтобы звезда не выглядела "мертвой"
+        uActivity: { value: Math.max(0.3, Math.min(1.0, params.coronaIntensity / 2.5)) },
       },
-      toneMapped: false,
+      toneMapped: false, // Оставляем false, так как мы сами контролируем диапазон в шейдере
     });
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -232,25 +234,20 @@ const STAR = (() =>  {
 
   // --- Создание короны (аддитивная сфера) ---
   function makeCorona(params) {
-    const geo = new THREE.SphereGeometry(
-      params.radius * params.coronaScale,
-      32,
-      32,
-    );
-    const col = new THREE.Color().setHSL(
-      params.coronaHue,
-      params.coronaSat,
-      params.coronaLum,
-    );
+    // Увеличено количество сегментов до 48 для идеально гладкого градиента свечения
+    const geo = new THREE.SphereGeometry(params.radius * params.coronaScale, 48, 48);
+    const col = new THREE.Color().setHSL(params.coronaHue, params.coronaSat, params.coronaLum);
+    
     const mat = new THREE.MeshBasicMaterial({
       color: col,
       transparent: true,
-      opacity: 0.18 * params.coronaIntensity,
+      opacity: Math.min(0.35, 0.12 * params.coronaIntensity), // Сделал мягче, чтобы не перекрывать звезду
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
       side: THREE.BackSide,
     });
+    
     const mesh = new THREE.Mesh(geo, mat);
     mesh.userData.isCorona = true;
     return mesh;
@@ -258,66 +255,51 @@ const STAR = (() =>  {
 
   // --- Публичное API ---
   return {
-    // Вычислить параметры без создания мешей
     getParams(star) {
       return computeParams(star);
     },
 
-    // Создать полный набор: светило + корона + свет
     generate(star, opts = {}) {
       const params = computeParams(star);
       const mesh = makeMesh(params);
       const corona = makeCorona(params);
-      corona.position.copy(mesh.position);
+
+      const pos = opts.position || new THREE.Vector3(0, 0, 0);
+      mesh.position.copy(pos);
+      corona.position.copy(pos);
 
       const light = new THREE.PointLight(
         params.lightColor,
         params.lightIntensity,
         params.lightDistance,
-        2,
+        2
       );
       light.position.copy(mesh.position);
 
-      // Немного данных для внешнего кода
       mesh.userData.klass = params.klass;
 
-      // Анимация пульсации — вызывающий код должен дергать это в update(dt)
+      // Анимация пульсации
       const update = (dt, time) => {
         mesh.material.uniforms.uTime.value = time;
-        const p =
-          1 + Math.sin(time * params.pulseSpeed) * params.pulseAmp * 0.5;
+        const p = 1 + Math.sin(time * params.pulseSpeed) * params.pulseAmp * 0.5;
         corona.scale.setScalar(p);
         light.intensity = params.lightIntensity * (0.9 + 0.1 * p);
       };
 
-      // Уровень опасности от 0.0 до 1.0 в зависимости от расстояния
-      // от игрока до центра Звезды.
-      //   dist <= radius       -> 1.0
-      //   dist >= radius * 2   -> 0.0
-      //   между ними — линейная интерполяция.
       const getDangerLevel = (playerPosition) => {
         if (!playerPosition) return 0;
-
         const DangerRangeFactor = 2;
-
         const worldPos = new THREE.Vector3();
-        mesh.getWorldPosition(worldPos); // ← заполняем реальной мировой позицией планеты
+        mesh.getWorldPosition(worldPos);
 
-        const dx = playerPosition.x - worldPos.x;
-        const dy = playerPosition.y - worldPos.y;
-        const dz = playerPosition.z - worldPos.z;
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
+        const dist = playerPosition.distanceTo(worldPos);
         const r = params.radius;
         const outer = r * DangerRangeFactor;
 
         if (dist <= r) return 1.0;
         if (dist >= outer) return 0.0;
 
-        // 1.0 у поверхности -> 0.0 на границе зоны
-        //return 1.0 - (dist - r) / (outer - r);
-
-        const t = (dist - r) / (outer - r); // 0..1
+        const t = (dist - r) / (outer - r);
         const s = t * t * (3 - 2 * t); // smoothstep
         return 1.0 - s;
       };
@@ -325,7 +307,6 @@ const STAR = (() =>  {
       return { mesh, corona, light, params, update, getDangerLevel };
     },
 
-    // Освободить ресурсы
     dispose(handle) {
       if (!handle) return;
       for (const obj of [handle.mesh, handle.corona]) {
@@ -338,5 +319,3 @@ const STAR = (() =>  {
     },
   };
 })();
-
-//export default STAR;

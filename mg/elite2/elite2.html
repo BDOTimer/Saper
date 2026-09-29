@@ -592,6 +592,9 @@
     function buildSystemFromStar(star)
     {   if (!star) return;
 
+        sun.rebuild(state.dataStar);
+        sun.setPosition(0, 500, 3000);
+
         // Светило — висит далеко впереди
         currentStarHandle = STAR.generate(star);
         const starPos = new THREE.Vector3(0, 0, -3000);
@@ -875,7 +878,7 @@
       // ------------------------------------------------------------------
       const state = {
         starIndex: 0,
-        currentStar: null,
+        dataStar: null,
 
         speed: 0,
         maxSpeed: 320,
@@ -987,7 +990,7 @@
 
         // Обновляем состояние игрока
         state.starIndex = targetIdx;
-        state.currentStar = star;
+        state.dataStar = star;
         updateSectorFromStar(star);
         GALAXY.setPlayerStar(targetIdx);
 
@@ -1037,11 +1040,11 @@
       GALAXY.init();
       GALAXY.setPlayerStar(state.starIndex);
 
-      state.currentStar = GALAXY.getCurrentStar();
-      updateSectorFromStar(state.currentStar);
+      state.dataStar = GALAXY.getCurrentStar();
+      updateSectorFromStar(state.dataStar);
 
       // Лог текущей звезды
-      const s = state.currentStar;
+      const s = state.dataStar;
       console.log(
         "STAR:",
         s.name,
@@ -1052,10 +1055,7 @@
       );
       
       // Стартовая система
-      buildSystemFromStar(state.currentStar);
-
-      sun.rebuild(state.currentStar);
-      sun.setPosition(0, 0, -3000);
+      buildSystemFromStar(state.dataStar);
 
       function resetGame() {
         state.speed = 0;
@@ -1167,7 +1167,9 @@
         const dt = Math.min(clock.getDelta(), 0.05);
         const time = clock.elapsedTime;
 
-        sun.update(dt/10); 
+        sun.update(dt * 0.1); 
+
+        currentStarHandle.update(dt, clock.elapsedTime);
 
         GALAXY.update(dt);
         updateHyper(dt);
@@ -1198,7 +1200,7 @@
           if (keys["ArrowDown"]) state.speed -= 220 * dt;
 
           state.speed *= Math.pow(0.85, dt);
-          state.speed = Math.max(
+          state.speed  = Math.max(
             state.minSpeed,
             Math.min(state.maxSpeed, state.speed),
           );
