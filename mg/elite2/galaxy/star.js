@@ -337,7 +337,7 @@ const STAR = (() => {
 
       const getDangerLevel = (playerPosition) => {
         if (!playerPosition) return 0;
-        const DangerRangeFactor = 2;
+        const DangerRangeFactor = 3;
         const worldPos = new THREE.Vector3();
         mesh.getWorldPosition(worldPos);
 

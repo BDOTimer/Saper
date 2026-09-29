@@ -217,6 +217,7 @@
     </script>
 
     <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
+    <script src="./galaxy/universe.js"></script>
     <script src="./galaxy/galaxy.js"></script>
     <script src="./galaxy/star.js"></script>
     <script src="./galaxy/star-G.js"></script>
@@ -233,11 +234,27 @@
       import * as THREE from "three";
       window.THREE = THREE;
 
-      import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-      import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+      import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
+      import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+      ///---------------------------------------|
+      /// Сид для всей Вселенной.               |
+      ///---------------------------------------|
+      const SEED_UNIVERSE = "NGC-4889-Command"; // Или число
+      const UNIVERSE      = new Universe(SEED_UNIVERSE);
+      window.Universe     = UNIVERSE; // Делаем глобальным
+
+
+      ///---------------------------------------|
+      /// Галактика: id = 0.                    |
+      ///---------------------------------------|
+      const seedGalaxy = UNIVERSE.getSeed    (0);
+      let       GALAXY = new Galaxy( seedGalaxy);
+                GALAXY . init();
+      window.   GALAXY = GALAXY;
       
-      HELP.init();
+      HELP .init();
       TRADE.init();
       
         const FUEL_BURN_PER_SPEED = 0;//0.005; // топливо/сек на единицу скорости
@@ -804,6 +821,12 @@
           return;
         }
 
+        if(state.dead && e.code === "Enter")
+        { resetGame();
+          e.preventDefault();
+          return;
+        }
+
         // ESC: закрыть оверлей
         if (e.code === "Escape") {
           if (HELP.isOpen()) {
@@ -839,11 +862,11 @@
         }
 
         if (GALAXY.isOpen()) {
-          if (e.code === "ArrowLeft") GALAXY.moveSelection(-1, 0);
-          if (e.code === "ArrowRight") GALAXY.moveSelection(1, 0);
-          if (e.code === "ArrowUp") GALAXY.moveSelection(0, 1);
-          if (e.code === "ArrowDown") GALAXY.moveSelection(0, -1);
-          if (e.code === "Enter") GALAXY.confirmJump();
+          if (e.code === "ArrowLeft" ) GALAXY.moveSelection(-1, 0);
+          if (e.code === "ArrowRight") GALAXY.moveSelection(1,  0);
+          if (e.code === "ArrowUp"   ) GALAXY.moveSelection(0,  1);
+          if (e.code === "ArrowDown" ) GALAXY.moveSelection(0, -1);
+          if (e.code === "Enter"     )        tryHyperJump ();
           e.preventDefault();
           return;
         }
@@ -867,8 +890,8 @@
         dataStar : null,
 
         speed    :    0,
-        maxSpeed :  320,
-        minSpeed :  -80,
+        maxSpeed :  120,
+        minSpeed :  -40,
 
         shield   : SHIELDMAX,
         fuel     :  100,
@@ -1024,7 +1047,6 @@
       // ------------------------------------------------------------------
       //  Инициализация GALAXY
       // ------------------------------------------------------------------
-      GALAXY.init();
       GALAXY.setPlayerStar(state.starIndex);
 
       state.dataStar = GALAXY.getCurrentStar();
@@ -1309,7 +1331,7 @@
             else if(dangerLevel > 0.1)
             {
                 state.shield -= 0.001 * dt;
-                flashDamage(dangerLevel);
+                flashDamage(0.6 * dangerLevel);
             }
         }
         

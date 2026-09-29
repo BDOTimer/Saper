@@ -1,440 +1,440 @@
-// galaxy.js — карта галактики для Elite-подобной игры
-// Экспортирует singleton GALAXY с методами:
-//   init()            — подготовить данные (генерирует звёзды, если нужно)
-//   toggle()          — открыть/закрыть карту
-//   isOpen()          — открыта ли карта
-//   setOpen(v)        — задать состояние открытости
-//   update(dt)        — вызывать каждый кадр из animate()
-//   setPlayerStar(i)  — задать индекс звезды, где сейчас игрок
-//   onJumpRequest(cb) — колбэк, вызывается при подтверждении прыжка (Enter)
-//   getCurrentStar()  — полные данные о текущей звезде игрока
-//   getSelectedStar() — полные данные о выбранной (под прицелом) звезде
-//   getStar(i)        — полные данные о звезде по индексу
+// galaxy.js — карта галактики для Elite-подобной игры.
+// Экспортирует класс Galaxy (singleton-инстанс создаётся в HTML).
+//
+// Использование:
+//   const galaxy = new Galaxy("NGC-4889-Command");   // или число
+//   galaxy.init();
+//   galaxy.toggle();
+//   galaxy.update(dt);
+//   galaxy.setPlayerStar(0);
+//   galaxy.getCurrentStar();
 
-const GALAXY = (() => {
-  // --- Параметры галактики ---
-  const STAR_COUNT = 64; // сколько звёзд
-  const GALAXY_R = 1.0; // нормированный радиус диска (0..1)
-  const SEED = 1338;
-
-  // --- RNG (mulberry32) ---
-  function mulberry32(seed) {
-    return function () {
-      seed |= 0;
-      seed = (seed + 0x6d2b79f5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+class Galaxy
+{
+    // ------------------------------------------------------------------
+    //  Приватные поля
+    // ------------------------------------------------------------------
+    #seed;
+    #rng;
+    #stars      = [];
+    #links      = [];
+    #state      = {
+        open:       false,
+        playerStar: 0,
+        selected:   0,
+        jumpCb:     null,
+        canvas:     null,
+        ctx:        null,
+        wrap:       null,
+        time:       0,
     };
-  }
 
-  // --- Данные звёзд ---
-  // Каждая: { id, name, x, y, r, color, tech, danger,
-  //           hue, dangerLabel, techLabel, economy, population, government, links }
-  const stars = [];
-  const rng = mulberry32(SEED);
+    // ------------------------------------------------------------------
+    //  Константы
+    // ------------------------------------------------------------------
+    static STAR_COUNT = 64;
+    static GALAXY_R   = 1.0;
 
-  function makeName() {
-    const A = [
-      "Al",
-      "Be",
-      "Ce",
-      "Dra",
-      "Eri",
-      "Fo",
-      "Ga",
-      "Hy",
-      "Ix",
-      "Ju",
-      "Ko",
-      "Lu",
-      "My",
-      "Ny",
-      "Or",
-      "Pi",
-      "Qu",
-      "Ry",
-      "Sy",
-      "Ty",
-      "Ur",
-      "Ve",
-      "Wo",
-      "Xa",
-      "Ye",
-      "Zo",
+    static ECONOMIES = [
+        "Industrial",
+        "Agricultural",
+        "Mining",
+        "Refinery",
+        "High-Tech",
+        "Tourism",
     ];
-    const B = [
-      "a",
-      "e",
-      "i",
-      "o",
-      "u",
-      "ar",
-      "ir",
-      "on",
-      "ax",
-      "es",
-      "ix",
-      "or",
-      "un",
-      "yl",
+
+    static GOVERNMENTS = [
+        "Anarchy",
+        "Feudal",
+        "Multi-Gov",
+        "Dictatorship",
+        "Communist",
+        "Confederacy",
+        "Democracy",
+        "Corporate",
     ];
-    const C = [
-      "",
-      " I",
-      " II",
-      " III",
-      " IV",
-      " V",
-      " Prime",
-      " Major",
-      " Minor",
-      " Alpha",
-      " Beta",
+
+    static NAME_A = [
+        "Al","Be","Ce","Dra","Eri","Fo","Ga","Hy","Ix","Ju",
+        "Ko","Lu","My","Ny","Or","Pi","Qu","Ry","Sy","Ty",
+        "Ur","Ve","Wo","Xa","Ye","Zo",
     ];
-    const a = A[Math.floor(rng() * A.length)];
-    const b = B[Math.floor(rng() * B.length)];
-    const c = C[Math.floor(rng() * C.length)];
-    return `${a}${b}${c}`;
-  }
 
-  const ECONOMIES = [
-    "Industrial",
-    "Agricultural",
-    "Mining",
-    "Refinery",
-    "High-Tech",
-    "Tourism",
-  ];
-  const GOVERNMENTS = [
-    "Anarchy",
-    "Feudal",
-    "Multi-Gov",
-    "Dictatorship",
-    "Communist",
-    "Confederacy",
-    "Democracy",
-    "Corporate",
-  ];
+    static NAME_B = [
+        "a","e","i","o","u","ar","ir","on","ax","es","ix","or","un","yl",
+    ];
 
-  for (let i = 0; i < STAR_COUNT; i++) {
-    // спиральное распределение по диску
-    const arm = i % 3;
-    const t = rng();
-    const r = Math.pow(t, 0.6) * GALAXY_R;
-    const baseA = (arm / 3) * Math.PI * 2;
-    const a = baseA + r * 4.0 + (rng() - 0.5) * 0.6;
-    const x = Math.cos(a) * r + (rng() - 0.5) * 0.05;
-    const y = Math.sin(a) * r + (rng() - 0.5) * 0.05;
+    static NAME_C = [
+        ""," I"," II"," III"," IV"," V"," Prime"," Major"," Minor"," Alpha"," Beta",
+    ];
 
-    const hue = 0.55 + (rng() - 0.5) * 0.25; // синий..красный
-    const color = `hsl(${(hue * 360) | 0}, 80%, ${65 + rng() * 20}%)`;
-    const tech = 1 + Math.floor(rng() * 15);
-    const danger = rng();
+    // ------------------------------------------------------------------
+    //  Конструктор
+    // ------------------------------------------------------------------
+    /**
+     * @param {number|string} seed  - Сид галактики.
+     * @param {object}        opts  - { starCount, galaxyR }
+     */
+    constructor(seed = 1338, opts = {})
+    {
+        this.#seed  = seed;
+        this.#rng   = Galaxy._mulberry32(Galaxy._toUint32(seed));
 
-    stars.push({
-      id: i,
-      name: makeName(),
-      x,
-      y,
-      r,
-      color,
-      tech,
-      danger,
-      // ★ дополнительные поля
-      hue,
-      dangerLabel: danger < 0.33 ? "LOW" : danger < 0.66 ? "MED" : "HIGH",
-      techLabel: tech <= 5 ? "LOW" : tech <= 10 ? "MID" : "HIGH",
-      economy: ECONOMIES[Math.floor(rng() * ECONOMIES.length)],
-      population: Math.floor(1e3 + rng() * 9e9),
-      government: GOVERNMENTS[Math.floor(rng() * GOVERNMENTS.length)],
-      links: [], // заполним ниже
-    });
-  }
+        this.starCount = opts.starCount ?? Galaxy.STAR_COUNT;
+        this.galaxyR   = opts.galaxyR   ?? Galaxy.GALAXY_R;
 
-  // Связи между близкими звёздами (для линий «торговых путей»)
-  const links = [];
-  for (let i = 0; i < stars.length; i++) {
-    let best = null;
-    let bestD = Infinity;
-    for (let j = 0; j < stars.length; j++) {
-      if (i === j) continue;
-      const d = (stars[i].x - stars[j].x) ** 2 + (stars[i].y - stars[j].y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = j;
-      }
-    }
-    if (best !== null && bestD < 0.08 * 0.08) links.push([i, best]);
-  }
-
-  // ★ прописываем связи в сами звёзды
-  for (const [a, b] of links) {
-    stars[a].links.push(b);
-    stars[b].links.push(a);
-  }
-
-  // --- Состояние ---
-  const state = {
-    open: false,
-    playerStar: 0, // индекс текущей звезды
-    selected: 0, // индекс выбранной звезды на карте
-    jumpCb: null,
-    canvas: null,
-    ctx: null,
-    time: 0,
-  };
-
-  // --- Создание DOM ---
-  function ensureDOM() {
-    if (state.canvas) return;
-
-    const wrap = document.createElement("div");
-    wrap.id = "galaxy-map";
-    wrap.style.cssText = `
-      position: fixed; inset: 0;
-      display: none; align-items: center; justify-content: center;
-      background: radial-gradient(ellipse at center, rgba(0,20,10,0.85), rgba(0,0,0,0.95));
-      z-index: 50; pointer-events: none;
-      font-family: "Courier New", monospace;
-      color: #33ff88;
-    `;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 900;
-    canvas.height = 900;
-    canvas.style.cssText = `
-      max-width: 92vmin; max-height: 92vmin;
-      width: 92vmin; height: 92vmin;
-      filter: drop-shadow(0 0 12px #00ff88);
-    `;
-
-    const hint = document.createElement("div");
-    hint.textContent = "Стрелки — выбор | ENTER — прыжок | M — закрыть";
-    hint.style.cssText = `
-      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
-      font-size: 13px; letter-spacing: 2px; opacity: 0.7;
-      text-shadow: 0 0 6px #00ff88;
-    `;
-
-    wrap.appendChild(canvas);
-    wrap.appendChild(hint);
-    document.body.appendChild(wrap);
-
-    state.canvas = canvas;
-    state.ctx = canvas.getContext("2d");
-    state.wrap = wrap;
-  }
-
-  // --- Переключение ---
-  function setOpen(v) {
-    ensureDOM();
-    state.open = v;
-    state.wrap.style.display = v ? "flex" : "none";
-    if (v) {
-      state.selected = state.playerStar;
-    }
-  }
-
-  function toggle() {
-    setOpen(!state.open);
-  }
-  function isOpen() {
-    return state.open;
-  }
-
-  // --- Управление ---
-  function moveSelection(dx, dy) {
-    const cur = stars[state.selected];
-    let best = null;
-    let bestScore = Infinity;
-    for (const s of stars) {
-      if (s.id === state.selected) continue;
-      const vx = s.x - cur.x;
-      const vy = s.y - cur.y;
-      const along = vx * dx + vy * dy;
-      if (along <= 0) continue;
-      const perp = Math.abs(vx * dy - vy * dx);
-      const score = perp * 10 - along;
-      if (score < bestScore) {
-        bestScore = score;
-        best = s;
-      }
-    }
-    if (best) state.selected = best.id;
-  }
-
-  function confirmJump() {
-    if (state.selected === state.playerStar) return;
-    if (state.jumpCb) state.jumpCb(state.selected, stars[state.selected]);
-  }
-
-  // --- Отрисовка ---
-  function draw() {
-    const ctx = state.ctx;
-    const W = state.canvas.width;
-    const H = state.canvas.height;
-    const cx = W / 2;
-    const cy = H / 2;
-    const scale = Math.min(W, H) * 0.42;
-
-    ctx.clearRect(0, 0, W, H);
-
-    // сетка координат
-    ctx.strokeStyle = "rgba(51,255,136,0.10)";
-    ctx.lineWidth = 1;
-    for (let g = -10; g <= 10; g++) {
-      const p = (g / 10) * scale;
-      ctx.beginPath();
-      ctx.moveTo(cx + p, cy - scale);
-      ctx.lineTo(cx + p, cy + scale);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx - scale, cy + p);
-      ctx.lineTo(cx + scale, cy + p);
-      ctx.stroke();
+        this.#generateStars();
+        this.#buildLinks();
     }
 
-    // круг-граница
-    ctx.strokeStyle = "rgba(51,255,136,0.35)";
-    ctx.beginPath();
-    ctx.arc(cx, cy, scale, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // связи
-    ctx.strokeStyle = "rgba(51,255,136,0.18)";
-    ctx.lineWidth = 1;
-    for (const [a, b] of links) {
-      const A = stars[a];
-      const B = stars[b];
-      ctx.beginPath();
-      ctx.moveTo(cx + A.x * scale, cy - A.y * scale);
-      ctx.lineTo(cx + B.x * scale, cy - B.y * scale);
-      ctx.stroke();
+    // ------------------------------------------------------------------
+    //  Приватные утилиты
+    // ------------------------------------------------------------------
+    static _toUint32(value) {
+        if (typeof value === "number") return value >>> 0;
+        let hash = 5381;
+        for (let i = 0; i < value.length; i++) {
+            hash = ((hash * 33) ^ value.charCodeAt(i)) >>> 0;
+        }
+        return hash;
     }
 
-    // звёзды
-    for (const s of stars) {
-      const px = cx + s.x * scale;
-      const py = cy - s.y * scale;
-
-      // ореол
-      const grad = ctx.createRadialGradient(px, py, 0, px, py, 10);
-      grad.addColorStop(0, s.color);
-      grad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(px, py, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      // ядро
-      ctx.fillStyle = s.color;
-      ctx.beginPath();
-      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // подпись для выбранной
-      if (s.id === state.selected) {
-        ctx.fillStyle = "#eaffea";
-        ctx.font = '12px "Courier New", monospace';
-        ctx.fillText(`${s.name}`, px + 10, py - 6);
-        ctx.fillStyle = "rgba(234,255,234,0.7)";
-        ctx.fillText(
-          `TECH ${s.tech}  DNG ${(s.danger * 100) | 0}%`,
-          px + 10,
-          py + 8,
-        );
-      }
+    static _mulberry32(a) {
+        return function () {
+            a |= 0;
+            a  = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
     }
 
-    // маркер игрока — мигающее кольцо вокруг текущей звезды
-    const ps = stars[state.playerStar];
-    const ppx = cx + ps.x * scale;
-    const ppy = cy - ps.y * scale;
-    const pulse = 8 + Math.sin(state.time * 4) * 2;
-    ctx.strokeStyle = "#ffff66";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(ppx, ppy, pulse, 0, Math.PI * 2);
-    ctx.stroke();
+    #makeName() {
+        const A = Galaxy.NAME_A;
+        const B = Galaxy.NAME_B;
+        const C = Galaxy.NAME_C;
+        const a = A[Math.floor(this.#rng() * A.length)];
+        const b = B[Math.floor(this.#rng() * B.length)];
+        const c = C[Math.floor(this.#rng() * C.length)];
+        return `${a}${b}${c}`;
+    }
 
-    ctx.fillStyle = "#ffff66";
-    ctx.font = 'bold 11px "Courier New", monospace';
-    ctx.fillText("YOU", ppx - 12, ppy - 14);
+    // ------------------------------------------------------------------
+    //  Генерация звёзд
+    // ------------------------------------------------------------------
+    #generateStars()
+    {
+        this.#stars.length = 0;
+        const N = this.starCount;
+        const R = this.galaxyR;
 
-    // перекрестие выбора
-    const sel = stars[state.selected];
-    const sx = cx + sel.x * scale;
-    const sy = cy - sel.y * scale;
-    ctx.strokeStyle = "#33ff88";
-    ctx.lineWidth = 1.5;
-    const k = 7;
-    ctx.beginPath();
-    ctx.moveTo(sx - k, sy - k);
-    ctx.lineTo(sx - k, sy - k / 2);
-    ctx.moveTo(sx - k, sy - k);
-    ctx.lineTo(sx - k / 2, sy - k);
-    ctx.moveTo(sx + k, sy + k);
-    ctx.lineTo(sx + k, sy + k / 2);
-    ctx.moveTo(sx + k, sy + k);
-    ctx.lineTo(sx + k / 2, sy + k);
-    ctx.moveTo(sx - k, sy + k);
-    ctx.lineTo(sx - k, sy + k / 2);
-    ctx.moveTo(sx - k, sy + k);
-    ctx.lineTo(sx - k / 2, sy + k);
-    ctx.moveTo(sx + k, sy - k);
-    ctx.lineTo(sx + k, sy - k / 2);
-    ctx.moveTo(sx + k, sy - k);
-    ctx.lineTo(sx + k / 2, sy - k);
-    ctx.stroke();
-  }
+        for (let i = 0; i < N; i++) {
+            const arm   = i % 3;
+            const t     = this.#rng();
+            const r     = Math.pow(t, 0.6) * R;
+            const baseA = (arm / 3) * Math.PI * 2;
+            const a     = baseA + r * 4.0 + (this.#rng() - 0.5) * 0.6;
 
-  // --- Публичное API ---
-  return {
+            const x = Math.cos(a) * r + (this.#rng() - 0.5) * 0.05;
+            const y = Math.sin(a) * r + (this.#rng() - 0.5) * 0.05;
+
+            const hue    = 0.55 + (this.#rng() - 0.5) * 0.25;
+            const color  = `hsl(${(hue * 360) | 0}, 80%, ${65 + this.#rng() * 20}%)`;
+            const tech   = 1 + Math.floor(this.#rng() * 15);
+            const danger = this.#rng();
+
+            this.#stars.push({
+                id:   i,
+                name: this.#makeName(),
+                x, y, r, color,
+                tech,
+                danger,
+                hue,
+                dangerLabel: danger < 0.33 ? "LOW" : danger < 0.66 ? "MED" : "HIGH",
+                techLabel:   tech <= 5 ? "LOW" : tech <= 10 ? "MID" : "HIGH",
+                economy:     Galaxy.ECONOMIES[Math.floor(this.#rng() * Galaxy.ECONOMIES.length)],
+                population:  Math.floor(1e3 + this.#rng() * 9e9),
+                government:  Galaxy.GOVERNMENTS[Math.floor(this.#rng() * Galaxy.GOVERNMENTS.length)],
+                links:       [],
+            });
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Связи между близкими звёздами
+    // ------------------------------------------------------------------
+    #buildLinks()
+    {
+        this.#links.length = 0;
+
+        for (let i = 0; i < this.#stars.length; i++) {
+            let best  = null;
+            let bestD = Infinity;
+            for (let j = 0; j < this.#stars.length; j++) {
+                if (i === j) continue;
+                const d =
+                    (this.#stars[i].x - this.#stars[j].x) ** 2 +
+                    (this.#stars[i].y - this.#stars[j].y) ** 2;
+                if (d < bestD) { bestD = d; best = j; }
+            }
+            if (best !== null && bestD < 0.08 * 0.08) {
+                this.#links.push([i, best]);
+            }
+        }
+
+        for (const [a, b] of this.#links) {
+            this.#stars[a].links.push(b);
+            this.#stars[b].links.push(a);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  DOM
+    // ------------------------------------------------------------------
+    #ensureDOM()
+    {
+        if (this.#state.canvas) return;
+
+        // ★ опциональная отладка сида
+        if (window.Universe && window.Universe.getSeed) {
+            console.log("🔍 Universe.getSeed(99):", window.Universe.getSeed(99));
+        }
+
+        const wrap = document.createElement("div");
+        wrap.id = "galaxy-map";
+        wrap.style.cssText = `
+            position: fixed; inset: 0;
+            display: none; align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at center, rgba(0,20,10,0.85), rgba(0,0,0,0.95));
+            z-index: 50; pointer-events: none;
+            font-family: "Courier New", monospace;
+            color: #33ff88;
+        `;
+
+        const canvas = document.createElement("canvas");
+        canvas.width  = 900;
+        canvas.height = 900;
+        canvas.style.cssText = `
+            max-width: 92vmin; max-height: 92vmin;
+            width: 92vmin; height: 92vmin;
+            filter: drop-shadow(0 0 12px #00ff88);
+        `;
+
+        const hint = document.createElement("div");
+        hint.textContent = "Стрелки — выбор | ENTER — прыжок | M — закрыть";
+        hint.style.cssText = `
+            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            font-size: 13px; letter-spacing: 2px; opacity: 0.7;
+            text-shadow: 0 0 6px #00ff88;
+        `;
+
+        wrap.appendChild(canvas);
+        wrap.appendChild(hint);
+        document.body.appendChild(wrap);
+
+        this.#state.wrap   = wrap;
+        this.#state.canvas = canvas;
+        this.#state.ctx    = canvas.getContext("2d");
+    }
+
+    // ------------------------------------------------------------------
+    //  Публичное API — открытие / закрытие
+    // ------------------------------------------------------------------
     init() {
-      ensureDOM();
-    },
-    toggle,
-    isOpen,
-    setOpen,
+        this.#ensureDOM();
+    }
 
-    get stars() {
-      return stars;
-    },
-    get currentIndex() {
-      return state.playerStar;
-    },
-    get selectedIndex() {
-      return state.selected;
-    },
+    setOpen(v) {
+        this.#ensureDOM();
+        this.#state.open = v;
+        this.#state.wrap.style.display = v ? "flex" : "none";
+        if (v) this.#state.selected = this.#state.playerStar;
+    }
 
-    // ★ полные данные о текущей звезде игрока
-    getCurrentStar() {
-      return stars[state.playerStar] || null;
-    },
-    // ★ полные данные о выбранной (под прицелом) звезде
-    getSelectedStar() {
-      return stars[state.selected] || null;
-    },
-    // ★ звезда по индексу
-    getStar(i) {
-      return stars[i] || null;
-    },
+    toggle() { this.setOpen(!this.#state.open); }
+    isOpen() { return this.#state.open; }
+
+    // ------------------------------------------------------------------
+    //  Управление
+    // ------------------------------------------------------------------
+    moveSelection(dx, dy)
+    {
+        const cur = this.#stars[this.#state.selected];
+        let best  = null;
+        let bestScore = Infinity;
+
+        for (const s of this.#stars) {
+            if (s.id === this.#state.selected) continue;
+            const vx = s.x - cur.x;
+            const vy = s.y - cur.y;
+            const along = vx * dx + vy * dy;
+            if (along <= 0) continue;
+            const perp = Math.abs(vx * dy - vy * dx);
+            const score = perp * 10 - along;
+            if (score < bestScore) { bestScore = score; best = s; }
+        }
+
+        if (best) this.#state.selected = best.id;
+    }
+
+    confirmJump()
+    {
+        if (this.#state.selected === this.#state.playerStar) return;
+        if (this.#state.jumpCb) {
+            this.#state.jumpCb(
+                this.#state.selected,
+                this.#stars[this.#state.selected],
+            );
+        }
+    }
+
+    onJumpRequest(cb) { this.#state.jumpCb = cb; }
+
+    // ------------------------------------------------------------------
+    //  Отрисовка
+    // ------------------------------------------------------------------
+    #draw()
+    {
+        const ctx   = this.#state.ctx;
+        const W     = this.#state.canvas.width;
+        const H     = this.#state.canvas.height;
+        const cx    = W / 2;
+        const cy    = H / 2;
+        const scale = Math.min(W, H) * 0.42;
+
+        ctx.clearRect(0, 0, W, H);
+
+        // сетка
+        ctx.strokeStyle = "rgba(51,255,136,0.10)";
+        ctx.lineWidth = 1;
+        for (let g = -10; g <= 10; g++) {
+            const p = (g / 10) * scale;
+            ctx.beginPath();
+            ctx.moveTo(cx + p, cy - scale);
+            ctx.lineTo(cx + p, cy + scale);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx - scale, cy + p);
+            ctx.lineTo(cx + scale, cy + p);
+            ctx.stroke();
+        }
+
+        // граница
+        ctx.strokeStyle = "rgba(51,255,136,0.35)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, scale, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // связи
+        ctx.strokeStyle = "rgba(51,255,136,0.18)";
+        ctx.lineWidth = 1;
+        for (const [a, b] of this.#links) {
+            const A = this.#stars[a];
+            const B = this.#stars[b];
+            ctx.beginPath();
+            ctx.moveTo(cx + A.x * scale, cy - A.y * scale);
+            ctx.lineTo(cx + B.x * scale, cy - B.y * scale);
+            ctx.stroke();
+        }
+
+        // звёзды
+        for (const s of this.#stars) {
+            const px = cx + s.x * scale;
+            const py = cy - s.y * scale;
+
+            const grad = ctx.createRadialGradient(px, py, 0, px, py, 10);
+            grad.addColorStop(0, s.color);
+            grad.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(px, py, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = s.color;
+            ctx.beginPath();
+            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (s.id === this.#state.selected) {
+                ctx.fillStyle = "#eaffea";
+                ctx.font = '12px "Courier New", monospace';
+                ctx.fillText(`${s.name}`, px + 10, py - 6);
+                ctx.fillStyle = "rgba(234,255,234,0.7)";
+                ctx.fillText(
+                    `TECH ${s.tech}  DNG ${(s.danger * 100) | 0}%`,
+                    px + 10, py + 8,
+                );
+            }
+        }
+
+        // маркер игрока
+        const ps  = this.#stars[this.#state.playerStar];
+        const ppx = cx + ps.x * scale;
+        const ppy = cy - ps.y * scale;
+        const pulse = 8 + Math.sin(this.#state.time * 4) * 2;
+
+        ctx.strokeStyle = "#ffff66";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ppx, ppy, pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffff66";
+        ctx.font = 'bold 11px "Courier New", monospace';
+        ctx.fillText("YOU", ppx - 12, ppy - 14);
+
+        // перекрестие
+        const sel = this.#stars[this.#state.selected];
+        const sx  = cx + sel.x * scale;
+        const sy  = cy - sel.y * scale;
+        const k   = 7;
+
+        ctx.strokeStyle = "#33ff88";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sx - k, sy - k);     ctx.lineTo(sx - k, sy - k / 2);
+        ctx.moveTo(sx - k, sy - k);     ctx.lineTo(sx - k / 2, sy - k);
+        ctx.moveTo(sx + k, sy + k);     ctx.lineTo(sx + k, sy + k / 2);
+        ctx.moveTo(sx + k, sy + k);     ctx.lineTo(sx + k / 2, sy + k);
+        ctx.moveTo(sx - k, sy + k);     ctx.lineTo(sx - k, sy + k / 2);
+        ctx.moveTo(sx - k, sy + k);     ctx.lineTo(sx - k / 2, sy + k);
+        ctx.moveTo(sx + k, sy - k);     ctx.lineTo(sx + k, sy - k / 2);
+        ctx.moveTo(sx + k, sy - k);     ctx.lineTo(sx + k / 2, sy - k);
+        ctx.stroke();
+    }
+
+    // ------------------------------------------------------------------
+    //  Геттеры
+    // ------------------------------------------------------------------
+    get stars()         { return this.#stars; }
+    get currentIndex()  { return this.#state.playerStar; }
+    get selectedIndex() { return this.#state.selected; }
+    get seed()          { return this.#seed; }
+
+    getCurrentStar()  { return this.#stars[this.#state.playerStar] || null; }
+    getSelectedStar() { return this.#stars[this.#state.selected]   || null; }
+    getStar(i)        { return this.#stars[i] || null; }
 
     setPlayerStar(i) {
-      state.playerStar = i;
-      state.selected = i;
-    },
-    moveSelection,
-    confirmJump,
-    // onJumpRequest(cb) {
-    //   state.jumpCb = cb;
-    // },
-    update(dt) {
-      state.time += dt;
-      if (state.open) draw();
-    },
-  };
-})();
+        this.#state.playerStar = i;
+        this.#state.selected   = i;
+    }
 
-//export default GALAXY;
+    // ------------------------------------------------------------------
+    //  Update — вызывать каждый кадр
+    // ------------------------------------------------------------------
+    update(dt) {
+        this.#state.time += dt;
+        if (this.#state.open) this.#draw();
+    }
+}
+
+// -----------------------------------------|
+//  Экспорт для Node.js и браузеров
+// -----------------------------------------:
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = Galaxy;
+} else {
+    window.Galaxy = Galaxy;
+}
