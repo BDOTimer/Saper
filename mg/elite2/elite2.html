@@ -516,8 +516,11 @@
           },
       });
 
-      //const sunLight = new THREE.DirectionalLight(0xffffff, 1.6);
-      const sunLight = new THREE.PointLight(0xffffff, 1.0, 8000, 1.0);
+      const sunLight9 = new THREE.DirectionalLight(0xffffff, 1.6);
+      scene.add(sunLight9);
+      sunLight9.position.set(1, 0.5, 0.7);
+
+      const sunLight = new THREE.PointLight(0xffffff, 3.0, 8000, 1.0);
       scene.add(sunLight);
       scene.add(new THREE.AmbientLight(0x334455, 0.6));
 
@@ -881,22 +884,25 @@
 
       addEventListener("keyup", (e) => (keys[e.code] = false));
 
+      const SHIELDMAX = 100;
+
       // ------------------------------------------------------------------
       //  Состояние
       // ------------------------------------------------------------------
       const state = {
-        starIndex: 0,
-        dataStar: null,
+        starIndex:    0,
+        dataStar : null,
 
-        speed: 0,
-        maxSpeed: 320,
-        minSpeed: -80,
-        shield: 100,
-        fuel: 100,
-        credits: 1000,
-        kills: 0,
-        sector: { x: 0, y: 0 },
-        dead: false,
+        speed    :    0,
+        maxSpeed :  320,
+        minSpeed :  -80,
+
+        shield   : SHIELDMAX,
+        fuel     :  100,
+        credits  : 1000,
+        kills    :    0,
+        sector   : { x: 0, y: 0 },
+        dead     : false,
 
         // гиперпрыжок
         hyper: {
@@ -1164,7 +1170,7 @@
       }
 
     ///------------------------------------------------------------------------|
-    /// Игровой цикл
+    /// Игровой цикл ✅
     ///------------------------------------------------------------------------:
     const clock = new THREE.Clock();
     const tmpVec = new THREE.Vector3();
@@ -1200,11 +1206,11 @@
           return;
         }
 
-/////////////////////////////////////////////////////////////////// - ИГРОК ЖИВ!
+///////////////////////////////////////////////////////////////// 🟢- ИГРОК ЖИВ!
     if (!state.dead)
     {
           // Тяга
-          if (keys["ArrowUp"]) state.speed += 220 * dt;
+          if (keys["ArrowUp"  ]) state.speed += 220 * dt;
           if (keys["ArrowDown"]) state.speed -= 220 * dt;
 
           state.speed *= Math.pow(0.85, dt);
@@ -1212,6 +1218,9 @@
             state.minSpeed,
             Math.min(state.maxSpeed, state.speed),
           );
+
+          // Автовосстановитель щита
+          if(state.shield < SHIELDMAX) state.shield += dt;
 
           // Ориентация
           const rotSpeed = 1.2 * dt;
@@ -1237,6 +1246,7 @@
         //   0.8 = пыль почти «прилипла» к камере → почти не набегает
         //   1.0 = пыль движется вместе с кораблём → стоит на месте визуально
         const DUST_FOLLOW = 0.7;
+        const METEOR_FOLLOW = 0.0;
         const dustDrift = forward
           .clone()
           .multiplyScalar((state.speed - 5) * dt * DUST_FOLLOW);
@@ -1290,9 +1300,15 @@
 
             wrapAround(m.position, camera.position, METEOR_RADIUS);
 
+            /// 💀💀💀
             const d = m.position.distanceTo(playerWorldPos);
             if (d < m.userData.size + 12) {
-              state.shield -= 200 * dt;
+
+              let damag = 5*dt;
+              if(state.speed > 10) damag = 0.4*state.speed * dt;
+
+              state.shield -= damag;
+
               flashDamage(0.6);
               if (state.shield <= 0) {
                 state.shield = 0;
@@ -1385,7 +1401,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             // успешная посадка — например, пополнить топливо/щит,
             // показать сообщение, отключить управление и т.п.
             state.fuel = 100;
-            state.shield = 100;
+            state.shield = SHIELDMAX;
             state.speed  = 0.5;
             // console.log("LANDED OK");
             
