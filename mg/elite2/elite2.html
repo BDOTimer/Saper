@@ -246,6 +246,7 @@
     <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
     <script src="./galaxy/galaxy.js"></script>
     <script src="./galaxy/star.js"></script>
+    <script src="./galaxy/star-G.js"></script>
     <script src="./galaxy/planet.js"></script>
     <script src="./galaxy/hyperfx.js"></script>
     <script src="./galaxy/skystar.js"></script>
@@ -579,6 +580,15 @@
         }
     }
 
+    // Создаем экземпляр звезды
+    const sun = new StarG(scene, camera, {
+        size: 8,
+        color: 0xfcc200,
+        pulseSpeed: 0.3,
+        rotationSpeed: 0.02,
+        haloScale: 20
+    });
+
     function buildSystemFromStar(star)
     {   if (!star) return;
 
@@ -591,6 +601,9 @@
         scene.add(currentStarHandle.mesh);
         scene.add(currentStarHandle.corona);
         scene.add(currentStarHandle.light);
+
+        //sun.rebuild(star);
+        //sun.setPosition(0, 100, -1000);
 
         // Планеты: число зависит от tech
         const n = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
@@ -1041,6 +1054,9 @@
       // Стартовая система
       buildSystemFromStar(state.currentStar);
 
+      sun.rebuild(state.currentStar);
+      sun.setPosition(0, 0, -3000);
+
       function resetGame() {
         state.speed = 0;
         state.shield = 100;
@@ -1150,6 +1166,8 @@
     {
         const dt = Math.min(clock.getDelta(), 0.05);
         const time = clock.elapsedTime;
+
+        sun.update(dt/10); 
 
         GALAXY.update(dt);
         updateHyper(dt);
