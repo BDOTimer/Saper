@@ -1,0 +1,386 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" role="img">
+ <title>Звёздный странник — дальний разведчик</title>
+ <desc>Космический корабль в стиле Elite Dangerous: гранёный корпус, купол кабины, радиаторный киль, циановые двигатели, тёплый свет далёкой звезды с анимацией.</desc>
+<defs>
+ <!-- фоновые градиенты -->
+ <radialGradient id="skyG" cx=".42" cy=".4" r=".9">
+   <stop offset="0" stop-color="#0d1830"/> <stop offset=".6" stop-color="#070c18"/> <stop offset="1" stop-color="#05070d"/>
+ </radialGradient>
+ <radialGradient id="neb1">
+   <stop offset="0" stop-color="#3f86ad" stop-opacity=".5"/> <stop offset=".55" stop-color="#3f86ad" stop-opacity=".14"/> <stop offset="1" stop-color="#3f86ad" stop-opacity="0"/>
+ </radialGradient>
+ <radialGradient id="neb2">
+   <stop offset="0" stop-color="#96579f" stop-opacity=".34"/> <stop offset=".6" stop-color="#96579f" stop-opacity=".1"/> <stop offset="1" stop-color="#96579f" stop-opacity="0"/>
+ </radialGradient>
+ <radialGradient id="sunG">
+   <stop offset="0" stop-color="#fff7ea"/> <stop offset=".12" stop-color="#ffe2b0" stop-opacity=".9"/> <stop offset=".4" stop-color="#ffb46b" stop-opacity=".26"/> <stop offset="1" stop-color="#ffb46b" stop-opacity="0"/>
+ </radialGradient>
+ <radialGradient id="vig" cx=".5" cy=".47" r=".72">
+   <stop offset=".55" stop-color="#000" stop-opacity="0"/> <stop offset="1" stop-color="#000" stop-opacity=".5"/>
+ </radialGradient>
+<!-- корпус -->
+ <linearGradient id="hullG" x1="0" y1="0" x2=".2" y2="1">
+   <stop offset="0" stop-color="#5a646f"/><stop offset=".25" stop-color="#39424c"/><stop offset=".5" stop-color="#242b34"/><stop offset=".78" stop-color="#141a21"/><stop offset="1" stop-color="#0a0d11"/>
+ </linearGradient>
+ <linearGradient id="warm" gradientUnits="userSpaceOnUse" x1="90" y1="0" x2="780" y2="0">
+   <stop offset="0" stop-color="#ffc584" stop-opacity=".17"/><stop offset=".5" stop-color="#ffc584" stop-opacity=".06"/><stop offset=".8" stop-color="#ffc584" stop-opacity="0"/>
+ </linearGradient>
+ <linearGradient id="deckG" x1="0" y1="0" x2="0" y2="1">
+   <stop offset="0" stop-color="#737f8d"/><stop offset=".6" stop-color="#454f5b"/><stop offset="1" stop-color="#2a323c"/>
+ </linearGradient>
+ <linearGradient id="bellyG" x1="0" y1="0" x2="0" y2="1">
+   <stop offset="0" stop-color="#1a222c"/><stop offset="1" stop-color="#04070a"/>
+ </linearGradient>
+ <linearGradient id="finG" x1="0" y1="0" x2="1" y2="0">
+   <stop offset="0" stop-color="#4d5763"/><stop offset=".55" stop-color="#232a33"/><stop offset="1" stop-color="#10151b"/>
+ </linearGradient>
+ <linearGradient id="farFinG" x1="0" y1="0" x2="0" y2="1">
+   <stop offset="0" stop-color="#1b222b"/><stop offset="1" stop-color="#0a0e13"/>
+ </linearGradient>
+ <linearGradient id="rimG" gradientUnits="userSpaceOnUse" x1="100" y1="0" x2="940" y2="0">
+   <stop offset="0" stop-color="#ffedd0"/><stop offset=".2" stop-color="#f6b877" stop-opacity=".85"/><stop offset=".5" stop-color="#e89a55" stop-opacity=".35"/><stop offset=".8" stop-color="#e89a55" stop-opacity="0"/>
+ </linearGradient>
+ <linearGradient id="cyanW" gradientUnits="userSpaceOnUse" x1="950" y1="0" x2="860" y2="0">
+   <stop offset="0" stop-color="#7fd0ff" stop-opacity=".4"/><stop offset="1" stop-color="#7fd0ff" stop-opacity="0"/>
+ </linearGradient>
+ <!-- кабина и двигатели -->
+ <linearGradient id="canopyG" x1="0" y1="0" x2=".55" y2="1">
+   <stop offset="0" stop-color="#cfeaff"/><stop offset=".3" stop-color="#6db4e2"/><stop offset=".6" stop-color="#16405f"/><stop offset="1" stop-color="#08131f"/>
+ </linearGradient>
+ <radialGradient id="engCore" cx=".4" cy=".5" r=".75">
+   <stop offset="0" stop-color="#ffffff"/><stop offset=".3" stop-color="#b8e9ff"/><stop offset=".62" stop-color="#3d8fe0"/><stop offset="1" stop-color="#0a2547"/>
+ </radialGradient>
+ <radialGradient id="engHalo">
+   <stop offset="0" stop-color="#9adcff" stop-opacity=".6"/><stop offset=".5" stop-color="#2f7fd6" stop-opacity=".2"/><stop offset="1" stop-color="#2f7fd6" stop-opacity="0"/>
+ </radialGradient>
+ <linearGradient id="exhG" gradientUnits="userSpaceOnUse" x1="935" y1="0" x2="1185" y2="0">
+   <stop offset="0" stop-color="#ecfbff" stop-opacity=".95"/><stop offset=".22" stop-color="#8fd4ff" stop-opacity=".6"/><stop offset=".55" stop-color="#2f7fd6" stop-opacity=".2"/><stop offset="1" stop-color="#2f7fd6" stop-opacity="0"/>
+ </linearGradient>
+ <radialGradient id="planetG" cx=".32" cy=".3" r="1">
+   <stop offset="0" stop-color="#2b3b4d"/><stop offset=".5" stop-color="#131e2b"/><stop offset="1" stop-color="#05080d"/>
+ </radialGradient>
+ <!-- размытия -->
+ <filter id="b1" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1"/></filter>
+ <filter id="b2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2"/></filter>
+ <filter id="b4" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"/></filter>
+ <filter id="b8" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="8"/></filter>
+ <!-- силуэт корпуса -->
+ <path id="hullP" d="M110 350 L212 318 L258 302 L300 281 L352 271 L398 280 L424 292 L560 288
+   L640 284 L664 222 L698 215 L740 278 L828 288 L878 294 L938 306 L944 330 L928 392 L898 406
+   L762 422 L700 428 L662 468 L616 468 L586 432 L430 448 L300 428 L222 408 Z"/>
+ <g id="spk"><path d="M0 -6.5L1.1 -1.1L6.5 0L1.1 1.1L0 6.5L-1.1 1.1L-6.5 0L-1.1 -1.1Z" fill="#dfeeff"/></g>
+</defs>
+
+<!-- ═══ ФОН ═══ -->
+<rect width="1200" height="675" fill="#05070d"/>
+<rect width="1200" height="675" fill="url(#skyG)"/>
+
+<!-- Туманности с анимацией "дыхания" -->
+<g>
+  <animate attributeName="opacity" values="0.55; 0.65; 0.55" dur="12s" repeatCount="indefinite"/>
+  <ellipse cx="860" cy="150" rx="330" ry="150" fill="url(#neb1)"/>
+</g>
+<g>
+  <animate attributeName="opacity" values="0.5; 0.6; 0.5" dur="15s" repeatCount="indefinite"/>
+  <ellipse cx="300" cy="540" rx="300" ry="140" fill="url(#neb2)"/>
+</g>
+<ellipse cx="520" cy="340" rx="420" ry="180" fill="url(#neb1)" opacity=".2"/>
+
+<!-- Звёзды (статичные + мерцающие) -->
+<g fill="#cfe2f5">
+  <circle cx="80" cy="60" r=".9"/> 
+  <circle cx="240" cy="40" r=".7"/> 
+  <circle cx="420" cy="60" r=".8"/>
+  <circle cx="520" cy="110" r=".9"/> 
+  <circle cx="610" cy="40" r="1.1"/> 
+  <circle cx="700" cy="80" r=".7"/>
+  <circle cx="760" cy="160" r="1"/> 
+  <circle cx="860" cy="60" r=".9"/> 
+  <circle cx="1030" cy="90" r=".8"/>
+  <circle cx="1120" cy="150" r="1"/> 
+  <circle cx="1160" cy="60" r=".7"/> 
+  <circle cx="1150" cy="260" r=".9"/>
+  <circle cx="1080" cy="330" r=".8"/> 
+  <circle cx="1140" cy="430" r="1.1"/> 
+  <circle cx="60" cy="180" r="1"/>
+  <circle cx="130" cy="260" r=".7"/> 
+  <circle cx="40" cy="320" r=".9"/> 
+  <circle cx="170" cy="420" r=".8"/>
+  <circle cx="90" cy="520" r="1.1"/> 
+  <circle cx="200" cy="560" r=".7"/> 
+  <circle cx="300" cy="610" r=".9"/>
+  <circle cx="420" cy="590" r="1"/> 
+  <circle cx="540" cy="630" r=".7"/> 
+  <circle cx="780" cy="620" r="1.1"/>
+  <circle cx="900" cy="300" r=".7"/> 
+  <circle cx="830" cy="240" r=".8"/> 
+  <circle cx="600" cy="180" r=".7"/>
+  <circle cx="450" cy="160" r="1"/> 
+  <circle cx="350" cy="200" r=".8"/> 
+  <circle cx="250" cy="150" r=".9"/>
+  <circle cx="40" cy="90" r=".8"/> 
+  <circle cx="1110" cy="540" r=".9"/> 
+  <circle cx="760" cy="520" r=".7"/>
+  
+  <!-- Мерцающие звёзды -->
+  <circle cx="150" cy="80" r="1.2" fill="#fff">
+    <animate attributeName="opacity" values="0.3; 1; 0.3" dur="3.2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="980" cy="400" r="1" fill="#fff">
+    <animate attributeName="opacity" values="0.4; 1; 0.4" dur="4.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="500" cy="500" r="1.3" fill="#fff">
+    <animate attributeName="opacity" values="0.2; 0.9; 0.2" dur="2.8s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="800" cy="100" r="0.9" fill="#fff">
+    <animate attributeName="opacity" values="0.5; 1; 0.5" dur="5.1s" repeatCount="indefinite"/>
+  </circle>
+</g>
+
+<!-- Яркие звёзды с ореолом -->
+<g>
+  <circle cx="330" cy="90" r="2.4" fill="#dceeff" opacity=".85" filter="url(#b2)"/> 
+  <circle cx="330" cy="90" r="1.1" fill="#fff">
+    <animate attributeName="opacity" values="0.8; 1; 0.8" dur="4s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="940" cy="120" r="2.4" fill="#dceeff" opacity=".85" filter="url(#b2)"/> 
+  <circle cx="940" cy="120" r="1.1" fill="#fff">
+    <animate attributeName="opacity" values="0.7; 1; 0.7" dur="3.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="660" cy="600" r="2" fill="#dceeff" opacity=".8" filter="url(#b2)"/>
+</g>
+
+<use href="#spk" transform="translate(330 90)" opacity=".9"/>
+<use href="#spk" transform="translate(940 120) scale(1.2)" opacity=".95"/>
+<use href="#spk" transform="translate(660 600) scale(.8)" opacity=".7"/>
+<use href="#spk" transform="translate(1080 330) scale(.7)" opacity=".6"/>
+
+<!-- далёкое солнце с анимацией -->
+<g>
+  <!-- Пульсация основного свечения -->
+  <circle cx="150" cy="120" r="130" fill="url(#sunG)">
+    <animate attributeName="r" values="130; 138; 130" dur="6s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1"/>
+    <animate attributeName="opacity" values="1; 0.85; 1" dur="6s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1"/>
+  </circle>
+  
+  <!-- Вращающиеся лучи/корона -->
+  <g>
+    <animateTransform attributeName="transform" type="rotate" from="0 150 120" to="360 150 120" dur="45s" repeatCount="indefinite"/>
+    <rect x="148" y="70" width="4" height="100" fill="#fff" opacity=".45" filter="url(#b1)"/>
+    <rect x="100" y="118" width="100" height="4" fill="#fff" opacity=".28" filter="url(#b1)"/>
+    <rect x="120" y="90" width="60" height="60" fill="#fff" opacity=".1" filter="url(#b2)" transform="rotate(45 150 120)"/>
+  </g>
+  
+  <circle cx="150" cy="120" r="10" fill="#fff8ec">
+    <animate attributeName="r" values="10; 11.5; 10" dur="3s" repeatCount="indefinite"/>
+  </circle>
+</g>
+
+<!-- планета в нижнем правом углу -->
+<g>
+  <circle cx="1020" cy="565" r="121" fill="none" stroke="#7fb2d8" stroke-width="4" opacity=".1" filter="url(#b2)"/>
+  <circle cx="1020" cy="565" r="120" fill="url(#planetG)"/>
+  <circle cx="1034" cy="579" r="120" fill="#05070d"/> <!-- терминатор -->
+</g>
+
+<!-- линии скорости (лёгкая анимация смещения) -->
+<g stroke="#9fc3e8" fill="none" opacity="0.15">
+  <path d="M40 636 262 628" stroke-width="1.3">
+    <animate attributeName="stroke-dasharray" values="0, 200; 200, 0" dur="2s" repeatCount="indefinite"/>
+  </path>
+  <path d="M320 658 568 650" stroke-width="1.3">
+    <animate attributeName="stroke-dasharray" values="0, 200; 200, 0" dur="2.3s" repeatCount="indefinite"/>
+  </path>
+  <path d="M710 646 980 640" stroke-width="1.3">
+    <animate attributeName="stroke-dasharray" values="0, 200; 200, 0" dur="1.8s" repeatCount="indefinite"/>
+  </path>
+</g>
+
+<!-- ═══ КОРАБЛЬ (Обёртка для эффекта невесомости) ═══ -->
+<g>
+  <animateTransform attributeName="transform" type="translate" values="0,0; 0,-3; 0,0" dur="6s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1"/>
+  
+  <g transform="rotate(-3 520 350)">
+    <!-- Ambient glow двигателей позади корпуса -->
+    <ellipse cx="965" cy="352" rx="150" ry="95" fill="url(#engHalo)" opacity=".55">
+      <animate attributeName="opacity" values="0.55; 0.7; 0.55" dur="2s" repeatCount="indefinite"/>
+    </ellipse>
+
+    <!-- дальний киль (за корпусом) -->
+    <path d="M560 287 L584 236 L606 233 L627 286 Z" fill="url(#farFinG)"/>
+    <path d="M560 287 L584 236 L606 233" fill="none" stroke="#67737f" stroke-width=".6" opacity=".5"/>
+    
+    <!-- корпус: тон + тёплая засветка + контур -->
+    <use href="#hullP" fill="url(#hullG)"/>
+    <use href="#hullP" fill="url(#warm)"/>
+    <use href="#hullP" fill="none" stroke="#03050a" stroke-width="1.5" opacity=".8"/>
+    
+    <!-- световые пояса: палуба и брюхо -->
+    <path d="M110 350 L212 318 L258 302 L300 281 L352 271 L398 280 L424 292 L560 288 L640 284
+             L640 293 L424 301 L302 290 L260 311 L214 327 Z" fill="url(#deckG)" opacity=".95"/>
+    <path d="M740 278 L828 288 L878 294 L938 306 L934 315 L876 303 L826 297 L742 287 Z" fill="url(#deckG)" opacity=".9"/>
+    <path d="M586 432 L430 448 L300 428 L222 408 L234 400 L306 419 L432 439 L584 424 Z" fill="url(#bellyG)"/>
+    <path d="M928 392 L898 406 L762 422 L700 428 L706 419 L764 413 L896 397 L920 384 Z" fill="url(#bellyG)"/>
+    
+    <!-- глубина: тень под надстройкой кабины, грязь, копоть от двигателей -->
+    <path d="M268 306 L424 298 L432 332 L276 344 Z" fill="#000" opacity=".15" filter="url(#b4)"/>
+    <ellipse cx="600" cy="330" rx="160" ry="40" fill="#000" opacity=".1" filter="url(#b8)"/>
+    <ellipse cx="860" cy="360" rx="70" ry="45" fill="#000" opacity=".22" filter="url(#b8)"/>
+    <ellipse cx="880" cy="404" rx="60" ry="10" fill="#2f7fd6" opacity=".12" filter="url(#b4)"/>
+    
+    <!-- циановая подсветка от двигателей на кормовом блоке -->
+    <path d="M878 294 L938 306 L944 330 L928 392 L898 406 L878 398 Z" fill="url(#cyanW)"/>
+    
+    <!-- швы панелей -->
+    <g fill="none" stroke="#04060a" stroke-width="1.2" opacity=".55">
+      <path d="M258 306 265 350"/><path d="M424 296 432 352"/><path d="M560 292 566 358"/>
+      <path d="M700 286 706 368"/><path d="M745 282 752 382"/><path d="M835 292 840 398"/>
+      <path d="M250 354 432 351 566 357 700 367 752 377 840 392 926 398"/>
+      <path d="M300 424 430 442 586 426 700 420 762 416 896 400"/>
+      <path d="M878 296 878 398"/><path d="M884 330 884 360"/><path d="M890 332 890 362"/>
+    </g>
+    <path d="M250 355.5 432 352.5 566 358.5 700 368.5 752 378.5 840 393.5" fill="none" stroke="#93a1b0" stroke-width=".6" opacity=".28"/>
+    
+    <!-- гребли: люки, решётки, обтекатели -->
+    <g stroke="#0b0f14" stroke-width=".6">
+      <rect x="445" y="298" width="28" height="11" rx="1" fill="#1d242c"/>
+      <rect x="612" y="292" width="22" height="9" rx="1" fill="#1d242c"/>
+      <rect x="888" y="302" width="44" height="13" fill="#10151b" stroke="#2a333d"/>
+      <rect x="452" y="414" width="46" height="10" fill="#0f141a" stroke="#262e37"/>
+      <rect x="506" y="411" width="30" height="9" fill="#0f141a" stroke="#262e37"/>
+      <rect x="700" y="404" width="28" height="9" fill="#0f141a" stroke="#262e37"/>
+      <rect x="736" y="402" width="18" height="8" fill="#0f141a" stroke="#262e37"/>
+    </g>
+    <path d="M892 306 928 306 M892 310 928 310" stroke="#39434d" stroke-width="1" fill="none"/>
+    <ellipse cx="188" cy="327" rx="9" ry="4" fill="#39424c" stroke="#0b0f14" stroke-width=".6"/>
+    <path d="M545 289 545 284" stroke="#55606b" fill="none"/>
+    <circle cx="545" cy="282" r="4.6" fill="#39424c" stroke="#0b0f14" stroke-width=".6"/>
+    <circle cx="543.5" cy="280.5" r="1.4" fill="#9fb0bf" opacity=".7"/>
+    <circle cx="585" cy="332" r="7.5" fill="#232a33" stroke="#0c1016" stroke-width="1.5"/>
+    <circle cx="585" cy="332" r="2" fill="#57e9ff" opacity=".55">
+      <animate attributeName="opacity" values="0.55; 0.8; 0.55" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- надстройка на кормовой палубе -->
+    <path d="M782 270 L828 279 L824 290 L778 281 Z" fill="url(#deckG)" stroke="#0b0f14" stroke-width=".8"/>
+    <path d="M782 270 828 279" stroke="#9aa8b6" stroke-width=".9" opacity=".5" fill="none"/>
+    
+    <!-- тень и главный киль с радиатором -->
+    <ellipse cx="690" cy="285" rx="56" ry="7" fill="#000" opacity=".35" filter="url(#b4)"/>
+    <path d="M640 284 L664 222 L698 215 L740 278 Z" fill="url(#finG)"/>
+    <g stroke="#ffb454" stroke-width="1.1" opacity=".45" filter="url(#b1)" fill="none">
+      <path d="M666 247 690 245"/><path d="M663 259 687 257"/><path d="M660 271 684 269"/>
+    </g>
+    <path d="M640 284 664 222 698 215" fill="none" stroke="url(#rimG)" stroke-width="2"/>
+    <path d="M698 215 740 278" fill="none" stroke="#05070a" stroke-width="1.5"/>
+    <path d="M586 432 616 468" fill="none" stroke="#6b7887" stroke-width="1" opacity=".4"/>
+    <path d="M616 468 662 468" fill="none" stroke="#04070a" stroke-width="1.5" opacity=".8"/>
+    <circle cx="639" cy="469" r="1.5" fill="#57e9ff" opacity=".8"/>
+    
+    <!-- кабина -->
+    <path d="M270 299 L300 281 L352 271 L398 280 L420 291 L415 296 L356 288 L306 293 L279 304 Z"
+          fill="url(#canopyG)" stroke="#0a0f15" stroke-width="1.8"/>
+    <path d="M310 292 305 283 M390 288 395 282" stroke="#0a0f15" stroke-width="1.6" fill="none"/>
+    <path d="M344 286 a5 5 0 0 1 10 0 l0 3 a5 3 0 0 1 -10 0 Z" fill="#0b1622" opacity=".9"/>
+    <ellipse cx="352" cy="293" rx="30" ry="4.5" fill="#7fd8ff" opacity=".16" filter="url(#b2)"/>
+    <path d="M298 293 L320 282 L327 283 L305 294 Z" fill="#fff" opacity=".3"/>
+    <path d="M336 291 L352 283 L356 284 L340 292 Z" fill="#fff" opacity=".18"/>
+    <path d="M272 298 302 282" stroke="#dff2ff" stroke-width="1" opacity=".5" filter="url(#b1)" fill="none"/>
+    
+    <!-- рим-лайт от солнца -->
+    <path d="M110 350 L212 318 L258 302 L300 281 L352 271 L398 280 L424 292 L560 288 L640 284"
+          fill="none" stroke="url(#rimG)" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M110 350 L212 318 L258 302" fill="none" stroke="#fff6e6" stroke-width="1" opacity=".85"/>
+    <path d="M742 278 L828 288 L878 294 L938 306" fill="none" stroke="#f2b06a" stroke-width="1.4" opacity=".3"/>
+    <path d="M110 350 222 408" stroke="#ffd9a8" stroke-width="1.2" opacity=".18" fill="none"/>
+    <path d="M938 306 L944 330 L928 392" fill="none" stroke="#8fd6ff" stroke-width="1.4" opacity=".4" filter="url(#b1)"/>
+    
+    <!-- антенны и мигалки -->
+    <path d="M468 290 468 252" stroke="#8a97a5" stroke-width="1" fill="none"/>
+    <path d="M492 290 504 264" stroke="#8a97a5" stroke-width=".8" opacity=".7" fill="none"/>
+    
+    <circle cx="266" cy="362" r="2.4" fill="#ff5d5d" filter="url(#b1)">
+      <animate attributeName="opacity" values=".2;1;.2" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="468" cy="250" r="1.8" fill="#ff5d5d">
+      <animate attributeName="opacity" values=".15;1;.15" dur="2.4s" repeatCount="indefinite"/>
+    </circle>
+    <g stroke="#fff" stroke-width="1.3" filter="url(#b1)">
+      <path d="M698 205 698 227"/><path d="M687 216 709 216"/>
+      <animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;.88;.92;.96;1" dur="4.5s" repeatCount="indefinite"/>
+    </g>
+    
+    <!-- RCS у носа -->
+    <path d="M246 331 L230 326 L231 335 Z" fill="#9fe8ff" opacity=".4" filter="url(#b2)"/>
+    
+    <!-- циановые контурные огни -->
+    <g filter="url(#b1)">
+      <rect x="886" y="318" width="42" height="2.6" fill="#57e9ff" opacity=".8">
+        <animate attributeName="opacity" values="0.8; 0.4; 0.8" dur="3s" repeatCount="indefinite"/>
+      </rect>
+      <circle cx="470" cy="296" r="1.4" fill="#57e9ff" opacity=".8"/>
+      <circle cx="494" cy="297" r="1.2" fill="#57e9ff" opacity=".8"/>
+      <circle cx="708" cy="373" r="1.5" fill="#57e9ff" opacity=".85"/>
+      <circle cx="718" cy="374" r="1.5" fill="#57e9ff" opacity=".85"/>
+      <circle cx="728" cy="375" r="1.5" fill="#57e9ff" opacity=".85"/>
+      <circle cx="738" cy="376" r="1.5" fill="#57e9ff" opacity=".85"/>
+    </g>
+    
+    <!-- опознавательные знаки -->
+    <path d="M290 376 L318 364 L318 388 Z" fill="#0d141b" stroke="#57e9ff" stroke-width="1" opacity=".9"/>
+    <path d="M296 376 L312 369 L312 383 Z" fill="#57e9ff" opacity=".35"/>
+    <text x="472" y="386" font-family="Arial, sans-serif" font-size="12.5" letter-spacing="4" fill="#b9c6d4" opacity=".5">ЗВЁЗДНЫЙ СТРАННИК</text>
+    <text x="473" y="399" font-family="Arial, sans-serif" font-size="7.5" letter-spacing="2.4" fill="#8fa0b0" opacity=".45">SRV-7742-IX · DEEP RANGE SURVEYOR</text>
+    
+    <!-- ═══ СОПЛА И ВЫХЛОП (Улучшенная анимация) ═══ -->
+    <g>
+      <!-- Верхнее сопло -->
+      <g>
+        <path d="M940 320 L1180 334 L1180 346 L940 356 Z" fill="url(#exhG)" filter="url(#b4)">
+          <animate attributeName="opacity" values="0.85; 0.95; 0.8; 0.9; 0.85" dur="0.8s" repeatCount="indefinite"/>
+        </path>
+        <path d="M940 329 L1080 338 L1080 342 L940 351 Z" fill="#dff4ff" opacity=".9" filter="url(#b2)">
+          <animate attributeName="opacity" values="0.9; 0.7; 0.95; 0.9" dur="0.6s" repeatCount="indefinite"/>
+        </path>
+      </g>
+      <!-- Нижнее сопло -->
+      <g>
+        <path d="M936 372 L1110 382 L1110 390 L936 395 Z" fill="url(#exhG)" opacity=".85" filter="url(#b4)">
+          <animate attributeName="opacity" values="0.85; 0.75; 0.9; 0.85" dur="0.9s" repeatCount="indefinite"/>
+        </path>
+        <path d="M936 377 L1040 383 L1040 387 L936 390 Z" fill="#dff4ff" opacity=".8" filter="url(#b2)">
+          <animate attributeName="opacity" values="0.8; 0.6; 0.85; 0.8" dur="0.7s" repeatCount="indefinite"/>
+        </path>
+      </g>
+      
+      <!-- Аура вокруг сопел -->
+      <ellipse cx="940" cy="338" rx="34" ry="40" fill="url(#engHalo)" opacity=".8" filter="url(#b4)">
+        <animate attributeName="rx" values="34; 37; 33; 34" dur="1.2s" repeatCount="indefinite"/>
+        <animate attributeName="ry" values="40; 43; 39; 40" dur="1.2s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="934" cy="381" rx="24" ry="28" fill="url(#engHalo)" opacity=".6" filter="url(#b4)">
+        <animate attributeName="rx" values="24; 26; 23; 24" dur="1.0s" repeatCount="indefinite"/>
+      </ellipse>
+      
+      <!-- Ядра двигателей -->
+      <ellipse cx="933" cy="338" rx="15" ry="23" fill="#05070a" stroke="#4a5560" stroke-width="2"/>
+      <ellipse cx="933" cy="338" rx="11" ry="18" fill="url(#engCore)">
+        <animate attributeName="opacity" values="1; 0.85; 1" dur="0.4s" repeatCount="indefinite"/>
+      </ellipse>
+      <circle cx="922" cy="322" r="1.5" fill="#fff" opacity=".8">
+        <animate attributeName="opacity" values="0.8; 0.4; 0.8" dur="0.5s" repeatCount="indefinite"/>
+      </circle>
+      
+      <ellipse cx="926" cy="381" rx="11" ry="15" fill="#05070a" stroke="#3d4750" stroke-width="1.6"/>
+      <ellipse cx="926" cy="381" rx="7.5" ry="11" fill="url(#engCore)">
+        <animate attributeName="opacity" values="1; 0.8; 1" dur="0.5s" repeatCount="indefinite"/>
+      </ellipse>
+    </g>
+  </g>
+</g>
+
+<!-- виньетка -->
+<rect width="1200" height="675" fill="url(#vig)"/>
+</svg>

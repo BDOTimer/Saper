@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400">
+  <defs>
+    <!-- Градиент для свечения двигателей -->
+    <radialGradient id="engineGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="1" />
+      <stop offset="60%" stop-color="#0088ff" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#00e5ff" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Градиент для корпуса -->
+    <linearGradient id="hullGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a5568" />
+      <stop offset="50%" stop-color="#2d3748" />
+      <stop offset="100%" stop-color="#1a202c" />
+    </linearGradient>
+
+    <!-- Градиент для носа -->
+    <linearGradient id="noseGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5a6a7a" />
+      <stop offset="100%" stop-color="#2a3444" />
+    </linearGradient>
+
+    <!-- Градиент для стекла кабины -->
+    <linearGradient id="canopyGlass" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.45" />
+      <stop offset="50%" stop-color="#0066aa" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#0a1a2a" stop-opacity="0.9" />
+    </linearGradient>
+
+    <!-- Градиент для солнца -->
+    <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff8e1" stop-opacity="1" />
+      <stop offset="35%" stop-color="#ffcc80" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#ffcc80" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Фильтр свечения -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Фильтр сильного свечения для двигателей -->
+    <filter id="strongGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- СОЛНЦЕ -->
+  <g>
+    <circle cx="120" cy="90" r="65" fill="url(#sunGlow)">
+      <animate attributeName="r" values="60;70;60" dur="6s" repeatCount="indefinite" />
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="6s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="120" cy="90" r="9" fill="#ffffff" filter="url(#glow)">
+      <animate attributeName="r" values="8;10;8" dur="4s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <!-- ЗВЁЗДЫ -->
+  <g fill="#ffffff">
+    <circle cx="280" cy="60" r="1.5">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="3s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="450" cy="40" r="1">
+      <animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="600" cy="80" r="1.8">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="4s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="720" cy="50" r="1.2">
+      <animate attributeName="opacity" values="0.3;0.9;0.3" dur="3.2s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="180" cy="320" r="1.4">
+      <animate attributeName="opacity" values="0.8;0.2;0.8" dur="3.8s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="680" cy="330" r="1">
+      <animate attributeName="opacity" values="0.4;1;0.4" dur="2.8s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="350" cy="360" r="1.6">
+      <animate attributeName="opacity" values="0.2;0.9;0.2" dur="4.5s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <!-- КОСМИЧЕСКИЙ КОРАБЛЬ "КОБРА МК-1" -->
+  <g transform="translate(400, 210)">
+    <animateTransform attributeName="transform" type="translate" values="400,210; 400,205; 400,210; 400,215; 400,210" dur="6s" repeatCount="indefinite" />
+
+    <g transform="rotate(-8)">
+      <!-- ЗАДНИЕ ДВИГАТЕЛИ -->
+      <g>
+        <ellipse cx="-55" cy="20" rx="14" ry="8" fill="#0a1a2a" stroke="#00e5ff" stroke-width="1.5" />
+        <ellipse cx="-55" cy="20" rx="10" ry="5" fill="#00e5ff" filter="url(#strongGlow)">
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="0.6s" repeatCount="indefinite" />
+        </ellipse>
+
+        <ellipse cx="55" cy="20" rx="14" ry="8" fill="#0a1a2a" stroke="#00e5ff" stroke-width="1.5" />
+        <ellipse cx="55" cy="20" rx="10" ry="5" fill="#00e5ff" filter="url(#strongGlow)">
+          <animate attributeName="opacity" values="1;0.6;1" dur="0.6s" repeatCount="indefinite" />
+        </ellipse>
+      </g>
+
+      <!-- КРЫЛЬЯ -->
+      <polygon points="-40,-10 -130,30 -110,50 -30,25" fill="url(#hullGradient)" stroke="#4a5568" stroke-width="1.2" />
+      <polygon points="40,-10 130,30 110,50 30,25" fill="url(#hullGradient)" stroke="#4a5568" stroke-width="1.2" />
+
+      <!-- Кончики крыльев -->
+      <polygon points="-130,30 -120,35 -125,45 -135,40" fill="#00e5ff" opacity="0.7">
+        <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2s" repeatCount="indefinite" />
+      </polygon>
+      <polygon points="130,30 120,35 125,45 135,40" fill="#00e5ff" opacity="0.7">
+        <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite" />
+      </polygon>
+
+      <!-- ЦЕНТРАЛЬНЫЙ КОРПУС -->
+      <rect x="-35" y="-5" width="70" height="30" rx="3" fill="#1a202c" stroke="#3a4a5c" stroke-width="1" />
+      <polygon points="-30,-10 -20,-50 20,-50 30,-10" fill="url(#hullGradient)" stroke="#4a5568" stroke-width="1.2" />
+
+      <!-- НОС -->
+      <polygon points="-20,-50 0,-110 20,-50" fill="url(#noseGradient)" stroke="#5a6a7a" stroke-width="1.2" />
+      <polygon points="-10,-55 0,-95 10,-55" fill="#0a0f18" opacity="0.8" />
+
+      <!-- ================= КАБИНА ПИЛОТА ================= -->
+      <g>
+        <!-- Основание кабины (тёмный каркас) -->
+        <polygon points="-14,-44 0,-72 14,-44" fill="#0a0f18" stroke="#2a3444" stroke-width="1.5" />
+
+        <!-- Стеклянный купол кабины -->
+        <polygon points="-12,-45 0,-70 12,-45" fill="url(#canopyGlass)" stroke="#00e5ff" stroke-width="1.2">
+          <animate attributeName="opacity" values="0.9;1;0.9" dur="4s" repeatCount="indefinite" />
+        </polygon>
+
+        <!-- Блик на стекле -->
+        <polygon points="-8,-48 -3,-62 -1,-48" fill="#ffffff" opacity="0.25">
+          <animate attributeName="opacity" values="0.15;0.4;0.15" dur="5s" repeatCount="indefinite" />
+        </polygon>
+
+        <!-- ПИЛОТ В КАБИНЕ -->
+        <!-- Кресло пилота -->
+        <polygon points="-6,-50 -8,-58 8,-58 6,-50" fill="#1a202c" stroke="#3a4a5c" stroke-width="0.6" />
+
+        <!-- Тело пилота (скафандр) -->
+        <ellipse cx="0" cy="-55" rx="4" ry="5" fill="#2d3748" stroke="#4a5568" stroke-width="0.5" />
+
+        <!-- Шлем пилота -->
+        <circle cx="0" cy="-61" r="3.2" fill="#3a4a5c" stroke="#5a6a7a" stroke-width="0.6" />
+
+        <!-- Визор шлема (светится) -->
+        <ellipse cx="0" cy="-61" rx="2.2" ry="1.6" fill="#00e5ff" opacity="0.9" filter="url(#glow)">
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+        </ellipse>
+
+        <!-- Отражение визора на стекле -->
+        <ellipse cx="0" cy="-61" rx="3" ry="2.2" fill="none" stroke="#00e5ff" stroke-width="0.4" opacity="0.5">
+          <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite" />
+        </ellipse>
+
+        <!-- Ремни безопасности / детали скафандра -->
+        <line x1="-3" y1="-57" x2="-3" y2="-52" stroke="#4a5568" stroke-width="0.5" />
+        <line x1="3" y1="-57" x2="3" y2="-52" stroke="#4a5568" stroke-width="0.5" />
+      </g>
+      <!-- ================= КОНЕЦ КАБИНЫ ================= -->
+
+      <!-- ДЕТАЛИ КОРПУСА -->
+      <line x1="0" y1="-95" x2="0" y2="-72" stroke="#5a6a7a" stroke-width="0.8" opacity="0.6" />
+
+      <rect x="-25" y="-30" width="10" height="15" fill="#1a202c" stroke="#3a4a5c" stroke-width="0.8" />
+      <rect x="15" y="-30" width="10" height="15" fill="#1a202c" stroke="#3a4a5c" stroke-width="0.8" />
+
+      <!-- Огни на корпусе -->
+      <circle cx="-22" cy="-15" r="1.5" fill="#ff3333">
+        <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="22" cy="-15" r="1.5" fill="#33ff33">
+        <animate attributeName="opacity" values="0.2;1;0.2" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+
+      <!-- Антенна -->
+      <line x1="0" y1="-95" x2="0" y2="-105" stroke="#5a6a7a" stroke-width="0.8" />
+      <circle cx="0" cy="-105" r="1.5" fill="#ff3333">
+        <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite" />
+      </circle>
+    </g>
+  </g>
+
+  <!-- НАДПИСЬ -->
+  <text x="400" y="380" font-family="monospace" font-size="14" fill="#00e5ff" opacity="0.8" text-anchor="middle" letter-spacing="4">
+    ELITE
+  </text>
+</svg>
