@@ -262,6 +262,7 @@
         }
 
         var btnContinue = document.getElementById("btn-continue");
+        
         if (hasSave()) {
           btnContinue.classList.remove("is-disabled");
           btnContinue.removeAttribute("aria-disabled");
@@ -289,10 +290,14 @@
         }
 
         function exitFs() {
-          if (document.exitFullscreen) return document.exitFullscreen();
+          if (document.exitFullscreen)
+            return document.exitFullscreen();
+
           if (document.webkitExitFullscreen)
             return document.webkitExitFullscreen();
-          if (document.msExitFullscreen) return document.msExitFullscreen();
+
+          if (document.msExitFullscreen) 
+            return document.msExitFullscreen();
         }
 
         btnFs.addEventListener("click", function () {
@@ -316,7 +321,18 @@
             document.addEventListener(evt, updateFsLabel);
           }
         );
+
+   /* ---------- НОВАЯ ИГРА в новом окне ---------- */
+    var btnNew = document.querySelector('.menu-btn[data-action="new"]');
+    if (btnNew) {
+      btnNew.addEventListener("click", function (e) {
+        e.preventDefault();
+        window.open('game-j.html', '_blank');
+      });
+    }
+        
       })();
+
     </script>
   </body>
 </html>
