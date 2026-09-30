@@ -573,37 +573,40 @@ function upHero(entry) {
  * ============================================================ */
 function dedupe() {
   var list = load();
-  var map  = Object.create(null); // name -> лучшая запись
 
-  list.forEach(function (row) {
-    var key = String(row.name || "ANONYMOUS").trim().toUpperCase();
-    var cur = map[key];
+  var map = new Map(); // name -> row
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    var rawName = r.name;
+    var name = (rawName == null || String(rawName).trim() === "")
+      ? "ANONYMOUS"
+      : String(rawName).trim().toUpperCase();
 
-    if (!cur) { map[key] = row; return; }
+    var row = {
+      name:  name,
+      score: Number(r.score) || 0,
+      rank:  String(r.rank || "HARMLESS").slice(0, 24),
+      date:  String(r.date || "")
+    };
 
-    var aScore = +cur.score || 0;
-    var bScore = +row.score || 0;
-
-    if (bScore > aScore) {
-      map[key] = row;
-    } else if (bScore === aScore) {
-      // при равенстве — берём ту, у которой дата больше (свежее)
-      var aDate = String(cur.date || "");
-      var bDate = String(row.date || "");
-      if (bDate > aDate) map[key] = row;
+    var cur = map.get(name);
+    if (!cur) { map.set(name, row); continue; }
+    if (row.score > cur.score) { map.set(name, row); continue; }
+    // при равенстве score — свежее по дате
+    if (row.score === cur.score && row.date > cur.date) {
+      map.set(name, row);
     }
-  });
+  }
 
-  // map -> массив, сортировка по score desc
-  var result = Object.keys(map).map(function (k) { return map[k]; });
-  result.sort(function (a, b) { return (+b.score || 0) - (+a.score || 0); });
+  var result = Array.from(map.values());
+  result.sort(function (a, b) { return b.score - a.score; });
 
   var removed = list.length - result.length;
   save(result);
 
   if (overlay && overlay.classList.contains("is-open")) renderRows();
 
-  return { removed: removed, total: result.length };
+  return { removed: removed, total: result.length, data: result };
 }
 
 window.HeroesList = {
