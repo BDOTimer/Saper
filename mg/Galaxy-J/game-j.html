@@ -2,7 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <title>Elite Remake — Prototype v2</title>
+    <title>Galaxy-J — Prototype v2</title>
     <link
       rel="icon"
       type="image/png"
@@ -216,6 +216,10 @@
       }
     </script>
 
+    <!-- Общие глобальный Набор Функций -->
+    <script src="./js/foos.js"></script>
+    <script src="./person/storage.js"></script>
+
     <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
     <script src="./galaxy/universe.js"></script>
     <script src="./galaxy/galaxy.js"></script>
@@ -237,6 +241,12 @@
       import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
       import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+      ///---------------------------------------|
+      /// Слот-0 для сейвера.                   |
+      ///---------------------------------------|
+      const  STORAGE_Slot_0  = new StorageSlot("asd");
+  /// window.STORAGE_Slot_0 = STORAGE_Slot_0; // Делаем глобальным
 
       ///---------------------------------------|
       /// Сид для всей Вселенной.               |

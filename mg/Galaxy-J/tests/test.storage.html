@@ -1,3 +1,7 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Storage test</title></head>
+
 <body>
 
 <div id="storage-status-v1" style="
@@ -20,7 +24,16 @@
     </label>
 </div>
 
+<div style="padding: 10px 14px; display: flex; gap: 8px;">
+    <button id="btn-load">▶ Загрузить</button>
+    <button id="btn-save">💾 Сохранить</button>
+    <button id="btn-delete">🗑 Удалить</button>
+</div>
+
 <pre id="out"></pre>
+
+<!-- Общие глобальный Набор Функций -->
+<script src="../js/foos.js"></script>
 
 <script src="../person/storage.js"></script>
 <script>
@@ -43,7 +56,7 @@ const setStatus_v2 = (text, color) => {
     el.appendChild(document.createElement('br')); // перенос строки
 };
 
-if(PlayerStateStorageSlot.checkAvailable)
+if(StorageSlot.checkAvailable)
 {   setStatus_v2('✓ БРАУЗЕР ХРАНИТ ВАШИ СЕЙВЫ ...\n', 'green');
     setStatus_v2('✗ ...', 'red');
 }
@@ -55,7 +68,7 @@ const nameInput = document.getElementById('hero-name');
 
 //const storageKey = 'test-player';
 //const STORAGE = new PlayerStateStorageOnce(storageKey);
-const  STORAGE = new PlayerStateStorageSlot();
+const  STORAGE = new StorageSlot();
 window.STORAGE = STORAGE; // Делаем глобальным
 
 // Автозагрузка при открытии страницы (если сохранение есть)
@@ -66,6 +79,16 @@ if (initial && initial.name) {
 } else {
     log('Сохранения нет, начинаем с чистого листа');
 }
+
+function test()
+{
+    console.log(window.FO.version());
+
+    const rnd = window.FO.math.random();
+    console.log(rnd());
+}
+
+test();
 
 // ====== КНОПКИ ======
 

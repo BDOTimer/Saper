@@ -6,21 +6,25 @@
 // Использование:
 //      <script src="./person/storage.js"></script>
 //      <script>
-//          const  STORAGE = new PlayerStateStorageSlot();
+//          const  STORAGE = new StorageSlot();
 //          window.STORAGE = STORAGE; // Делаем глобальным
 //          ...
 //      </script>
 //-----------------------------------------------------------------------------|
 
-class PlayerStateStorageSlot
+class StorageSlot
 {
-    static keyDefault  = 'default';
+    static keyDefault  = 'saver-';
     static count       = 0;
     static isAvailable = false;
 
     constructor(storageKey = this.constructor.keyDefault)
     {
         this.key = storageKey + this.constructor.count++;
+
+        console.log(`... StorageSlot: ${this.key}`);
+
+    /// this.test();
     }
 
     // -----------------------------------------|
@@ -63,10 +67,10 @@ class PlayerStateStorageSlot
         {   const key = '__test__';
             localStorage.setItem(key, '1');
             localStorage.removeItem(key);
-            PlayerStateStorageSlot.isAvailable = true;
+            StorageSlot.isAvailable = true;
             return true;
         } catch
-        {   PlayerStateStorageSlot.isAvailable = false;
+        {   StorageSlot.isAvailable = false;
             return false;
         }
     }
@@ -78,13 +82,21 @@ class PlayerStateStorageSlot
     {   // Сейчас метод пуст, 
         // но зарезервирован для очистки тяжелых ресурсов.
     }
+
+    test()
+    {
+        console.log(window.FO.version());
+
+        const rnd = window.FO.math.random();
+        console.log(rnd());
+    }
 }
 
 // -----------------------------------------|
 //  Экспорт для Node.js и браузеров
 // -----------------------------------------:
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
-    module.exports = PlayerStateStorage;
+    module.exports = StorageSlot;
 } else {
-    window.PlayerStateStorage = PlayerStateStorage;
+    window.StorageSlot = StorageSlot;
 }
