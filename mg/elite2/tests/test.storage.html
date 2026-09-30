@@ -1,9 +1,16 @@
 <body>
 
-<div id="storage-status" style="
+<div id="storage-status-v1" style="
     padding: 10px 14px;
     font: bold 15px/1.4 monospace;
     border-bottom: 1px solid #ccc;
+"></div>
+
+<div id="storage-status-v2" style="
+    padding: 10px 14px;
+    font: bold 15px/0.6 monospace;
+    border-bottom: 1px solid #ccc;
+    white-space: pre-line;
 "></div>
 
 <div>
@@ -11,12 +18,6 @@
         Имя героя:
         <input type="text" id="hero-name" value="Герой">
     </label>
-</div>
-
-<div style="margin-top: 12px;">
-    <button id="btn-save">СОХРАНИТЬ</button>
-    <button id="btn-load">ЗАГРУЗИТЬ</button>
-    <button id="btn-delete">УДАЛИТЬ СОХРАНЕНИЕ</button>
 </div>
 
 <pre id="out"></pre>
@@ -27,17 +28,27 @@
 const log = (...a) => document.getElementById('out').textContent += a.join(' ') + '\n';
 
 // Функция для статуса сверху
-const setStatus = (text, color) => {
-    const el = document.getElementById('storage-status');
+const setStatus_v1 = (text, color) => {
+    const el = document.getElementById('storage-status-v1');
     el.textContent = text;
     el.style.color = color;
 };
 
+const setStatus_v2 = (text, color) => {
+    const el = document.getElementById('storage-status-v2');
+    const span = document.createElement('span');
+    span.textContent = text;
+    span.style.color = color;
+    el.appendChild(span);
+    el.appendChild(document.createElement('br')); // перенос строки
+};
+
 if(PlayerStateStorageSlot.checkAvailable)
-{   setStatus('✓ БРАУЗЕР ХРАНИТ ВАШИ СЕЙВЫ ...', 'green');
+{   setStatus_v2('✓ БРАУЗЕР ХРАНИТ ВАШИ СЕЙВЫ ...\n', 'green');
+    setStatus_v2('✗ ...', 'red');
 }
 else
-{   setStatus('✗ localStorage НЕДОСТУПЕН — сохранения работать не будут', 'red');
+{   setStatus_v2('✗ localStorage НЕДОСТУПЕН — сохранения работать не будут', 'red');
 }
 
 const nameInput = document.getElementById('hero-name');
