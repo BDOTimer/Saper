@@ -106,7 +106,7 @@ const HELP = (() => {
 
     // заголовок
     const title = document.createElement("div");
-    title.textContent = "ELITE — ПУЛЬТ УПРАВЛЕНИЯ";
+    title.textContent = "GALAXY-J: ПУЛЬТ УПРАВЛЕНИЯ";
     title.style.cssText = `
       text-align: center;
       font-size: 20px;

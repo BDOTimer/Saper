@@ -198,6 +198,65 @@
       padding: clamp(6px, 1.4vh, 9px) clamp(14px, 3.5vw, 16px);
       border-width: 1px;
     }
+
+        /* --- Акцентная кнопка (аналог .winner-screen button) --- */
+    .winner-screen button,
+    .back-btn {
+        padding: 15px 30px;
+        font-size: clamp(16px, 4vw, 20px);
+        background: #a8ff78;
+        color: #0a140a;
+        border: none;
+        cursor: pointer;
+        border-radius: 10px;
+        font-weight: bold;
+        font-family: inherit;
+        box-shadow: 0 0 20px rgba(168, 255, 120, 0.6);
+        text-decoration: none;
+        display: inline-block;
+        letter-spacing: 2px;
+        transition: all 0.2s ease;
+    }
+
+    .winner-screen button:hover,
+    .winner-screen button:focus {
+        background: #c6ff9a;
+        color: #0a140a;
+        box-shadow:
+            0 0 28px rgba(168, 255, 120, 0.85),
+            0 0 60px rgba(168, 255, 120, 0.35);
+        transform: translateY(-2px);
+        outline: none;
+    }
+
+    /* --- Кнопка "Назад" (контурная) --- */
+    .back-btn {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 8px 16px;
+        font-size: clamp(13px, 3vw, 16px);
+        background: rgba(168, 255, 120, 0.15);
+        color: #a8ff78;
+        border: 2px solid #a8ff78;
+        box-shadow: 0 0 12px rgba(168, 255, 120, 0.4);
+        z-index: 25;
+        letter-spacing: 2px;
+    }
+
+    .back-btn:hover,
+    .back-btn:focus {
+        background: rgba(168, 255, 120, 0.28);
+        color: #f4ffe8;
+        box-shadow: 0 0 20px rgba(168, 255, 120, 0.7);
+        outline: none;
+    }
+
+    .back-btn:active {
+        background: rgba(168, 255, 120, 0.55);
+        color: #0a140a;
+        box-shadow: 0 0 26px rgba(168, 255, 120, 0.9);
+    }
     </style>
   </head>
 
@@ -225,7 +284,11 @@
           <span class="arrow">▶</span>
         </a>
 
-        <a href="mg/elite/about.html" class="menu-btn" data-action="about">
+        <a href="mg/elite/about.html" 
+           class="menu-btn" 
+           data-action="about"
+           id="btn-about"
+        >
           <span><span class="num">03</span>ОПИСАНИЕ ИГРЫ</span>
           <span class="arrow">▶</span>
         </a>
@@ -253,6 +316,9 @@
       -->
     </div>
 
+    <a href="../../index.html" class="back-btn">← Меню</a>
+
+    <script src="js/m-note-1.js"></script>
     <script>
       (function () {
         /* ---------- Проверка сохранения (заглушка) ---------- */
@@ -299,6 +365,13 @@
     // }
         
       })();
+
+    // пример: открыть справку по кнопке
+    document.getElementById("btn-about").addEventListener("click",
+      function (e) {
+        e.preventDefault();
+        MNote.show();
+    });
 
     </script>
   </body>
