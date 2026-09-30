@@ -242,6 +242,44 @@
       import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+      function requestFs() {
+          //if (isFullscreen()) return Promise.resolve();
+
+          const e = document.documentElement;
+          let p;
+          if (e.requestFullscreen) p = e.requestFullscreen();
+          else if (e.webkitRequestFullscreen) p = e.webkitRequestFullscreen();
+          else if (e.msRequestFullscreen) p = e.msRequestFullscreen();
+          else return Promise.resolve();
+
+          // webkit возвращает undefined — нормализуем
+          return Promise.resolve(p);
+      }
+
+      function tryFs() {
+        requestFs()
+          .then(function () {
+            // успех — снимаем обработчики
+            removeListeners();
+          })
+          .catch(function () {
+            // не получилось — оставляем обработчики, попробуем на следующем жесте
+          });
+      }
+
+      function removeListeners() {
+        ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
+          function (evt) {
+            document.removeEventListener(evt, tryFs);
+        });
+      }
+
+      // Навешиваем только на реальные жесты
+      ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
+        function (evt) {
+          document.addEventListener(evt, tryFs, { passive: true });
+      });
+
       ///---------------------------------------|
       /// Слот-0 для сейвера.                   |
       ///---------------------------------------|
@@ -300,6 +338,7 @@
         clearTimeout(cursorTimer);
         cursorTimer = setTimeout(hideCursor, 3000);
       }
+      
       ["mousedown", "pointerdown", "touchstart", "keydown", "wheel"].forEach(
         (evt) => document.addEventListener(evt, showCursor, { passive: true }),
       );
