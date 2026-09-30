@@ -1,0 +1,86 @@
+<body>
+
+<div id="storage-status" style="
+    padding: 10px 14px;
+    font: bold 15px/1.4 monospace;
+    border-bottom: 1px solid #ccc;
+"></div>
+
+<div>
+    <label>
+        Имя героя:
+        <input type="text" id="hero-name" value="Герой">
+    </label>
+</div>
+
+<div style="margin-top: 12px;">
+    <button id="btn-save">СОХРАНИТЬ</button>
+    <button id="btn-load">ЗАГРУЗИТЬ</button>
+    <button id="btn-delete">УДАЛИТЬ СОХРАНЕНИЕ</button>
+</div>
+
+<pre id="out"></pre>
+
+<script src="../person/storage.js"></script>
+<script>
+
+const log = (...a) => document.getElementById('out').textContent += a.join(' ') + '\n';
+
+// Функция для статуса сверху
+const setStatus = (text, color) => {
+    const el = document.getElementById('storage-status');
+    el.textContent = text;
+    el.style.color = color;
+};
+
+if(PlayerStateStorageSlot.checkAvailable)
+{   setStatus('✓ БРАУЗЕР ХРАНИТ ВАШИ СЕЙВЫ ...', 'green');
+}
+else
+{   setStatus('✗ localStorage НЕДОСТУПЕН — сохранения работать не будут', 'red');
+}
+
+const nameInput = document.getElementById('hero-name');
+
+//const storageKey = 'test-player';
+//const STORAGE = new PlayerStateStorageOnce(storageKey);
+const  STORAGE = new PlayerStateStorageSlot();
+window.STORAGE = STORAGE; // Делаем глобальным
+
+// Автозагрузка при открытии страницы (если сохранение есть)
+const initial = STORAGE.load();
+if (initial && initial.name) {
+    nameInput.value = initial.name;
+    log('Автозагружено:', JSON.stringify(initial));
+} else {
+    log('Сохранения нет, начинаем с чистого листа');
+}
+
+// ====== КНОПКИ ======
+
+document.getElementById('btn-save').addEventListener('click', () => {
+    const data = {
+        name: nameInput.value.trim() || 'Безымянный',
+        hp: 100,
+        pos: { x: 10, y: 20 },
+        savedAt: Date.now()
+    };
+    STORAGE.save(data);
+    log('▶ СОХРАНИТЬ:', JSON.stringify(data));
+});
+
+document.getElementById('btn-load').addEventListener('click', () => {
+    const data = STORAGE.load();
+    log('▶ ЗАГРУЗИТЬ:', JSON.stringify(data));
+    if (data && data.name) nameInput.value = data.name;
+});
+
+document.getElementById('btn-delete').addEventListener('click', () => {
+    STORAGE.remove();
+    nameInput.value = '';
+    log(`▶ УДАЛИТЬ СОХРАНЕНИЕ: ключ "${STORAGE.getKey()}" удалён`);
+});
+
+</script>
+</body>
+</html>
