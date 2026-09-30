@@ -293,7 +293,11 @@
           <span class="arrow">▶</span>
         </a>
 
-        <a href="mg/elite/scores.html" class="menu-btn" data-action="scores">
+        <a href="mg/elite/scores.html" 
+           class="menu-btn" 
+           data-action="scores"
+           id="btn-scores"
+        >
           <span><span class="num">04</span>РЕКОРД-ЛИСТ</span>
           <span class="arrow">▶</span>
         </a>
@@ -318,9 +322,22 @@
 
     <a href="../../index.html" class="back-btn">← Меню</a>
 
+    <script>
+      window.HEROES_OPTIONS = { maxEntries: 200 };
+    </script>
+
     <script src="js/m-note-1.js"></script>
+    <script src="js/heroes-list.js"></script>
     <script>
       (function () {
+
+        // HeroesList.add({
+        //    name: "Пупкин",
+        //    score: 12500,
+        //    rank: "ELITE",
+        //    date: "2025-01-12"
+        // });
+
         /* ---------- Проверка сохранения (заглушка) ---------- */
         // Замените на реальную проверку: localStorage, IndexedDB и т.п.
         function hasSave() {
@@ -366,13 +383,40 @@
         
       })();
 
-    // пример: открыть справку по кнопке
+    const namePlayer = "Пупкин";
+
+    function updateHeloesList()
+    {
+      const player = HeroesList.getPlayer(namePlayer);
+
+      HeroesList.upHero({
+          name:  player.name    || "ПИЛОТ",
+          score: player.credits || 7,
+          rank:  player.rank    || "HARMLESS",
+          date:  new Date().toISOString().slice(0, 10)
+      });
+    }
+
+    // Об игре
     document.getElementById("btn-about").addEventListener("click",
       function (e) {
         e.preventDefault();
         MNote.show();
     });
 
+    // Таблица Героев
+    document.getElementById("btn-scores").addEventListener("click",
+      function (e) {
+        e.preventDefault();
+
+        updateHeloesList();
+      //HeroesList.dedupe();
+
+        HeroesList.show();
+    });
+
+    // добавить запись после окончания партии:
+    // HeroesList.add({ name: "ВЫ", score: 15200, rank: "COMPETENT" });
     </script>
   </body>
 </html>
