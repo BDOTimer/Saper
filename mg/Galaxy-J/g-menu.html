@@ -322,13 +322,13 @@
       <div class="subtitle">Classic space • ZX SPECTRUM</div>
 
       <div class="menu-buttons">
-        <a href="g-start.html" class="menu-btn" data-action="new" >
+        <a href="g-start-loop.html" class="menu-btn" data-action="new" >
           <span><span class="num">01</span>НОВАЯ ИГРА</span>
           <span class="arrow">▶</span>
         </a>
 
         <a
-          href="mg/elite/g-start.html?continue=1"
+          href="mg/elite/g-start-loop.html?continue=1"
           class="menu-btn is-disabled"
           data-action="continue"
           id="btn-continue"
@@ -383,12 +383,29 @@
     <script src="person/ui-input-name.js"></script>
     <script>
 
-      // Создаём поле ввода имени в правом верхнем углу
-      const uiName = new UIInputName({
-        parent: document.body,
-        offsetTop: 12,
-        offsetRight: 12
-      });
+    // Создаём поле ввода имени в правом верхнем углу
+    const uiName = new UIInputName({
+      parent: document.body,
+      offsetTop: 12,
+      offsetRight: 12,
+
+      // --- сюда приходит НОВОЕ имя игрока ---
+      onApply: function (newName) {
+        console.log("Применено новое имя: ", newName); /// FAIL...
+
+        // например: обновить запись в рекорд-листе
+        if (window.HeroesList) {
+          HeroesList.upHero({
+            name:  newName,
+            score: 0,
+            rank:  "HARMLESS",
+            date:  new Date().toISOString().slice(0, 10)
+          });
+        }
+      }
+    });
+
+    console.log("uiName.namePlayer: ", uiName.namePlayer); // ОК!
 
       (function () {
 
@@ -444,7 +461,7 @@
         
       })();
 
-    const namePlayer = "Пупкин2";
+    const namePlayer = "Вася Пупкин";
 
     function updateHeloesList()
     {
@@ -471,7 +488,7 @@
         e.preventDefault();
 
         updateHeloesList();
-        HeroesList.dedupe();
+      //HeroesList.dedupe();
 
         HeroesList.show();
     });
@@ -484,6 +501,7 @@
 
     // добавить запись после окончания партии:
     // HeroesList.add({ name: "ВЫ", score: 15200, rank: "COMPETENT" });
+    
     </script>
   </body>
 </html>

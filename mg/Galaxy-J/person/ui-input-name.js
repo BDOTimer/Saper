@@ -2,45 +2,70 @@
 /// Отвечает за ввод пользователем его имени.
 /// Используется в модуле g-menu.html
 /// Объект хранит текущее имя игрока внутри localStorage.
-/// После ввода нового имени старое остаётся в localStorage (в истории).
+/// После ввода нового имени старое остаётся в localStorage (в HeroesList).
 /// ---
 /// Графика:
 ///     - рисуется окно ввода.
 ///     - над окном вывода выводится текущее действительное имя.
 ///     - рядом внизу с окном ввода рисуется кнопочка "применить".
 ///     - ширина кнопки и окна ввода совпадают.
-///     - данный ввод находится справа вверху окна g-menu.html
-///     - стиль соответствует стилю g-menu.html
+///     - данный ввод находится справа вверху окна g-menu.html.
+///     - стиль соответствует стилю g-menu.html.
+/// ---
+/// Поведение:
+///     - наличие фокуса ВВОДа.
+///     - при фокусе на ВВОД ИМЯ в окне ВВОДа должно подсвечиваться ярече.
+///     - при потери фокуса ИМЯ в окне ВВОДа должно восстонавливаться 
+///       текущим именем. 
+///     - текущее ИМЯ должно подсвечиваться ярче чем ИМЯ в окне ВВОДа.
+///     - текущее ИМЯ должно иметь анимированную пульсирующую ауру.
+///     - при клике на ПРИМЕНИТЬ должен вызваться коллбэк из  g-menu.html
+///     - в коллбек передаётся новое ИМЯ ИГРОКА.
+///     - UIInputName инициализируется коллбэком в конструкторе.
 
 class UIInputName
 {
     // ---------- Ключи localStorage ----------
     static KEY_CURRENT = "galaxy.player.name";
-    static KEY_HISTORY = "galaxy.player.name.history";
 
     // ---------- Значение по умолчанию ----------
     namePlayer = "Анонимус-1917";
 
+    // ---------- Коллбэк, приходящий снаружи ----------
+    _onApply = null;
+
     // ---------- DOM-ссылки ----------
-    _root      = null;
-    _titleEl   = null;
-    _inputEl   = null;
-    _buttonEl  = null;
+    _root     = null;
+    _titleEl  = null;
+    _inputEl  = null;
+    _buttonEl = null;
+
+    // ---------- id анимации ауры (для destroy) ----------
+    _auraStyleEl = null;
 
     // =========================================================
     //  КОНСТРУКТОР
+    //  options = {
+    //      parent, offsetTop, offsetRight,
+    //      onApply: function(newName) { ... }   // <-- новый параметр
+    //  }
     // =========================================================
     constructor(options = {})
     {
-        // --- родитель (по умолчанию — body) ---
-        this._parent = options.parent || document.body;
+        this._parent      = options.parent      || document.body;
+        this._offsetTop   = options.offsetTop   ?? 12;
+        this._offsetRight = options.offsetRight ?? 12;
 
-        // --- позиция (правый верхний угол) ---
-        this._offsetTop   = options.offsetTop   ?? 12;   // px
-        this._offsetRight = options.offsetRight ?? 12;   // px
+        // --- сохранить коллбэк, если он передан ---
+        if (typeof options.onApply === "function") {
+            this._onApply = options.onApply;
+        }
 
         // --- прочитать сохранённое имя ---
         this._loadFromStorage();
+
+        // --- один раз внедряем keyframes для ауры ---
+        this._injectAuraStyles();
 
         // --- построить интерфейс ---
         this._buildUI();
@@ -73,13 +98,23 @@ class UIInputName
         if (!silent) this._render();
     }
 
+    /** Установить коллбэк «на лету». */
+    setOnApply(fn)
+    {
+        this._onApply = (typeof fn === "function") ? fn : null;
+    }
+
     /** Полностью удалить UI со страницы. */
     destroy()
     {
         if (this._root && this._root.parentNode) {
             this._root.parentNode.removeChild(this._root);
         }
+        if (this._auraStyleEl && this._auraStyleEl.parentNode) {
+            this._auraStyleEl.parentNode.removeChild(this._auraStyleEl);
+        }
         this._root = null;
+        this._auraStyleEl = null;
     }
 
     // =========================================================
@@ -92,9 +127,7 @@ class UIInputName
             if (saved && saved.trim()) {
                 this.namePlayer = saved;
             }
-        } catch (e) {
-            /* приватный режим / отключено — оставляем дефолт */
-        }
+        } catch (e) { /* ignore */ }
     }
 
     _saveCurrent()
@@ -105,20 +138,56 @@ class UIInputName
     }
 
     /** Старое имя уходит в историю, не удаляя текущее. */
-    _pushHistory(name)
+    // _pushHistory(name)
+    // {
+    //     if (!name || !name.trim()) return;
+    //     try {
+    //         const raw = localStorage.getItem(UIInputName.KEY_HISTORY);
+    //         const arr = raw ? JSON.parse(raw) : [];
+    //         arr.push({
+    //             name: name.trim(),
+    //             date: new Date().toISOString()
+    //         });
+    //         while (arr.length > 100) arr.shift();
+    //         localStorage.setItem(UIInputName.KEY_HISTORY, JSON.stringify(arr));
+    //     } catch (e) { /* ignore */ }
+    // }
+
+    // =========================================================
+    //  ВНУТРЕННЕЕ — стили
+    // =========================================================
+
+    /** Один раз добавляет @keyframes для пульсирующей ауры заголовка. */
+    _injectAuraStyles()
     {
-        if (!name || !name.trim()) return;
-        try {
-            const raw = localStorage.getItem(UIInputName.KEY_HISTORY);
-            const arr = raw ? JSON.parse(raw) : [];
-            arr.push({
-                name: name.trim(),
-                date: new Date().toISOString()
-            });
-            // ограничим историю 100 записями
-            while (arr.length > 100) arr.shift();
-            localStorage.setItem(UIInputName.KEY_HISTORY, JSON.stringify(arr));
-        } catch (e) { /* ignore */ }
+        const STYLE_ID = "ui-input-name-aura-styles";
+        if (document.getElementById(STYLE_ID)) {
+            this._auraStyleEl = document.getElementById(STYLE_ID);
+            return;
+        }
+
+        const style = document.createElement("style");
+        style.id = STYLE_ID;
+        style.textContent = `
+            @keyframes ui-input-name-aura {
+                0%, 100% {
+                    text-shadow:
+                        0 0 6px  #d8ffd8,
+                        0 0 12px #a8ff78,
+                        0 0 22px rgba(168, 255, 120, 0.75),
+                        0 0 38px rgba(168, 255, 120, 0.45);
+                }
+                50% {
+                    text-shadow:
+                        0 0 10px #ffffff,
+                        0 0 20px #d8ffd8,
+                        0 0 34px rgba(168, 255, 120, 0.95),
+                        0 0 60px rgba(168, 255, 120, 0.60);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+        this._auraStyleEl = style;
     }
 
     // =========================================================
@@ -129,30 +198,36 @@ class UIInputName
         // --- корневой контейнер ---
         const root = document.createElement("div");
         root.className = "ui-input-name";
-        root.style.position   = "fixed";
-        root.style.top        = this._offsetTop + "px";
-        root.style.right      = this._offsetRight + "px";
-        root.style.zIndex     = "30";
-        root.style.width      = "min(260px, 68vw)";
-        root.style.display    = "flex";
-        root.style.flexDirection = "column";
-        root.style.gap        = "6px";
-        root.style.fontFamily = '"Courier New", monospace';
-        root.style.letterSpacing = "1.5px";
-        root.style.userSelect = "none";
+        Object.assign(root.style, {
+            position:        "fixed",
+            top:             this._offsetTop + "px",
+            right:           this._offsetRight + "px",
+            zIndex:          "30",
+            width:           "min(260px, 68vw)",
+            display:         "flex",
+            flexDirection:   "column",
+            gap:             "6px",
+            fontFamily:      '"Courier New", monospace',
+            letterSpacing:   "1.5px",
+            userSelect:      "none"
+        });
 
-        // ---------- Заголовок (текущее имя) ----------
+        // ---------- Заголовок «текущее имя» ----------
+        //   Ярче, чем поле ввода. Пульсирующая аура.
         const title = document.createElement("div");
         title.className = "ui-input-name__title";
-        title.style.color        = "#eaffd0";
-        title.style.opacity      = "0.75";
-        title.style.fontSize     = "clamp(10px, 2.4vw, 12px)";
-        title.style.textAlign    = "left";
-        title.style.padding      = "0 4px";
-        title.style.textShadow   = "0 0 6px rgba(168,255,120,0.4)";
-        title.style.whiteSpace   = "nowrap";
-        title.style.overflow     = "hidden";
-        title.style.textOverflow = "ellipsis";
+        Object.assign(title.style, {
+            color:           "#f4ffe8",              // ярче, чем #eaffd0
+            fontSize:        "clamp(11px, 2.6vw, 13px)",
+            fontWeight:      "bold",
+            textAlign:       "left",
+            padding:         "0 4px",
+            whiteSpace:      "nowrap",
+            overflow:        "hidden",
+            textOverflow:    "ellipsis",
+            // пульсирующая аура
+            animation:       "ui-input-name-aura 2.2s ease-in-out infinite"
+        });
 
         // ---------- Поле ввода ----------
         const input = document.createElement("input");
@@ -166,18 +241,18 @@ class UIInputName
         Object.assign(input.style, {
             width:           "100%",
             boxSizing:       "border-box",
-            background:      "rgba(168, 255, 120, 0.10)",
-            border:          "2px solid #a8ff78",
+            background:      "rgba(168, 255, 120, 0.08)",  // базовый фон — ТУСКЛЕЕ
+            border:          "2px solid #7fbf5f",          // базовый бордер — ТУСКЛЕЕ
             borderRadius:    "10px",
-            color:           "#eaffd0",
+            color:           "#cfe6b8",                    // текст — ТУСКЛЕЕ текущего имени
             fontFamily:      '"Courier New", monospace',
             fontSize:        "clamp(12px, 3vw, 15px)",
             fontWeight:      "bold",
             letterSpacing:   "2px",
             padding:         "8px 12px",
             outline:         "none",
-            boxShadow:       "0 0 10px rgba(168,255,120,0.35) inset, 0 0 10px rgba(168,255,120,0.25)",
-            transition:      "box-shadow 0.2s ease, background 0.2s ease"
+            boxShadow:       "0 0 6px rgba(168,255,120,0.18) inset",
+            transition:      "box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease"
         });
 
         // ---------- Кнопка "применить" ----------
@@ -185,23 +260,23 @@ class UIInputName
         button.type = "button";
         button.className = "ui-input-name__btn";
         button.textContent = "ПРИМЕНИТЬ";
-        button.style.width = "100%";
-        button.style.boxSizing = "border-box";
-        button.style.background = "rgba(168, 255, 120, 0.15)";
-        button.style.border = "2px solid #a8ff78";
-        button.style.color = "#a8ff78";
-        button.style.borderRadius = "10px";
-        button.style.fontFamily = '"Courier New", monospace';
-        button.style.fontWeight = "bold";
-        button.style.letterSpacing = "2px";
-        button.style.cursor = "pointer";
-        button.style.padding = "7px 12px";
-        button.style.fontSize = "clamp(11px, 2.6vw, 13px)";
-        button.style.transition = "all 0.2s ease";
-        button.style.boxShadow = "0 0 12px rgba(168,255,120,0.4)";
+        Object.assign(button.style, {
+            width:           "100%",
+            boxSizing:       "border-box",
+            background:      "rgba(168, 255, 120, 0.15)",
+            border:          "2px solid #a8ff78",
+            color:           "#a8ff78",
+            borderRadius:    "10px",
+            fontFamily:      '"Courier New", monospace',
+            fontWeight:      "bold",
+            letterSpacing:   "2px",
+            cursor:          "pointer",
+            padding:         "7px 12px",
+            fontSize:        "clamp(11px, 2.6vw, 13px)",
+            transition:      "all 0.2s ease",
+            boxShadow:       "0 0 12px rgba(168,255,120,0.4)"
+        });
 
-        // hover / active — через отдельные обработчики,
-        // чтобы не тянуть внешние стили.
         button.addEventListener("mouseenter", () => {
             button.style.background = "rgba(168,255,120,0.28)";
             button.style.color = "#f4ffe8";
@@ -223,22 +298,10 @@ class UIInputName
             button.style.boxShadow = "0 0 20px rgba(168,255,120,0.7)";
         });
 
-        input.addEventListener("focus", () => {
-            input.style.boxShadow =
-                "0 0 12px rgba(168,255,120,0.55) inset, 0 0 20px rgba(168,255,120,0.6)";
-            input.style.background = "rgba(168,255,120,0.18)";
-        });
-        input.addEventListener("blur", () => {
-            input.style.boxShadow =
-                "0 0 10px rgba(168,255,120,0.35) inset, 0 0 10px rgba(168,255,120,0.25)";
-            input.style.background = "rgba(168,255,120,0.10)";
-        });
-
         // ---------- Собираем ----------
         root.appendChild(title);
         root.appendChild(input);
         root.appendChild(button);
-
         this._parent.appendChild(root);
 
         this._root     = root;
@@ -246,7 +309,37 @@ class UIInputName
         this._inputEl  = input;
         this._buttonEl = button;
 
+        // ---------- Базовое состояние input (без фокуса) ----------
+        this._setInputBlurred();
+
         this._render();
+    }
+
+    // ---------- Стиль поля ввода В ФОКУСЕ ----------
+    _setInputFocused()
+    {
+        const input = this._inputEl;
+        if (!input) return;
+
+        input.style.background  = "rgba(200, 255, 160, 0.22)";
+        input.style.borderColor = "#eaffd0";
+        input.style.color       = "#ffffff";
+        input.style.boxShadow   =
+            "0 0 14px rgba(200,255,160,0.85) inset, " +
+            "0 0 22px rgba(168,255,120,0.9), " +
+            "0 0 40px rgba(168,255,120,0.5)";
+    }
+
+    // ---------- Стиль поля ввода БЕЗ ФОКУСА ----------
+    _setInputBlurred()
+    {
+        const input = this._inputEl;
+        if (!input) return;
+
+        input.style.background  = "rgba(168, 255, 120, 0.08)";
+        input.style.borderColor = "#7fbf5f";
+        input.style.color       = "#777777"; // <-- ВНЕ ФОКУСА
+        input.style.boxShadow   = "0 0 6px rgba(168,255,120,0.18) inset";
     }
 
     /** Обновляет заголовок «текущее имя». */
@@ -266,27 +359,42 @@ class UIInputName
     // =========================================================
     _bindEvents()
     {
-        // --- клик по кнопке "ПРИМЕНИТЬ" ---
+        // --- фокус на поле ввода ---
+        this._inputEl.addEventListener("focus", () => {
+            this._setInputFocused();
+        });
+
+        // --- потеря фокуса: вернуть текущее имя и потушить стиль ---
+        this._inputEl.addEventListener("blur", () => {
+            this._inputEl.value = this.namePlayer;  // откат
+            this._setInputBlurred();
+        });
+
+        // --- не даём input потерять фокус при mousedown на кнопке ---
+        this._buttonEl.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+        });
+
+        // --- кнопка "ПРИМЕНИТЬ" ---
         this._buttonEl.addEventListener("click", (e) => {
             e.preventDefault();
             this._applyFromInput();
         });
 
-        // --- Enter в поле ввода = применить ---
+        // --- клавиатура ---
         this._inputEl.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
                 this._applyFromInput();
-                this._inputEl.blur();
+                this._inputEl.blur();       // спровоцирует откат и потухание
             } else if (e.key === "Escape") {
-                // откат значения в поле к текущему имени
                 this._inputEl.value = this.namePlayer;
                 this._inputEl.blur();
             }
         });
     }
 
-    /** Прочитать значение из input и применить. */
+    /** Прочитать значение из input, применить и вызвать коллбэк. */
     _applyFromInput()
     {
         if (!this._inputEl) return;
@@ -298,25 +406,35 @@ class UIInputName
             return;
         }
 
+        // Ничего не изменилось — просто перерисуем
         if (next === this.namePlayer) {
-            // Ничего не изменилось — просто перерисуем
             this._render();
             return;
-        }
+        } 
 
-        // Старое имя — в историю, новое — в current
-        this._pushHistory(this.namePlayer);
-
+        // Новое имя в current
         this.namePlayer = next;
         this._saveCurrent();
         this._render();
 
-        // --- оповестим подписчиков (другие модули игры) ---
+        // --- коллбэк снаружи, если он есть ---
+        if (typeof this._onApply === "function") {
+            try {
+                this._onApply(this.namePlayer);
+            } catch (e) {
+                console.error("UIInputName.onApply error:", e);
+            }
+        }
+
+        // --- и всё равно оповестим через событие, для совместимости ---
         try {
             window.dispatchEvent(new CustomEvent("player-name-changed", {
                 detail: { name: this.namePlayer }
             }));
-        } catch (e) { /* ignore */ }
+        } catch (e)
+        { 
+            /* ignore */ 
+        }
     }
 }
 
