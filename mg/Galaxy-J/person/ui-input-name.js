@@ -1,8 +1,12 @@
 /// ui-input-name.js
 /// Отвечает за ввод пользователем его имени.
-/// Используется в модуле g-menu.html
-/// Объект хранит текущее имя игрока внутри localStorage.
-/// После ввода нового имени старое остаётся в localStorage (в HeroesList).
+/// Используется в модуле g-menu.html.
+/// ---
+/// Хранение:
+///     - имя живёт в активном профиле ProfileStore.
+///     - ProfileStore.ensure() гарантирует, что профиль есть всегда.
+///     - UIInputName не трогает localStorage напрямую.
+///     - ProfileStore — единственный источник правды для имени.
 /// ---
 /// Графика:
 ///     - рисуется окно ввода.
@@ -14,22 +18,28 @@
 /// ---
 /// Поведение:
 ///     - наличие фокуса ВВОДа.
-///     - при фокусе на ВВОД ИМЯ в окне ВВОДа должно подсвечиваться ярче.
-///     - при потере фокуса ИМЯ в окне ВВОДа должно восстанавливаться
+///     - при фокусе ИМЯ в окне ВВОДа подсвечивается ярче.
+///     - при потере фокуса ИМЯ в окне ВВОДа восстанавливается
 ///       текущим именем.
-///     - текущее ИМЯ должно подсвечиваться ярче чем ИМЯ в окне ВВОДа.
-///     - текущее ИМЯ должно иметь анимированную пульсирующую ауру.
+///     - текущее ИМЯ подсвечивается ярче, чем ИМЯ в окне ВВОДа.
+///     - текущее ИМЯ имеет анимированную пульсирующую ауру.
 ///     - при клике на ПРИМЕНИТЬ генерируется событие "player-name-changed"
 ///       на window, в detail.name передаётся новое имя игрока.
-///     - всегда гарантируется, что в localStorage существует текущее имя!
+///     - UIInputName больше не знает ключей localStorage.
+///     - Чтение: constructor → _loadFromStorage → ProfileStore.ensure() → profile.name.
+///     - Запись: _applyFromInput → _saveCurrent → ProfileStore.rename(profile.id, newName).
+///     - Первый запуск: ProfileStore.ensure() 
+///       создаёт дефолтный профиль с NAME_PLAYER_DEFAULT, 
+///       UIInputName читает его и показывает.
+///     - Событие player-name-changed шлётся только при реальной смене имени.
+
 
 class UIInputName
 {
-    // ---------- Ключи localStorage ----------
-    static KEY_CURRENT = "galaxy.player.name";
-
     // ---------- Значение по умолчанию ----------
-    namePlayer = "Анонимус-1917";
+    namePlayer = (typeof NAME_PLAYER_DEFAULT !== "undefined")
+        ? NAME_PLAYER_DEFAULT
+        : "ERROR: profile-store.js";
 
     // ---------- DOM-ссылки ----------
     _root        = null;
@@ -87,7 +97,10 @@ class UIInputName
             this._auraStyleEl.parentNode.removeChild(this._auraStyleEl);
         }
         this._root        = null;
-        this._titleTextEl = null;   // <-- FIX
+        this._titleEl     = null;
+        this._titleTextEl = null;
+        this._inputEl     = null;
+        this._buttonEl    = null;
         this._auraStyleEl = null;
     }
 
@@ -96,23 +109,28 @@ class UIInputName
     // =========================================================
     _loadFromStorage()
     {
-        try {
-            const saved = localStorage.getItem(UIInputName.KEY_CURRENT);
-            if (saved && saved.trim()) {
-                this.namePlayer = saved;
-            }
-            else
-            {   // первый запуск — зафиксируем дефолт в хранилище
-                this._saveCurrent();
-            }
-        } catch (e) { /* ignore */ }
+        if (typeof ProfileStore === "undefined") {
+            console.warn("UIInputName: ProfileStore не подключён, работаем на дефолте.");
+            return;
+        }
+
+        const profile = ProfileStore.ensure();
+        if (profile && profile.name) {
+            this.namePlayer = profile.name;
+        }
     }
 
     _saveCurrent()
     {
-        try {
-            localStorage.setItem(UIInputName.KEY_CURRENT, this.namePlayer);
-        } catch (e) { /* ignore */ }
+        if (typeof ProfileStore === "undefined") {
+            console.warn("UIInputName: ProfileStore не подключён, имя не сохранено.");
+            return;
+        }
+
+        const profile = ProfileStore.ensure();
+        if (profile) {
+            ProfileStore.rename(profile.id, this.namePlayer);
+        }
     }
 
     // =========================================================
@@ -189,12 +207,6 @@ class UIInputName
             fontWeight:   "bold",
             textAlign:    "left",
             padding:      "2px 4px",
-
-            // статичная аура (пока анимация не стартовала / fallback)
-            filter:       "drop-shadow(0 0 2px rgba(216,255,216,0.9)) " +
-                          "drop-shadow(0 0 6px rgba(168,255,120,0.8)) " +
-                          "drop-shadow(0 0 14px rgba(168,255,120,0.45))",
-            willChange:   "filter",
 
             // пульсирующая аура
             animation:    "ui-input-name-aura 2.2s ease-in-out infinite"
@@ -377,7 +389,7 @@ class UIInputName
         });
     }
 
-    /** Прочитать значение из input, применить и вызвать коллбэк. */
+    /** Прочитать значение из input, применить и оповестить через событие. */
     _applyFromInput()
     {
         if (!this._inputEl) return;
@@ -388,6 +400,7 @@ class UIInputName
             return;
         }
 
+        // имя не изменилось — событие не шлём
         if (next === this.namePlayer) {
             this._render();
             return;
@@ -403,6 +416,83 @@ class UIInputName
                 detail: { name: this.namePlayer }
             }));
         } catch (e){ /* ignore */ }
+    }
+
+    /**
+     * Строгая проверка имени.
+     * @returns {{ ok: boolean, errors: string[] }}
+     */
+    static validateName(name, {
+        min = 3,
+        max = 16,
+        cyrillic = true,
+        spaces   = true,
+        doubleSpaces = false,
+        forbidden = [],
+    } = {}) {
+        const errors = [];
+
+        // 0. Тип
+        if (typeof name !== 'string') {
+            return { ok: false, errors: ['имя должно быть строкой'] };
+        }
+
+        // 1. NFC-нормализация
+        const normalized = name.normalize('NFC');
+
+        // 2. Пустая строка — ранний выход
+        if (!normalized.trim()) {
+            return { ok: false, errors: ['имя не может быть пустым'] };
+        }
+
+        // 3. Длина по code points
+        const charCount = [...normalized].length;
+        if (charCount < min) errors.push(`минимум ${min} символов`);
+        if (charCount > max) errors.push(`максимум ${max} символов`);
+
+        // 4. Пробелы по краям
+        if (normalized !== normalized.trim()) {
+            errors.push('нельзя начинать или заканчивать пробелом');
+        }
+
+        // 5. Пробелы запрещены явно
+        if (!spaces && / /.test(normalized)) {
+            errors.push('пробелы не разрешены');
+        }
+
+        // 6. Двойные пробелы (только если пробелы разрешены)
+        if (spaces && !doubleSpaces && / {2,}/.test(normalized)) {
+            errors.push('двойные пробелы запрещены');
+        }
+
+        // 7. Белый список
+        let cls = 'a-zA-Z0-9_\\-';
+        if (cyrillic) cls += 'а-яёА-ЯЁ';
+        if (spaces)   cls += ' ';
+        const reAllowed = new RegExp(`^[${cls}]+$`, 'u');
+        if (!reAllowed.test(normalized)) {
+            errors.push(
+            'допустимы только: латиница' + (cyrillic ? ', кириллица' : '') +
+            ', цифры, "_" и "-"' + (spaces ? ', пробел' : '')
+            );
+            // дальше проверять нет смысла
+            return { ok: false, errors };
+        }
+
+        // 8. Первый символ — буква
+        let letters = 'a-zA-Z';
+        if (cyrillic) letters += 'а-яёА-ЯЁ';
+        if (!new RegExp(`^[${letters}]`, 'u').test(normalized)) {
+            errors.push('имя должно начинаться с буквы');
+        }
+
+        // 9. Зарезервированные имена
+        const lower = normalized.toLowerCase();
+        if (forbidden.some(f => String(f).trim().toLowerCase() === lower)) {
+            errors.push('это имя зарезервировано');
+        }
+
+        return { ok: errors.length === 0, errors };
     }
 }
 

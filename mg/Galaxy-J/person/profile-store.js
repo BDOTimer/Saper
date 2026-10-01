@@ -13,6 +13,7 @@
 ///     - не меняется при переименовании
 /// ---
 /// Публичные методы:
+///     ensure()                — гарантировать наличие активного профиля
 ///     list()                  — массив id профилей
 ///     hasAny()                — есть ли хоть один профиль
 ///     load(id)                — объект профиля или null
@@ -22,9 +23,9 @@
 ///     create(name)            — создать профиль, вернуть объект
 ///     rename(id, name)        — переименовать профиль
 ///     saveGame(id, saveData)  — записать save-поле профиля
+///     resetGame(id)           — сбросить save, не удаляя профиль
 ///     remove(id)              — удалить профиль
 ///     getNameForUI()          — имя для UI (профиль или черновик)
-///     setDraftName(name)      — записать имя в черновик
 /// ---
 /// События (window):
 ///     - "profile-changed" — общий сигнал: создан/удалён/переключён/переименован.
@@ -34,13 +35,51 @@
 ///     window.addEventListener("profile-changed", (e) => {
 ///         console.log("profile-changed:", e.detail);
 ///     });
+/// ---
+/// Поведение:
+///     - Подключили profile-store.js — сработал static { ensure(); }.
+///     - ensure(): всегда гарантирует активный профиль! 
+///     - Теперь ProfileStore.current() всегда возвращает объект 
+///       (кроме критических ситуаций).
+///     - UIInputName:
+///         - читает имя из ProfileStore.ensure().name;
+///         - пишет через ProfileStore.rename(profile.id, newName).
+///     - g-start.html: const p = ProfileStore.ensure(); ProfileStore.resetGame(p.id);
+///     - g-menu.html : const p = ProfileStore.ensure(); btnContinue.disabled = !p.save;
+
+const NAME_PLAYER_DEFAULT = "Анонимус-1917";
 
 class ProfileStore
 {
     // ---------- Ключи localStorage ----------
     static KEY_LIST    = "galaxy.profiles";
     static KEY_CURRENT = "galaxy.currentProfile";
-    static KEY_DRAFT   = "galaxy.player.name";
+
+    static {
+        // При загрузке скрипта гарантируем, что профиль есть
+        this.ensure();
+    }
+
+    /** Гарантировать, что активный профиль существует. */
+    static ensure()
+    {
+        // 1. Есть активный валидный профиль? — вернуть его.
+        const cur = this.current();
+        if (cur) return cur;
+
+        // 2. Есть какие-то профили, но активного нет? — сделать первый активным.
+        const ids = this.list();
+        if (ids.length > 0) {
+            const p = this.load(ids[0]);
+            if (p) {
+                this.setCurrent(p.id);
+                return p;
+            }
+        }
+
+        // 3. Профилей нет вовсе — создать самый первый.
+        return this.create(NAME_PLAYER_DEFAULT);
+    }
 
     // ---------- Идентификатор ключа профиля ----------
     static keyProfile(id)
@@ -97,11 +136,18 @@ class ProfileStore
         }
     }
 
-    /** Текущий активный профиль (или null). */
     static current()
     {
         const id = this.currentId();
-        return id ? this.load(id) : null;
+        if (!id) return null;
+
+        const p = this.load(id);
+        if (!p) {
+            // ссылка висит — почистим
+            try { localStorage.removeItem(this.KEY_CURRENT); } catch (e) {}
+            return null;
+        }
+        return p;
     }
 
     /** id текущего активного профиля (или null). */
@@ -179,7 +225,7 @@ class ProfileStore
     {
         const cleanName = (typeof name === "string" && name.trim())
             ? name.trim()
-            : (this.getDraftName() || "Анонимус-1917");
+            : NAME_PLAYER_DEFAULT;
 
         const now = new Date().toISOString();
 
@@ -251,6 +297,21 @@ class ProfileStore
         return true;
     }
 
+    /** Сбросить сейв у профиля, не удаляя его. */
+    static resetGame(id)
+    {
+        const p = this.load(id);
+        if (!p) return false;
+
+        p.save = null;
+        p.lastPlayed = new Date().toISOString();
+
+        if (!this._writeProfile(p)) return false;
+
+        this._emit(id, p);
+        return true;
+    }
+
     /** Удалить профиль по id. */
     static remove(id)
     {
@@ -280,46 +341,6 @@ class ProfileStore
 
         this._emit(id, null);
         return true;
-    }
-
-    // =========================================================
-    //  ЧЕРНОВИК ИМЕНИ (когда профиля ещё нет)
-    // =========================================================
-
-    /** Имя для UI: из активного профиля, иначе — из черновика. */
-    static getNameForUI()
-    {
-        const p = this.current();
-        if (p && p.name) return p.name;
-
-        const draft = this.getDraftName();
-        if (draft) return draft;
-
-        return "Анонимус-1917";
-    }
-
-    /** Прочитать черновик имени. */
-    static getDraftName()
-    {
-        try {
-            const v = localStorage.getItem(this.KEY_DRAFT);
-            return (v && v.trim()) ? v : "";
-        } catch (e) {
-            return "";
-        }
-    }
-
-    /** Записать имя в черновик. */
-    static setDraftName(name)
-    {
-        const cleanName = (typeof name === "string" && name.trim()) ? name.trim() : "";
-        if (!cleanName) return false;
-        try {
-            localStorage.setItem(this.KEY_DRAFT, cleanName);
-            return true;
-        } catch (e) {
-            return false;
-        }
     }
 
     // =========================================================
@@ -361,8 +382,9 @@ class ProfileStore
         try {
             localStorage.removeItem(this.KEY_LIST);
             localStorage.removeItem(this.KEY_CURRENT);
-            localStorage.removeItem(this.KEY_DRAFT);
         } catch (e) {}
+
+        this.ensure();
     }
 
     // =========================================================
@@ -376,33 +398,34 @@ class ProfileStore
 
         this._wipe();
 
-        console.log("hasAny (после wipe) =", this.hasAny());              // false
-        console.log("list    (после wipe) =", this.list());                // []
+        console.log("hasAny (после wipe) =", this.hasAny());            // false
+        console.log("list    (после wipe) =", this.list());             // []
 
-        const a = this.create("Анонимус-1917");
-        console.log("create A =", a);                                       // { id, name, ... }
-        console.log("hasAny =", this.hasAny());                             // true
-        console.log("current =", this.current()?.name);                     // "Анонимус-1917"
+        const a = this.create(NAME_PLAYER_DEFAULT);
+        console.log("create A =", a);                                   // { id, name, ... }
+        console.log("hasAny =", this.hasAny());                         // true
+        console.log("current =", this.current()?.name);                 // "Анонимус-1917"
 
         const b = this.create("Сокол");
         console.log("create B =", b);
 
-        console.log("list =", this.list());                                 // [A.id, B.id]
-        console.log("current =", this.current()?.name);                     // "Сокол"
+        console.log("list =", this.list());                             // [A.id, B.id]
+        console.log("current =", this.current()?.name);                 // "Сокол"
 
         this.setCurrent(a.id);
-        console.log("после setCurrent(A) =", this.current()?.name);         // "Анонимус-1917"
+        console.log("после setCurrent(A) =", this.current()?.name);     // "Анонимус-1917"
 
         this.rename(a.id, "Соколиный Глаз");
-        console.log("после rename(A) =", this.current()?.name);             // "Соколиный Глаз"
+        console.log("после rename(A) =", this.current()?.name);         // "Соколиный Глаз"
 
         this.saveGame(a.id, { ship: "Cobra", credits: 100, sector: 7 });
         console.log("после saveGame(A) =", this.load(a.id)?.save);
 
         this.remove(b.id);
-        console.log("после remove(B), list =", this.list());                // [A.id]
-        console.log("current =", this.current()?.name);                     // "Соколиный Глаз"
+        console.log("после remove(B), list =", this.list());            // [A.id]
+        console.log("current =", this.current()?.name);                 // "Соколиный Глаз"
 
+        this.ensure(); 
         this.debugDump();
 
         console.groupEnd();
