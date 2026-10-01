@@ -322,7 +322,11 @@
       <div class="subtitle">Classic space • ZX SPECTRUM</div>
 
       <div class="menu-buttons">
-        <a href="g-start-loop.html" class="menu-btn" data-action="new" >
+        <a href="g-start-loop.html" 
+           class="menu-btn" 
+           data-action="new"
+           id="btn-new"
+        >
           <span><span class="num">01</span>НОВАЯ ИГРА</span>
           <span class="arrow">▶</span>
         </a>
@@ -386,35 +390,36 @@
     // Создаём поле ввода имени в правом верхнем углу
     const uiName = new UIInputName({
       parent: document.body,
-      offsetTop: 12,
+      offsetTop  : 12,
       offsetRight: 12,
+    });
 
-      // --- сюда приходит НОВОЕ имя игрока ---
-      onApply: function (newName) {
-        console.log("Применено новое имя: ", newName); /// FAIL...
+    // Подписка на событие смены имени игрока
+    window.addEventListener("player-name-changed", 
+      function (e) {
+        console.log("[event] новое имя:", e.detail.name);
 
-        // например: обновить запись в рекорд-листе
+        // Обновить рекорд-лист
         if (window.HeroesList) {
           HeroesList.upHero({
-            name:  newName,
+            name:  e.detail.name,
             score: 0,
             rank:  "HARMLESS",
             date:  new Date().toISOString().slice(0, 10)
           });
         }
       }
-    });
+    );
 
     console.log("uiName.namePlayer: ", uiName.namePlayer); // ОК!
 
-      (function () {
+    // function checkNamePlayerInStorage() {
 
-        // HeroesList.add({
-        //    name: "Пупкин",
-        //    score: 12500,
-        //    rank: "ELITE",
-        //    date: "2025-01-12"
-        // });
+    // }
+
+    // checkNamePlayerInStorage();
+
+      (function () {
 
         /* ---------- Проверка сохранения (заглушка) ---------- */
         // Замените на реальную проверку: localStorage, IndexedDB и т.п.
@@ -474,6 +479,31 @@
           date:  new Date().toISOString().slice(0, 10)
       });
     }
+
+    // Начать игру
+    document.getElementById("btn-new").addEventListener("click",
+      function (e) {
+        e.preventDefault();
+
+        console.log("Начать игру ...");
+
+        // TODO: ...
+
+        // Переход на страницу игры
+        window.location.href = "g-start-loop.html";
+    });
+
+    // Продолжить игру
+    document.getElementById("btn-continue").addEventListener("click",
+      function (e) {
+        e.preventDefault();
+
+        console.log("Продолжить игру ...");
+
+        // TODO: ...
+
+        window.location.href = "g-start-loop.html";
+    });
 
     // Об игре
     document.getElementById("btn-about").addEventListener("click",
