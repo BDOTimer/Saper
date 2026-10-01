@@ -1,3 +1,5 @@
+<!-- Файл g-menu.html
+-->
 <!doctype html>
 <html lang="ru">
   <head>
@@ -320,13 +322,13 @@
       <div class="subtitle">Classic space • ZX SPECTRUM</div>
 
       <div class="menu-buttons">
-        <a href="game-j.html" class="menu-btn" data-action="new" >
+        <a href="g-start.html" class="menu-btn" data-action="new" >
           <span><span class="num">01</span>НОВАЯ ИГРА</span>
           <span class="arrow">▶</span>
         </a>
 
         <a
-          href="mg/elite/game.html?continue=1"
+          href="mg/elite/g-start.html?continue=1"
           class="menu-btn is-disabled"
           data-action="continue"
           id="btn-continue"
@@ -336,8 +338,7 @@
           <span class="arrow">▶</span>
         </a>
 
-        <a href="mg/elite/about.html" 
-           class="menu-btn" 
+        <a class="menu-btn" 
            data-action="about"
            id="btn-about"
         >
@@ -345,8 +346,7 @@
           <span class="arrow">▶</span>
         </a>
 
-        <a href="mg/elite/scores.html" 
-           class="menu-btn" 
+        <a class="menu-btn" 
            data-action="scores"
            id="btn-scores"
         >
@@ -380,7 +380,16 @@
 
     <script src="js/m-note-1.js"></script>
     <script src="js/heroes-list.js"></script>
+    <script src="person/ui-input-name.js"></script>
     <script>
+
+      // Создаём поле ввода имени в правом верхнем углу
+      const uiName = new UIInputName({
+        parent: document.body,
+        offsetTop: 12,
+        offsetRight: 12
+      });
+
       (function () {
 
         // HeroesList.add({
@@ -465,6 +474,12 @@
         HeroesList.dedupe();
 
         HeroesList.show();
+    });
+
+    // Пример: реагировать на смену имени
+    window.addEventListener("player-name-changed", (e) => {
+      console.log("Новое имя пилота:", e.detail.name);
+      // тут можно перерисовать рекорд-лист и т.п.
     });
 
     // добавить запись после окончания партии:
