@@ -602,6 +602,14 @@
         _overlay = overlay;
         _listEl  = list;
 
+        // --- ОЗВУЧКА КНОПОК (один вызов на все кнопки сразу) ---
+        overlay.addEventListener("click", (e) => {
+            const btn = e.target.closest("button");
+            if (!btn) return;
+            // один вызов озвучки для любой кнопки внутри оверлея
+            playClick(); // <-- ваша функция озвучки
+        });
+
         // --- реакция на изменения профилей ---
         _onChanged = () => renderList();
         window.addEventListener("profile-changed", _onChanged);

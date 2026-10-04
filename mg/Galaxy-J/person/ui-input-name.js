@@ -357,8 +357,6 @@ class UIInputName
             this._openProfilesChoice();
         });
 
-
-
         // ---------- Собираем ----------
         root.appendChild(title);
         root.appendChild(input);
@@ -373,7 +371,13 @@ class UIInputName
         this._inputEl         = input;
         this._buttonEl        = button;
         this._buttonProfilesEl = buttonProfiles;   // <-- добавить
-        
+
+        // ---------- Озвучка ВСЕХ кнопок этого виджета ----------
+        root.addEventListener("click", (e) => {
+            const btn = e.target.closest("button");
+            if (!btn || !root.contains(btn)) return;
+            playClick();
+        });
 
         this._setInputBlurred();
         this._render();
