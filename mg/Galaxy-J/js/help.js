@@ -202,9 +202,9 @@ const HELP = (() => {
     state.open = v;
     state.root.style.display = v ? "flex" : "none";
   }
-  const toggle = () => setOpen(!state.open);
-  const close = () => setOpen(false);
-  const isOpen = () => state.open;
+  const toggle = () =>   setOpen(!state.open);
+  const close  = () => { setOpen(false); }
+  const isOpen = () =>   state.open;
 
   return {
     init() {

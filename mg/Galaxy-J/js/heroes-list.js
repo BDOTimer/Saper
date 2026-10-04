@@ -449,6 +449,8 @@
     if (lastFocus && typeof lastFocus.focus === "function") {
       lastFocus.focus();
     }
+
+    playClick();
   }
 
   function toggle() {

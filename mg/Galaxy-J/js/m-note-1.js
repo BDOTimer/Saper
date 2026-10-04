@@ -281,6 +281,8 @@
 
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) hide();
+
+      playClick();
     });
 
     panel.appendChild(closeBtn);
