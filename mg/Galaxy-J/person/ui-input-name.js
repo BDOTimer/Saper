@@ -66,6 +66,11 @@ class UIInputName
         this._injectAuraStyles();
         this._buildUI();
         this._bindEvents();
+
+        window.addEventListener("profile-changed", () => {
+            this._loadFromStorage();
+            this._render();
+        });
     }
 
     // =========================================================
