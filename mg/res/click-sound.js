@@ -26,8 +26,11 @@
   }
 
   // Делегирование: реагируем на клики по любым .menu-btn
-  document.addEventListener('pointerdown', e => {
-    if (e.target.closest('.menu-btn')) playClick();
-    if (e.target.closest('.back-btn')) playClick();
+  document.addEventListener('pointerdown', e =>
+  {
+           if (e.target.closest('.menu-btn')) playClick();
+      else if (e.target.closest('.back-btn')) playClick();
+
+      else playClick();
   }, { passive: true });
 })();
