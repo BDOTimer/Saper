@@ -44,9 +44,11 @@ class UIInputName
     // ---------- DOM-ссылки ----------
     _root        = null;
     _titleEl     = null;
-    _titleTextEl = null;   // <-- FIX: внутренний span (ellipsis), текст живёт здесь
+    _titleTextEl = null;   // <-- внутренний span (ellipsis)
     _inputEl     = null;
     _buttonEl    = null;
+
+    _buttonProfilesEl = null;
 
     // ---------- id стиля анимации ауры (для destroy) ----------
     _auraStyleEl = null;
@@ -102,6 +104,8 @@ class UIInputName
         this._inputEl     = null;
         this._buttonEl    = null;
         this._auraStyleEl = null;
+
+        this._buttonProfilesEl = null;
     }
 
     // =========================================================
@@ -294,17 +298,77 @@ class UIInputName
             button.style.boxShadow = "0 0 20px rgba(168,255,120,0.7)";
         });
 
+        // ---------- Кнопка "ПРОФИЛИ" ----------
+        const buttonProfiles = document.createElement("button");
+        buttonProfiles.type = "button";
+        buttonProfiles.className = "ui-input-name__btn ui-input-name__btn--profiles";
+        buttonProfiles.textContent = "ПРОФИЛИ";
+        Object.assign(buttonProfiles.style, {
+            width:           "40%",
+            minWidth:        "88px",          // <-- гарантия, что текст влезет
+            boxSizing:       "border-box",
+            alignSelf:       "flex-end",
+            whiteSpace:      "nowrap",        // <-- текст не переносится
+            background:      "rgba(168, 255, 120, 0.15)",
+            border:          "2px solid #185f08",
+            color:           "#a8ff78",
+            borderRadius:    "10px",
+            fontFamily:      '"Courier New", monospace',
+            fontWeight:      "bold",
+            letterSpacing:   "1px",           // <-- было 2px, чуть ужимаем
+            cursor:          "pointer",
+            padding:         "7px 10px",      // <-- было 12px
+            fontSize:        "clamp(6px, 2.4vw, 8px)",  // <-- чуть мельче
+            transition:      "all 0.2s ease",
+            boxShadow:       "0 0 12px rgba(168,255,120,0.4)"
+        });
+
+        buttonProfiles.addEventListener("mouseenter", () => {
+            buttonProfiles.style.background = "rgba(168,255,120,0.28)";
+            buttonProfiles.style.color = "#f4ffe8";
+            buttonProfiles.style.boxShadow = "0 0 20px rgba(168,255,120,0.7)";
+        });
+        buttonProfiles.addEventListener("mouseleave", () => {
+            buttonProfiles.style.background = "rgba(168,255,120,0.15)";
+            buttonProfiles.style.color = "#a8ff78";
+            buttonProfiles.style.boxShadow = "0 0 12px rgba(168,255,120,0.4)";
+        });
+        buttonProfiles.addEventListener("mousedown", () => {
+            buttonProfiles.style.background = "rgba(168,255,120,0.55)";
+            buttonProfiles.style.color = "#0a140a";
+            buttonProfiles.style.boxShadow = "0 0 26px rgba(168,255,120,0.9)";
+        });
+        buttonProfiles.addEventListener("mouseup", () => {
+            buttonProfiles.style.background = "rgba(168,255,120,0.28)";
+            buttonProfiles.style.color = "#f4ffe8";
+            buttonProfiles.style.boxShadow = "0 0 20px rgba(168,255,120,0.7)";
+        });
+
+        buttonProfiles.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+        });
+        buttonProfiles.addEventListener("click", (e) => {
+            e.preventDefault();
+            this._openProfilesChoice();
+        });
+
+
+
         // ---------- Собираем ----------
         root.appendChild(title);
         root.appendChild(input);
         root.appendChild(button);
+        root.appendChild(buttonProfiles);   // <-- добавить
+
         this._parent.appendChild(root);
 
-        this._root        = root;
-        this._titleEl     = title;
-        this._titleTextEl = titleText;   // <-- FIX
-        this._inputEl     = input;
-        this._buttonEl    = button;
+        this._root            = root;
+        this._titleEl         = title;
+        this._titleTextEl     = titleText;
+        this._inputEl         = input;
+        this._buttonEl        = button;
+        this._buttonProfilesEl = buttonProfiles;   // <-- добавить
+        
 
         this._setInputBlurred();
         this._render();
@@ -416,6 +480,59 @@ class UIInputName
                 detail: { name: this.namePlayer }
             }));
         } catch (e){ /* ignore */ }
+    }
+
+    /**
+     * ПРОФИЛИ.
+     * Подгружает ui-profile-choice.js (один раз) и вызывает его точку входа.
+     * Ожидаемый контракт скрипта:
+     *   window.UiProfileChoice = { open(options) }   // либо функция-конструктор
+     */
+    _openProfilesChoice()
+    {
+        const invoke = () => {
+            try {
+                if (typeof window.openUiProfileChoice === "function") {
+                    window.openUiProfileChoice();
+                    return;
+                }
+                if (window.UiProfileChoice) {
+                    if (typeof window.UiProfileChoice.open === "function") {
+                        window.UiProfileChoice.open();
+                        return;
+                    }
+                    if (typeof window.UiProfileChoice === "function") {
+                        new window.UiProfileChoice();
+                        return;
+                    }
+                }
+                console.warn("UIInputName: ui-profile-choice.js загружен, но точка входа не найдена.");
+            } catch (e) {
+                console.error("UIInputName: ошибка вызова ui-profile-choice.js:", e);
+            }
+        };
+
+        // Уже загружен — просто вызвать
+        if (window.__uiProfileChoiceLoaded) { invoke(); return; }
+        if (document.getElementById("ui-profile-choice-script")) {
+            // скрипт уже в DOM, но, возможно, ещё грузится — подождём load
+            const s = document.getElementById("ui-profile-choice-script");
+            s.addEventListener("load", () => { window.__uiProfileChoiceLoaded = true; invoke(); }, { once: true });
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.id  = "ui-profile-choice-script";
+        script.src = "person/ui-profile-choice.js";
+        script.defer = true;
+        script.addEventListener("load", () => {
+            window.__uiProfileChoiceLoaded = true;
+            invoke();
+        }, { once: true });
+        script.addEventListener("error", () => {
+            console.error("UIInputName: не удалось загрузить ui-profile-choice.js");
+        }, { once: true });
+        document.head.appendChild(script);
     }
 
     /**
