@@ -24,14 +24,21 @@
 
 // ---- Колбэк «произошла стыковка» ----
 let onDockCallback = null;
-
+// ---- Колбэк «отстыковка от станции» ----
+let onUndockCallback = null;
 // ---- Разрешение/запрет входа ----
 let dockingEnabled = true;
+// ---- Флаг «пристыкован» (последний известный статус) ----
+let dockedNow = false;
 
 const STATION = (() => {
 
   const setOnDock = (fn) => {
     onDockCallback = typeof fn === "function" ? fn : null;
+  };
+
+  const setOnUndock = (fn) => {
+    onUndockCallback = typeof fn === "function" ? fn : null;
   };
 
   // ---------------------------------------------------------------
@@ -346,7 +353,8 @@ const STATION = (() => {
       //   - сверяем «верх» корабля (+Y локальный) с «верхом» шлюза (+Y локальный)
       //   - если всё в допусках — успех; если в створе, но углы плохие — авария
 
-      const computeStatus = (playerPos, playerQuat) => {
+      const computeStatus = (playerPos, playerQuat) =>
+      {
         if (!playerPos || !playerQuat) return 0;
 
         // Мировые поза/ориентация станции
@@ -436,20 +444,23 @@ const STATION = (() => {
 
       let lastLandingStatus = 0;
 
-      const getLandingStatus = (playerPos, playerQuat) => {
-        
+      const getLandingStatus = (playerPos, playerQuat) =>
+      {
         if (!playerPos || !playerQuat)
         {   console.log("error: getLandingStatus");
             return 0;
         }
-          
+
         const status = computeStatus(playerPos, playerQuat);
 
         if (status === 1 && lastLandingStatus !== 1) {
             if (onDockCallback) onDockCallback();
         }
-        lastLandingStatus = status;
 
+        // Запоминаем «пристыкован ли сейчас»
+        dockedNow = (status === 1);
+
+        lastLandingStatus = status;
         return status;
       };
       
@@ -474,9 +485,9 @@ const STATION = (() => {
 
       return {
           group, params, update, getDangerLevel, getLandingStatus,
-          setDockingEnabled,   // ← новое
-          isDockingEnabled,    // ← новое
-          setOnDock, 
+          setDockingEnabled,
+          isDockingEnabled,
+          setOnDock, setOnUndock,
       };
     },
 
@@ -492,6 +503,22 @@ const STATION = (() => {
       });
     },
   };
+
 })();
+
+// ★ Единожды вешаем обработчик O — до IIFE или после, но не внутри
+if (!window.__station_keydown_bound) {
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "KeyO") return;
+    if (!dockedNow) return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    console.log("STATION: UNDOCK by key O");
+    if (onUndockCallback) onUndockCallback();
+  });
+  window.__station_keydown_bound = true;
+}
 
 //export default STATION;

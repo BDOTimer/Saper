@@ -309,6 +309,10 @@
       
       HELP .init();
       TRADE.init();
+      TRADE.setOnCreditsChanged((credits) => {
+        state.credits = credits;
+        elCredits.textContent = credits;
+      });
       
         const FUEL_BURN_PER_SPEED = 0;//0.005; // топливо/сек на единицу скорости
         const HYPER_FUEL_PER_UNIT = 0;//40;    // топлива на 1.0 расстояния между звёздами
@@ -600,8 +604,9 @@
     //  Использует STAR и PLANET из ./galaxy/star.js и ./galaxy/planet.js
     // ------------------------------------------------------------------------:
     const planets = []; // массив хэндлов PLANET.generate(...)
-    let currentStarHandle = null;
+    let currentStarHandle    = null;
     let currentStationHandle = null;
+    let isDocked = false;
 
     function clearSystem()
     {   for (const p of planets) {
@@ -888,6 +893,21 @@
           return;
         }
 
+        if (e.code === "KeyT")
+        {
+          // TRADE уже сам обработал это событие (закрылся)
+          if (e.defaultPrevented) return;
+
+          // Открыть TRADE можно только на пристыкованном корабле
+          if (isDocked) {
+            e.preventDefault();
+            TRADE.open(state.credits);
+          } else {
+            console.log("TRADE: не пристыкован — T игнорируется");
+          }
+          return;
+        }
+
         // ESC: закрыть оверлей
         if (e.code === "Escape") {
           if (HELP.isOpen()) {
@@ -907,6 +927,8 @@
           e.preventDefault();
           return;
         }
+
+        if (isDocked) return;
 
         // Гиперпрыжок — работает и с открытой картой, и в полёте
         if (e.code === "KeyJ") {
@@ -1174,12 +1196,12 @@
       buildSystemFromStar(state.dataStar);
 
       function resetGame() {
-        state.speed = 0;
-        state.shield = 100;
-        state.fuel = 100;
-        state.credits = 1000;
-        state.kills = 0;
-        state.dead = false;
+        state.speed   =     0;
+        state.shield  =   100;
+        state.fuel    =   100;
+        state.kills   =     0;
+        state.dead    = false;
+      //state.credits =  1000;
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
@@ -1218,22 +1240,6 @@
         }
       }
 
-      // ------------------------------------------------------------------
-      //  HUD
-      // ------------------------------------------------------------------
-      //const $ = (id) => document.getElementById(id);
-      const elSpeed = $("speed");
-      const elSpeedBar = $("speed-bar");
-      const elShield = $("shield");
-      const elShieldBar = $("shield-bar");
-      const elFuel = $("fuel");
-      const elFuelBar = $("fuel-bar");
-      const elCredits = $("credits");
-      const elKills = $("kills");
-      const elSector = $("sector");
-      const elDamage = $("damage-flash");
-      const elGameover = $("gameover");
-
       let damageTimer = 0;
       function flashDamage(intensity = 1) {
         damageTimer = 0.25;
@@ -1246,11 +1252,11 @@
           Math.min(100, (Math.abs(state.speed) / state.maxSpeed) * 100) + "%";
         elShield.textContent = Math.round(state.shield);
         elShieldBar.style.width = state.shield + "%";
-        elFuel.textContent = Math.round(state.fuel);
+        elFuel.textContent    = Math.round(state.fuel);
         elFuelBar.style.width = state.fuel + "%";
-        elCredits.textContent = state.credits;
-        elKills.textContent = state.kills;
-        elSector.textContent = `${state.sector.x},${state.sector.y}`;
+        elKills .textContent  = state.kills;
+        elSector.textContent  = `${state.sector.x},${state.sector.y}`;
+      //elCredits.textContent = state.credits;
 
         // подсветка, когда топлива мало:
         elFuel.style.color = state.fuel < 10 ? "#ff6666" : "";
@@ -1274,6 +1280,22 @@
         playLaser();
       }
 
+    // ------------------------------------------------------------------
+    //  HUD
+    // ------------------------------------------------------------------
+    //const $ = (id)  => document.getElementById(id);
+    const elSpeed     = $("speed");
+    const elSpeedBar  = $("speed-bar");
+    const elShield    = $("shield");
+    const elShieldBar = $("shield-bar");
+    const elFuel      = $("fuel");
+    const elFuelBar   = $("fuel-bar");
+    const elCredits   = $("credits");
+    const elKills     = $("kills");
+    const elSector    = $("sector");
+    const elDamage    = $("damage-flash");
+    const elGameover  = $("gameover");
+
     ///------------------------------------------------------------------------|
     /// Игровой цикл ✅
     ///-------------------------------------------------------------------- .an:
@@ -1286,13 +1308,50 @@
     //----------------:
     // ★ Одноразовый сигнал «пристыковались»
     currentStationHandle.setOnDock(() => {
+
+      console.log("DOCK: стыковка к станции");
+      isDocked = true;
+
       // Пополняем ресурсы
       state.fuel   = 100;
       state.shield = SHIELDMAX;
       state.speed  = 3;
 
       // Открываем торговлю (один раз, не каждый кадр)
-      TRADE.open();
+      TRADE.open(state.credits);
+    });
+
+    //----------------|
+    // Отстыковка.    |
+    //----------------:
+    currentStationHandle.setOnUndock(() =>
+    {
+      console.log("UNDOCK: отстыковка от станции");
+
+      isDocked = false;
+
+      // Закрыть TRADE, если открыт
+      if (TRADE.isOpen()) TRADE.close();
+
+      // // Отодвинуть корабль от шлюза, чтобы status стал 0
+      // if (currentStationHandle) {
+      //   const stationQuat = new THREE.Quaternion();
+      //   currentStationHandle.group.getWorldQuaternion(stationQuat);
+
+      //   // Ось «наружу» из шлюза = локальный -Z станции
+      //   const outAxis = new THREE.Vector3(0, 0, -1)
+      //     .applyQuaternion(stationQuat)
+      //     .normalize();
+
+      //   const push = currentStationHandle.params.gateLength * 1.5 + 50;
+      //   camera.position.addScaledVector(outAxis, push);
+      // }
+
+      // Сброс скоростей — чтобы не влететь обратно
+      state.speed = 560;
+      // state.angVel.pitch = 0;
+      // state.angVel.yaw   = 0;
+      // state.angVel.roll  = 0;
     });
 
     function animate() 
@@ -1354,45 +1413,48 @@ state.speed = Math.max(
 // Мёртвая зона, чтобы не «полз» вечно возле нуля
 if (Math.abs(state.speed) < 0.05 && thrustIn === 0) state.speed = 0;
 
-// ------- Плавное вращение с инерцией -------
-const ax = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0); // pitch
-const ay = (keys["ArrowLeft"] ? 1 : 0) - (keys["ArrowRight"] ? 1 : 0); // yaw
-const az = (keys["KeyA"] ? 1 : 0) - (keys["KeyD"] ? 1 : 0); // roll
+if (!isDocked)
+{
+  // ------- Плавное вращение с инерцией -------
+  const ax = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0); // pitch
+  const ay = (keys["ArrowLeft"] ? 1 : 0) - (keys["ArrowRight"] ? 1 : 0); // yaw
+  const az = (keys["KeyA"] ? 1 : 0) - (keys["KeyD"] ? 1 : 0); // roll
 
-// Разгон по осям
-state.angVel.pitch += ax * ROT.accel * dt;
-state.angVel.yaw   += ay * ROT.accel * dt;
-state.angVel.roll  += az * ROT.accel * dt;
+  // Разгон по осям
+  state.angVel.pitch += ax * ROT.accel * dt;
+  state.angVel.yaw   += ay * ROT.accel * dt;
+  state.angVel.roll  += az * ROT.accel * dt;
 
-// Экспоненциальное торможение (работает и при отпущенной клавише,
-// и как «вязкое» ограничение сверху)
-const damp = Math.exp(-ROT.damping * dt);
-state.angVel.pitch *= damp;
-state.angVel.yaw   *= damp;
-state.angVel.roll  *= damp;
+  // Экспоненциальное торможение (работает и при отпущенной клавише,
+  // и как «вязкое» ограничение сверху)
+  const damp = Math.exp(-ROT.damping * dt);
+  state.angVel.pitch *= damp;
+  state.angVel.yaw   *= damp;
+  state.angVel.roll  *= damp;
 
-// Ограничение максимальной угловой скорости
-state.angVel.pitch = THREE.MathUtils.clamp(state.angVel.pitch, -ROT.maxPitch, ROT.maxPitch);
-state.angVel.yaw   = THREE.MathUtils.clamp(state.angVel.yaw,   -ROT.maxYaw,   ROT.maxYaw);
-state.angVel.roll  = THREE.MathUtils.clamp(state.angVel.roll,  -ROT.maxRoll,  ROT.maxRoll);
+  // Ограничение максимальной угловой скорости
+  state.angVel.pitch = THREE.MathUtils.clamp(state.angVel.pitch, -ROT.maxPitch, ROT.maxPitch);
+  state.angVel.yaw   = THREE.MathUtils.clamp(state.angVel.yaw,   -ROT.maxYaw,   ROT.maxYaw);
+  state.angVel.roll  = THREE.MathUtils.clamp(state.angVel.roll,  -ROT.maxRoll,  ROT.maxRoll);
 
-// Мёртвая зона, чтобы не «дрожал» на нуле
-if (Math.abs(state.angVel.pitch) < 1e-4) state.angVel.pitch = 0;
-if (Math.abs(state.angVel.yaw)   < 1e-4) state.angVel.yaw   = 0;
-if (Math.abs(state.angVel.roll)  < 1e-4) state.angVel.roll  = 0;
+  // Мёртвая зона, чтобы не «дрожал» на нуле
+  if (Math.abs(state.angVel.pitch) < 1e-4) state.angVel.pitch = 0;
+  if (Math.abs(state.angVel.yaw)   < 1e-4) state.angVel.yaw   = 0;
+  if (Math.abs(state.angVel.roll)  < 1e-4) state.angVel.roll  = 0;
 
-// Применяем вращение
-camera.rotateX(state.angVel.pitch * dt);
-camera.rotateY(state.angVel.yaw   * dt);
-camera.rotateZ(state.angVel.roll  * dt);
+  // Применяем вращение
+  camera.rotateX(state.angVel.pitch * dt);
+  camera.rotateY(state.angVel.yaw   * dt);
+  camera.rotateZ(state.angVel.roll  * dt);
+}
 ////////////////////////////////////////////////////////////////////////////////
 
-          // Движение вперёд
-          const forward = tmpVec
-            .set(0, 0, -1)
-            .applyQuaternion(camera.quaternion)
-            .clone();
-          camera.position.addScaledVector(forward, state.speed * dt);
+        // Движение вперёд
+        const forward = tmpVec
+          .set(0, 0, -1)
+          .applyQuaternion(camera.quaternion)
+          .clone();
+        camera.position.addScaledVector(forward, state.speed * dt);
 
         // Дрейф метеоров (мир летит на игрока — минус корректный)
         //const drift = forward.multiplyScalar(-state.speed * dt);
@@ -1407,73 +1469,73 @@ camera.rotateZ(state.angVel.roll  * dt);
           .clone()
           .multiplyScalar((state.speed - 5) * dt * DUST_FOLLOW);
 
-          // Пыль
-          {
-            const attr = dust.geometry.attributes.position;
-            const arr = attr.array;
-            const H = DUST_RADIUS;
-            const cx = camera.position.x;
-            const cy = camera.position.y;
-            const cz = camera.position.z;
+        // Пыль
+        {
+          const attr = dust.geometry.attributes.position;
+          const arr = attr.array;
+          const H = DUST_RADIUS;
+          const cx = camera.position.x;
+          const cy = camera.position.y;
+          const cz = camera.position.z;
 
-            for (let i = 0; i < DUST_COUNT; i++) {
-              const ix = i * 3;
-              arr[ix + 0] += dustDrift.x;
-              arr[ix + 1] += dustDrift.y;
-              arr[ix + 2] += dustDrift.z;
+          for (let i = 0; i < DUST_COUNT; i++) {
+            const ix = i * 3;
+            arr[ix + 0] += dustDrift.x;
+            arr[ix + 1] += dustDrift.y;
+            arr[ix + 2] += dustDrift.z;
 
-              const dx = arr[ix + 0] - cx;
-              const dy = arr[ix + 1] - cy;
-              const dz = arr[ix + 2] - cz;
-              if (dx > H) arr[ix + 0] -= H * 2;
-              if (dx < -H) arr[ix + 0] += H * 2;
-              if (dy > H) arr[ix + 1] -= H * 2;
-              if (dy < -H) arr[ix + 1] += H * 2;
-              if (dz > H) arr[ix + 2] -= H * 2;
-              if (dz < -H) arr[ix + 2] += H * 2;
-            }
-            attr.needsUpdate = true;
-
-            const speedFactor = Math.min(
-              1,
-              Math.abs(state.speed) / state.maxSpeed,
-            );
-            dust.material.opacity = 0.35 + speedFactor * 0.65;
-            dust.material.size = 1.2 + speedFactor * 2.0;
+            const dx = arr[ix + 0] - cx;
+            const dy = arr[ix + 1] - cy;
+            const dz = arr[ix + 2] - cz;
+            if (dx > H) arr[ix + 0] -= H * 2;
+            if (dx < -H) arr[ix + 0] += H * 2;
+            if (dy > H) arr[ix + 1] -= H * 2;
+            if (dy < -H) arr[ix + 1] += H * 2;
+            if (dz > H) arr[ix + 2] -= H * 2;
+            if (dz < -H) arr[ix + 2] += H * 2;
           }
+          attr.needsUpdate = true;
 
-          // Метеоры
-          player.getWorldPosition(playerWorldPos);
+          const speedFactor = Math.min(
+            1,
+            Math.abs(state.speed) / state.maxSpeed,
+          );
+          dust.material.opacity = 0.35 + speedFactor * 0.65;
+          dust.material.size = 1.2 + speedFactor * 2.0;
+        }
 
-          for (const m of meteors) {
-            m.position.x += dustDrift.x;
-            m.position.y += dustDrift.y;
-            m.position.z += dustDrift.z;
+        // Метеоры
+        player.getWorldPosition(playerWorldPos);
 
-            m.rotation.x += m.userData.spin.x * dt;
-            m.rotation.y += m.userData.spin.y * dt;
-            m.rotation.z += m.userData.spin.z * dt;
+        for (const m of meteors) {
+          m.position.x += dustDrift.x;
+          m.position.y += dustDrift.y;
+          m.position.z += dustDrift.z;
 
-            wrapAround(m.position, camera.position, METEOR_RADIUS);
+          m.rotation.x += m.userData.spin.x * dt;
+          m.rotation.y += m.userData.spin.y * dt;
+          m.rotation.z += m.userData.spin.z * dt;
 
-            /// 💀💀💀
-            const d = m.position.distanceTo(playerWorldPos);
-            if (d < m.userData.size + 12) {
+          wrapAround(m.position, camera.position, METEOR_RADIUS);
 
-              let damag = 5*dt;
-              if(state.speed > 10) damag = 0.4*state.speed * dt;
+          /// 💀💀💀
+          const d = m.position.distanceTo(playerWorldPos);
+          if (d < m.userData.size + 12) {
 
-              state.shield -= damag;
+            let damag = 5*dt;
+            if(state.speed > 10) damag = 0.4*state.speed * dt;
 
-              flashDamage(0.6);
-              if (state.shield <= 0) {
-                state.shield = 0;
-                state.dead = true;
-                elGameover.style.display = "flex";
-                playDeath();
-              }
+            state.shield -= damag;
+
+            flashDamage(0.6);
+            if (state.shield <= 0) {
+              state.shield = 0;
+              state.dead = true;
+              elGameover.style.display = "flex";
+              playDeath();
             }
           }
+        }
           
         ///-----------------------------------|
         /// Проверка столкновения с Планетами.|
@@ -1541,22 +1603,30 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
 /// nose dot gateIn ≈ +1 — нос смотрит внутрь станции, всё правильно.
 /// nose dot gateIn ≈ −1 — нос смотрит наружу, ты летишь «задом наперёд».
         
-        if (currentStationHandle) {
-          const status = currentStationHandle.getLandingStatus(
+        if (currentStationHandle)
+        { const status = currentStationHandle.getLandingStatus(
             playerWorldPos,
             playerWorldQuat,
           );
 
-          if (status === 2) {
+          if (status === 2)
+          {
             // авария
+            isDocked = false;
             state.shield = 0;
             state.dead = true;
             elGameover.style.display = "flex";
             playDeath();
-          } else if (status === 1) {
+          }
+          else if (status === 1) {
             // успешная посадка — например, пополнить топливо/щит,
             // показать сообщение, отключить управление и т.п.
             // ...
+            isDocked = true;
+          }
+          else
+          {
+            isDocked = false; // ???
           }
         }
         

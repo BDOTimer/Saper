@@ -17,6 +17,9 @@
 //   ENTER       — продать выделенный товар (из инвентаря)
 //   ESC         — закрыть
 
+// ---- Колбэк «кредиты изменились» ----
+let onCreditsChangedCallback = null;
+
 const TRADE = (() => {
   // --- Товары станции: { name, buy, sell, stock } ---
   // buy  — сколько платит игрок при покупке (станция продаёт)
@@ -54,6 +57,14 @@ const TRADE = (() => {
     list2El: null,
     creditsEl: null,
     hintEl: null,
+  };
+
+  const setOnCreditsChanged = (fn) => {
+    onCreditsChangedCallback = typeof fn === "function" ? fn : null;
+  };
+
+  const fireCreditsChanged = () => {
+    if (onCreditsChangedCallback) onCreditsChangedCallback(state.credits);
   };
 
   // --- Внутренние помощники ---
@@ -460,6 +471,8 @@ const TRADE = (() => {
       state.inventory.push({ name: g.name, qty: 1, buyPrice: g.buy });
     }
 
+    fireCreditsChanged();   // ★
+
     flashHint("КУПЛЕНО: " + g.name, "#88ff88");
     renderAll();
   }
@@ -487,6 +500,8 @@ const TRADE = (() => {
         state.list2Index = Math.max(0, state.inventory.length - 1);
       }
     }
+
+    fireCreditsChanged();
 
     flashHint(
       `ПРОДАНО: ${item.name} за ${fmt(sellPrice)} cr`,
@@ -533,13 +548,13 @@ const TRADE = (() => {
     const key = e.key;
 
     // Навигация и действия — только когда экран открыт
-    if (key === KEY_EXIT || key === "Escape" || e.code === "Escape") {
-    //if (key === "1" || e.code === "Digit1" || e.code === "Numpad1") {
+    if (e.code === "KeyT" || key === "t" || key === "T" || key === "е" || key === "Е")
+    {
       e.preventDefault();
       e.stopPropagation(); // ← Чтобы HTML-листенер не съел событие
       setOpen(false);
 
-      console.log('key === KEY_EXIT');
+      console.log("TRADE: closed by key T");
 
       return;
     }
@@ -586,7 +601,8 @@ const TRADE = (() => {
         window.__trade_keydown_bound = true;
       }
     },
-    open() {
+    open(credits) {
+      state.credits = credits;
       setOpen(true);
     },
     close() {
@@ -605,6 +621,7 @@ const TRADE = (() => {
     setCredits(v) {
       state.credits = v;
       renderCredits();
+      fireCreditsChanged();
     },
     getGoods() {
       return state.goods;
@@ -621,6 +638,7 @@ const TRADE = (() => {
       state.list2Index = 0;
       renderAll();
     },
+    setOnCreditsChanged,   // ← новое
   };
 })();
 
