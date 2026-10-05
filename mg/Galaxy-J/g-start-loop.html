@@ -931,18 +931,20 @@
 
       addEventListener("keyup", (e) => (keys[e.code] = false));
 
+////////////////////////////////////////////////////////////////////// - .state:
+
       const SHIELDMAX = 100;
 
-      // ------------------------------------------------------------------
+      // ------------------------------------------------------------
       //  Состояние
-      // ------------------------------------------------------------------
-      const state = {
-        starIndex:    0,
+      // ------------------------------------------------------------
+      const state =
+      { starIndex:    0,
         dataStar : null,
 
         speed    :    0,
         maxSpeed :  120,
-        minSpeed :  -40,
+        minSpeed :  -20,
 
         shield   : SHIELDMAX,
         fuel     :  100,
@@ -961,6 +963,48 @@
         },
       };
 
+      //------------------------------------------------------ .keys:
+      // Угловые скорости вращения корпуса (рад/сек)
+      state.angVel = { pitch: 0, yaw: 0, roll: 0 };
+
+      // Настройки «инерции» вращения
+      const ROT =
+      { accel:    3.2,  // рад/с² - разгон (чем больше, тем резче выход на макс)
+        damping:  2.6,  // 1/с   - торможение (чем больше, тем быстрее гаснет)
+        maxPitch: 1.2,  // рад/с - ограничение по тангажу (W/S)
+        maxYaw:   1.1,  // рад/с - ограничение по рысканию (стрелки)
+        maxRoll:  1.6,  // рад/с - ограничение по крену (A/D)
+      };
+
+      // Тяжёлый грузовик — долгий разгон, долгое торможение
+      // const ROT = { accel: 1.6, damping: 0.9, maxPitch: 0.7, maxYaw: 0.6, maxRoll: 0.9 };
+
+      // Истребитель — быстро реагирует, быстро гаснет
+      // const ROT = { accel: 6.0, damping: 5.0, maxPitch: 1.8, maxYaw: 1.6, maxRoll: 2.4 };
+
+      // Текущий «средний» вариант
+      // const ROT = { accel: 3.2, damping: 2.6, maxPitch: 1.2, maxYaw: 1.1, maxRoll: 1.6 };
+
+      // "ПЕДАЛЬ ТЯГИ"
+      const THR =
+      { accel:   6,   // ед/с² - разгон при удержании клавиши
+        brake: 0.3,   // 1/с   - торможение когда клавиша отпущена (инерция выбега)
+        drag:  0.1,   // 1/с   - лёгкое сопротивление, когда тяга удерживается
+      };
+
+      // Тяжёлый корабль — долгий разгон, длинный выбег
+      // const THR = { accel: 90,  brake: 0.8, drag: 0.3 };
+
+      // Аркадный истребитель — быстрый отклик, короткий выбег
+      // const THR = { accel: 320, brake: 4.0, drag: 0.6 };
+
+      // Средний
+      // const THR = { accel: 180, brake: 1.8, drag: 0.4 };
+
+      //------------------------------------------------------------.
+
+///////////////////////////////////////////////////////////////////////////////.
+
       function updateSectorFromStar(star) {
         if (!star) return;
         state.sector.x = Math.round((star.x + 1) * 50);
@@ -973,9 +1017,9 @@
       const elHyperTarget = $("hyper-target");
       const elHyperProgress = $("hyper-progress");
 
-      // ------------------------------------------------------------------
+      // ------------------------------------------------------------
       //  Гиперпрыжок
-      // ------------------------------------------------------------------
+      // ------------------------------------------------------------
       function distanceBetweenStars(a, b) {
         if (!a || !b) return 0;
         const dx = a.x - b.x;
@@ -1060,6 +1104,8 @@
         camera.quaternion.set(0, 0, 0, 1);
         state.speed = 0;
 
+        state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
+
         for (const e of enemies) scene.remove(e);
         enemies.length = 0;
         for (const l of lasers) scene.remove(l);
@@ -1124,6 +1170,9 @@
         state.credits = 1000;
         state.kills = 0;
         state.dead = false;
+
+        // Сброс на «докручивание» после респавна / гиперпрыжка,
+        state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
         for (const e of enemies) scene.remove(e);
         enemies.length = 0;
@@ -1217,7 +1266,7 @@
 
     ///------------------------------------------------------------------------|
     /// Игровой цикл ✅
-    ///------------------------------------------------------------------------:
+    ///-------------------------------------------------------------------- .an:
     const clock = new THREE.Clock();
     const tmpVec = new THREE.Vector3();
     const playerWorldPos = new THREE.Vector3();
@@ -1255,27 +1304,64 @@
 ///////////////////////////////////////////////////////////////// 🟢- ИГРОК ЖИВ!
     if (!state.dead)
     {
-          // Тяга
-          if (keys["ArrowUp"  ]) state.speed += 220 * dt;
-          if (keys["ArrowDown"]) state.speed -= 220 * dt;
-
-          state.speed *= Math.pow(0.85, dt);
-          state.speed  = Math.max(
-            state.minSpeed,
-            Math.min(state.maxSpeed, state.speed),
-          );
 
           // Автовосстановитель щита
           if(state.shield < SHIELDMAX) state.shield += dt;
 
-          // Ориентация
-          const rotSpeed = 1.2 * dt;
-          if (keys["KeyW"]) camera.rotateX(rotSpeed);
-          if (keys["KeyS"]) camera.rotateX(-rotSpeed);
-          if (keys["KeyA"]) camera.rotateZ(rotSpeed);
-          if (keys["KeyD"]) camera.rotateZ(-rotSpeed);
-          if (keys["ArrowLeft"]) camera.rotateY(rotSpeed);
-          if (keys["ArrowRight"]) camera.rotateY(-rotSpeed);
+//////////////////////////////////////////////////////////////////////// - keys:
+
+// ------- Плавная тяга с инерцией -------
+const thrustIn = (keys["ArrowUp"] ? 1 : 0) - (keys["ArrowDown"] ? 1 : 0);
+
+// Разгон
+state.speed += thrustIn * THR.accel * dt;
+
+// Экспоненциальное торможение (не зависит от FPS)
+// Если тяга отпущена — гасим сильнее; если держим — только слегка "вязко" ограничиваем.
+const damping = thrustIn === 0 ? THR.brake : THR.drag;
+state.speed *= Math.exp(-damping * dt);
+
+// Ограничение диапазона
+state.speed = Math.max(
+  state.minSpeed,
+  Math.min(state.maxSpeed, state.speed),
+);
+
+// Мёртвая зона, чтобы не «полз» вечно возле нуля
+if (Math.abs(state.speed) < 0.05 && thrustIn === 0) state.speed = 0;
+
+// ------- Плавное вращение с инерцией -------
+const ax = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0); // pitch
+const ay = (keys["ArrowLeft"] ? 1 : 0) - (keys["ArrowRight"] ? 1 : 0); // yaw
+const az = (keys["KeyA"] ? 1 : 0) - (keys["KeyD"] ? 1 : 0); // roll
+
+// Разгон по осям
+state.angVel.pitch += ax * ROT.accel * dt;
+state.angVel.yaw   += ay * ROT.accel * dt;
+state.angVel.roll  += az * ROT.accel * dt;
+
+// Экспоненциальное торможение (работает и при отпущенной клавише,
+// и как «вязкое» ограничение сверху)
+const damp = Math.exp(-ROT.damping * dt);
+state.angVel.pitch *= damp;
+state.angVel.yaw   *= damp;
+state.angVel.roll  *= damp;
+
+// Ограничение максимальной угловой скорости
+state.angVel.pitch = THREE.MathUtils.clamp(state.angVel.pitch, -ROT.maxPitch, ROT.maxPitch);
+state.angVel.yaw   = THREE.MathUtils.clamp(state.angVel.yaw,   -ROT.maxYaw,   ROT.maxYaw);
+state.angVel.roll  = THREE.MathUtils.clamp(state.angVel.roll,  -ROT.maxRoll,  ROT.maxRoll);
+
+// Мёртвая зона, чтобы не «дрожал» на нуле
+if (Math.abs(state.angVel.pitch) < 1e-4) state.angVel.pitch = 0;
+if (Math.abs(state.angVel.yaw)   < 1e-4) state.angVel.yaw   = 0;
+if (Math.abs(state.angVel.roll)  < 1e-4) state.angVel.roll  = 0;
+
+// Применяем вращение
+camera.rotateX(state.angVel.pitch * dt);
+camera.rotateY(state.angVel.yaw   * dt);
+camera.rotateZ(state.angVel.roll  * dt);
+////////////////////////////////////////////////////////////////////////////////
 
           // Движение вперёд
           const forward = tmpVec
