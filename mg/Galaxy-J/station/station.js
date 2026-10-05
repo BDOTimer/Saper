@@ -22,7 +22,18 @@
 //     - совпадения направления «носа» корабля с осью шлюза (внутрь)
 //     - совпадения «верха» корабля с «верхом» шлюза (крен)
 
+// ---- Колбэк «произошла стыковка» ----
+let onDockCallback = null;
+
+// ---- Разрешение/запрет входа ----
+let dockingEnabled = true;
+
 const STATION = (() => {
+
+  const setOnDock = (fn) => {
+    onDockCallback = typeof fn === "function" ? fn : null;
+  };
+
   // ---------------------------------------------------------------
   //  RNG
   // ---------------------------------------------------------------
@@ -237,7 +248,10 @@ const STATION = (() => {
       }),
     );
         
-    topMarker.position.set(0, params.gateRadius * 1.05, -params.gateLength / 2);
+    const markerUp  = params.gateRadius * 1.35; // насколько выше центра шлюза
+    const markerFwd = params.gateRadius * 0.05; // насколько выдвинуть наружу (−Z)
+    topMarker.position.set(0, markerUp, -params.gateLength / 2 + markerFwd);
+
     gateGroup.add(topMarker);
     
     // Сохраняем ссылки для анимации/проверок
@@ -258,9 +272,24 @@ const STATION = (() => {
       return computeParams(star);
     },
 
-    generate(star, opts = {}) {
+    generate(star, opts = {})
+    {
       const params = computeParams(star);
       const group = makeStationGroup(params);
+
+      // ★ Применяем первоначальную ориентацию станции
+      if (opts.quaternion instanceof THREE.Quaternion) {
+        group.quaternion.copy(opts.quaternion);
+      } else if (opts.rotation) {
+        // rotation: { x, y, z } в радианах
+        group.rotation.set(
+          opts.rotation.x || 0,
+          opts.rotation.y || 0,
+          opts.rotation.z || 0,
+        );
+      } else if (opts.euler instanceof THREE.Euler) {
+        group.quaternion.setFromEuler(opts.euler);
+      }
 
       // ---- Анимация ----
       const update = (dt, time) => {
@@ -316,7 +345,8 @@ const STATION = (() => {
       //   - сверяем направление «носа» корабля (-Z локальный) с осью шлюза (внутрь станции, +Z локальный шлюза → но корабль летит в -Z мира шлюза)
       //   - сверяем «верх» корабля (+Y локальный) с «верхом» шлюза (+Y локальный)
       //   - если всё в допусках — успех; если в створе, но углы плохие — авария
-      const getLandingStatus = (playerPos, playerQuat) => {
+
+      const computeStatus = (playerPos, playerQuat) => {
         if (!playerPos || !playerQuat) return 0;
 
         // Мировые поза/ориентация станции
@@ -403,34 +433,51 @@ const STATION = (() => {
         // В створе, но совсем не туда — считаем аварией (врезался в стенку)
         return 2;
       };
-      
-        // ---- Разрешение/запрет входа ----
-        let dockingEnabled = true;
 
-        const COLORS = {
-          enabled:  { marker: 0x00ff00, ring: 0x00ff88 }, // зелёный
-          disabled: { marker: 0xff2222, ring: 0xff3333 }, // красный
-        };
+      let lastLandingStatus = 0;
 
-        function applyDockingColors() {
-          const c = dockingEnabled ? COLORS.enabled : COLORS.disabled;
-          group.userData.topMarker.material.color.setHex(c.marker);
-          group.userData.gateRing.material.color.setHex(c.ring);
+      const getLandingStatus = (playerPos, playerQuat) => {
+        
+        if (!playerPos || !playerQuat)
+        {   console.log("error: getLandingStatus");
+            return 0;
         }
-        applyDockingColors(); // применяем сразу при создании
+          
+        const status = computeStatus(playerPos, playerQuat);
 
-        const setDockingEnabled = (enabled) => {
-          dockingEnabled = !!enabled;
-          applyDockingColors();
-        };
+        if (status === 1 && lastLandingStatus !== 1) {
+            if (onDockCallback) onDockCallback();
+        }
+        lastLandingStatus = status;
 
-        const isDockingEnabled = () => dockingEnabled;
+        return status;
+      };
+      
+      const COLORS = {
+        enabled:  { marker: 0x00ff00, ring: 0x00ff88 }, // зелёный
+        disabled: { marker: 0xff2222, ring: 0xff3333 }, // красный
+      };
 
-        return {
-            group, params, update, getDangerLevel, getLandingStatus,
-            setDockingEnabled,   // ← новое
-            isDockingEnabled,    // ← новое
-        };
+      function applyDockingColors() {
+        const c = dockingEnabled ? COLORS.enabled : COLORS.disabled;
+        group.userData.topMarker.material.color.setHex(c.marker);
+        group.userData.gateRing.material.color.setHex(c.ring);
+      }
+      applyDockingColors(); // применяем сразу при создании
+
+      const setDockingEnabled = (enabled) => {
+        dockingEnabled = !!enabled;
+        applyDockingColors();
+      };
+
+      const isDockingEnabled = () => dockingEnabled;
+
+      return {
+          group, params, update, getDangerLevel, getLandingStatus,
+          setDockingEnabled,   // ← новое
+          isDockingEnabled,    // ← новое
+          setOnDock, 
+      };
     },
 
     dispose(handle) {

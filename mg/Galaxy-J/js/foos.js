@@ -14,6 +14,8 @@
 (function (global) {
     'use strict';
 
+    global.KEY_EXIT = "Backquote"; // 'Ё' "Escape" 
+
     // Создаем корневой объект, если он еще не существует.
     // Это защищает от затирания данных, если скрипт подключается дважды.
     const FO = global.FO || {};

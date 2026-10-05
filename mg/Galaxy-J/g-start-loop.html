@@ -244,6 +244,8 @@
       import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+      console.log("KEY_EXIT: ", KEY_EXIT); 
+
       function requestFs() {
           //if (isFullscreen()) return Promise.resolve();
 
@@ -269,17 +271,18 @@
           });
       }
 
+      /// ПОЛНЫЙ ЭКРАН
       function removeListeners() {
         ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
           function (evt) {
-            document.removeEventListener(evt, tryFs);
+            // document.removeEventListener(evt, tryFs);
         });
       }
 
       // Навешиваем только на реальные жесты
       ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
         function (evt) {
-          document.addEventListener(evt, tryFs, { passive: true });
+          //document.addEventListener(evt, tryFs, { passive: true });
       });
 
       ///---------------------------------------|
@@ -506,10 +509,10 @@
 
       function makeLaserMaterial() {
         return new THREE.MeshBasicMaterial({
-          color: 0xffff66,
+          color:   0xffff66,
           toneMapped: false,
           transparent: true,
-          opacity: 1.0,
+          opacity:      1.0,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
@@ -677,10 +680,17 @@
             planets.push(p);
         }
         
-        // Станция — где-то в стороне, не на пути планет
-        currentStationHandle = STATION.generate(star);
+        //-------------------------|
+        // Станция::Ориентация.    |
+        //-------------------------:
+        currentStationHandle = STATION.generate(star, {
+          rotation: { x: 0, y: Math.PI, z: 0 },
+        });
         
-        currentStationHandle.group.position.set(0, 200, -600);
+        //-------------------------|
+        // Станция::Позиция.       |
+        //-------------------------:
+        currentStationHandle.group.position.set(0, 0, -600);
         scene.add(currentStationHandle.group);
     }
     
@@ -1271,6 +1281,20 @@
     const tmpVec = new THREE.Vector3();
     const playerWorldPos = new THREE.Vector3();
 
+    //----------------|
+    // Стыковка.      |
+    //----------------:
+    // ★ Одноразовый сигнал «пристыковались»
+    currentStationHandle.setOnDock(() => {
+      // Пополняем ресурсы
+      state.fuel   = 100;
+      state.shield = SHIELDMAX;
+      state.speed  = 3;
+
+      // Открываем торговлю (один раз, не каждый кадр)
+      TRADE.open();
+    });
+
     function animate() 
     {
         const dt = Math.min(clock.getDelta(), 0.05);
@@ -1532,12 +1556,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
           } else if (status === 1) {
             // успешная посадка — например, пополнить топливо/щит,
             // показать сообщение, отключить управление и т.п.
-            state.fuel = 100;
-            state.shield = SHIELDMAX;
-            state.speed  = 0.5;
-            // console.log("LANDED OK");
-            
-            TRADE.open(); 
+            // ...
           }
         }
         

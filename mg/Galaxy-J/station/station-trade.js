@@ -415,7 +415,7 @@ const TRADE = (() => {
         state.activeList === 1 ? "купить" : "продать"
       } &nbsp;·&nbsp;
       <span style="color:#ffff88;">TAB</span> — переключить список &nbsp;·&nbsp;
-      <span style="color:#ffff88;">ESC</span> — закрыть<br>
+      <span style="color:#ffff88;">~ (Ё)</span> — закрыть<br>
       <span style="opacity:0.6;">активный список: <b style="color:#a8ffd0;">${activeName}</b></span>
     `;
   }
@@ -533,9 +533,14 @@ const TRADE = (() => {
     const key = e.key;
 
     // Навигация и действия — только когда экран открыт
-    if (key === "Escape") {
+    if (key === KEY_EXIT || key === "Escape" || e.code === "Escape") {
+    //if (key === "1" || e.code === "Digit1" || e.code === "Numpad1") {
       e.preventDefault();
+      e.stopPropagation(); // ← Чтобы HTML-листенер не съел событие
       setOpen(false);
+
+      console.log('key === KEY_EXIT');
+
       return;
     }
 
