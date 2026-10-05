@@ -535,7 +535,78 @@
         20000,
       );
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      class CameraManager
+      {
+        constructor(camera, ship, planets) {
+          this.camera  = camera;
+          this.ship    = ship;    // объект с .position (THREE.Vector3)
+          this.planets = planets; // массив объектов с .position
+
+          this.clock = new THREE.Clock();
+          this.farUpdateTimer = 0;
+          this.checkInterval  = 1.0; // секунды
+          this.minFar = 7000;
+          this.margin = 1.2;
+
+          this.seconds = 0;
+        }
+
+        /**
+         * Вызывать один раз в кадре (из основного animate)
+         */
+        update()
+        { const dt = this.clock.getDelta();
+          this.farUpdateTimer += dt;
+
+          if (this.farUpdateTimer >= this.checkInterval) {
+            this.farUpdateTimer -= this.checkInterval;
+            this._recalculateFar();
+            this.seconds++;
+          }
+        }
+
+        _recalculateFar()
+        {
+          const positionShip = this.ship.position;
+          let maxVisible = 0;
+
+          // 1. Считаем самую дальнюю планету
+          for (const p of this.planets) {
+            const d = positionShip.distanceTo(p.position);
+            if (d > maxVisible) maxVisible = d;
+          }
+
+          // 2. Учитываем звезду в (0, 0, 0)
+          const distToStar = positionShip.length(); // это distanceTo(new THREE.Vector3(0,0,0))
+          if (distToStar > maxVisible) {
+            maxVisible = distToStar;
+          }
+
+          this.camera.far = Math.max(maxVisible * this.margin, this.minFar);
+          this.camera.updateProjectionMatrix();
+        }
+
+        _zoomInStar()
+        {
+          const positionShip = this.ship.position;
+
+          const distToStar = positionShip.length();
+          const maxOrbit   = 8000;  // радиус орбиты самой дальней планеты
+
+          // Самый дальний объект, который может быть виден:
+          // планета на противоположной от корабля стороне звезды
+          const maxVisible = distToStar + maxOrbit;
+
+          this.camera.far = Math.max(maxVisible * this.margin, this.minFar);
+          this.camera.updateProjectionMatrix();
+        }
+      }
+
+      const renderer = new THREE.WebGLRenderer({
+         antialias: true
+      //,logarithmicDepthBuffer: true
+      });
+
       renderer.setSize(innerWidth, innerHeight);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
