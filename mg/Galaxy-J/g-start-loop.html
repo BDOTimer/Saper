@@ -238,7 +238,7 @@
     <script src="./station/station-trade.js"></script>
     
     <script src="./js/help.js"></script>
-    <script src="../js/sound-lib.js"></script>
+    <script src="./snd/g-sound-lib.js"></script>
 
     <script type="module">
       import * as THREE from "three";
@@ -317,18 +317,8 @@
         state.credits = credits;
         elCredits.textContent = credits;
       });
-      
-        const FUEL_BURN_PER_SPEED = 0;//0.005; // топливо/сек на единицу скорости
-        const HYPER_FUEL_PER_UNIT = 0;//40;    // топлива на 1.0 расстояния между звёздами
-        const HYPER_MIN_FUEL = 5;              // минимум, чтобы вообще стартовать
-        const HYPER_DURATION = 6;              // в секундах
-        
-        const TUNING_SHIP =
-        {
-            fuel_rate:      FUEL_BURN_PER_SPEED,
-            fuel_hyper:     HYPER_FUEL_PER_UNIT,
-            fuel_hyper_min: HYPER_MIN_FUEL
-        };
+
+      const HYPER_DURATION = 6; // в секундах
 
       // ------------------------------------------------------------------
       //  Отладочные переключатели
@@ -360,11 +350,13 @@
       // ============================================================
       //  Звук
       // ============================================================
-      const kit = SoundKit.createSoundKit({
-        laser: { src: "snd/laser-1.mp3", volume: 0.45, pool: 3 },
-        death: { src: "snd/ship-death-1.mp3", volume: 0.35, pool: 1 },
-        damag: { src: "snd/damag-1.mp3", volume: 0.35, pool: 3 },
-        hjump: { src: "snd/ship-HJ-1.mp3", volume: 0.35, pool: 1 },
+      const kit = SND.createSoundKit({
+        laser  : { src: "snd/laser-1.mp3"     , volume: 0.45, pool: 3 },
+        death  : { src: "snd/ship-death-1.mp3", volume: 0.35, pool: 1 },
+        damag  : { src: "snd/damag-1.mp3"     , volume: 0.35, pool: 3 },
+        hjump  : { src: "snd/ship-HJ-1.mp3"   , volume: 0.35, pool: 1 },
+        docking: { src: "snd/good-dock-1.mp3" , volume: 0.35, pool: 1 },
+        dockout: { src: "snd/good-dock-1.mp3" , volume: 0.35, pool: 1 },
       });
 
       kit.autoUnlock();
@@ -1040,48 +1032,49 @@
 
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 
-      const SHIELDMAX = 100;
+    // ------------------------------------------------------------
+    //  Состояние
+    // ------------------------------------------------------------
+    // Игрок
+    const  pers = new Pers();
+    window.PERS = pers;   // удобный доступ из консоли / других скриптов
 
-      // ------------------------------------------------------------
-      //  Состояние
-      // ------------------------------------------------------------
-      const state =
-      { starIndex:    0,
-        dataStar : null,
+    // Корабль
+    const  ship = new Ship();
+    window.SHIP = ship;
 
-        speed    :    0,
-        maxSpeed :  120,
-        minSpeed :  -20,
+    // Гиперпрыжок — это состояние мира/сессии, пока оставляем как есть
+    const hyper = {
+      active: false, t: 0, duration: 2.2, targetIdx: -1, fuelCost: 0,
+    };
 
-        shield   : SHIELDMAX,
-        fuel     :  100,
-        credits  : 1000,
-        kills    :    0,
-        sector   : { x: 0, y: 0 },
-        dead     : false,
+// Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
+const state = {
+  get starIndex() { return pers.starIndex; }, set starIndex(v) { pers.starIndex = v; },
+  get dataStar()  { return pers.dataStar;  }, set dataStar(v)  { pers.dataStar  = v; },
+  get credits()   { return pers.credits;   }, set credits(v)   { pers.credits   = v; },
+  get kills()     { return pers.kills;     }, set kills(v)     { pers.kills     = v; },
+  get sector()    { return pers.sector;    }, set sector(v)    { pers.sector    = v; },
+  get dead()      { return pers.dead;      }, set dead(v)      { pers.dead      = v; },
 
-        // гиперпрыжок
-        hyper: {
-          active: false,
-          t: 0, // прошло секунд
-          duration: 2.2, // длительность анимации
-          targetIdx: -1, // куда прыгаем
-          fuelCost: 0, // сколько топлива спишет
-        },
-      };
+  get speed()     { return ship.speed;     }, set speed(v)     { ship.speed     = v; },
+  get maxSpeed()  { return ship.maxSpeed;  }, set maxSpeed(v)  { ship.maxSpeed  = v; },
+  get minSpeed()  { return ship.minSpeed;  }, set minSpeed(v)  { ship.minSpeed  = v; },
+  get shield()    { return ship.shield;    }, set shield(v)    { ship.shield    = v; },
+  get fuel()      { return ship.fuel;      }, set fuel(v)      { ship.fuel      = v; },
+  get angVel()    { return ship.angVel;    },
 
-      //------------------------------------------------------ .keys:
-      // Угловые скорости вращения корпуса (рад/сек)
-      state.angVel = { pitch: 0, yaw: 0, roll: 0 };
+  hyper,
+};
 
-      // Настройки «инерции» вращения
-      const ROT =
-      { accel:    3.2,  // рад/с² - разгон (чем больше, тем резче выход на макс)
-        damping:  2.6,  // 1/с   - торможение (чем больше, тем быстрее гаснет)
-        maxPitch: 1.2,  // рад/с - ограничение по тангажу (W/S)
-        maxYaw:   1.1,  // рад/с - ограничение по рысканию (стрелки)
-        maxRoll:  1.6,  // рад/с - ограничение по крену (A/D)
-      };
+      // // Настройки «инерции» вращения
+      // const ROT =
+      // { accel:    3.2,  // рад/с² - разгон (чем больше, тем резче выход на макс)
+      //   damping:  2.6,  // 1/с   - торможение (чем больше, тем быстрее гаснет)
+      //   maxPitch: 1.2,  // рад/с - ограничение по тангажу (W/S)
+      //   maxYaw:   1.1,  // рад/с - ограничение по рысканию (стрелки)
+      //   maxRoll:  1.6,  // рад/с - ограничение по крену (A/D)
+      // };
 
       // Тяжёлый грузовик — долгий разгон, долгое торможение
       // const ROT = { accel: 1.6, damping: 0.9, maxPitch: 0.7, maxYaw: 0.6, maxRoll: 0.9 };
@@ -1093,11 +1086,11 @@
       // const ROT = { accel: 3.2, damping: 2.6, maxPitch: 1.2, maxYaw: 1.1, maxRoll: 1.6 };
 
       // "ПЕДАЛЬ ТЯГИ"
-      const THR =
-      { accel:   6,   // ед/с² - разгон при удержании клавиши
-        brake: 0.3,   // 1/с   - торможение когда клавиша отпущена (инерция выбега)
-        drag:  0.1,   // 1/с   - лёгкое сопротивление, когда тяга удерживается
-      };
+      // const THR =
+      // { accel:   6,   // ед/с² - разгон при удержании клавиши
+      //   brake: 0.3,   // 1/с   - торможение когда клавиша отпущена (инерция выбега)
+      //   drag:  0.1,   // 1/с   - лёгкое сопротивление, когда тяга удерживается
+      // };
 
       // Тяжёлый корабль — долгий разгон, длинный выбег
       // const THR = { accel: 90,  brake: 0.8, drag: 0.3 };
@@ -1156,10 +1149,9 @@
         if (!cur || !dst) return;
 
         const dist = distanceBetweenStars(cur, dst);
+
         const fuelCost = Math.max(
-          HYPER_MIN_FUEL,
-          Math.round(dist * HYPER_FUEL_PER_UNIT),
-        );
+          ship.TUNING.fuel_hyper_min, Math.round(dist * ship.TUNING.fuel_hyper));
 
         if (state.fuel < fuelCost) {
           console.log(
@@ -1198,7 +1190,7 @@
         }
 
         // Списываем топливо
-        state.fuel = Math.max(0, state.fuel - TUNING_SHIP.fuel_hyper);
+        state.fuel = Math.max(0, state.fuel - ship.TUNING.fuel_hyper);
 
         // Обновляем состояние игрока
         state.starIndex = targetIdx;
@@ -1270,13 +1262,10 @@
       // Стартовая система
       buildSystemFromStar(state.dataStar);
 
-      function resetGame() {
-        state.speed   =     0;
-        state.shield  =   100;
-        state.fuel    =   100;
-        state.kills   =     0;
-        state.dead    = false;
-      //state.credits =  1000;
+      function resetGame()
+      {
+        pers.reset(); // kills=0, dead=false, credits сохраняются
+        ship.reset(); // speed=0, shield=max, fuel=100, angVel=0
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
@@ -1286,7 +1275,7 @@
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
 
-        camera.position.set(0, 0, 0);
+        camera.position  .set(0, 0, 0);
         camera.quaternion.set(0, 0, 0, 1);
 
         reseedDustAndMeteors();
@@ -1387,9 +1376,11 @@
       console.log("DOCK: стыковка к станции");
       isDocked = true;
 
+      kit.sounds.docking.play();
+
       // Пополняем ресурсы
       state.fuel   = 100;
-      state.shield = SHIELDMAX;
+      state.shield = ship.SHIELDMAX;
       state.speed  = 3;
 
       // Открываем торговлю (один раз, не каждый кадр)
@@ -1402,8 +1393,9 @@
     currentStationHandle.setOnUndock(() =>
     {
       console.log("UNDOCK: отстыковка от станции");
-
       isDocked = false;
+
+      kit.sounds.dockout.play();
 
       // Закрыть TRADE, если открыт
       if (TRADE.isOpen()) TRADE.close();
@@ -1464,7 +1456,7 @@
     {
 
           // Автовосстановитель щита
-          if(state.shield < SHIELDMAX) state.shield += dt;
+          if(state.shield < ship.SHIELDMAX) state.shield += dt;
 
 ///////////////////////////////////////////////////////////////////// 🔍 .keys:
 
@@ -1472,11 +1464,11 @@
 const thrustIn = (keys["ArrowUp"] ? 1 : 0) - (keys["ArrowDown"] ? 1 : 0);
 
 // Разгон
-state.speed += thrustIn * THR.accel * dt;
+state.speed += thrustIn * ship.THR.accel * dt;
 
 // Экспоненциальное торможение (не зависит от FPS)
 // Если тяга отпущена — гасим сильнее; если держим — только слегка "вязко" ограничиваем.
-const damping = thrustIn === 0 ? THR.brake : THR.drag;
+const damping = thrustIn === 0 ? ship.THR.brake : ship.THR.drag;
 state.speed *= Math.exp(-damping * dt);
 
 // Ограничение диапазона
@@ -1496,21 +1488,21 @@ if (!isDocked)
   const az = (keys["KeyA"] ? 1 : 0) - (keys["KeyD"] ? 1 : 0); // roll
 
   // Разгон по осям
-  state.angVel.pitch += ax * ROT.accel * dt;
-  state.angVel.yaw   += ay * ROT.accel * dt;
-  state.angVel.roll  += az * ROT.accel * dt;
+  state.angVel.pitch += ax * ship.ROT.accel * dt;
+  state.angVel.yaw   += ay * ship.ROT.accel * dt;
+  state.angVel.roll  += az * ship.ROT.accel * dt;
 
   // Экспоненциальное торможение (работает и при отпущенной клавише,
   // и как «вязкое» ограничение сверху)
-  const damp = Math.exp(-ROT.damping * dt);
+  const damp = Math.exp(-ship.ROT.damping * dt);
   state.angVel.pitch *= damp;
   state.angVel.yaw   *= damp;
   state.angVel.roll  *= damp;
 
   // Ограничение максимальной угловой скорости
-  state.angVel.pitch = THREE.MathUtils.clamp(state.angVel.pitch, -ROT.maxPitch, ROT.maxPitch);
-  state.angVel.yaw   = THREE.MathUtils.clamp(state.angVel.yaw,   -ROT.maxYaw,   ROT.maxYaw);
-  state.angVel.roll  = THREE.MathUtils.clamp(state.angVel.roll,  -ROT.maxRoll,  ROT.maxRoll);
+  state.angVel.pitch = THREE.MathUtils.clamp(state.angVel.pitch, -ship.ROT.maxPitch, ship.ROT.maxPitch);
+  state.angVel.yaw   = THREE.MathUtils.clamp(state.angVel.yaw,   -ship.ROT.maxYaw,   ship.ROT.maxYaw);
+  state.angVel.roll  = THREE.MathUtils.clamp(state.angVel.roll,  -ship.ROT.maxRoll,  ship.ROT.maxRoll);
 
   // Мёртвая зона, чтобы не «дрожал» на нуле
   if (Math.abs(state.angVel.pitch) < 1e-4) state.angVel.pitch = 0;
@@ -1712,7 +1704,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
         // Топливо
         if (state.speed !== 0)
         {
-            state.fuel -= Math.abs(state.speed) * dt * TUNING_SHIP.fuel_rate;
+            state.fuel -= Math.abs(state.speed) * dt * ship.TUNING.fuel_rate;
             if (state.fuel <= 0)
             {   state.fuel  = 0;
                 state.speed *= 0.98;
