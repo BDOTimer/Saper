@@ -1,199 +1,178 @@
-//-----------------------------------------------------------------------------|
-// universe.js
-// Вся Вселенная начинается от сюда!
-//-----------------------------------------------------------------------------|
+//-----------------------------------------------------------------------------
+// universe.js — детерминированная Вселенная: seedRoot → N галактик → M звёзд
+//-----------------------------------------------------------------------------
 
-//----------------------------------------------------------------------------☘️
-// class HolderSeeds: Хранитель ключей(сидов) и 
-// генератор детерминированного шума для ~200 галактик.
-//-----------------------------------------------------------------------------:
-class HolderSeeds
+const SEED_ROOT_DEFAULT         = 2026;
+const AMOUNT_GALAXY_DEFAULT     =  100;
+const STARS_MIN = 50, STARS_MAX =  250;
+
+//----------------------------------------------------------------------------|
+// Чистые утилиты (без состояния — основа детерминизма)
+//----------------------------------------------------------------------------|
+
+/** number | string → uint32. Строки — djb2. */
+function toUint32(value)
+{   if (typeof value === 'number') {
+        if (!Number.isFinite(value)) throw new TypeError('seed: ожидалось конечное число');
+        return value >>> 0;
+    }
+    if (typeof value === 'string') {
+        let h = 5381;
+        for (let i = 0; i < value.length; i++)
+            h = (Math.imul(h, 33) ^ value.charCodeAt(i)) >>> 0;
+        return h;
+    }
+    throw new TypeError('seed: number | string ожидалось, пришёл ' + typeof value);
+}
+
+/** hash-combine (boost-style): порядок аргументов влияет на результат. */
+function hashCombine(seed, value)
+{   const s = toUint32(seed), v = toUint32(value);
+    return (s ^ (v + 0x9e3779b9 + (s << 6) + (s >>> 2))) >>> 0;
+}
+
+/** splitmix32-финализатор: лавинное смешивание производных сидов. */
+function mix32(a)
+{   a = (a + 0x9e3779b9) | 0;
+    let t = a ^ (a >>> 16);
+    t = Math.imul(t, 0x21f0aaad);
+    t = t ^ (t >>> 15);
+    t = Math.imul(t, 0x735a2d97);
+    return (t ^ (t >>> 15)) >>> 0;
+}
+
+/** Mulberry32 — быстрый детерминированный PRNG, [0, 1). */
+function mulberry32(seed)
+{   let a = toUint32(seed);
+    return function () {
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+//----------------------------------------------------------------------------|
+// class RNG — обёртка над PRNG
+//----------------------------------------------------------------------------|
+class RNG
 {
+    constructor(seed) { this._rand = mulberry32(seed); }
 
-    #seeds = [];   // ← объявляем приватное поле
+    next()          { return this._rand(); }                          // [0, 1)
+    range(min, max) { return min + (max - min) * this._rand(); }      // [min, max)
+    int(min, max)   { return Math.floor(this.range(min, max + 1)); }  // [min, max] целое
+    chance(p)       { return this._rand() < p; }
 
-    /*
-     * @param {number|string} seed - Сид вселенной. Может быть числом или строкой.
-     */
-    constructor(sseed, amount)
-    {
-        // Приводим сид к 32-битному беззнаковому целому
-        this.sseed = sseed;
-        this. seed = HolderSeeds._toUint32(sseed);
-        // Создаем привязанный генератор псевдослучайных чисел
-        this.random = HolderSeeds._mulberry32(this.seed);
-
-        for(let i = 0; i < amount; ++i)
-        {
-            const n = this.random()
-            this.#seeds.push(n);
-        }
-
-    //  for(let i = 0; i < this.#seeds.length; ++i)
-    //  {   console.log(`🔍 #seeds [${i}]: ${this.#seeds[i]}`);
-    //  }
-    }
-
-    // -----------------------------------------|
-    //  Конвертация сида
-    // -----------------------------------------:
-    static _toUint32(value)
-    {   if (typeof value === 'number') {
-            return value >>> 0;
-        }
-        // Простой хеш строки в 32-битное число (djb2)
-        let hash = 5381;
-        for (let i = 0; i < value.length; i++) {
-            hash = (hash * 33) ^ value.charCodeAt(i);
-            hash = hash >>> 0;
-        }
-        return hash;
-    }
-
-    // -----------------------------------------|
-    //  Утилиты: 
-    //  Генератор псевдослучайных чисел Mulberry32
-    //  Быстрый, детерминированный, 
-    //  проходит тесты на равномерность.
-    // -----------------------------------------:
-    static _mulberry32(a)
-    {   return function ()
-        {   a |= 0;
-            a  = (a + 0x6d2b79f5) | 0;
-            let  t = Math.imul(a ^ (a >>> 15), 1 | a);
-            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
-    }
-
-    // -----------------------------------------|
-    //  Основные методы генерации
-    // -----------------------------------------:
-
-    /**
-     * Возвращает число от 0 (включительно) до 1 (не включая).
-     */
-    next() {
-        return this.random();
-    }
-
-    /**
-     * Возвращает число в диапазоне [min, max).
-     */
-    range(min, max) {
-        return min + (max - min) * this.random();
-    }
-
-    /**
-     * Возвращает случайный элемент массива.
-     */
     choice(array) {
-        return array[Math.floor(this.random() * array.length)];
+        if (!Array.isArray(array) || array.length === 0)
+            throw new Error('RNG.choice(): пустой массив');
+        return array[Math.floor(this._rand() * array.length)];
     }
 
-    /**
-     * Возвращает детерминированный ID галактики по её индексу.
-     * Полезно, чтобы не хранить все 200 сидов в памяти, а вычислять их на лету.
-     * @param {number} galaxyIndex - Индекс галактики (например, от 0 до 199)
-     */
-    getGalaxySeed(galaxyIndex) {
-        // Смешиваем базовый сид вселенной с индексом галактики
-        const combined = this._toUint32(
-            this.seed + 0x9e3779b9 + (galaxyIndex << 6) + (galaxyIndex >> 2));
-        return Universe._mulberry32(combined);
-    }
-
-    getSeed(i) {
-        return this.#seeds[i];
+    shuffle(array) {                       // Fisher–Yates
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(this._rand() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
 }
 
-// -----------------------------------------|
-//  Экспорт для Node.js и браузеров
-// -----------------------------------------:
-if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
-    module.exports = HolderSeeds;
-} else {
-    window.Universe = HolderSeeds;
-}
-
-
-//----------------------------------------------------------------------------☘️
-// class Universe
-// Хранитель HolderSeeds для ~200 галактик.
-//
-// Использование:
-//      <script src="./galaxy/universe.js"></script>
-//      <script>
-//          const SEED_UNIVERSE = "NGC-4889-Command"; // Или число
-//          const UNIVERSE      = new Universe(SEED_UNIVERSE);
-//          window.Universe     = UNIVERSE; // Делаем глобальным
-//          ...
-//      </script>
-//-----------------------------------------------------------------------------:
-
-const SEED_ROOT_DEFAULT     = 2026;
-const AMOUNT_GALAXY_DEFAULT = 100;
-
+//----------------------------------------------------------------------------|
+// class Universe — навигация + детерминированная деривация сидов
+//----------------------------------------------------------------------------|
 class Universe
 {
-
-    /// Здесь храним рутовый сид:
     #seedRoot;
+    #amountGalaxy;
 
-    /// Здесь держим сиды для всех галактик:
-    #holderSeeds;
-
-    constructor(sseed = SEED_ROOT_DEFAULT, amount = AMOUNT_GALAXY_DEFAULT)
-    {
-         this.load(sseed, amount);
+    constructor(sseed = SEED_ROOT_DEFAULT, amount = AMOUNT_GALAXY_DEFAULT) {
+        this.indexGalaxy = 0;
+        this.indexStar   = 0;
+        this.load(sseed, amount);
     }
 
-    // -----------------------------------------|
-    //  Основные методы генерации
-    // -----------------------------------------:
+    get seedRoot()     { return this.#seedRoot; }
+    get amountGalaxy() { return this.#amountGalaxy; }
 
-    /**
-     * Возвращает детерминированный ID галактики по её индексу.
-     * Полезно, чтобы не хранить все 200 сидов в памяти, а вычислять их на лету.
-     * @param {number} galaxyIndex - Индекс галактики (например, от 0 до 199)
-     */
-    getGalaxySeed(galaxyIndex) {
-        return this.#holderSeeds.getGalaxySeed(i);
+    load(sseed, amount = AMOUNT_GALAXY_DEFAULT) {
+        if (!Number.isInteger(amount) || amount <= 0)
+            throw new RangeError('amount: требуется целое > 0');
+        this.#seedRoot     = sseed;
+        this.#amountGalaxy = amount;
+        this.indexGalaxy   = 0;
+        this.indexStar     = 0;
     }
 
-    getSeed(i) {
-        return this.#holderSeeds.getSeed(i);
+    goToGalaxy(i) {
+        this._checkGalaxy(i);
+        this.indexGalaxy = i;
+        this.indexStar   = 0;   // смена галактики сбрасывает курсор звёзд
     }
 
-    // -----------------------------------------|
-    //  Dispose (для будущих расширений)
-    // -----------------------------------------:
-    dispose() {
-        // Сейчас метод пуст, 
-        // но зарезервирован для очистки тяжелых ресурсов.
+    /** Детерминированный сид галактики (uint32). */
+    getGalaxySeed(i) {
+        this._checkGalaxy(i);
+        return mix32(hashCombine(this.#seedRoot, i));
     }
 
-    load(seed, amount)
-    {
-        /// Загрузить страторвый(рутовый) сид ...
-        /// const SEED_ROOT = ...;
-        this.#seedRoot    = seed;
-        this.#holderSeeds = new HolderSeeds(this.#seedRoot, amount);
+    getGalaxyRng(i) { return new RNG(this.getGalaxySeed(i)); }
+
+    /** M — число звёзд, детерминированно из сида галактики (отдельный подпоток). */
+    getStarCount(i) {
+        return new RNG(mix32(hashCombine(this.getGalaxySeed(i), 'count')))
+            .int(STARS_MIN, STARS_MAX);
     }
 
-    save()
-    {
-        /// Сохранить страторвый(рутовый) сид: this.#seedRoot
+    /** Детерминированный сид звезды: seedGalaxy + индекс звезды. */
+    getStarSeed(gi, si) {
+        this._checkGalaxy(gi);
+        const m = this.getStarCount(gi);
+        if (!Number.isInteger(si) || si < 0 || si >= m)
+            throw new RangeError(`starIndex ${si} вне [0, ${m})`);
+        return mix32(hashCombine(this.getGalaxySeed(gi), si));
+    }
 
+    getStarRng(gi, si) { return new RNG(this.getStarSeed(gi, si)); }
+
+    _checkGalaxy(i) {
+        if (!Number.isInteger(i) || i < 0 || i >= this.#amountGalaxy)
+            throw new RangeError(`galaxyIndex ${i} вне [0, ${this.#amountGalaxy})`);
+    }
+
+    /** В localStorage — только то, что нельзя сгенерировать. */
+    save(key = 'universe.save') {
+        const data = {
+            v: 1,                        // версия формата — на будущее
+            seedRoot: this.#seedRoot,    // если сид вводится игроком
+            amount: this.#amountGalaxy,  // если фиксирован — можно не хранить
+            indexGalaxy: this.indexGalaxy,
+            indexStar:   this.indexStar,
+        };
+        try { localStorage.setItem(key, JSON.stringify(data)); }
+        catch (e) { console.warn('Universe.save():', e); } // приватный режим / квота
+    }
+
+    static fromSave(key = 'universe.save') {
+        try {
+            const d = JSON.parse(localStorage.getItem(key) || 'null');
+            if (!d || d.v !== 1) return null;
+            const u = new Universe(d.seedRoot, d.amount);
+            u.indexGalaxy = d.indexGalaxy;
+            u.indexStar   = d.indexStar;
+            return u;
+        } catch { return null; }
     }
 }
 
-// -----------------------------------------|
-//  Экспорт для Node.js и браузеров
-// -----------------------------------------:
-if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
-    module.exports = Universe;
-} else {
-    window.Universe = Universe;
+//----------------------------------------------------------------------------|
+// Экспорт: один неймспейс, ничего не перезаписывается
+//----------------------------------------------------------------------------|
+const UniverseJS = { Universe, RNG, utils: { toUint32, hashCombine, mix32, mulberry32 } };
+
+if (typeof module !== 'undefined' && module.exports)
+{   module.exports = UniverseJS;
+} else if (typeof window !== 'undefined')
+{   window.UniverseJS = UniverseJS; // const U = new UniverseJS.Universe(seed);
 }

@@ -300,14 +300,14 @@
       /// Сид для всей Вселенной.               |
       ///---------------------------------------|
       const SEED_UNIVERSE = "NGC-4889-Command"; // Или число
-      const UNIVERSE      = new Universe(SEED_UNIVERSE);
+      const UNIVERSE      = new UniverseJS.Universe(SEED_UNIVERSE);
       window.Universe     = UNIVERSE; // Делаем глобальным
 
 
       ///---------------------------------------|
       /// Галактика: id = 0.                    |
       ///---------------------------------------|
-      const seedGalaxy = UNIVERSE.getSeed    (0);
+      const seedGalaxy = UNIVERSE.getGalaxySeed(0);
       let       GALAXY = new Galaxy( seedGalaxy);
                 GALAXY . init();
       window.   GALAXY = GALAXY;
