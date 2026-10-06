@@ -3,25 +3,14 @@
 // Вся Вселенная начинается от сюда!
 // Особенности:
 //      - universe.js без зависимостей!
-// Описание работы:
-//      - Есть 1 главный рутовый сид всей Вселенной seedRoot
-//      - Сид Галактики(seedGalaxy) из seedRoot и индекса от 0 ... N
-//      - Сид Звезды(seedStar) из  seedGalaxy и индекса от 0 ... M
-//      - N(количество Галактик) рандомно от seedRoot
-//      - M(количество звёзд) рандомно от seedGalaxy
-//      - Т.е. каждая Звезда(Star) иемеет уникальный ДЕТЕРМИНИРОВАННЫЙ сид!
-//      - new Universe(seed) сам подхватывает сейв, если он есть:
-//        сейв есть   → восстановлены seedRoot/amount/позиция,
-//        сейва нет   → новая вселенная от seed, курсор (0, 0)
-//      - в localStorage храним только те данные, которые нельзя сгенерировать!
+//      - НЕ работает с localStorage — только чистые данные + генерация.
+//      - Сохранение/восстановление — через toJSON() / fromJSON().
+//        Их вызывает Game (а Game — уже через ProfileStore).
 //-----------------------------------------------------------------------------|
 
 const SEED_ROOT_DEFAULT     = 2026;
 const AMOUNT_GALAXY_DEFAULT =  100;
-const STARS_MIN = 50, STARS_MAX =  250;
-
-const SAVE_KEY_DEFAULT    = 'universe.save';
-//const SAVE_FORMAT_VERSION = 1;
+const STARS_MIN = 50, STARS_MAX = 250;
 
 //----------------------------------------------------------------------------|
 // Чистые утилиты (без состояния — основа детерминизма)
@@ -29,7 +18,8 @@ const SAVE_KEY_DEFAULT    = 'universe.save';
 
 /** number | string → uint32. Строки — djb2. */
 function toUint32(value)
-{   if (typeof value === 'number') {
+{
+    if (typeof value === 'number') {
         if (!Number.isFinite(value)) throw new TypeError('seed: ожидалось конечное число');
         return value >>> 0;
     }
@@ -44,13 +34,15 @@ function toUint32(value)
 
 /** hash-combine (boost-style): порядок аргументов влияет на результат. */
 function hashCombine(seed, value)
-{   const s = toUint32(seed), v = toUint32(value);
+{
+    const s = toUint32(seed), v = toUint32(value);
     return (s ^ (v + 0x9e3779b9 + (s << 6) + (s >>> 2))) >>> 0;
 }
 
 /** splitmix32-финализатор: лавинное смешивание производных сидов. */
 function mix32(a)
-{   a = (a + 0x9e3779b9) | 0;
+{
+    a = (a + 0x9e3779b9) | 0;
     let t = a ^ (a >>> 16);
     t = Math.imul(t, 0x21f0aaad);
     t = t ^ (t >>> 15);
@@ -60,7 +52,8 @@ function mix32(a)
 
 /** Mulberry32 — быстрый детерминированный PRNG, [0, 1). */
 function mulberry32(seed)
-{   let a = toUint32(seed);
+{
+    let a = toUint32(seed);
     return function () {
         a = (a + 0x6d2b79f5) | 0;
         let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -76,9 +69,9 @@ class RNG
 {
     constructor(seed) { this._rand = mulberry32(seed); }
 
-    next()          { return this._rand(); }                          // [0, 1)
-    range(min, max) { return min + (max - min) * this._rand(); }      // [min, max)
-    int(min, max)   { return Math.floor(this.range(min, max + 1)); }  // [min, max] целое
+    next()          { return this._rand(); }
+    range(min, max) { return min + (max - min) * this._rand(); }
+    int(min, max)   { return Math.floor(this.range(min, max + 1)); }
     chance(p)       { return this._rand() < p; }
 
     choice(array) {
@@ -87,7 +80,7 @@ class RNG
         return array[Math.floor(this._rand() * array.length)];
     }
 
-    shuffle(array) {                       // Fisher–Yates (мутирует array!)
+    shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(this._rand() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
@@ -98,6 +91,7 @@ class RNG
 
 //----------------------------------------------------------------------------|
 // class Universe — навигация + детерминированная деривация сидов
+// Состояние — чистые данные. Сохранение — через toJSON()/fromJSON().
 //----------------------------------------------------------------------------|
 class Universe
 {
@@ -105,61 +99,56 @@ class Universe
     #amountGalaxy;
     #indexGalaxy;
     #indexStar;
-    #restored;
 
-    constructor(sseed = SEED_ROOT_DEFAULT, amount = AMOUNT_GALAXY_DEFAULT) {
-        this.load(sseed, amount);       // 1) дефолт: вселенная от seed, курсор (0, 0)
-        this.#restore(sseed, amount);   // 2) есть валидный сейв → он перекрывает дефолт
+    constructor(seed = SEED_ROOT_DEFAULT, amount = AMOUNT_GALAXY_DEFAULT)
+    {
+        this.load(seed, amount);
     }
 
     get seedRoot()     { return this.#seedRoot; }
     get amountGalaxy() { return this.#amountGalaxy; }
+    get indexGalaxy()  { return this.#indexGalaxy; }
+    get indexStar()    { return this.#indexStar; }
 
-    /** Позиция курсора — только для чтения. Навигация: goToGalaxy() / goToStar(). */
-    get indexGalaxy() { return this.#indexGalaxy; }
-    get indexStar()   { return this.#indexStar; }
-
-    /** true — состояние взято из сейва; false — сгенерировано с нуля. */
-    get restored()     { return this.#restored; }
-
-    load(sseed, amount = AMOUNT_GALAXY_DEFAULT) {
+    load(seed, amount = AMOUNT_GALAXY_DEFAULT)
+    {
         if (!Number.isInteger(amount) || amount <= 0)
             throw new RangeError('amount: требуется целое > 0');
-        this.#seedRoot     = sseed;
+        this.#seedRoot     = seed;
         this.#amountGalaxy = amount;
         this.#indexGalaxy  = 0;
         this.#indexStar    = 0;
-        this.#restored     = false;
     }
 
-    goToGalaxy(i) {
+    goToGalaxy(i)
+    {
         this.#checkGalaxy(i);
         this.#indexGalaxy = i;
-        this.#indexStar   = 0;   // смена галактики сбрасывает курсор звёзд
+        this.#indexStar   = 0;
     }
 
-    /** Навигация внутри ТЕКУЩЕЙ галактики: i проверяется по M этой галактики. */
-    goToStar(i) {
+    goToStar(i)
+    {
         this.#checkStar(i);
         this.#indexStar = i;
     }
 
-    /** Детерминированный сид галактики (uint32). */
-    getGalaxySeed(i) {
+    getGalaxySeed(i)
+    {
         this.#checkGalaxy(i);
         return mix32(hashCombine(this.#seedRoot, i));
     }
 
     getGalaxyRng(i) { return new RNG(this.getGalaxySeed(i)); }
 
-    /** M — число звёзд, детерминированно из сида галактики (отдельный подпоток). */
-    getStarCount(i) {
+    getStarCount(i)
+    {
         return new RNG(mix32(hashCombine(this.getGalaxySeed(i), 'count')))
             .int(STARS_MIN, STARS_MAX);
     }
 
-    /** Детерминированный сид звезды: seedGalaxy + индекс звезды. */
-    getStarSeed(gi, si) {
+    getStarSeed(gi, si)
+    {
         this.#checkStarIn(gi, si);
         return mix32(hashCombine(this.getGalaxySeed(gi), si));
     }
@@ -173,7 +162,6 @@ class Universe
             throw new RangeError(`galaxyIndex ${i} вне [0, ${this.#amountGalaxy})`);
     }
 
-    /** Проверка звезды в произвольной галактике (общая для getStarSeed/goToStar). */
     #checkStarIn(gi, si) {
         this.#checkGalaxy(gi);
         const m = this.getStarCount(gi);
@@ -181,80 +169,89 @@ class Universe
             throw new RangeError(`starIndex ${si} вне [0, ${m})`);
     }
 
-    /** Проверка звезды относительно текущего положения курсора. */
     #checkStar(i) { this.#checkStarIn(this.#indexGalaxy, i); }
 
     //--------------------------------------------------------------------------
+    //  СЕРИАЛИЗАЦИЯ — для ProfileStore (через Game)
+    //--------------------------------------------------------------------------
 
     /**
-     * Пытается подхватить сейв. НАРУЖУ НЕ БРОСАЕТ НИКОГДА:
-     *   - localStorage нет (Node) / приватный режим / битый JSON → дефолт;
-     *   - сейв не прошёл валидацию → дефолт (fallbackSeed/fallbackAmount).
-     * Валидный сейв перекрывает и seed, и amount, и позицию курсора.
+     * Снимок «того, что нельзя сгенерировать»:
+     *   - seedRoot       (пользовательский сид)
+     *   - amountGalaxy   (кол-во галактик)
+     *   - indexGalaxy    (курсор)
+     *   - indexStar      (курсор)
+     * @return {object}
      */
-    #restore(fallbackSeed, fallbackAmount) {
-        let d = null;
-        try {
-            if (typeof localStorage !== 'undefined')    // в Node/тестах — просто дефолт
-                d = JSON.parse(localStorage.getItem(SAVE_KEY_DEFAULT) || 'null');
-        } catch { d = null; }                           // квота / приватный режим / битый JSON
-
-        if (!d || d.v !== SAVE_FORMAT_VERSION) return;  // сейва нет → дефолт
-
-        try {
-            this.load(d.seedRoot, d.amount);            // проверит amount
-            this.goToGalaxy(d.indexGalaxy);             // проверит индекс галактики
-            this.goToStar(d.indexStar);                 // проверит индекс звезды (по M сохранённой галактики)
-            this.#restored = true;
-        } catch {
-            this.load(fallbackSeed, fallbackAmount);    // битый сейв → дефолт конструктора
-        }
-    }
-
-    /** В localStorage — только то, что нельзя сгенерировать. */
-    save(key = SAVE_KEY_DEFAULT) {
-        const data = {
-            v: SAVE_FORMAT_VERSION,      // версия формата — на будущее
-            seedRoot: this.#seedRoot,    // если сид вводится игроком
-            amount: this.#amountGalaxy,  // если фиксирован — можно не хранить
+    toJSON()
+    {
+        return {
+            seedRoot:    this.#seedRoot,
+            amount:      this.#amountGalaxy,
             indexGalaxy: this.#indexGalaxy,
             indexStar:   this.#indexStar,
         };
-        try { localStorage.setItem(key, JSON.stringify(data)); }
-        catch (e) { console.warn('Universe.save():', e); } // приватный режим / квота
     }
 
-    /** «Новая игра»: стереть сейв ПЕРЕД new Universe(seed). */
-    static removeSave(key = SAVE_KEY_DEFAULT) {
+    /**
+     * Восстановить состояние из снимка.
+     * НЕ бросает наружу: битый снимок → остаёмся с дефолтным состоянием,
+     * выставленным в конструкторе или предыдущим load().
+     * @param  {object|null} data
+     * @return {boolean} true — применили; false — снимок не валиден
+     */
+    fromJSON(data)
+    {
+        if (!data || typeof data !== 'object') return false;
+
+        // 1) Проверим seedRoot/amount — они должны пройти load()
         try {
-            if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
-        } catch (e) { console.warn('Universe.removeSave():', e); }
+            this.load(data.seedRoot, data.amount);
+        } catch (e) {
+            return false;
+        }
+
+        // 2) Проверим курсоры через штатные переходы
+        try {
+            this.goToGalaxy(data.indexGalaxy);
+            this.goToStar(data.indexStar);
+        } catch (e) {
+            // Битые индексы → откат к дефолтному состоянию конструктора
+            this.load(data.seedRoot, data.amount);
+            return false;
+        }
+
+        return true;
     }
 }
 
 //----------------------------------------------------------------------------|
 // Экспорт: один неймспейс, ничего не перезаписывается
 //----------------------------------------------------------------------------|
-const UniverseJS = { Universe, RNG, utils: { toUint32, hashCombine, mix32, mulberry32 } };
+const UniverseJS = {
+    Universe,
+    RNG,
+    utils: { toUint32, hashCombine, mix32, mulberry32 },
+};
 
-if (typeof module !== 'undefined' && module.exports)
-{   module.exports = UniverseJS;
-} else if (typeof window !== 'undefined')
-{   window.UniverseJS = UniverseJS; // const U = new UniverseJS.Universe(seed);
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = UniverseJS;
+} else if (typeof window !== 'undefined') {
+    window.UniverseJS = UniverseJS;
 }
 
-
+//----------------------------------------------------------------------------|
 // Как пользоваться:
-
-// const U = new UniverseJS.Universe(seed);
-// // сейва нет  → вселенная от seed, курсор (0, 0)
-// // сейв есть  → та же вселенная и та же позиция, что в сейве
-
-// if (U.restored) { /* показать «Продолжить игру» */ }
-
-// U.goToGalaxy(3); U.goToStar(42);
-// U.save();   // сохранение по-прежнему явное
-
-// // Кнопка «Новая игра»:
-// UniverseJS.Universe.removeSave();
-// const U2 = new UniverseJS.Universe(newSeed);
+//
+//     const U = new UniverseJS.Universe(seed);   // чистая вселенная, без localStorage
+//     U.goToGalaxy(3); U.goToStar(42);
+//
+//     // Сохранение — через Game/ProfileStore:
+//     const snap = U.toJSON();
+//     ProfileStore.saveGame(profileId, { v: 1, universe: snap, pers: {...}, ship: {...} });
+//
+//     // Восстановление:
+//     const save = ProfileStore.load(profileId).save;
+//     const U2 = new UniverseJS.Universe(save.universe.seedRoot, save.universe.amount);
+//     U2.fromJSON(save.universe);
+//----------------------------------------------------------------------------|

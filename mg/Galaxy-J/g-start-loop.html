@@ -334,8 +334,20 @@
     const pers     = game.pers;
     const ship     = game.ship;
 
-    // Для Новой Игры
-    if (!universe.restored) universe.save();
+    // function newGame(newSeed = "NGC-4889-Command") {
+    //     // сброс сохранённого состояния профиля
+    //     ProfileStore.resetGame(ProfileStore.current().id);
+
+    //     // новый мир
+    //     game.universe = new UniverseJS.Universe(newSeed);
+    //     game.pers     = new Pers();
+    //     game.ship     = new Ship();
+
+    //     // пересборка сцены
+    //     clearSystem();
+    //     const seedGalaxy = game.universe.getGalaxySeed(game.universe.indexGalaxy);
+    //     // ... пересоздать GALAXY и т.д.
+    // }
 
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 // ------------|
@@ -358,10 +370,6 @@ const state = {
   get angVel()    { return ship.angVel;    },
 };
 ///////////////////////////////////////////////////////////////////////////////.
-
-      // явно синхронизировать:
-      if (universe.restored) pers.starIndex = universe.indexStar;
-      else                   universe.goToStar(pers.starIndex);
 
       ///---------------------------------------|
       /// Галактика: id = 0.                    |
@@ -1179,7 +1187,7 @@ const state = {
 
         // ★ Синхронизируем курсор вселенной
         game.universe.goToStar(targetIdx);
-        game.universe.save();       // ★ и сохраняем прогресс
+        game.save(); // сохранит вселенную + pers + ship в один профиль
 
         // Сброс сцены
         camera.position.set(0, 0, 0);

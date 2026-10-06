@@ -23,22 +23,19 @@ const SAVE_FORMAT_VERSION = 1;   // версия формата save-поля п
 
 class Game
 {
+    static SAVE_FORMAT_VERSION = 1;
+
     constructor(options = {})
     {
-        // --- Игрок ---
         this.pers = options.pers ?? new Pers(options.persOptions);
-
-        // --- Корабль ---
         this.ship = options.ship ?? new Ship(options.shipOptions);
 
-        // --- Вселенная ---
-        // Если universe не передан — создаём сами от seedRoot.
-        // Universe сам подхватит сейв из localStorage, если он есть.
+        // Universe создаётся «чистым» — реальный seed/amount могут быть
+        // перезаписаны в this.load(), когда подтянем save из профиля.
         this.universe = options.universe ?? new UniverseJS.Universe(
             options.seedRoot ?? 2026,
         );
 
-        // --- Гиперпрыжок ---
         this.hyper = options.hyper ?? {
             active:    false,
             t:         0,
@@ -47,93 +44,85 @@ class Game
             fuelCost:  0,
         };
 
-        // --- Мир / сцена (логические коллекции, без THREE) ---
         this.enemies = [];
         this.lasers  = [];
         this.planets = [];
 
-        // --- Текущее светило системы ---
         this.currentStarHandle    = null;
         this.currentStationHandle = null;
-
-        // --- Флаги сессии ---
         this.isDocked = false;
 
-        // Загрузка профиля (pers + ship)
+        // Загрузка профиля (pers + ship + universe)
         this.load();
     }
 
     // ------------------------------------------------------------
-    //  SNAPSHOT — то, что уходит в ProfileStore.save
+    //  SNAPSHOT — единый снимок: pers + ship + universe
     // ------------------------------------------------------------
-    /**
-     * Собрать снимок сохраняемых полей.
-     * Специально НЕ включает:
-     *     - universe — она хранится сама (Universe.save());
-     *     - hyper / enemies / lasers / planets — мгновенное состояние сессии;
-     *     - currentStarHandle / currentStationHandle — THREE-объекты;
-     *     - angVel — сбрасывается в 0 при загрузке.
-     */
     _snapshot()
     {
         return {
-            v: SAVE_FORMAT_VERSION,
+            v: Game.SAVE_FORMAT_VERSION,
             pers: {
-                credits:   this.pers.credits,
-                kills:     this.pers.kills,
-                sector:    { ...this.pers.sector },
-                starIndex: this.pers.starIndex,
-                dead:      this.pers.dead,
+                credits: this.pers.credits,
+                kills:   this.pers.kills,
+                sector:  { ...this.pers.sector },
+                dead:    this.pers.dead,
+                // starIndex НЕ дублируем: он живёт в universe.indexStar
             },
             ship: {
                 shield: this.ship.shield,
                 fuel:   this.ship.fuel,
                 speed:  this.ship.speed,
             },
+            // ★ Всё состояние вселенной — одной вложенной структурой
+            universe: this.universe.toJSON(),
         };
     }
 
-    /**
-     * Восстановить pers / ship из снимка.
-     * Не падает на частично битом сейве — просто игнорирует недостающие поля.
-     */
     _restore(saveData)
     {
         if (!saveData || typeof saveData !== "object") return;
-        if (saveData.v !== SAVE_FORMAT_VERSION) return;
+        if (saveData.v !== Game.SAVE_FORMAT_VERSION) return;
 
-        const p = saveData.pers || {};
-        const s = saveData.ship || {};
+        const p  = saveData.pers  || {};
+        const s  = saveData.ship  || {};
+        const u  = saveData.universe || null;
 
         // --- pers ---
-        if (typeof p.credits   === "number") this.pers.credits   = p.credits;
-        if (typeof p.kills     === "number") this.pers.kills     = p.kills;
+        if (typeof p.credits === "number") this.pers.credits = p.credits;
+        if (typeof p.kills   === "number") this.pers.kills   = p.kills;
         if (p.sector && typeof p.sector === "object") {
             this.pers.sector = {
                 x: Number(p.sector.x) || 0,
                 y: Number(p.sector.y) || 0,
             };
         }
-        if (typeof p.starIndex === "number") this.pers.starIndex = p.starIndex;
-        if (typeof p.dead      === "boolean") this.pers.dead     = p.dead;
+        if (typeof p.dead === "boolean") this.pers.dead = p.dead;
 
         // --- ship ---
         if (typeof s.shield === "number") this.ship.shield = s.shield;
         if (typeof s.fuel   === "number") this.ship.fuel   = s.fuel;
         if (typeof s.speed  === "number") this.ship.speed  = s.speed;
 
-        // angVel после загрузки — всегда чистый, чтобы не «докручивало»
         this.ship.angVel.pitch = 0;
         this.ship.angVel.yaw   = 0;
         this.ship.angVel.roll  = 0;
+
+        // --- universe ---
+        // fromJSON сам перепроверит и не бросит наружу;
+        // если снимок битый — останется текущее (дефолтное) состояние.
+        if (u && typeof this.universe.fromJSON === "function") {
+            this.universe.fromJSON(u);
+
+            // После восстановления курсора синхронизируем pers.starIndex,
+            // чтобы g-start-loop.html сразу знал, где игрок.
+            this.pers.starIndex = this.universe.indexStar;
+        }
     }
 
-    // ------------------------------------------------------------
-    //  LOAD / SAVE через ProfileStore
-    // ------------------------------------------------------------
     load()
     {
-        // ProfileStore может быть не подключён (например, юнит-тест Game).
         if (typeof ProfileStore === "undefined") return;
 
         const profile = ProfileStore.current();
@@ -144,23 +133,15 @@ class Game
 
     save()
     {
-        // 1. Вселенная — своим ключом (localStorage: "universe.save").
-        if (this.universe && typeof this.universe.save === "function") {
-            this.universe.save();
-        }
+        if (typeof ProfileStore === "undefined") return;
 
-        // 2. pers + ship — в активный профиль через ProfileStore.
-        if (typeof ProfileStore !== "undefined") {
-            const profile = ProfileStore.current();
-            if (profile && profile.id) {
-                ProfileStore.saveGame(profile.id, this._snapshot());
-            }
+        const profile = ProfileStore.current();
+        if (profile && profile.id) {
+            ProfileStore.saveGame(profile.id, this._snapshot());
         }
+        // ★ Ушло: this.universe.save() — теперь всё через ProfileStore
     }
 
-    // ------------------------------------------------------------
-    //  Полный рестарт сессии (без пересоздания объектов)
-    // ------------------------------------------------------------
     reset()
     {
         this.pers.reset();
@@ -175,11 +156,16 @@ class Game
         this.lasers.length  = 0;
 
         this.isDocked = false;
+    }
 
-        // Вселенную НЕ трогаем — игрок просто респавнится в текущей системе.
-        // Для «Новой игры» вызывающий код должен явно сделать:
-        //   UniverseJS.Universe.removeSave();
-        //   game.universe = new UniverseJS.Universe(newSeed);
+    /// «Новая игра»: стереть save активного профиля.
+    /// Сама вселенная пересоздаётся вызывающим кодом (см. ниже).
+    static newGame()
+    {
+        if (typeof ProfileStore !== "undefined") {
+            const profile = ProfileStore.current();
+            if (profile) ProfileStore.resetGame(profile.id);
+        }
     }
 }
 
@@ -188,3 +174,44 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
 } else {
     window.Game = Game;
 }
+
+// Итоговая схема хранения:
+// localStorage
+//  ├── "galaxy.profiles"          ← список id профилей
+//  ├── "galaxy.currentProfile"    ← активный id
+//  └── "galaxy.profile.p_xxx"     ← сам профиль:
+//          {
+//              id, name, created, lastPlayed,
+//              save: {                     ← ВСЁ в одном save
+//                  v: 1,
+//                  pers:     { credits, kills, sector, dead },
+//                  ship:     { shield, fuel, speed },
+//                  universe: { seedRoot, amount, indexGalaxy, indexStar }
+//              },
+//              stats: { score, rank }
+//          }
+
+// // 1. Убедимся, что чистого localStorage от Universe больше нет
+// console.log(localStorage.getItem("universe.save"));  // ожидаем null
+
+// // 2. Что видит игра
+// console.log("universe.seedRoot =", GAME.universe.seedRoot);
+// console.log("universe.indexStar =", GAME.universe.indexStar);
+// console.log("pers.credits      =", GAME.pers.credits);
+
+// // 3. Поменяем состояние
+// GAME.pers.credits = 5555;
+// GAME.universe.goToStar(3);
+
+// // 4. Сохраним
+// GAME.save();
+
+// // 5. Проверим, что save лёг в профиль целиком
+// console.dir(ProfileStore.current().save, { depth: null });
+
+// // 6. F5
+
+// // 7. После перезагрузки:
+// console.log("pers.credits       =", GAME.pers.credits);       // 5555
+// console.log("universe.indexStar =", GAME.universe.indexStar); // 3
+// console.log("pers.starIndex     =", GAME.pers.starIndex);     // 3 (синхронизирован)
