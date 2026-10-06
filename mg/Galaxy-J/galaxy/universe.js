@@ -21,7 +21,7 @@ const AMOUNT_GALAXY_DEFAULT =  100;
 const STARS_MIN = 50, STARS_MAX =  250;
 
 const SAVE_KEY_DEFAULT    = 'universe.save';
-const SAVE_FORMAT_VERSION = 1;
+//const SAVE_FORMAT_VERSION = 1;
 
 //----------------------------------------------------------------------------|
 // Чистые утилиты (без состояния — основа детерминизма)
