@@ -323,6 +323,41 @@
     const  game = new Game({ seedRoot: SEED_UNIVERSE });
     window.GAME = game;
 
+    // --------------------------------------------------------------
+    //  Сцена / камера / рендерер
+    // --------------------------------------------------------------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000005);
+
+    const camera = new THREE.PerspectiveCamera(
+        75,
+        innerWidth / innerHeight,
+        0.1,
+        20000,
+    );
+
+    // ★ Восстановление позы корабля из сохранения
+    if (game.world)
+    {   const p = game.world.pos;
+        if (p) {
+            camera.position.set(
+                Number(p.x) || 0,
+                Number(p.y) || 0,
+                Number(p.z) || 0,
+            );
+        }
+        const q = game.world.quat;
+        if (q)
+        {   camera.quaternion.set(
+                Number(q.x) || 0,
+                Number(q.y) || 0,
+                Number(q.z) || 0,
+                Number(q.w) || 1,   // w по умолчанию 1 — «нет поворота»
+            );
+        }
+        // isDocked восстанавливается внутри Game._restore
+    }
+
     // Удобные алиасы (для читаемости кода ниже)
     const universe = game.universe;
     const pers     = game.pers;
@@ -582,18 +617,35 @@ const state = {
         });
       }
 
-      // ------------------------------------------------------------------
-      //  Сцена / камера / рендерер
-      // ------------------------------------------------------------------
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x000005);
+      // ------------------------------------------------------------
+      //  Сборка снимка мира для сохранения
+      // ------------------------------------------------------------
+      function buildWorldSnapshot()
+      {   return {
+              // Поза корабля = поза камеры (камера — «мозг» игрока)
+              pos: {
+                  x: camera.position.x,
+                  y: camera.position.y,
+                  z: camera.position.z,
+              },
+              quat: {
+                  x: camera.quaternion.x,
+                  y: camera.quaternion.y,
+                  z: camera.quaternion.z,
+                  w: camera.quaternion.w,
+              },
+              // Стыковка
+              isDocked: game.isDocked,
+          };
+      }
 
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        innerWidth / innerHeight,
-        0.1,
-        20000,
-      );
+      // ------------------------------------------------------------
+      //  Единая точка сохранения игры (со снимком мира)
+      // ------------------------------------------------------------
+      function saveGame()
+      {   game.world = buildWorldSnapshot();
+          game.save();
+      }
 
       class CameraManager
       {
@@ -1181,7 +1233,7 @@ const state = {
 
         // ★ Синхронизируем курсор вселенной
         game.universe.goToStar(targetIdx);
-        game.save();
+        saveGame();
 
         console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
 
@@ -1336,20 +1388,22 @@ const state = {
     // Стыковка.      |
     //----------------:
     // ★ Одноразовый сигнал «пристыковались»
-    currentStationHandle.setOnDock(() => {
+    currentStationHandle.setOnDock(() =>
+    {
+        console.log("DOCK: стыковка к станции");
+        game.isDocked = true;
 
-      console.log("DOCK: стыковка к станции");
-      game.isDocked = true;
+        kit.sounds.docking.play();
 
-      kit.sounds.docking.play();
+        // Пополняем ресурсы
+        state.fuel   = 100;
+        state.shield = ship.SHIELDMAX;
+        state.speed  = 3;
 
-      // Пополняем ресурсы
-      state.fuel   = 100;
-      state.shield = ship.SHIELDMAX;
-      state.speed  = 3;
+        // Открываем торговлю (один раз, не каждый кадр)
+        TRADE.open(state.credits);
 
-      // Открываем торговлю (один раз, не каждый кадр)
-      TRADE.open(state.credits);
+        saveGame();
     });
 
     //----------------|

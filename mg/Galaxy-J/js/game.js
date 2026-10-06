@@ -52,6 +52,9 @@ class Game
         this.currentStationHandle = null;
         this.isDocked = false;
 
+        // Заполняется снаружи — из g-start-loop.html через game.world = {...}
+        this.world = null;
+
         // Загрузка профиля (pers + ship + universe)
         this.load();
     }
@@ -77,6 +80,7 @@ class Game
             },
             // ★ Всё состояние вселенной — одной вложенной структурой
             universe: this.universe.toJSON(),
+            world: this.world ?? null,
         };
     }
 
@@ -118,6 +122,14 @@ class Game
             // После восстановления курсора синхронизируем pers.starIndex,
             // чтобы g-start-loop.html сразу знал, где игрок.
             this.pers.starIndex = this.universe.indexStar;
+        }
+
+        // --- world ---
+        if (saveData.world && typeof saveData.world === "object")
+        {   this.world = saveData.world;
+            if (typeof saveData.world.isDocked === "boolean") {
+                this.isDocked = saveData.world.isDocked;
+            }
         }
     }
 
