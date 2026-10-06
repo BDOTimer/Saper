@@ -131,13 +131,22 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
 //          ...
 //      </script>
 //-----------------------------------------------------------------------------:
+
+const SEED_ROOT_DEFAULT     = 2026;
+const AMOUNT_GALAXY_DEFAULT = 100;
+
 class Universe
 {
+
+    /// Здесь храним рутовый сид:
+    #seedRoot;
+
+    /// Здесь держим сиды для всех галактик:
     #holderSeeds;
 
-    constructor(sseed, amount = 100)
+    constructor(sseed = SEED_ROOT_DEFAULT, amount = AMOUNT_GALAXY_DEFAULT)
     {
-         this.#holderSeeds = new HolderSeeds(sseed, amount);
+         this.load(sseed, amount);
     }
 
     // -----------------------------------------|
@@ -163,6 +172,20 @@ class Universe
     dispose() {
         // Сейчас метод пуст, 
         // но зарезервирован для очистки тяжелых ресурсов.
+    }
+
+    load(seed, amount)
+    {
+        /// Загрузить страторвый(рутовый) сид ...
+        /// const SEED_ROOT = ...;
+        this.#seedRoot    = seed;
+        this.#holderSeeds = new HolderSeeds(this.#seedRoot, amount);
+    }
+
+    save()
+    {
+        /// Сохранить страторвый(рутовый) сид: this.#seedRoot
+
     }
 }
 
