@@ -515,7 +515,7 @@ if (!window.__station_keydown_bound) {
     e.preventDefault();
     e.stopImmediatePropagation();
 
-    console.log("STATION: UNDOCK by key O");
+    //console.log("STATION: UNDOCK by key O");
     if (onUndockCallback) onUndockCallback();
   });
   window.__station_keydown_bound = true;

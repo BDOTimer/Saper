@@ -297,6 +297,28 @@
   /// window.STORAGE_Slot_0 = STORAGE_Slot_0; // Делаем глобальным
 
     // --------------------------------------------------------------
+    //  HUD
+    // --------------------------------------------------------------
+    // ★ HUD-элементы, нужные гиперпрыжку
+    const $ = (id) => document.getElementById(id);
+    const elHyper = $("hyper");
+    const elHyperTarget = $("hyper-target");
+    const elHyperProgress = $("hyper-progress");
+
+    //const $ = (id)  => document.getElementById(id);
+    const elSpeed     = $("speed");
+    const elSpeedBar  = $("speed-bar");
+    const elShield    = $("shield");
+    const elShieldBar = $("shield-bar");
+    const elFuel      = $("fuel");
+    const elFuelBar   = $("fuel-bar");
+    const elCredits   = $("credits");
+    const elKills     = $("kills");
+    const elSector    = $("sector");
+    const elDamage    = $("damage-flash");
+    const elGameover  = $("gameover");
+
+    // --------------------------------------------------------------
     //  Игровая сессия: Pers + Ship + Universe
     // --------------------------------------------------------------
     //-------------------------|
@@ -304,7 +326,7 @@
     //-------------------------:
     const SEED_UNIVERSE = "NGC-4889-Command"; // Или число
     
-    const game = new Game({ seedRoot: SEED_UNIVERSE });
+    const  game = new Game({ seedRoot: SEED_UNIVERSE });
     window.GAME = game;
 
     // Удобные алиасы (для читаемости кода ниже)
@@ -337,6 +359,10 @@ const state = {
 };
 ///////////////////////////////////////////////////////////////////////////////.
 
+      // явно синхронизировать:
+      if (universe.restored) pers.starIndex = universe.indexStar;
+      else                   universe.goToStar(pers.starIndex);
+
       ///---------------------------------------|
       /// Галактика: id = 0.                    |
       ///---------------------------------------|
@@ -348,10 +374,6 @@ const state = {
       GALAXY.setPlayerStar(pers.starIndex);
       pers.dataStar = GALAXY.getCurrentStar();
       updateSectorFromStar(pers.dataStar);
-
-      // явно синхронизировать:
-      if (universe.restored) pers.starIndex = universe.indexStar;
-      else                   universe.goToStar(pers.starIndex);
       
       HELP .init();
       TRADE.init();
@@ -1075,12 +1097,6 @@ const state = {
         state.sector.y = Math.round((star.y + 1) * 50);
       }
 
-      // ★ HUD-элементы, нужные гиперпрыжку
-      const $ = (id) => document.getElementById(id);
-      const elHyper = $("hyper");
-      const elHyperTarget = $("hyper-target");
-      const elHyperProgress = $("hyper-progress");
-
       // ------------------------------------------------------------
       //  Гиперпрыжок
       // ------------------------------------------------------------
@@ -1207,11 +1223,6 @@ const state = {
         if (k >= 1) completeHyperJump();
       }
 
-      // ------------------------------------------------------------------
-      //  Инициализация GALAXY
-      // ------------------------------------------------------------------
-      GALAXY.setPlayerStar(state.starIndex);
-
       state.dataStar = GALAXY.getCurrentStar();
       updateSectorFromStar(state.dataStar);
 
@@ -1309,22 +1320,6 @@ const state = {
         lasers.push(laser);
         playLaser();
       }
-
-    // ------------------------------------------------------------------
-    //  HUD
-    // ------------------------------------------------------------------
-    //const $ = (id)  => document.getElementById(id);
-    const elSpeed     = $("speed");
-    const elSpeedBar  = $("speed-bar");
-    const elShield    = $("shield");
-    const elShieldBar = $("shield-bar");
-    const elFuel      = $("fuel");
-    const elFuelBar   = $("fuel-bar");
-    const elCredits   = $("credits");
-    const elKills     = $("kills");
-    const elSector    = $("sector");
-    const elDamage    = $("damage-flash");
-    const elGameover  = $("gameover");
 
     ///------------------------------------------------------------------------|
     /// Игровой цикл ✅

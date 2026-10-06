@@ -554,7 +554,7 @@ const TRADE = (() => {
       e.stopPropagation(); // ← Чтобы HTML-листенер не съел событие
       setOpen(false);
 
-      console.log("TRADE: closed by key T");
+    //console.log("TRADE: closed by key T");
 
       return;
     }
