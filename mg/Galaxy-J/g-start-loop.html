@@ -1187,7 +1187,9 @@ const state = {
 
         // ★ Синхронизируем курсор вселенной
         game.universe.goToStar(targetIdx);
-        game.save(); // сохранит вселенную + pers + ship в один профиль
+        game.save();
+
+        console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
 
         // Сброс сцены
         camera.position.set(0, 0, 0);

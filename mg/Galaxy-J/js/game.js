@@ -195,9 +195,9 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
 // console.log(localStorage.getItem("universe.save"));  // ожидаем null
 
 // // 2. Что видит игра
-// console.log("universe.seedRoot =", GAME.universe.seedRoot);
+// console.log("universe.seedRoot  =", GAME.universe.seedRoot);
 // console.log("universe.indexStar =", GAME.universe.indexStar);
-// console.log("pers.credits      =", GAME.pers.credits);
+// console.log("pers.credits       =", GAME.pers.credits);
 
 // // 3. Поменяем состояние
 // GAME.pers.credits = 5555;
