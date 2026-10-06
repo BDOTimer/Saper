@@ -292,25 +292,66 @@
 
       ///---------------------------------------|
       /// Слот-0 для сейвера.                   |
-      ///---------------------------------------|
+      ///---------------------------------------:
       const  STORAGE_Slot_0  = new StorageSlot("asd");
   /// window.STORAGE_Slot_0 = STORAGE_Slot_0; // Делаем глобальным
 
-      ///---------------------------------------|
-      /// Сид для всей Вселенной.               |
-      ///---------------------------------------|
-      const SEED_UNIVERSE = "NGC-4889-Command"; // Или число
-      const UNIVERSE      = new UniverseJS.Universe(SEED_UNIVERSE);
-      window.Universe     = UNIVERSE; // Делаем глобальным
+    // --------------------------------------------------------------
+    //  Игровая сессия: Pers + Ship + Universe
+    // --------------------------------------------------------------
+    //-------------------------|
+    // Сид для всей Вселенной. |
+    //-------------------------:
+    const SEED_UNIVERSE = "NGC-4889-Command"; // Или число
+    
+    const game = new Game({ seedRoot: SEED_UNIVERSE });
+    window.GAME = game;
 
+    // Удобные алиасы (для читаемости кода ниже)
+    const universe = game.universe;
+    const pers     = game.pers;
+    const ship     = game.ship;
+
+    // Для Новой Игры
+    if (!universe.restored) universe.save();
+
+//////////////////////////////////////////////////////////////////// 🔍 .state:
+// ------------|
+//  Состояние  |
+// ------------:
+// Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
+const state = {
+  get starIndex() { return pers.starIndex; }, set starIndex(v) { pers.starIndex = v; },
+  get dataStar()  { return pers.dataStar;  }, set dataStar(v)  { pers.dataStar  = v; },
+  get credits()   { return pers.credits;   }, set credits(v)   { pers.credits   = v; },
+  get kills()     { return pers.kills;     }, set kills(v)     { pers.kills     = v; },
+  get sector()    { return pers.sector;    }, set sector(v)    { pers.sector    = v; },
+  get dead()      { return pers.dead;      }, set dead(v)      { pers.dead      = v; },
+
+  get speed()     { return ship.speed;     }, set speed(v)     { ship.speed     = v; },
+  get maxSpeed()  { return ship.maxSpeed;  }, set maxSpeed(v)  { ship.maxSpeed  = v; },
+  get minSpeed()  { return ship.minSpeed;  }, set minSpeed(v)  { ship.minSpeed  = v; },
+  get shield()    { return ship.shield;    }, set shield(v)    { ship.shield    = v; },
+  get fuel()      { return ship.fuel;      }, set fuel(v)      { ship.fuel      = v; },
+  get angVel()    { return ship.angVel;    },
+};
+///////////////////////////////////////////////////////////////////////////////.
 
       ///---------------------------------------|
       /// Галактика: id = 0.                    |
       ///---------------------------------------|
-      const seedGalaxy = UNIVERSE.getGalaxySeed(0);
+      const seedGalaxy = universe.getGalaxySeed(universe.indexGalaxy);
       let       GALAXY = new Galaxy( seedGalaxy);
                 GALAXY . init();
       window.   GALAXY = GALAXY;
+
+      GALAXY.setPlayerStar(pers.starIndex);
+      pers.dataStar = GALAXY.getCurrentStar();
+      updateSectorFromStar(pers.dataStar);
+
+      // явно синхронизировать:
+      if (universe.restored) pers.starIndex = universe.indexStar;
+      else                   universe.goToStar(pers.starIndex);
       
       HELP .init();
       TRADE.init();
@@ -1028,38 +1069,6 @@
 
       addEventListener("keyup", (e) => (keys[e.code] = false));
 
-//////////////////////////////////////////////////////////////////// 🔍 .state:
-
-    // ------------------------------------------------------------
-    //  Состояние
-    // ------------------------------------------------------------
-    // Единая игровая сессия
-    const game = new Game();
-    window.GAME = game;
-
-    // Удобные алиасы (для читаемости кода ниже)
-    const pers = game.pers;
-    const ship = game.ship;
-
-// Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
-const state = {
-  get starIndex() { return pers.starIndex; }, set starIndex(v) { pers.starIndex = v; },
-  get dataStar()  { return pers.dataStar;  }, set dataStar(v)  { pers.dataStar  = v; },
-  get credits()   { return pers.credits;   }, set credits(v)   { pers.credits   = v; },
-  get kills()     { return pers.kills;     }, set kills(v)     { pers.kills     = v; },
-  get sector()    { return pers.sector;    }, set sector(v)    { pers.sector    = v; },
-  get dead()      { return pers.dead;      }, set dead(v)      { pers.dead      = v; },
-
-  get speed()     { return ship.speed;     }, set speed(v)     { ship.speed     = v; },
-  get maxSpeed()  { return ship.maxSpeed;  }, set maxSpeed(v)  { ship.maxSpeed  = v; },
-  get minSpeed()  { return ship.minSpeed;  }, set minSpeed(v)  { ship.minSpeed  = v; },
-  get shield()    { return ship.shield;    }, set shield(v)    { ship.shield    = v; },
-  get fuel()      { return ship.fuel;      }, set fuel(v)      { ship.fuel      = v; },
-  get angVel()    { return ship.angVel;    },
-};
-
-///////////////////////////////////////////////////////////////////////////////.
-
       function updateSectorFromStar(star) {
         if (!star) return;
         state.sector.x = Math.round((star.x + 1) * 50);
@@ -1151,6 +1160,10 @@ const state = {
         state.dataStar = star;
         updateSectorFromStar(star);
         GALAXY.setPlayerStar(targetIdx);
+
+        // ★ Синхронизируем курсор вселенной
+        game.universe.goToStar(targetIdx);
+        game.universe.save();       // ★ и сохраняем прогресс
 
         // Сброс сцены
         camera.position.set(0, 0, 0);
