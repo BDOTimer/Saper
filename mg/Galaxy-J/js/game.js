@@ -133,7 +133,11 @@ class Game
 
     save()
     {
-        if (typeof ProfileStore === "undefined") return;
+        if (typeof ProfileStore === "undefined")
+        {   console.assert(ProfileStore === null, 
+                `🔴 typeof ProfileStore === "undefined"`);
+            return;
+        }
 
         const profile = ProfileStore.current();
         if (profile && profile.id) {

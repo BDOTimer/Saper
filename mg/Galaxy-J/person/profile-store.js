@@ -285,6 +285,9 @@ class ProfileStore
     /** Сохранить поле save у профиля. */
     static saveGame(id, saveData)
     {
+        console.assert(saveData === null, "🔴 saveGame");
+        console.log("🔍" + saveData);
+
         const p = this.load(id);
         if (!p) return false;
 
