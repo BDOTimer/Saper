@@ -16,8 +16,9 @@
 // ------------------------------------------------------------------
 window.DEBUG =
 {   isSpawnEnemies: false, // ← временно выключено для дебага
-    //isSpawnMeteors: true,
-    //isLogJumps    : true,
+    isDockTest    : false,
+//  isSpawnMeteors: true ,
+//  isLogJumps    : true ,
 };
 
 (function (global) {

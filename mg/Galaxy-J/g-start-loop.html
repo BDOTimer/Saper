@@ -222,13 +222,14 @@
     <script src="./js/foos.js"></script>
     <script src="./person/storage.js"></script>
 
-    <!-- Игрок и его корабль -->
-    <script src="./person/pers.js"></script>
-    <script src="./ships/ship.js"></script>
-
-    <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
+    <!-- Вселенная, Галактика, Игрок и его Корабль -->
     <script src="./galaxy/universe.js"></script>
     <script src="./galaxy/galaxy.js"></script>
+    <script src="./person/pers.js"></script>
+    <script src="./ships/ship.js"></script>
+    <script src="./js/game.js"></script>
+
+    <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
     <script src="./galaxy/star.js"></script>
     <script src="./galaxy/star-G.js"></script>
     <script src="./galaxy/planet.js"></script>
@@ -317,8 +318,6 @@
         state.credits = credits;
         elCredits.textContent = credits;
       });
-
-      const HYPER_DURATION = 6; // в секундах
 
       // ------------------------------------------------------------------
       //  Отладочные переключатели
@@ -673,7 +672,6 @@
     const planets = []; // массив хэндлов PLANET.generate(...)
     let currentStarHandle    = null;
     let currentStationHandle = null;
-    let isDocked = false;
 
     function clearSystem()
     {   for (const p of planets) {
@@ -966,7 +964,7 @@
           if (e.defaultPrevented) return;
 
           // Открыть TRADE можно только на пристыкованном корабле
-          if (isDocked) {
+          if (game.isDocked) {
             e.preventDefault();
             TRADE.open(state.credits);
           } else {
@@ -995,7 +993,7 @@
           return;
         }
 
-        if (isDocked) return;
+        if (game.isDocked) return;
 
         // Гиперпрыжок — работает и с открытой картой, и в полёте
         if (e.code === "KeyJ") {
@@ -1035,18 +1033,13 @@
     // ------------------------------------------------------------
     //  Состояние
     // ------------------------------------------------------------
-    // Игрок
-    const  pers = new Pers();
-    window.PERS = pers;   // удобный доступ из консоли / других скриптов
+    // Единая игровая сессия
+    const game = new Game();
+    window.GAME = game;
 
-    // Корабль
-    const  ship = new Ship();
-    window.SHIP = ship;
-
-    // Гиперпрыжок — это состояние мира/сессии, пока оставляем как есть
-    const hyper = {
-      active: false, t: 0, duration: 2.2, targetIdx: -1, fuelCost: 0,
-    };
+    // Удобные алиасы (для читаемости кода ниже)
+    const pers = game.pers;
+    const ship = game.ship;
 
 // Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
 const state = {
@@ -1063,45 +1056,7 @@ const state = {
   get shield()    { return ship.shield;    }, set shield(v)    { ship.shield    = v; },
   get fuel()      { return ship.fuel;      }, set fuel(v)      { ship.fuel      = v; },
   get angVel()    { return ship.angVel;    },
-
-  hyper,
 };
-
-      // // Настройки «инерции» вращения
-      // const ROT =
-      // { accel:    3.2,  // рад/с² - разгон (чем больше, тем резче выход на макс)
-      //   damping:  2.6,  // 1/с   - торможение (чем больше, тем быстрее гаснет)
-      //   maxPitch: 1.2,  // рад/с - ограничение по тангажу (W/S)
-      //   maxYaw:   1.1,  // рад/с - ограничение по рысканию (стрелки)
-      //   maxRoll:  1.6,  // рад/с - ограничение по крену (A/D)
-      // };
-
-      // Тяжёлый грузовик — долгий разгон, долгое торможение
-      // const ROT = { accel: 1.6, damping: 0.9, maxPitch: 0.7, maxYaw: 0.6, maxRoll: 0.9 };
-
-      // Истребитель — быстро реагирует, быстро гаснет
-      // const ROT = { accel: 6.0, damping: 5.0, maxPitch: 1.8, maxYaw: 1.6, maxRoll: 2.4 };
-
-      // Текущий «средний» вариант
-      // const ROT = { accel: 3.2, damping: 2.6, maxPitch: 1.2, maxYaw: 1.1, maxRoll: 1.6 };
-
-      // "ПЕДАЛЬ ТЯГИ"
-      // const THR =
-      // { accel:   6,   // ед/с² - разгон при удержании клавиши
-      //   brake: 0.3,   // 1/с   - торможение когда клавиша отпущена (инерция выбега)
-      //   drag:  0.1,   // 1/с   - лёгкое сопротивление, когда тяга удерживается
-      // };
-
-      // Тяжёлый корабль — долгий разгон, длинный выбег
-      // const THR = { accel: 90,  brake: 0.8, drag: 0.3 };
-
-      // Аркадный истребитель — быстрый отклик, короткий выбег
-      // const THR = { accel: 320, brake: 4.0, drag: 0.6 };
-
-      // Средний
-      // const THR = { accel: 180, brake: 1.8, drag: 0.4 };
-
-      //------------------------------------------------------------.
 
 ///////////////////////////////////////////////////////////////////////////////.
 
@@ -1128,7 +1083,7 @@ const state = {
       }
 
       function tryHyperJump() {
-        if (state.dead || state.hyper.active) return;
+        if (state.dead || game.hyper.active) return;
 
         // Если карта закрыта — откроем её, чтобы игрок выбрал цель
         if (!GALAXY.isOpen()) {
@@ -1161,27 +1116,26 @@ const state = {
         }
 
         // Запускаем анимацию
-        state.hyper.active = true;
-        state.hyper.t = 0;
-        state.hyper.duration = HYPER_DURATION;
-        state.hyper.targetIdx = targetIdx;
-        state.hyper.fuelCost = fuelCost;
+        game.hyper.active = true;
+        game.hyper.t = 0;
+        game.hyper.targetIdx = targetIdx;
+        game.hyper.fuelCost = fuelCost;
 
         elHyperTarget.textContent = `${cur.name} → ${dst.name}`;
         elHyperProgress.style.width = "0%";
         elHyper.style.display = "flex";
 
         kit.sounds.hjump.play();
-        HYPERFX.start(state.hyper.duration); // визуал Гиперпрыжка
+        HYPERFX.start(game.hyper.duration); // визуал Гиперпрыжка
 
         GALAXY.setOpen(false);
       }
 
       function completeHyperJump() {
-        const targetIdx = state.hyper.targetIdx;
+        const targetIdx = game.hyper.targetIdx;
         const star = GALAXY.getStar(targetIdx);
         if (!star) {
-          state.hyper.active = false;
+          game.hyper.active = false;
           
           HYPERFX.stop(); // Остановка Гиперпрыжка.
           
@@ -1206,7 +1160,7 @@ const state = {
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
         for (const e of enemies) scene.remove(e);
-        enemies.length = 0;
+        game.enemies.length = 0;
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
 
@@ -1220,21 +1174,21 @@ const state = {
           star.tech,
           star.dangerLabel,
           star.economy,
-          `(-${state.hyper.fuelCost} fuel)`,
+          `(-${game.hyper.fuelCost} fuel)`,
         );
 
         // kit.sounds.hjump.stop(); // ★ звук прибытия
 
         // Завершаем
-        state.hyper.active = false;
+        game.hyper.active = false;
         elHyper.style.display = "none";
       }
 
       function updateHyper(dt) {
-        if (!state.hyper.active) return;
+        if (!game.hyper.active) return;
 
-        state.hyper.t += dt;
-        const k = Math.min(1, state.hyper.t / state.hyper.duration);
+        game.hyper.t += dt;
+        const k = Math.min(1, game.hyper.t / game.hyper.duration);
         elHyperProgress.style.width = (k * 100).toFixed(1) + "%";
 
         if (k >= 1) completeHyperJump();
@@ -1264,14 +1218,13 @@ const state = {
 
       function resetGame()
       {
-        pers.reset(); // kills=0, dead=false, credits сохраняются
-        ship.reset(); // speed=0, shield=max, fuel=100, angVel=0
+        game.reset();
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
         for (const e of enemies) scene.remove(e);
-        enemies.length = 0;
+        game.enemies.length = 0;
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
 
@@ -1374,7 +1327,7 @@ const state = {
     currentStationHandle.setOnDock(() => {
 
       console.log("DOCK: стыковка к станции");
-      isDocked = true;
+      game.isDocked = true;
 
       kit.sounds.docking.play();
 
@@ -1393,7 +1346,7 @@ const state = {
     currentStationHandle.setOnUndock(() =>
     {
       console.log("UNDOCK: отстыковка от станции");
-      isDocked = false;
+      game.isDocked = false;
 
       kit.sounds.dockout.play();
 
@@ -1435,7 +1388,7 @@ const state = {
         HYPERFX.update(dt, clock.elapsedTime);
 
         // Пока идёт гиперпрыжок — мир заморожен, но рендер идёт
-        if (state.hyper.active) {
+        if (game.hyper.active) {
           // Светило текущей системы можно продолжать анимировать для красоты
           if (currentStarHandle && currentStarHandle.update) {
             currentStarHandle.update(dt, clock.elapsedTime);
@@ -1480,7 +1433,7 @@ state.speed = Math.max(
 // Мёртвая зона, чтобы не «полз» вечно возле нуля
 if (Math.abs(state.speed) < 0.05 && thrustIn === 0) state.speed = 0;
 
-if (!isDocked)
+if (!game.isDocked)
 {
   // ------- Плавное вращение с инерцией -------
   const ax = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0); // pitch
@@ -1679,7 +1632,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
           if (status === 2)
           {
             // авария
-            isDocked = false;
+            game.isDocked = false;
             state.shield = 0;
             state.dead = true;
             elGameover.style.display = "flex";
@@ -1689,11 +1642,11 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             // успешная посадка — например, пополнить топливо/щит,
             // показать сообщение, отключить управление и т.п.
             // ...
-            isDocked = true;
+            game.isDocked = true;
           }
           else
           {
-            isDocked = false; // ???
+            game.isDocked = false; // ???
           }
         }
         
