@@ -794,7 +794,7 @@ const state = {
 
         if (currentStationHandle) {
             scene.remove(currentStationHandle.group);
-            STATION.dispose(currentStationHandle);
+            currentStationHandle.dispose();
             currentStationHandle = null;
         }
     }
@@ -853,6 +853,7 @@ const state = {
         }
 
         currentStationHandle = new Station(star);
+        
 
         scene.add(currentStationHandle.group);
     }

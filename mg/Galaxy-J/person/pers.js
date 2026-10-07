@@ -17,6 +17,8 @@ class Pers
 {
     constructor(options = {})
     {
+        this.name = "?name";
+
         // --- Метрики игрока ---
         this.credits   = options.credits   ?? 1000;
         this.kills     = options.kills     ?? 0;
@@ -25,6 +27,9 @@ class Pers
         // --- Навигация ---
         this.indexGalaxy = options.indexGalaxy ?? 0;
         this.indexStar   = options.indexStar   ?? 0;
+        this.seedGalaxy  = -1;
+        this.seedStar    = -1;
+
         this.dataStar    = options.dataStar    ?? null;
 
         // --- Жизненный статус ---
@@ -32,17 +37,12 @@ class Pers
 
         // Загрузка профиля (пока заглушка)
         this.load();
-
-        console.log("🚩 Имя перса: ", this.name);
     }
 
     load()
     {
         // TODO: подключить profile-store.js
         // Пока ничего не делаем — используются значения из конструктора.
-
-        // Загрузим имя игрока в программу из localStorage
-        this.name = Pers.resolveName();
     }
 
     save()
@@ -58,23 +58,34 @@ class Pers
         // credits сохраняем — это накопление игрока
     }
 
-    /// Имя игрока: активный профиль → дефолт → константа
-    static resolveName()
-    {
-        const fallback = (typeof NAME_PLAYER_DEFAULT !== "undefined")
-            ? NAME_PLAYER_DEFAULT
-            : "?noname";
+    toJSON()
+    {   return {
+            indexGalaxy: this.indexGalaxy,
+            indexStar  : this.indexStar,
+            seedGalaxy : this.seedGalaxy,
+            seedStar   : this.seedStar,
+        };
+    }
 
-        try {
-            if (typeof ProfileStore !== "undefined") {
-                const profile = ProfileStore.ensure();   // гарантирует профиль
-                const n = profile && profile.name;
-                if (typeof n === "string" && n.trim()) return n.trim();
-            }
-        } catch (e) {
-            console.warn("Pers: ProfileStore недоступен:", e);
-        }
-        return fallback;
+    fromJSON(data)
+    {
+        if (!data || typeof data !== 'object') return false;
+
+        const ig = data.indexGalaxy;
+        const is = data.indexStar;
+        const sg = data.seedGalaxy;
+        const ss = data.seedStar;
+
+        if (!Number.isInteger(ig) || ig < 0 ||
+            !Number.isInteger(is) || is < 0
+        )   throw new RangeError('Storage error');
+
+        this.indexGalaxy = ig;
+        this.indexStar   = is;
+        this.seedGalaxy  = sg;
+        this.seedStar    = ss;
+
+        return true;
     }
 }
 

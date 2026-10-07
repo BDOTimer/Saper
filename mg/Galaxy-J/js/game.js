@@ -68,19 +68,23 @@ class Game
             v: Game.SAVE_FORMAT_VERSION,
             pers: {
                 credits: this.pers.credits,
-                kills:   this.pers.kills,
-                sector:  { ...this.pers.sector },
-                dead:    this.pers.dead,
+                kills  : this.pers.kills,
+                sector : { ...this.pers.sector },
+                dead   : this.pers.dead,
                 // indexStar НЕ дублируем: он живёт в universe.indexStar
             },
             ship: {
                 shield: this.ship.shield,
-                fuel:   this.ship.fuel,
-                speed:  this.ship.speed,
+                fuel  : this.ship.fuel,
+                speed : this.ship.speed,
             },
+
+            // Навигация Перса
+            nav: this.pers.toJSON(),
+
             // ★ Всё состояние вселенной — одной вложенной структурой
             universe: this.universe.toJSON(),
-            world: this.world ?? null,
+            world   : this.world ?? null,
         };
     }
 
@@ -92,6 +96,7 @@ class Game
         const p  = saveData.pers  || {};
         const s  = saveData.ship  || {};
         const u  = saveData.universe || null;
+        const n  = saveData.nav      || null;
 
         // --- pers ---
         if (typeof p.credits === "number") this.pers.credits = p.credits;
@@ -121,7 +126,12 @@ class Game
 
             // После восстановления курсора синхронизируем pers.starIndex,
             // чтобы g-start-loop.html сразу знал, где игрок.
-            this.pers.starIndex = this.universe.indexStar;
+            this.universe.starIndex = this.universe.indexStar;
+        }
+
+        // --- Nav ---
+        if (n)
+        {   this.pers.fromJSON(n);
         }
 
         // --- world ---
@@ -139,6 +149,8 @@ class Game
 
         const profile = ProfileStore.current();
         if (!profile || !profile.save) return;
+
+        this.pers.name = profile.name;
 
         this._restore(profile.save);
     }
