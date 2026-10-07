@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------
 window.DEBUG =
 {   isSpawnEnemies: false, // ← временно выключено для дебага
-    isDockTest    : false,
+    isDockTest    : true,
 //  isSpawnMeteors: true ,
 //  isLogJumps    : true ,
 };
@@ -36,8 +36,6 @@ window.DEBUG =
     FO.math = {
         /**
          * Генератор случайных чисел Mulberry32 (быстрый и детерминированный).
-         * @param {number} seed 
-         * @returns {function(): number}
          */
         random(seed = 0) {
             let a = seed >>> 0;

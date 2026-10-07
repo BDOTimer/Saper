@@ -29,6 +29,8 @@ class Galaxy
         time:       0,
     };
 
+    get seed() { return this.#seed; }
+
     // ------------------------------------------------------------------
     //  Константы
     // ------------------------------------------------------------------
@@ -76,7 +78,7 @@ class Galaxy
      * @param {number|string} seed  - Сид галактики.
      * @param {object}        opts  - { starCount, galaxyR }
      */
-    constructor(seed = 1338, opts = {})
+    constructor(seed, opts = {})
     {
         this.#seed  = seed;
         this.#rng   = Galaxy._mulberry32(Galaxy._toUint32(seed));

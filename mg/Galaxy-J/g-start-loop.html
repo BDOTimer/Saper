@@ -866,18 +866,9 @@ const state = {
             scene.add(p.mesh);
             planets.push(p);
         }
-        
-        //-------------------------|
-        // Станция::Ориентация.    |
-        //-------------------------:
-        currentStationHandle = STATION.generate(star, {
-          rotation: { x: 0, y: Math.PI, z: 0 },
-        });
-        
-        //-------------------------|
-        // Станция::Позиция.       |
-        //-------------------------:
-        currentStationHandle.group.position.set(0, 0, -600);
+
+        currentStationHandle = new Station(star);
+
         scene.add(currentStationHandle.group);
     }
     

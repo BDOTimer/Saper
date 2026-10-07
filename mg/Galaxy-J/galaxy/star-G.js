@@ -23,8 +23,10 @@
 //  Корабль спавниться не менее 5000 м от звезды
 //  Планеты имееют орбиты от 1000м до 3000м
 
-class StarG {
-    constructor(scene, camera, options = {}) {
+class StarG
+{
+    constructor(scene, camera, options = {})
+    {
         this.scene  = scene;
         this.camera = camera;
 
