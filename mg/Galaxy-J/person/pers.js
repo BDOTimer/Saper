@@ -32,12 +32,17 @@ class Pers
 
         // Загрузка профиля (пока заглушка)
         this.load();
+
+        console.log("🚩 Имя перса: ", this.name);
     }
 
     load()
     {
         // TODO: подключить profile-store.js
         // Пока ничего не делаем — используются значения из конструктора.
+
+        // Загрузим имя игрока в программу из localStorage
+        this.name = Pers.resolveName();
     }
 
     save()
@@ -51,6 +56,25 @@ class Pers
         this.kills  = 0;
         this.dead   = false;
         // credits сохраняем — это накопление игрока
+    }
+
+    /// Имя игрока: активный профиль → дефолт → константа
+    static resolveName()
+    {
+        const fallback = (typeof NAME_PLAYER_DEFAULT !== "undefined")
+            ? NAME_PLAYER_DEFAULT
+            : "?noname";
+
+        try {
+            if (typeof ProfileStore !== "undefined") {
+                const profile = ProfileStore.ensure();   // гарантирует профиль
+                const n = profile && profile.name;
+                if (typeof n === "string" && n.trim()) return n.trim();
+            }
+        } catch (e) {
+            console.warn("Pers: ProfileStore недоступен:", e);
+        }
+        return fallback;
     }
 }
 

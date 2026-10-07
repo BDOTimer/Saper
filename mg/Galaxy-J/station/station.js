@@ -173,6 +173,8 @@ class Station
 
         // --- Применяем цвета входа/выхода ---
         this._applyDockingColors();
+
+        console.log("🚩 Station --> Имя перса: ", GAME.pers.name);
     }
 
     // ---------------------------------------------------------------
