@@ -163,6 +163,8 @@ class Station
             }
         }
 
+        this.statusLast = 0;
+
         // --- Применяем цвета входа/выхода ---
         this._applyDockingColors();
 
@@ -464,9 +466,16 @@ class Station
 
         const status = this._computeStatus(playerPos, playerQuat);
 
-        // if (status === 1)
-        // {   setOnDock();
-        // }
+        if(status === 2) return 2;
+        if(status === 1 && this.statusLast !== 1)
+        {
+        //  setOnDock();
+            this.statusLast = 1;
+            return 1;
+        }
+
+        this.statusLast = status;
+
         return status;
     }
 
