@@ -163,7 +163,7 @@ class Station
             }
         }
 
-        this.statusLast = 0;
+        this.statusLast = 1;
 
         // --- Применяем цвета входа/выхода ---
         this._applyDockingColors();
@@ -471,12 +471,14 @@ class Station
         {
         //  setOnDock();
             this.statusLast = 1;
-            return 1;
+            //console.log("🟢 status: ", status);
+            return status;
         }
 
+        //console.log("🔴 status: ", 0);
         this.statusLast = status;
 
-        return status;
+        return 0;
     }
 
     // ---------------------------------------------------------------

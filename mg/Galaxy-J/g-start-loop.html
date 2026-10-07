@@ -1451,6 +1451,13 @@ const state = {
         saveGame();
     };
 
+    /// В начале игры
+    if(game.isDock)
+    {
+        HUD.setStatus("D", true, { pulse: false }); // зелёный
+        TRADE.open(state.credits);
+    }
+
     function animate() 
     {
         const dt = Math.min(clock.getDelta(), 0.05);
@@ -1916,7 +1923,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
         //   camera.position.addScaledVector(outAxis, push);
         // }
 
-        state.speed = 560;
+        state.speed = 500;
     });
 
 </script>
