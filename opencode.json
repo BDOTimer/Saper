@@ -1,15 +1,4 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "models": [
-    {
-      "title": "Qwen2.5 Coder (latest)",
-      "provider": "ollama",
-      "model": "qwen2.5-coder:latest"
-    }
-  ],
-  "tabAutocompleteModel": {
-    "title": "Qwen2.5 Coder (latest)",
-    "provider": "ollama",
-    "model": "qwen2.5-coder:latest"
-  }
+  "model": "opencode/big-pickle"
 }
