@@ -29,15 +29,25 @@
 
 <img id="cockpit-svg" src="ships/cockpit-1.svg" alt="">
 
-  <div id="reticle">
-    <svg viewBox="0 0 70 70">
-      <line class="rh" x1="35" y1="0" x2="35" y2="20" />
-      <line class="rh" x1="35" y1="50" x2="35" y2="70" />
-      <line class="rh" x1="0" y1="35" x2="20" y2="35" />
-      <line class="rh" x1="50" y1="35" x2="70" y2="35" />
-      <circle class="rh" cx="35" cy="35" r="2" fill="#33ff88" />
-    </svg>
+<!-- ВЕРХНЯЯ ПАНЕЛЬ: ИНДИКАТОРЫ D / S -->
+<div id="top-panel">
+  <div class="round-ind" id="ind-d" data-kind="D">
+    <span class="round-ind__letter">D</span>
   </div>
+  <div class="round-ind" id="ind-s" data-kind="S">
+    <span class="round-ind__letter">S</span>
+  </div>
+</div>
+
+<div id="reticle">
+  <svg viewBox="0 0 70 70">
+    <line class="rh" x1="35" y1="0" x2="35" y2="20" />
+    <line class="rh" x1="35" y1="50" x2="35" y2="70" />
+    <line class="rh" x1="0" y1="35" x2="20" y2="35" />
+    <line class="rh" x1="50" y1="35" x2="70" y2="35" />
+    <circle class="rh" cx="35" cy="35" r="2" fill="#33ff88" />
+  </svg>
+</div>
 
   <!-- ================= ЛЕВАЯ КОНСОЛЬ ================= -->
   <div class="console console-left">
@@ -313,6 +323,63 @@
     const elGameover  = $("gameover");
 
     // --------------------------------------------------------------
+//  Верхняя панель: индикаторы D / S
+// --------------------------------------------------------------
+const elIndD = document.getElementById("ind-d");
+const elIndS = document.getElementById("ind-s");
+
+/**
+ * Управление круглыми индикаторами верхней панели.
+ *
+ *   HUD.setStatus("D", true)   // D → зелёный
+ *   HUD.setStatus("D", false)  // D → серый
+ *   HUD.setStatus("S", true)   // S → красный
+ *   HUD.setStatus("S", false)  // S → серый
+ *
+ * @param {"D"|"S"} kind
+ * @param {boolean} on
+ * @param {{pulse?: boolean}} [opts]
+ */
+
+const HUD = (() => {
+  const map = { D: elIndD, S: elIndS };
+  const state = { D: false, S: false };
+
+  function setStatus(kind, on, opts = {}) {
+    const el = map[kind];
+    if (!el) {
+      console.warn(`HUD.setStatus: неизвестный индикатор "${kind}"`);
+      return;
+    }
+    state[kind] = !!on;
+    el.classList.toggle("is-on", !!on);
+
+    // пульсация — только если явно попросили и индикатор включён
+    if (Object.prototype.hasOwnProperty.call(opts, "pulse")) {
+      el.classList.toggle("is-pulse", !!opts.pulse && !!on);
+    }
+  }
+
+  function getStatus(kind) {
+    return !!state[kind];
+  }
+
+  function toggle(kind, opts) {
+    setStatus(kind, !state[kind], opts);
+  }
+
+  function reset() {
+    setStatus("D", false);
+    setStatus("S", false);
+  }
+
+  return { setStatus, getStatus, toggle, reset, state };
+})();
+
+// Удобный глобальный доступ (например, из других скриптов)
+window.HUD = HUD;
+
+    // --------------------------------------------------------------
     //  Игровая сессия: Pers + Ship + Universe
     // --------------------------------------------------------------
     //-------------------------|
@@ -384,12 +451,11 @@ const state = {
 ///////////////////////////////////////////////////////////////////////////////.
 
       ///---------------------------------------|
-      /// Галактика: id = 0.                    |
+      /// Галактика:                            |
       ///---------------------------------------|
       const seedGalaxy = GAME.pers.seedGalaxy;
-      let       GALAXY = new Galaxy( seedGalaxy);
+       window.  GALAXY = new Galaxy( seedGalaxy);
                 GALAXY . init();
-      window.   GALAXY = GALAXY;
 
       GALAXY.setPlayerStar(pers.indexStar);
       pers.dataStar = GALAXY.getCurrentStar();
@@ -626,6 +692,9 @@ const state = {
       function saveGame()
       {   game.world = buildWorldSnapshot();
           game.save();
+
+          HUD.setStatus("S", true, { pulse: true }); 
+          setTimeout(() => HUD.setStatus("S", false), 3000);
       }
 
       class CameraManager
@@ -1360,11 +1429,14 @@ const state = {
     //----------------|
     // Стыковка.      |
     //----------------:
-    // ★ Одноразовый сигнал «пристыковались»
-    currentStationHandle.setOnDock(() =>
+    function setOnDock()
     {
-        console.log("DOCK: стыковка к станции");
+        if(game.isDock === true) return;
+
         game.isDock = true;
+        console.log("DOCK: стыковка к станции");
+
+        HUD.setStatus("D", true, { pulse: false }); // зелёный
 
         kit.sounds.docking.play();
 
@@ -1377,7 +1449,7 @@ const state = {
         TRADE.open(state.credits);
 
         saveGame();
-    });
+    };
 
     function animate() 
     {
@@ -1647,11 +1719,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             // успешная посадка — например, пополнить топливо/щит,
             // показать сообщение, отключить управление и т.п.
             // ...
-            game.isDock = true;
-          }
-          else
-          {
-            game.isDock = false; // ???
+            setOnDock();
           }
         }
         
@@ -1826,9 +1894,9 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
         // ------------------------------------------------
         //  Отстыковка извне (для keydown-обработчика)
         // ------------------------------------------------
-        
-        console.log("🚩 UNDOCK: отстыковка от станции");
         GAME.isDock = false;
+        console.log("🚩 UNDOCK: отстыковка от станции");
+        HUD.setStatus("D", false); // серый
 
         kit.sounds.dockout.play();
 

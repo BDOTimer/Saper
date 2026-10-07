@@ -135,7 +135,6 @@ class Station
 
         // --- Состояние стыковки ---
         this._dockingEnabled   = options.dockingEnabled ?? true;
-        this._lastLandingStatus = 0;
 
         // --- Колбэки ---
         this._onDockCallback   = null;
@@ -458,41 +457,33 @@ class Station
 
     getLandingStatus(playerPos, playerQuat)
     {
-        if (!playerPos || !playerQuat)
-        {
-            console.log("error: getLandingStatus");
-            return 0;
-        }
+        if(GAME.isDock) return 0;
+
+        console.assert(playerPos );
+        console.assert(playerQuat);
 
         const status = this._computeStatus(playerPos, playerQuat);
 
-        if (status === 1 && this._lastLandingStatus !== 1)
-        {
-            if (this._onDockCallback) this._onDockCallback();
-        }
-
-        GAME.isDock     = (status === 1);
-        this._lastLandingStatus = status;
+        // if (status === 1)
+        // {   setOnDock();
+        // }
         return status;
     }
 
     // ---------------------------------------------------------------
     //  Колбэки и цвета
     // ---------------------------------------------------------------
-    setOnDock(fn)
-    {
-        this._onDockCallback = typeof fn === "function" ? fn : null;
+    setOnDock()
+    {   /// включение флага в g-start-loop.html
     }
 
-    setOnUndock(fn)
-    {
-        this._onUndockCallback = typeof fn === "function" ? fn : null;
+    setOnUndock()
+    {  /// отключение флага в g-start-loop.html
     }
 
     _applyDockingColors()
-    {
-        const COLORS = {
-            enabled:  { marker: 0x00ff00, ring: 0x00ff88 },
+    {   const COLORS =
+        {   enabled:  { marker: 0x00ff00, ring: 0x00ff88 },
             disabled: { marker: 0xff2222, ring: 0xff3333 },
         };
         const c = this._dockingEnabled ? COLORS.enabled : COLORS.disabled;
@@ -502,8 +493,7 @@ class Station
     }
 
     setDockingEnabled(enabled)
-    {
-        this._dockingEnabled = !!enabled;
+    {   this._dockingEnabled = !!enabled;
         this._applyDockingColors();
     }
 
