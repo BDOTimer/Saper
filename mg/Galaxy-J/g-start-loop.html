@@ -363,28 +363,13 @@
     const pers     = game.pers;
     const ship     = game.ship;
 
-    // function newGame(newSeed = "NGC-4889-Command") {
-    //     // сброс сохранённого состояния профиля
-    //     ProfileStore.resetGame(ProfileStore.current().id);
-
-    //     // новый мир
-    //     game.universe = new UniverseJS.Universe(newSeed);
-    //     game.pers     = new Pers();
-    //     game.ship     = new Ship();
-
-    //     // пересборка сцены
-    //     clearSystem();
-    //     const seedGalaxy = game.universe.getGalaxySeed(game.universe.indexGalaxy);
-    //     // ... пересоздать GALAXY и т.д.
-    // }
-
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 // ------------|
 //  Состояние  |
 // ------------:
 // Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
 const state = {
-  get starIndex() { return pers.starIndex; }, set starIndex(v) { pers.starIndex = v; },
+  get indexStar() { return pers.starIndex; }, set indexStar(v) { pers.indexStar = v; },
   get dataStar()  { return pers.dataStar;  }, set dataStar(v)  { pers.dataStar  = v; },
   get credits()   { return pers.credits;   }, set credits(v)   { pers.credits   = v; },
   get kills()     { return pers.kills;     }, set kills(v)     { pers.kills     = v; },
@@ -408,7 +393,7 @@ const state = {
                 GALAXY . init();
       window.   GALAXY = GALAXY;
 
-      GALAXY.setPlayerStar(pers.starIndex);
+      GALAXY.setPlayerStar(pers.indexStar);
       pers.dataStar = GALAXY.getCurrentStar();
       updateSectorFromStar(pers.dataStar);
       
@@ -1217,7 +1202,7 @@ const state = {
         state.fuel = Math.max(0, state.fuel - ship.TUNING.fuel_hyper);
 
         // Обновляем состояние игрока
-        state.starIndex = targetIdx;
+        state.indexStar = targetIdx;
         state.dataStar = star;
         updateSectorFromStar(star);
         GALAXY.setPlayerStar(targetIdx);

@@ -71,7 +71,7 @@ class Game
                 kills:   this.pers.kills,
                 sector:  { ...this.pers.sector },
                 dead:    this.pers.dead,
-                // starIndex НЕ дублируем: он живёт в universe.indexStar
+                // indexStar НЕ дублируем: он живёт в universe.indexStar
             },
             ship: {
                 shield: this.ship.shield,

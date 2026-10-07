@@ -3,6 +3,7 @@
 /// Используется в модуле g-start-loop.html.
 /// ---
 /// Хранение:
+///     - Перс находиться в {indexGalaxy, indexStar} 🔔
 ///     - Загрузка важных данных в/из профиля [profile-store.js] — позже.
 ///     - Пока: значения по умолчанию в конструкторе.
 /// ---
@@ -22,8 +23,9 @@ class Pers
         this.sector    = options.sector    ?? { x: 0, y: 0 };
 
         // --- Навигация ---
-        this.starIndex = options.starIndex ?? 0;
-        this.dataStar  = options.dataStar  ?? null;
+        this.indexGalaxy = options.indexGalaxy ?? 0;
+        this.indexStar   = options.indexStar   ?? 0;
+        this.dataStar    = options.dataStar    ?? null;
 
         // --- Жизненный статус ---
         this.dead      = options.dead      ?? false;
