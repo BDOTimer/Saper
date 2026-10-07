@@ -27,14 +27,19 @@ class Game
 
     constructor(options = {})
     {
-        this.pers = options.pers ?? new Pers(options.persOptions);
-        this.ship = options.ship ?? new Ship(options.shipOptions);
 
         // Universe создаётся «чистым» — реальный seed/amount могут быть
         // перезаписаны в this.load(), когда подтянем save из профиля.
         this.universe = options.universe ?? new UniverseJS.Universe(
             options.seedRoot ?? 2026,
         );
+
+        this.pers = options.pers ?? new Pers({
+            ...(options.shipOptions || {}),
+            universe: this.universe
+        });
+
+        this.ship = options.ship ?? new Ship(options.shipOptions);
 
         this.hyper = options.hyper ?? {
             active:    false,

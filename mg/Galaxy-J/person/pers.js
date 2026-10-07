@@ -19,6 +19,10 @@ class Pers
     {
         this.name = "?name";
 
+        const u = options.universe ?? null; this.universe = u;
+
+        console.assert(u != null);
+
         // --- Метрики игрока ---
         this.credits   = options.credits   ?? 1000;
         this.kills     = options.kills     ?? 0;
@@ -27,8 +31,8 @@ class Pers
         // --- Навигация ---
         this.indexGalaxy = options.indexGalaxy ?? 0;
         this.indexStar   = options.indexStar   ?? 0;
-        this.seedGalaxy  = -1;
-        this.seedStar    = -1;
+        this.seedGalaxy  = u.getGalaxySeed(this.indexGalaxy);
+        this.seedStar    = u.getStarSeed  (this.indexGalaxy, this.indexStar);
 
         this.dataStar    = options.dataStar    ?? null;
 
@@ -37,6 +41,18 @@ class Pers
 
         // Загрузка профиля (пока заглушка)
         this.load();
+    }
+
+    goGalaxy(i)
+    {   this.indexGalaxy = i;
+        this.seedGalaxy  = this.universe.getGalaxySeed(this.indexGalaxy);
+    }
+
+    goStar(i)
+    {
+        this.indexStar = i;
+        this.seedStar
+            = this.universe.getStarSeed(this.indexGalaxy, this.indexStar);
     }
 
     load()
