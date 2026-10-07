@@ -1,0 +1,8 @@
+{
+    "editor.find.addExtraSpaceOnTop": true,
+    "editor.find.autoFindInSelection": "always",
+    "editor.find.cursorMoveOnType": true,
+    "editor.find.findOnType": true,
+    "editor.find.loop": true,
+    "files.autoGuessEncoding": false
+}

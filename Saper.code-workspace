@@ -4,5 +4,18 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"folder-customization.folders": [
+			{
+				"path": "Saper\\mg\\Galaxy-J\\",
+				"badge": "🔅",
+				"color": "foldercustomization.AnsiColor20"
+			},
+			{
+				"path": "Saper\\mg\\Galaxy-J\\js\\",
+				"color": "foldercustomization.AnsiColor22",
+				"badge": "🪶"
+			}
+		]
+	}
 }
