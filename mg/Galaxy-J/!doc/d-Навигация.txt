@@ -14,8 +14,10 @@ class Pers;
     - Экземпляр класса window.GAME это синглетон.
 
     - Два метода ключевые:
-        setIndexGalaxy(i);
-        setIndexStar  (i);
+        set indexGalaxy(i)
+        set indexStar  (i)
+    - По индексам вычисляются сиды.
+    - Сиды не могут быть изменены извне - сиды только на чтение!
     - Вызваются в jump2Galaxy() и jump2Star()
     - indexGalaxy и indexStar выбираются из меню выбора Галактики и Звезды.
     - Выбор Галактики это отдельное меню.

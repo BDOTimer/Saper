@@ -355,13 +355,11 @@
                 Number(q.w) || 1,   // w по умолчанию 1 — «нет поворота»
             );
         }
-        // isDocked восстанавливается внутри Game._restore
     }
 
     // Удобные алиасы (для читаемости кода ниже)
-    const universe = game.universe;
-    const pers     = game.pers;
-    const ship     = game.ship;
+    const pers = game.pers;
+    const ship = game.ship;
 
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 // ------------|
@@ -388,7 +386,7 @@ const state = {
       ///---------------------------------------|
       /// Галактика: id = 0.                    |
       ///---------------------------------------|
-      const seedGalaxy = universe.getGalaxySeed(universe.indexGalaxy);
+      const seedGalaxy = GAME.pers.seedGalaxy;
       let       GALAXY = new Galaxy( seedGalaxy);
                 GALAXY . init();
       window.   GALAXY = GALAXY;
@@ -619,8 +617,6 @@ const state = {
                   z: camera.quaternion.z,
                   w: camera.quaternion.w,
               },
-              // Стыковка
-              isDocked: game.isDocked,
           };
       }
 
@@ -1058,7 +1054,7 @@ const state = {
           if (e.defaultPrevented) return;
 
           // Открыть TRADE можно только на пристыкованном корабле
-          if (game.isDocked) {
+          if (game.isDock) {
             e.preventDefault();
             TRADE.open(state.credits);
           } else {
@@ -1087,7 +1083,7 @@ const state = {
           return;
         }
 
-        if (game.isDocked) return;
+        if (game.isDock) return;
 
         // Гиперпрыжок — работает и с открытой картой, и в полёте
         if (e.code === "KeyJ") {
@@ -1209,7 +1205,7 @@ const state = {
         GALAXY.setPlayerStar(targetIdx);
 
         // ★ Синхронизируем курсор вселенной
-        game.universe.goToStar(targetIdx);
+        GAME.pers.indexStar = targetIdx;
         saveGame();
 
         console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
@@ -1368,7 +1364,7 @@ const state = {
     currentStationHandle.setOnDock(() =>
     {
         console.log("DOCK: стыковка к станции");
-        game.isDocked = true;
+        game.isDock = true;
 
         kit.sounds.docking.play();
 
@@ -1381,40 +1377,6 @@ const state = {
         TRADE.open(state.credits);
 
         saveGame();
-    });
-
-    //----------------|
-    // Отстыковка.    |
-    //----------------:
-    currentStationHandle.setOnUndock(() =>
-    {
-      console.log("UNDOCK: отстыковка от станции");
-      game.isDocked = false;
-
-      kit.sounds.dockout.play();
-
-      // Закрыть TRADE, если открыт
-      if (TRADE.isOpen()) TRADE.close();
-
-      // // Отодвинуть корабль от шлюза, чтобы status стал 0
-      // if (currentStationHandle) {
-      //   const stationQuat = new THREE.Quaternion();
-      //   currentStationHandle.group.getWorldQuaternion(stationQuat);
-
-      //   // Ось «наружу» из шлюза = локальный -Z станции
-      //   const outAxis = new THREE.Vector3(0, 0, -1)
-      //     .applyQuaternion(stationQuat)
-      //     .normalize();
-
-      //   const push = currentStationHandle.params.gateLength * 1.5 + 50;
-      //   camera.position.addScaledVector(outAxis, push);
-      // }
-
-      // Сброс скоростей — чтобы не влететь обратно
-      state.speed = 560;
-      // state.angVel.pitch = 0;
-      // state.angVel.yaw   = 0;
-      // state.angVel.roll  = 0;
     });
 
     function animate() 
@@ -1476,7 +1438,7 @@ state.speed = Math.max(
 // Мёртвая зона, чтобы не «полз» вечно возле нуля
 if (Math.abs(state.speed) < 0.05 && thrustIn === 0) state.speed = 0;
 
-if (!game.isDocked)
+if (!game.isDock)
 {
   // ------- Плавное вращение с инерцией -------
   const ax = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0); // pitch
@@ -1675,7 +1637,7 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
           if (status === 2)
           {
             // авария
-            game.isDocked = false;
+            game.isDock = false;
             state.shield = 0;
             state.dead = true;
             elGameover.style.display = "flex";
@@ -1685,11 +1647,11 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             // успешная посадка — например, пополнить топливо/щит,
             // показать сообщение, отключить управление и т.п.
             // ...
-            game.isDocked = true;
+            game.isDock = true;
           }
           else
           {
-            game.isDocked = false; // ???
+            game.isDock = false; // ???
           }
         }
         
@@ -1853,8 +1815,44 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
 
     window.addEventListener('resize', resize);
     resize();
-    </script>
-  </body>
+
+    window.addEventListener("keydown", (e) =>
+    {   if (e.code !== "KeyO") return;
+        if (!GAME.isDock     ) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        
+        // ------------------------------------------------
+        //  Отстыковка извне (для keydown-обработчика)
+        // ------------------------------------------------
+        
+        console.log("🚩 UNDOCK: отстыковка от станции");
+        GAME.isDock = false;
+
+        kit.sounds.dockout.play();
+
+        if (TRADE.isOpen()) TRADE.close();
+
+        // // Отодвинуть корабль от шлюза, чтобы status стал 0
+        // if (currentStationHandle) {
+        //   const stationQuat = new THREE.Quaternion();
+        //   currentStationHandle.group.getWorldQuaternion(stationQuat);
+
+        //   // Ось «наружу» из шлюза = локальный -Z станции
+        //   const outAxis = new THREE.Vector3(0, 0, -1)
+        //     .applyQuaternion(stationQuat)
+        //     .normalize();
+
+        //   const push = currentStationHandle.params.gateLength * 1.5 + 50;
+        //   camera.position.addScaledVector(outAxis, push);
+        // }
+
+        state.speed = 560;
+    });
+
+</script>
+</body>
 </html>
 
 

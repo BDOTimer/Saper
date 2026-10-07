@@ -62,6 +62,21 @@ function mulberry32(seed)
     };
 }
 
+/// Случайные углы Эйлера (радианы), каждый в диапазоне [-π, π].
+function RandVec3Rot(seed)
+{
+    const TWO_PI = Math.PI * 2;
+    const s0 = toUint32(seed);
+    const s1 = mix32(hashCombine(s0, 'x'));
+    const s2 = mix32(hashCombine(s0, 'y'));
+    const s3 = mix32(hashCombine(s0, 'z'));
+    return {
+        x: (s1 / 4294967296) * TWO_PI - Math.PI,
+        y: (s2 / 4294967296) * TWO_PI - Math.PI,
+        z: (s3 / 4294967296) * TWO_PI - Math.PI,
+    };
+}
+
 //----------------------------------------------------------------------------|
 // class RNG — обёртка над PRNG
 //----------------------------------------------------------------------------|
@@ -120,36 +135,32 @@ class Universe
         this.#indexStar    = 0;
     }
 
-    goToGalaxy(i)
+    go2Galaxy(i)
     {
         this.#checkGalaxy(i);
         this.#indexGalaxy = i;
         this.#indexStar   = 0;
     }
 
-    goToStar(i)
-    {
-        this.#checkStar(i);
+    go2Star(i)
+    {   this.#checkStar(i);
         this.#indexStar = i;
     }
 
     getGalaxySeed(i)
-    {
-        this.#checkGalaxy(i);
+    {   this.#checkGalaxy(i);
         return mix32(hashCombine(this.#seedRoot, i));
     }
 
     getGalaxyRng(i) { return new RNG(this.getGalaxySeed(i)); }
 
     getStarCount(i)
-    {
-        return new RNG(mix32(hashCombine(this.getGalaxySeed(i), 'count')))
+    {   return new RNG(mix32(hashCombine(this.getGalaxySeed(i), 'count')))
             .int(STARS_MIN, STARS_MAX);
     }
 
     getStarSeed(gi, si)
-    {
-        this.#checkStarIn(gi, si);
+    {   this.#checkStarIn(gi, si);
         return mix32(hashCombine(this.getGalaxySeed(gi), si));
     }
 
@@ -184,12 +195,9 @@ class Universe
      * @return {object}
      */
     toJSON()
-    {
-        return {
+    {   return {
             seedRoot:    this.#seedRoot,
             amount:      this.#amountGalaxy,
-            indexGalaxy: this.#indexGalaxy,
-            indexStar:   this.#indexStar,
         };
     }
 
@@ -198,7 +206,6 @@ class Universe
      * НЕ бросает наружу: битый снимок → остаёмся с дефолтным состоянием,
      * выставленным в конструкторе или предыдущим load().
      * @param  {object|null} data
-     * @return {boolean} true — применили; false — снимок не валиден
      */
     fromJSON(data)
     {
@@ -211,15 +218,15 @@ class Universe
             return false;
         }
 
-        // 2) Проверим курсоры через штатные переходы
-        try {
-            this.goToGalaxy(data.indexGalaxy);
-            this.goToStar(data.indexStar);
-        } catch (e) {
-            // Битые индексы → откат к дефолтному состоянию конструктора
-            this.load(data.seedRoot, data.amount);
-            return false;
-        }
+        // // 2) Проверим курсоры через штатные переходы
+        // try {
+        //     this.goToGalaxy(data.indexGalaxy);
+        //     this.goToStar(data.indexStar);
+        // } catch (e) {
+        //     // Битые индексы → откат к дефолтному состоянию конструктора
+        //     this.load(data.seedRoot, data.amount);
+        //     return false;
+        // }
 
         return true;
     }
@@ -231,7 +238,7 @@ class Universe
 const UniverseJS = {
     Universe,
     RNG,
-    utils: { toUint32, hashCombine, mix32, mulberry32 },
+    utils: { toUint32, hashCombine, mix32, mulberry32, RandVec3Rot },
 };
 
 if (typeof module !== 'undefined' && module.exports) {

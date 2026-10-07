@@ -55,7 +55,7 @@ class Game
 
         this.currentStarHandle    = null;
         this.currentStationHandle = null;
-        this.isDocked = false;
+        this.isDock = false;
 
         // Заполняется снаружи — из g-start-loop.html через game.world = {...}
         this.world = null;
@@ -76,7 +76,7 @@ class Game
                 kills  : this.pers.kills,
                 sector : { ...this.pers.sector },
                 dead   : this.pers.dead,
-                // indexStar НЕ дублируем: он живёт в universe.indexStar
+                isDock : this.isDock,
             },
             ship: {
                 shield: this.ship.shield,
@@ -112,7 +112,8 @@ class Game
                 y: Number(p.sector.y) || 0,
             };
         }
-        if (typeof p.dead === "boolean") this.pers.dead = p.dead;
+        if (typeof p.dead   === "boolean") this.pers.dead = p.dead;
+        if (typeof p.isDock === "boolean") this.isDock    = p.isDock;
 
         // --- ship ---
         if (typeof s.shield === "number") this.ship.shield = s.shield;
@@ -142,9 +143,9 @@ class Game
         // --- world ---
         if (saveData.world && typeof saveData.world === "object")
         {   this.world = saveData.world;
-            if (typeof saveData.world.isDocked === "boolean") {
-                this.isDocked = saveData.world.isDocked;
-            }
+            // if (typeof saveData.world.isDock === "boolean") {
+            //     this.isDock = saveData.world.isDock;
+            // }
         }
     }
 
@@ -188,7 +189,7 @@ class Game
         this.enemies.length = 0;
         this.lasers.length  = 0;
 
-        this.isDocked = false;
+        this.isDock = false;
     }
 
     /// «Новая игра»: стереть save активного профиля.

@@ -45,9 +45,6 @@ class Pers
 
         // --- Жизненный статус ---
         this.dead = options.dead ?? false;
-
-        // Загрузка профиля (пока заглушка)
-        this.load();
     }
 
     // --- Геттеры для приватных полей ---
@@ -67,6 +64,8 @@ class Pers
         this.#indexGalaxy = i;
         this.#seedGalaxy  = this.universe.getGalaxySeed(i);
         this.#seedStar    = this.universe.getStarSeed(i, this.#indexStar);
+
+        this.universe.go2Galaxy(i);
     }
 
     /// Установка индекса звезды. Пересчитывает seedStar.
@@ -77,6 +76,8 @@ class Pers
 
         this.#indexStar = i;
         this.#seedStar  = this.universe.getStarSeed(this.#indexGalaxy, i);
+
+        this.universe.go2Star(i);
     }
 
     /// Сброс метрик игрока после смерти / рестарта

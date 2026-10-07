@@ -124,15 +124,6 @@ class Station
         };
     }
 
-    /// Обратная совместимость: раньше был STATION.dispose(handle).
-    static dispose(handle)
-    {
-        if (handle && typeof handle.dispose === "function")
-        {
-            handle.dispose();
-        }
-    }
-
     // ---------------------------------------------------------------
     //  Экземпляр
     // ---------------------------------------------------------------
@@ -143,7 +134,6 @@ class Station
         this.group  = this._buildGroup(this.params);
 
         // --- Состояние стыковки ---
-        this._dockedNow        = false;
         this._dockingEnabled   = options.dockingEnabled ?? true;
         this._lastLandingStatus = 0;
 
@@ -167,14 +157,17 @@ class Station
             }
             else
             {
-                //const seedStar = UniverseJS.Universe.get;/////////////////////
+                const rot = UniverseJS.utils.RandVec3Rot(GAME.pers.seedStar);
+                this.setRotation({ rotation: rot });
+                this.group.position.set(0, 0, -600);
+            //  console.log(rot);
             }
         }
 
         // --- Применяем цвета входа/выхода ---
         this._applyDockingColors();
 
-       console.log("🚩 Station --> Имя перса: ", GAME.pers.name);
+        console.log("🚩 Station --> Имя перса: ", GAME.pers.name);
     }
 
     // ---------------------------------------------------------------
@@ -478,7 +471,7 @@ class Station
             if (this._onDockCallback) this._onDockCallback();
         }
 
-        this._dockedNow         = (status === 1);
+        GAME.isDock     = (status === 1);
         this._lastLandingStatus = status;
         return status;
     }
@@ -520,16 +513,6 @@ class Station
     }
 
     // ---------------------------------------------------------------
-    //  Отстыковка извне (для keydown-обработчика)
-    // ---------------------------------------------------------------
-    tryUndock()
-    {
-        if (!this._dockedNow) return false;
-        if (this._onUndockCallback) this._onUndockCallback();
-        return true;
-    }
-
-    // ---------------------------------------------------------------
     //  Освобождение ресурсов
     // ---------------------------------------------------------------
     dispose()
@@ -548,31 +531,6 @@ class Station
             }
         });
     }
-}
-
-// ★ Единожды вешаем обработчик O.
-//   Так как Station теперь класс, а не одиночка, обработчик ищет
-//   «активную» станцию через window.GAME.
-if (typeof window !== "undefined" && !window.__station_keydown_bound)
-{
-    window.addEventListener("keydown", (e) =>
-    {
-        if (e.code !== "KeyO") return;
-
-        // Пытаемся найти активную станцию
-        const handle =
-            (window.GAME && window.GAME.station) ||
-            (window.currentStationHandle) ||
-            null;
-
-        if (!handle || typeof handle.tryUndock !== "function") return;
-        if (!handle._dockedNow) return;
-
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        handle.tryUndock();
-    });
-    window.__station_keydown_bound = true;
 }
 
 // Экспорт
