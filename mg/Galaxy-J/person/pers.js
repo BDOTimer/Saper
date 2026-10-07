@@ -79,17 +79,6 @@ class Pers
         this.#seedStar  = this.universe.getStarSeed(this.#indexGalaxy, i);
     }
 
-    load()
-    {
-        // TODO: подключить profile-store.js
-        // Пока ничего не делаем — используются значения из конструктора.
-    }
-
-    save()
-    {
-        // TODO: подключить profile-store.js
-    }
-
     /// Сброс метрик игрока после смерти / рестарта
     reset()
     {
