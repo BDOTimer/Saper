@@ -1075,7 +1075,7 @@ html, body {
   right: 130px;
   display: flex;
   gap: 10px; /* ← расстояние между кружками D и S */
-  z-index: 50;
+  z-index: 150;
   pointer-events: none; /* чтобы не мешали кликам по игре */
 }
 
