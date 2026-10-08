@@ -66,7 +66,7 @@
             }
 
             .tune-menu__panel {
-                width: min(460px, 88vw);
+                width: min(520px, 88vw);
                 max-height: 82vh;
                 overflow: hidden;
                 display: flex;
@@ -275,6 +275,20 @@
                 color: #0a140a;
                 box-shadow: 0 0 26px rgba(168, 255, 120, 0.9);
             }
+            .tune-menu__title-name {
+                font-size: 1.15em;  /* чуть больше заголовка */
+                color: #fff3a8;   /* слегка желтоватый */
+                text-shadow:
+                    0 0 4px  rgba(255, 240, 150, 0.85),
+                    0 0 12px rgba(255, 220, 80, 0.55);
+                margin-left: 6px;
+                letter-spacing: 1.5px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                max-width: 55%;
+                vertical-align: baseline;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -297,6 +311,22 @@
             && typeof ProfileStore.ensure === "function"
             && typeof ProfileStore.getSettings === "function"
             && typeof ProfileStore.updateSettings === "function";
+    }
+
+    function getPlayerName() {
+        // 1) активный профиль из ProfileStore
+        if (hasStore()) {
+            try {
+                const p = ProfileStore.ensure();
+                if (p && p.name) return p.name;
+            } catch (_) { /* ignore */ }
+        }
+        // 2) запасной вариант — глобальная переменная, если есть
+        if (typeof window.NAME_PLAYER !== "undefined" && window.NAME_PLAYER) {
+            return String(window.NAME_PLAYER);
+        }
+        // 3) совсем запасной
+        return "ИГРОК";
     }
 
     function currentProfileId() {
@@ -461,7 +491,11 @@
     // ---------------------------------------------------------
     //  Синхронизация с профилем (при profile-changed)
     // ---------------------------------------------------------
-    function syncFromProfile() {
+    function syncFromProfile()
+    {
+        const nameEl = _overlay && _overlay.querySelector(".tune-menu__title-name");
+        if (nameEl) nameEl.textContent = getPlayerName();
+        
         if (!_overlay || !_listEl) return;
         const s = readSettings();
 
@@ -508,9 +542,14 @@
         const title = document.createElement("div");
         title.className = "tune-menu__title";
 
-        const titleText = document.createElement("span");
-        titleText.textContent = "НАСТРОЙКИ";
-        title.appendChild(titleText);
+            const titleText = document.createElement("span");
+            titleText.textContent = "НАСТРОЙКИ:";
+            title.appendChild(titleText);
+
+            const titleName = document.createElement("span");
+            titleName.className = "tune-menu__title-name";
+            titleName.textContent = getPlayerName();
+            title.appendChild(titleName);
 
         const closeBtn = document.createElement("button");
         closeBtn.type = "button";
