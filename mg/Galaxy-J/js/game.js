@@ -62,6 +62,9 @@ class Game
 
         // Загрузка профиля (pers + ship + universe)
         this.load();
+
+        this._restoreCamera();
+        this._setupRender  ();
     }
 
     // ------------------------------------------------------------
@@ -201,12 +204,149 @@ class Game
             if (profile) ProfileStore.resetGame(profile.id);
         }
     }
+
+    _restoreCamera()
+    {   this.camera = new THREE.PerspectiveCamera(
+            75,
+            innerWidth / innerHeight,
+            0.1,
+            20000,
+        );
+
+        // ★ Восстановление позы корабля из сохранения
+        if (this.world)
+        {   const p = this.world.pos;
+            if (p) {
+                this.camera.position.set(
+                    Number(p.x) || 0,
+                    Number(p.y) || 0,
+                    Number(p.z) || 0,
+                );
+            }
+            const q = this.world.quat;
+            if (q)
+            {   this.camera.quaternion.set(
+                    Number(q.x) || 0,
+                    Number(q.y) || 0,
+                    Number(q.z) || 0,
+                    Number(q.w) || 1,   // w по умолчанию 1 — «нет поворота»
+                );
+            }
+        }
+    }
+
+    // ----------------------------------------------------
+    //  Сборка снимка мира для сохранения
+    // ----------------------------------------------------
+    buildWorldSnapshot()
+    {   return {
+            // Поза корабля = поза камеры (камера — «мозг» игрока)
+            pos: {
+                x: this.camera.position.x,
+                y: this.camera.position.y,
+                z: this.camera.position.z,
+            },
+            quat: {
+                x: this.camera.quaternion.x,
+                y: this.camera.quaternion.y,
+                z: this.camera.quaternion.z,
+                w: this.camera.quaternion.w,
+            },
+        };
+    }
+
+    _setupRender()
+    {   const r = new THREE.WebGLRenderer({
+        antialias: true
+        //,logarithmicDepthBuffer: true
+        });
+
+        r.setSize(innerWidth, innerHeight);
+        r.setPixelRatio(Math.min(devicePixelRatio, 2));
+        r.toneMapping = THREE.ACESFilmicToneMapping;
+        r.toneMappingExposure = 1.1;
+        document.body.appendChild(r.domElement);
+
+        this.renderer = r;
+    }
+}
+
+class CameraFar
+{
+    constructor(camera, ship, planets)
+    {
+        this.camera  = camera;
+        this.ship    = ship;    // объект с .position (THREE.Vector3)
+        this.planets = planets; // массив объектов с .position
+
+        this.clock = new THREE.Clock();
+        this.farUpdateTimer = 0;
+        this.checkInterval  = 1.0; // секунды
+        this.minFar = 7000;
+        this.margin = 1.2;
+
+        this.seconds = 0;
+    }
+
+    /*
+     * Вызывать один раз в кадре (из основного animate)
+     */
+    update(dt)
+    {   
+    //  const dt = this.clock.getDelta();
+        this.farUpdateTimer += dt;
+
+        if (this.farUpdateTimer >= this.checkInterval)
+        {   this.farUpdateTimer -= this.checkInterval;
+        //  this._recalculateFar();
+            this._zoomInStar();
+            this.seconds++;
+        }
+    }
+
+    _recalculateFar()
+    {
+        const positionShip = this.ship.position;
+        let maxVisible = 0;
+
+        // 1. Считаем самую дальнюю планету
+        for (const p of this.planets) {
+            const d = positionShip.distanceTo(p.position);
+            if (d > maxVisible) maxVisible = d;
+        }
+
+        // 2. Учитываем звезду в (0, 0, 0)
+        const distToStar = positionShip.length(); // это distanceTo(new THREE.Vector3(0,0,0))
+        if (distToStar > maxVisible) {
+            maxVisible = distToStar;
+        }
+
+        this.camera.far = Math.max(maxVisible * this.margin, this.minFar);
+        this.camera.updateProjectionMatrix();
+    }
+
+    _zoomInStar()
+    {
+        const positionShip = this.ship.position;
+
+        const distToStar = positionShip.length();
+        const maxOrbit   = 8000;  // радиус орбиты самой дальней планеты
+
+        // Самый дальний объект, который может быть виден:
+        // планета на противоположной от корабля стороне звезды
+        const maxVisible = distToStar + maxOrbit;
+
+        this.camera.far = Math.max(maxVisible * this.margin, this.minFar);
+        this.camera.updateProjectionMatrix();
+    }
 }
 
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
     module.exports = Game;
+    module.exports = CameraFar;
 } else {
-    window.Game = Game;
+    window.Game    = Game;
+    window.exports = CameraFar;
 }
 
 // Итоговая схема хранения:

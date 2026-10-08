@@ -394,36 +394,11 @@ window.HUD = HUD;
     // --------------------------------------------------------------
     //  Сцена / камера / рендерер
     // --------------------------------------------------------------
-    const scene = new THREE.Scene();
+    const scene      = new THREE.Scene();
     scene.background = new THREE.Color(0x000005);
 
-    const camera = new THREE.PerspectiveCamera(
-        75,
-        innerWidth / innerHeight,
-        0.1,
-        20000,
-    );
-
-    // ★ Восстановление позы корабля из сохранения
-    if (game.world)
-    {   const p = game.world.pos;
-        if (p) {
-            camera.position.set(
-                Number(p.x) || 0,
-                Number(p.y) || 0,
-                Number(p.z) || 0,
-            );
-        }
-        const q = game.world.quat;
-        if (q)
-        {   camera.quaternion.set(
-                Number(q.x) || 0,
-                Number(q.y) || 0,
-                Number(q.z) || 0,
-                Number(q.w) || 1,   // w по умолчанию 1 — «нет поворота»
-            );
-        }
-    }
+    const camera   = GAME.camera;
+    const renderer = GAME.renderer;
 
     // Удобные алиасы (для читаемости кода ниже)
     const pers = game.pers;
@@ -451,76 +426,76 @@ const state = {
 };
 ///////////////////////////////////////////////////////////////////////////////.
 
-      ///---------------------------------------|
-      /// Галактика:                            |
-      ///---------------------------------------|
-      const seedGalaxy = GAME.pers.seedGalaxy;
-       window.  GALAXY = new Galaxy( seedGalaxy);
-                GALAXY . init();
+    ///---------------------------------------|
+    /// Галактика:                            |
+    ///---------------------------------------|
+    const seedGalaxy = GAME.pers.seedGalaxy;
+    window.   GALAXY = new Galaxy( seedGalaxy);
+              GALAXY . init();
 
-      GALAXY.setPlayerStar(pers.indexStar);
-      pers.dataStar = GALAXY.getCurrentStar();
-      updateSectorFromStar(pers.dataStar);
-      
-      HELP .init();
-      TRADE.init();
-      TRADE.setOnCreditsChanged((credits) => {
+    GALAXY.setPlayerStar(pers.indexStar);
+    pers.dataStar = GALAXY.getCurrentStar();
+    updateSectorFromStar(pers.dataStar);
+    
+    HELP .init();
+    TRADE.init();
+    TRADE.setOnCreditsChanged((credits) => {
         state.credits = credits;
         elCredits.textContent = credits;
-      });
+    });
 
-      // ============================================================
-      //  Скрытие курсора через 3 секунды бездействия
-      // ============================================================
-      let cursorTimer = null;
-      function hideCursor() {
+    // ============================================================
+    //  Скрытие курсора через 3 секунды бездействия
+    // ============================================================
+    let cursorTimer = null;
+    function hideCursor() {
         document.body.classList.add("hide-cursor");
-      }
-      function showCursor() {
+    }
+    function showCursor() {
         document.body.classList.remove("hide-cursor");
         clearTimeout(cursorTimer);
         cursorTimer = setTimeout(hideCursor, 3000);
-      }
+    }
       
-      ["mousedown", "pointerdown", "touchstart", "keydown", "wheel"].forEach(
-        (evt) => document.addEventListener(evt, showCursor, { passive: true }),
-      );
-      showCursor();
+    ["mousedown", "pointerdown", "touchstart", "keydown", "wheel"].forEach(
+      (evt) => document.addEventListener(evt, showCursor, { passive: true }),
+    );
+    showCursor();
 
-      // ============================================================
-      //  Звук
-      // ============================================================
-      const Vol = Settings.volume;
-      const kit = SND.createSoundKit({
+    // ============================================================
+    //  Звук
+    // ============================================================
+    const Vol = Settings.volume;
+    const kit = SND.createSoundKit({
         laser  : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 3 },
         death  : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
         damag  : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 3 },
         hjump  : { src: "snd/ship-HJ-1.mp3"   , volume: Vol, pool: 1 },
         docking: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
         dockout: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
-      });
+    });
 
-      kit.autoUnlock();
+    kit.autoUnlock();
 
-      const playLaser = () => kit.sounds.laser.play();
-      const playDeath = () => kit.sounds.death.play();
-      const playDamag = () => kit.sounds.damag.play();
-      // kit.sounds.hjump.play();
+    const playLaser = () => kit.sounds.laser.play();
+    const playDeath = () => kit.sounds.death.play();
+    const playDamag = () => kit.sounds.damag.play();
+    // kit.sounds.hjump.play();
 
-      // ------------------------------------------------------------------
-      //  Утилиты
-      // ------------------------------------------------------------------
-      function mulberry32(seed) {
+    // ------------------------------------------------------------------
+    //  Утилиты
+    // ------------------------------------------------------------------
+    function mulberry32(seed) {
         return function () {
-          seed |= 0;
-          seed = (seed + 0x6d2b79f5) | 0;
-          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            seed |= 0;
+            seed = (seed + 0x6d2b79f5) | 0;
+            let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
-      }
+    }
 
-      function wrapAround(pos, origin, halfSize) {
+    function wrapAround(pos, origin, halfSize) {
         const dx = pos.x - origin.x;
         const dy = pos.y - origin.y;
         const dz = pos.z - origin.z;
@@ -530,90 +505,91 @@ const state = {
         if (dy < -halfSize) pos.y += halfSize * 2;
         if (dz > halfSize) pos.z -= halfSize * 2;
         if (dz < -halfSize) pos.z += halfSize * 2;
-      }
+    }
 
-      // ------------------------------------------------------------------
-      //  Корабль игрока
-      // ------------------------------------------------------------------
-      function makePlayerShip() {
-        const group = new THREE.Group();
-        const body = new THREE.Mesh(
-          new THREE.ConeGeometry(6, 22, 8),
-          new THREE.MeshStandardMaterial({
-            color: 0x337744,
-            metalness: 0.7,
-            roughness: 0.4,
-          }),
-        );
-        body.rotation.x = Math.PI / 2;
-        body.position.z = -8;
-        group.add(body);
+    // ------------------------------------------------------------------
+    //  Корабль игрока
+    // ------------------------------------------------------------------
+    function makePlayerShip() {
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.ConeGeometry(6, 22, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x337744,
+          metalness: 0.7,
+          roughness: 0.4,
+        }),
+      );
+      body.rotation.x = Math.PI / 2;
+      body.position.z = -8;
+      group.add(body);
 
-        const wing = new THREE.Mesh(
-          new THREE.BoxGeometry(20, 1, 6),
-          new THREE.MeshStandardMaterial({
-            color: 0x446633,
-            metalness: 0.8,
-            roughness: 0.5,
-          }),
-        );
-        wing.position.z = 2;
-        group.add(wing);
+      const wing = new THREE.Mesh(
+        new THREE.BoxGeometry(20, 1, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x446633,
+          metalness: 0.8,
+          roughness: 0.5,
+        }),
+      );
+      wing.position.z = 2;
+      group.add(wing);
 
-        const cockpit = new THREE.Mesh(
-          new THREE.SphereGeometry(3, 12, 8),
-          new THREE.MeshStandardMaterial({
-            color: 0x227711, /// 🍈
-            metalness: 0.9,
-            roughness: 0.1,
-            emissive: 0x223311, /// 🍈
-            emissiveIntensity: 0.6,
-          }),
-        );
-        cockpit.position.set(0, 2, -4);
-        cockpit.scale.set(1, 0.7, 1.6);
-        group.add(cockpit);
+      const cockpit = new THREE.Mesh(
+        new THREE.SphereGeometry(3, 12, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x227711, /// 🍈
+          metalness: 0.9,
+          roughness: 0.1,
+          emissive: 0x223311, /// 🍈
+          emissiveIntensity: 0.6,
+        }),
+      );
+      cockpit.position.set(0, 2, -4);
+      cockpit.scale.set(1, 0.7, 1.6);
+      group.add(cockpit);
 
-        const engMat = new THREE.MeshBasicMaterial({
-          color: 0x666666,
-          toneMapped: false,
-        });
-        const eng1 = new THREE.Mesh(
-          new THREE.CylinderGeometry(2, 2.5, 3, 12),
-          engMat,
-        );
-        eng1.rotation.x = Math.PI / 2;
-        eng1.position.set(-5, 0, 8);
-        group.add(eng1);
-        const eng2 = eng1.clone();
-        eng2.position.x = 5;
-        group.add(eng2);
+      const engMat = new THREE.MeshBasicMaterial({
+        color: 0x666666,
+        toneMapped: false,
+      });
+      const eng1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(2, 2.5, 3, 12),
+        engMat,
+      );
+      eng1.rotation.x = Math.PI / 2;
+      eng1.position.set(-5, 0, 8);
+      group.add(eng1);
+      const eng2 = eng1.clone();
+      eng2.position.x = 5;
+      group.add(eng2);
 
-        const muzzleMat = new THREE.MeshBasicMaterial({
-          color: 0x666666,
-          toneMapped: false,
-          transparent: true,
-          opacity: 0,
-        });
-        const muzzle1 = new THREE.Mesh(
-          new THREE.SphereGeometry(1.6, 8, 8),
-          muzzleMat.clone(),
-        );
-        muzzle1.position.set(-8, 0, 0);
-        group.add(muzzle1);
-        const muzzle2 = muzzle1.clone();
-        muzzle2.position.x = 8;
-        group.add(muzzle2);
+      const muzzleMat = new THREE.MeshBasicMaterial({
+        color: 0x666666,
+        toneMapped: false,
+        transparent: true,
+        opacity: 0,
+      });
+      const muzzle1 = new THREE.Mesh(
+        new THREE.SphereGeometry(1.6, 8, 8),
+        muzzleMat.clone(),
+      );
+      muzzle1.position.set(-8, 0, 0);
+      group.add(muzzle1);
+      const muzzle2 = muzzle1.clone();
+      muzzle2.position.x = 8;
+      group.add(muzzle2);
 
-        group.userData.engines = [eng1, eng2];
-        group.userData.muzzles = [muzzle1, muzzle2];
-        return group;
-      }
+      group.userData.engines = [eng1, eng2];
+      group.userData.muzzles = [muzzle1, muzzle2];
+      return group;
+    }
 
-      // ------------------------------------------------------------------
-      //  Враг
-      // ------------------------------------------------------------------
-      function makeEnemyShip() {
+    // ------------------------------------------------------------------
+    //  Враг
+    // ------------------------------------------------------------------
+    function makeEnemyShip()
+    {
         const group = new THREE.Group();
         const mat = new THREE.MeshStandardMaterial({
           color: 0xaa3333,
@@ -629,201 +605,103 @@ const state = {
         group.add(ring);
         group.userData.enemy = true;
         return group;
-      }
+    }
 
-      // ------------------------------------------------------------------
-      //  Лазер
-      // ------------------------------------------------------------------
-      const LASER_LENGTH = 40;
-      const LASER_RADIUS = 0.4;
-      const LASER_SPEED = 900;
+    // ------------------------------------------------------------------
+    //  Лазер
+    // ------------------------------------------------------------------
+    const LASER_LENGTH = 40;
+    const LASER_RADIUS = 0.4;
+    const LASER_SPEED = 900;
 
-      const laserGeo = new THREE.CylinderGeometry(
+    const laserGeo = new THREE.CylinderGeometry(
         LASER_RADIUS,
         LASER_RADIUS,
         LASER_LENGTH,
         6,
         1,
         true,
-      );
-      laserGeo.rotateX(Math.PI / 2);
+    );
+    laserGeo.rotateX(Math.PI / 2);
 
-      function makeLaserMaterial() {
+    function makeLaserMaterial() {
         return new THREE.MeshBasicMaterial({
-          color:   0xffff66,
-          toneMapped: false,
-          transparent: true,
-          opacity:      1.0,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
+            color:   0xffff66,
+            toneMapped: false,
+            transparent: true,
+            opacity:      1.0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
         });
-      }
+    }
 
-      // ------------------------------------------------------------
-      //  Сборка снимка мира для сохранения
-      // ------------------------------------------------------------
-      function buildWorldSnapshot()
-      {   return {
-              // Поза корабля = поза камеры (камера — «мозг» игрока)
-              pos: {
-                  x: camera.position.x,
-                  y: camera.position.y,
-                  z: camera.position.z,
-              },
-              quat: {
-                  x: camera.quaternion.x,
-                  y: camera.quaternion.y,
-                  z: camera.quaternion.z,
-                  w: camera.quaternion.w,
-              },
-          };
-      }
+    // ------------------------------------------------------------
+    //  Единая точка сохранения игры (со снимком мира)
+    // ------------------------------------------------------------
+    function saveGame()
+    {   game.world = game.buildWorldSnapshot();
+        game.save();
 
-      // ------------------------------------------------------------
-      //  Единая точка сохранения игры (со снимком мира)
-      // ------------------------------------------------------------
-      function saveGame()
-      {   game.world = buildWorldSnapshot();
-          game.save();
+        HUD.setStatus("S", true, { pulse: true }); 
+        setTimeout(() => HUD.setStatus("S", false), 3000);
+    }
 
-          HUD.setStatus("S", true, { pulse: true }); 
-          setTimeout(() => HUD.setStatus("S", false), 3000);
-      }
-
-      class CameraManager
-      {
-        constructor(camera, ship, planets) {
-          this.camera  = camera;
-          this.ship    = ship;    // объект с .position (THREE.Vector3)
-          this.planets = planets; // массив объектов с .position
-
-          this.clock = new THREE.Clock();
-          this.farUpdateTimer = 0;
-          this.checkInterval  = 1.0; // секунды
-          this.minFar = 7000;
-          this.margin = 1.2;
-
-          this.seconds = 0;
-        }
-
-        /**
-         * Вызывать один раз в кадре (из основного animate)
-         */
-        update()
-        { const dt = this.clock.getDelta();
-          this.farUpdateTimer += dt;
-
-          if (this.farUpdateTimer >= this.checkInterval) {
-            this.farUpdateTimer -= this.checkInterval;
-            this._recalculateFar();
-            this.seconds++;
-          }
-        }
-
-        _recalculateFar()
-        {
-          const positionShip = this.ship.position;
-          let maxVisible = 0;
-
-          // 1. Считаем самую дальнюю планету
-          for (const p of this.planets) {
-            const d = positionShip.distanceTo(p.position);
-            if (d > maxVisible) maxVisible = d;
-          }
-
-          // 2. Учитываем звезду в (0, 0, 0)
-          const distToStar = positionShip.length(); // это distanceTo(new THREE.Vector3(0,0,0))
-          if (distToStar > maxVisible) {
-            maxVisible = distToStar;
-          }
-
-          this.camera.far = Math.max(maxVisible * this.margin, this.minFar);
-          this.camera.updateProjectionMatrix();
-        }
-
-        _zoomInStar()
-        {
-          const positionShip = this.ship.position;
-
-          const distToStar = positionShip.length();
-          const maxOrbit   = 8000;  // радиус орбиты самой дальней планеты
-
-          // Самый дальний объект, который может быть виден:
-          // планета на противоположной от корабля стороне звезды
-          const maxVisible = distToStar + maxOrbit;
-
-          this.camera.far = Math.max(maxVisible * this.margin, this.minFar);
-          this.camera.updateProjectionMatrix();
-        }
-      }
-
-      const renderer = new THREE.WebGLRenderer({
-         antialias: true
-      //,logarithmicDepthBuffer: true
-      });
-
-      renderer.setSize(innerWidth, innerHeight);
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.1;
-      document.body.appendChild(renderer.domElement);
-
-      const composer = new EffectComposer(renderer);
-      composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(
         new THREE.Vector2(innerWidth, innerHeight),
         0.9,
         0.6,
         0.15,
-      );
-      composer.addPass(bloom);
+    );
+    composer.addPass(bloom);
       
-      // Визуал эффекта туннеля Гиперпрыжка
-      HYPERFX.attach({ THREE, scene, camera, bloom,
-        composer,
-        chromatic: {
-            enabled: true,
-            maxOffset: 0.012,
-            vignette: 0.6,
-            baseIntensity: 0.15,
-            boostDuringJump: 0.85,
-          },
-      });
+    // Визуал эффекта туннеля Гиперпрыжка
+    HYPERFX.attach({ THREE, scene, camera, bloom,
+      composer,
+      chromatic: {
+          enabled: true,
+          maxOffset: 0.012,
+          vignette: 0.6,
+          baseIntensity: 0.15,
+          boostDuringJump: 0.85,
+        },
+    });
 
-      const sunLight9 = new THREE.DirectionalLight(0xffffff, 1.6);
-      scene.add(sunLight9);
-      sunLight9.position.set(1, 0.5, 0.7);
+    const sunLight9 = new THREE.DirectionalLight(0xffffff, 1.6);
+    scene.add(sunLight9);
+    sunLight9.position.set(1, 0.5, 0.7);
 
-      const sunLight = new THREE.PointLight(0xffffff, 3.0, 8000, 1.0);
-      scene.add(sunLight);
-      scene.add(new THREE.AmbientLight(0x334455, 0.6));
+    const sunLight = new THREE.PointLight(0xffffff, 3.0, 8000, 1.0);
+    scene.add(sunLight);
+    scene.add(new THREE.AmbientLight(0x334455, 0.6));
 
-      // ---------------------------------------|
-      //  Звёздное небо (дальний фон).
-      // ---------------------------------------:
-      const skystars = SKYSTAR.makeStarfield(12345, {
-          count: 4000,
-          radius: 4000,
-          sizeMax: 8,
-          opacity: 0.9,
-          starPoints: 6,
+    // ---------------------------------------|
+    //  Звёздное небо (дальний фон).
+    // ---------------------------------------:
+    const skystars = SKYSTAR.makeStarfield(12345, {
+        count: 4000,
+        radius: 4000,
+        sizeMax: 8,
+        opacity: 0.9,
+        starPoints: 6,
           
-            // Цвет
-            hueBase: 0.10,   // центр спектра (0..1): 0.55 ≈ голубой
-            hueRange: 0.20,  // насколько широко разбрасывать вокруг него.
-            saturation: 0.8, // насыщенность 0..1
-            saturationJitter: 0.25, // добавочный разброс насыщенности
-            
-            lightnessMin: 0.7, lightnessRange: 0.25,
-          shapeWeights: { star: 40, sparkle: 20, disc: 40 },
-        });
-      scene.add(skystars);
+        // Цвет
+        hueBase   : 0.10, // центр спектра (0..1): 0.55 ≈ голубой
+        hueRange  : 0.20, // насколько широко разбрасывать вокруг него.
+        saturation:  0.8, // насыщенность 0..1
+        saturationJitter: 0.25, // добавочный разброс насыщенности
+        
+        lightnessMin: 0.7, lightnessRange: 0.25,
+        shapeWeights: { star: 40, sparkle: 20, disc: 40 },
+    });
+    scene.add(skystars);
 
-      const player = makePlayerShip();
-      camera.add(player);
-      player.position.set(0, -6, 12);
-      player.scale.set(3, 0.1, 3);
-      scene.add(camera);
+    const player = makePlayerShip();
+    camera.add(player);
+    player.position.set(0, -6, 12);
+    player.scale.set(3, 0.1, 3);
+    scene.add(camera);
 
     // ------------------------------------------------------------------------|
     //  Система текущей звезды: светило + планеты
@@ -1268,13 +1146,21 @@ const state = {
 
         // ★ Синхронизируем курсор вселенной
         GAME.pers.indexStar = targetIdx;
-        saveGame();
 
         console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
 
         // Сброс сцены
-        camera.position.set(0, 0, 0);
-        camera.quaternion.set(0, 0, 0, 1);
+        if(Settings.isTestDockToStation)
+        {   camera.position  .set(0, 0, 0);
+            camera.quaternion.set(0, 0, 0, 1);
+        }
+        else
+        {   camera.position.set(0, 0, 10000);
+            camera.lookAt(0,0,0);
+        }
+
+        saveGame();
+
         state.speed = 0;
 
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
