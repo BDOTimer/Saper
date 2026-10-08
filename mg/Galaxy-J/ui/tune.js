@@ -372,6 +372,8 @@
         }, 160);
 
         document.removeEventListener("keydown", onKeyDown, true);
+
+        music.setVolumeL();
     }
 
     function onKeyDown(e) {

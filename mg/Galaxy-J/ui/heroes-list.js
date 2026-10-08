@@ -451,6 +451,7 @@
     }
 
     playClick();
+    music.setVolumeL();
   }
 
   function toggle() {

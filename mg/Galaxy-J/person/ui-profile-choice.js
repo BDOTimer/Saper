@@ -298,6 +298,8 @@
         }, 160);
 
         document.removeEventListener("keydown", onKeyDown, true);
+
+        music.play();
     }
 
     function onKeyDown(e) {
@@ -618,6 +620,8 @@
         document.addEventListener("keydown", onKeyDown, true);
 
         renderList();
+
+        music.pause();
     }
 
     // ---------------------------------------------------------

@@ -342,9 +342,10 @@
         </a>
 
         <!-- class="menu-btn is-disabled" 
+         href="mg/elite/g-start-loop.html?continue=1"
         -->
         <a
-          href="mg/elite/g-start-loop.html?continue=1"
+          
           class="menu-btn"
           data-action="continue"
           id="btn-continue"
@@ -390,98 +391,102 @@
 
     <a href="../../index.html" class="back-btn">← Выход</a>
 
-    <script> window.HEROES_OPTIONS = { maxEntries: 200 }; </script>
+<script> window.HEROES_OPTIONS = { maxEntries: 200 }; </script>
 
-    <!--
-    <script src="../res/click-sound.js"></script>
-    -->
-    <script src="./js/g-click-sound.js"></script>
-    <script src="./person/profile-store.js"></script>
-    <script src="./ui/tune.js"></script>
+<!--
+<script src="../res/click-sound.js"></script>
+-->
+<script src="./js/g-click-sound.js"></script>
+<script src="./person/profile-store.js"></script>
+<script src="./ui/tune.js"></script>
 
-    <script src="./ui/m-note-1.js"></script>
-    <script src="./ui/heroes-list.js"></script>
-    <script src="./person/ui-profile-choice.js"></script>
-    <script src="./person/ui-input-name.js"></script>
+<script src="./ui/m-note-1.js"></script>
+<script src="./ui/heroes-list.js"></script>
+<script src="./person/ui-profile-choice.js"></script>
+<script src="./person/ui-input-name.js"></script>
 
-    <script>
-      
-    // Создаём поле ввода имени в правом верхнем углу
-    const uiName = new UIInputName({
-      parent: document.body,
-      offsetTop  : 12,
-      offsetRight: 12,
-    });
+<script>
 
-    // Подписка на событие смены имени игрока
-    window.addEventListener("player-name-changed", 
-      function (e) {
-        console.log("[event] новое имя:", e.detail.name);
+window.music = new AudioManager('./snd/m-1/bass-1.mp3');
+music.init(); // ждёт первого клика
+//music.setVolume(0.2);
+  
+// Создаём поле ввода имени в правом верхнем углу
+const uiName = new UIInputName({
+    parent: document.body,
+    offsetTop  : 12,
+    offsetRight: 12,
+});
 
-        // Обновить рекорд-лист
-        if (window.HeroesList) {
-          HeroesList.upHero({
-            name:  e.detail.name,
-            score: 0,
-            rank:  "HARMLESS",
-            date:  new Date().toISOString().slice(0, 10)
-          });
-        }
-      }
-    );
+// Подписка на событие смены имени игрока
+window.addEventListener("player-name-changed", 
+  function (e) {
+    console.log("[event] новое имя:", e.detail.name);
 
-    console.log("uiName.namePlayer: ", uiName.namePlayer); // ОК!
+    // Обновить рекорд-лист
+    if (window.HeroesList) {
+      HeroesList.upHero({
+        name:  e.detail.name,
+        score: 0,
+        rank:  "HARMLESS",
+        date:  new Date().toISOString().slice(0, 10)
+      });
+    }
+  }
+);
 
-    // function checkNamePlayerInStorage() {
-    // }
-    // checkNamePlayerInStorage();
+console.log("uiName.namePlayer: ", uiName.namePlayer); // ОК!
 
-      (function () {
+// function checkNamePlayerInStorage() {
+// }
+// checkNamePlayerInStorage();
 
-        /* ---------- Проверка сохранения (заглушка) ---------- */
-        // Замените на реальную проверку: localStorage, IndexedDB и т.п.
-        function hasSave() {
-          try {
-            return !!localStorage.getItem("elite.save");
-          } catch (e) {
-            return false;
-          }
-        }
+(function () {
 
-        var btnContinue = document.getElementById("btn-continue");
-        
-        if (hasSave()) {
-          btnContinue.classList.remove("is-disabled");
-          btnContinue.removeAttribute("aria-disabled");
-        } else {
-          btnContinue.addEventListener("click", function (e) {
-            e.preventDefault();
-          });
-        }
+  /* ---------- Проверка сохранения (заглушка) ---------- */
+  // Замените на реальную проверку: localStorage, IndexedDB и т.п.
+  function hasSave() {
+    try {
+      return !!localStorage.getItem("elite.save");
+    } catch (e) {
+      return false;
+    }
+  }
 
-        /* ---------- Полноэкранный режим ---------- */
-        var btnFs = document.getElementById("btn-fullscreen");
+var btnContinue = document.getElementById("btn-continue");
 
-        btnFs.addEventListener("click", function () {
-          /// ...
-        });
+if (hasSave()) {
+  btnContinue.classList.remove("is-disabled");
+  btnContinue.removeAttribute("aria-disabled");
+} else {
+  btnContinue.addEventListener("click", function (e) {
+    e.preventDefault();
+  });
+}
 
-        ["fullscreenchange", "webkitfullscreenchange", "msfullscreenchange"].forEach(
-          function (evt) {
-            //document.addEventListener(evt, ...);
-          }
-        );
+/* ---------- Полноэкранный режим ---------- */
+var btnFs = document.getElementById("btn-fullscreen");
 
-    /* ---------- НОВАЯ ИГРА в новом окне ---------- */
-    // var btnNew = document.querySelector('.menu-btn[data-action="new"]');
-    // if (btnNew) {
-    //   btnNew.addEventListener("click", function (e) {
-    //     e.preventDefault();
-    //     window.open('game-j.html');
-    //   });
-    // }
-        
-      })();
+btnFs.addEventListener("click", function () {
+  /// ...
+});
+
+["fullscreenchange", "webkitfullscreenchange", "msfullscreenchange"].forEach(
+  function (evt) {
+    //document.addEventListener(evt, ...);
+  }
+);
+
+/* ---------- НОВАЯ ИГРА в новом окне ---------- */
+// var btnNew = document.querySelector('.menu-btn[data-action="new"]');
+// if (btnNew) {
+//   btnNew.addEventListener("click", function (e) {
+//     e.preventDefault();
+//     window.open('game-j.html');
+//   });
+// }
+    
+})();
 
     const namePlayer = "Вася Пупкин";
 
@@ -516,6 +521,7 @@
         e.preventDefault();
         if (window.TuneMenu) {
             TuneMenu.open();
+            music.setVolumeM();
         } else {
             console.warn("[menu] TuneMenu не подключён");
         }
@@ -526,6 +532,7 @@
       function (e) {
         e.preventDefault();
         MNote.show();
+        music.setVolumeM();
     });
 
     // Таблица Героев
@@ -537,6 +544,7 @@
       //HeroesList.dedupe();
 
         HeroesList.show();
+        music.setVolumeM();
     });
 
     // Пример: реагировать на смену имени

@@ -320,6 +320,7 @@
     if (lastFocus && typeof lastFocus.focus === "function") {
       lastFocus.focus();
     }
+    music.setVolumeL();
   }
 
   function toggle() {
