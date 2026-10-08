@@ -1,7 +1,7 @@
 // star.js — генератор уникального светила с анимированным гало
 // Зависимости: THREE должен быть доступен глобально (window.THREE)
 
-const STAR = (() => {
+const StarA = (() => {
   // --- RNG (mulberry32) ---
   function mulberry32(seed) {
     return function () {
@@ -308,7 +308,7 @@ const STAR = (() => {
 
     generate(star, opts = {}) {
       const params = computeParams(star);
-      const mesh = makeMesh(params);
+      const mesh   = makeMesh(params);
       const corona = makeHalo(params); // Используем новый шейдер гало
 
       const pos = opts.position || new THREE.Vector3(0, 0, 0);

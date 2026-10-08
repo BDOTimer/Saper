@@ -39,7 +39,7 @@ class StarG
             rotationSpeed:  0.05,
             lightIntensity: 3.0,
             lightDistance:  5000,
-            position:       { x: 500, y: 500, z: 500 },
+            position:       { x: 0, y: 0, z: 0 },
             ...options,
         };
         this.settings = s;

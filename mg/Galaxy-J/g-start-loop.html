@@ -240,8 +240,8 @@
     <script src="./ships/ship.js"></script>
     <script src="./js/game.js"></script>
 
-    <!-- Классические скрипты: кладут GALAXY, STAR, PLANET, HELP в глобал -->
-    <script src="./galaxy/star.js"></script>
+    <!-- Классические скрипты: кладут GALAXY, StarA, PLANET, HELP в глобал -->
+    <script src="./galaxy/star-A.js"></script>
     <script src="./galaxy/star-G.js"></script>
     <script src="./galaxy/planet.js"></script>
     <script src="./galaxy/hyperfx.js"></script>
@@ -490,13 +490,14 @@ const state = {
       // ============================================================
       //  Звук
       // ============================================================
+      const Vol = Settings.volume;
       const kit = SND.createSoundKit({
-        laser  : { src: "snd/laser-1.mp3"     , volume: 0.45, pool: 3 },
-        death  : { src: "snd/ship-death-1.mp3", volume: 0.35, pool: 1 },
-        damag  : { src: "snd/damag-1.mp3"     , volume: 0.35, pool: 3 },
-        hjump  : { src: "snd/ship-HJ-1.mp3"   , volume: 0.35, pool: 1 },
-        docking: { src: "snd/good-dock-1.mp3" , volume: 0.35, pool: 1 },
-        dockout: { src: "snd/good-dock-1.mp3" , volume: 0.35, pool: 1 },
+        laser  : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 3 },
+        death  : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
+        damag  : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 3 },
+        hjump  : { src: "snd/ship-HJ-1.mp3"   , volume: Vol, pool: 1 },
+        docking: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
+        dockout: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
       });
 
       kit.autoUnlock();
@@ -826,7 +827,7 @@ const state = {
 
     // ------------------------------------------------------------------------|
     //  Система текущей звезды: светило + планеты
-    //  Использует STAR и PLANET из ./galaxy/star.js и ./galaxy/planet.js
+    //  Использует StarA и PLANET из ./galaxy/star.js и ./galaxy/planet.js
     // ------------------------------------------------------------------------:
     const planets = []; // массив хэндлов PLANET.generate(...)
     let currentStarHandle    = null;
@@ -845,7 +846,7 @@ const state = {
           scene.remove(currentStarHandle.mesh);
           scene.remove(currentStarHandle.corona);
           scene.remove(currentStarHandle.light);
-          STAR.dispose(currentStarHandle);
+          StarA.dispose(currentStarHandle);
           currentStarHandle = null;
         }
 
@@ -873,7 +874,7 @@ const state = {
         // sun.setVisible(false);
 
         // Светило — висит далеко впереди
-        currentStarHandle = STAR.generate(star);
+        currentStarHandle = StarA.generate(star);
         const starPos = new THREE.Vector3(0, 0, -3000);
         currentStarHandle.mesh.position.copy(starPos);
         currentStarHandle.corona.position.copy(starPos);
@@ -1319,7 +1320,7 @@ const state = {
       // Лог текущей звезды
       const s = state.dataStar;
       console.log(
-        "STAR:",
+        "StarA: ",
         s.name,
         s.tech,
         s.dangerLabel,
