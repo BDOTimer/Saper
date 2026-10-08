@@ -12,27 +12,25 @@ class EnemyA
     static scene = null;
 
     /// Подключить к сцене (вызвать один раз после создания scene)
-    static init(scene) {
-        EnemyA.scene = scene;
+    static init(scene, camera) {
+        EnemyA.scene  = scene;
+        EnemyA.camera = camera;
     }
 
     /// Спавн врага (бывшая spawnEnemy)
-    static spawn(camera) {
-        if (!EnemyA.scene) {
-            console.warn("EnemyA: сначала вызови EnemyA.init(scene)");
-            return null;
-        }
-        if (!Settings.isSpawnEnemies) return null; // дебаг-выключатель
+    static spawn(camera)
+    {   if (!Settings.isSpawnEnemies)  return null;
+        if ( EnemyA.list.length >= 5 || Math.random() > this.RATE) return null;
 
+        const c    = camera ? camera.position : { x: 0, y: 0, z: 0 }; // ★ вокруг игрока
         const ang  = Math.random() * Math.PI * 2;
         const dist = 400 + Math.random() * 600;
-        const pos  = new THREE.Vector3(
-            Math.cos(ang) * dist,
-           (Math.random() - 0.5) * 200,
-            Math.sin(ang) * dist,
-        );
 
-        const e = new EnemyA(pos);
+        const e = new EnemyA(new THREE.Vector3(
+            c.x + Math.cos(ang) * dist,
+            c.y + (Math.random() - 0.5) * 200,
+            c.z + Math.sin(ang) * dist,
+        ));
         EnemyA.list.push(e);
         return e;
     }
@@ -58,7 +56,8 @@ class EnemyA
         enemy.dispose();
     }
 
-    static get count() { return EnemyA.list; }
+    static get count() { return EnemyA.list.length; }
+    get rotation() { return this.mesh.rotation; } 
 
     //--------------------------------------------------------|
     // ЭКЗЕМПЛЯР                                              |
@@ -76,6 +75,8 @@ class EnemyA
 
         this.alive = true;
         EnemyA.scene.add(this.mesh);
+
+        this.RATE = 0.005;
     }
 
     // Доступ к hp/speed и через класс, и через userData

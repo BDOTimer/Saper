@@ -381,9 +381,9 @@ const HUD = (() => {
 // Удобный глобальный доступ (например, из других скриптов)
 window.HUD = HUD;
 
-    // --------------------------------------------------------------
+    // ----------------------------------------------------
     //  Игровая сессия: Pers + Ship + Universe
-    // --------------------------------------------------------------
+    // ----------------------------------------------------
     //-------------------------|
     // Сид для всей Вселенной. |
     //-------------------------:
@@ -392,9 +392,9 @@ window.HUD = HUD;
     const  game = new Game({ seedRoot: SEED_UNIVERSE });
     window.GAME = game;
 
-    // --------------------------------------------------------------
+    // ----------------------------------------------------
     //  Сцена / камера / рендерер
-    // --------------------------------------------------------------
+    // ----------------------------------------------------
     const scene      = new THREE.Scene();
     scene.background = new THREE.Color(0x000005);
 
@@ -404,6 +404,11 @@ window.HUD = HUD;
     // Удобные алиасы (для читаемости кода ниже)
     const pers = game.pers;
     const ship = game.ship;
+
+    // ----------------------------------------------------
+    //  Враг
+    // ----------------------------------------------------
+    EnemyA.init(scene, camera);
 
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 // ------------|
@@ -506,28 +511,6 @@ const state = {
         if (dy < -halfSize) pos.y += halfSize * 2;
         if (dz > halfSize) pos.z -= halfSize * 2;
         if (dz < -halfSize) pos.z += halfSize * 2;
-    }
-
-    // ------------------------------------------------------------------
-    //  Враг
-    // ------------------------------------------------------------------
-    function makeEnemyShip()
-    {
-        const group = new THREE.Group();
-        const mat = new THREE.MeshStandardMaterial({
-          color: 0xaa3333,
-          metalness:  0.7,
-          roughness:  0.5,
-        });
-        group.add(new THREE.Mesh(new THREE.OctahedronGeometry(8, 0), mat));
-        const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(10, 1, 8, 24),
-          new THREE.MeshBasicMaterial({ color: 0xff4444, toneMapped: false }),
-        );
-        ring.rotation.x = Math.PI / 2;
-        group.add(ring);
-        group.userData.enemy = true;
-        return group;
     }
 
     // ------------------------------------------------------------------
@@ -718,32 +701,14 @@ const state = {
     }
     
     // ------------------------------------------------------------------------|
-    //  Враги / лазеры / эффекты
+    //  Лазеры / эффекты
     // ------------------------------------------------------------------------:
-    const enemies = [];
     const lasers  = [];
 
-    function spawnEnemy()
-    {   if (!Settings.isSpawnEnemies) return; // дебаг-выключатель
+    let shotCounter = 0;
 
-        const e   = makeEnemyShip();
-        const ang = Math.random() * Math.PI * 2;
-        const dist = 400 + Math.random() * 600;
-        e.position.set(
-            Math.cos(ang) * dist,
-           (Math.random() - 0.5) * 200,
-            Math.sin(ang) * dist,
-        );
-        e.userData.hp = 3;
-        e.userData.speed = 20 + Math.random() * 40;
-        scene  .add (e);
-        enemies.push(e);
-    }
-
-      let shotCounter = 0;
-
-      function spawnLaser() {
-        const pos = new THREE.Vector3();
+    function spawnLaser()
+    {   const pos = new THREE.Vector3();
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(
           camera.quaternion,
         );
@@ -760,7 +725,7 @@ const state = {
         mesh.userData.life = 1.5;
         scene.add(mesh);
         return mesh;
-      }
+    }
 
       const hitEffects = [];
       const hitFlashGeo = new THREE.SphereGeometry(1, 12, 12);
@@ -1088,8 +1053,8 @@ const state = {
 
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
-        for (const e of enemies) scene.remove(e);
-        game.enemies.length = 0;
+        EnemyA.clear();
+
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
 
@@ -1137,18 +1102,17 @@ const state = {
         s.population,
       );
       
-      // Стартовая система
-      buildSystemFromStar(state.dataStar);
+    // Стартовая система
+    buildSystemFromStar(state.dataStar);
 
-      function resetGame()
-      {
-        game.reset();
+    function resetGame()
+    {   game.reset();
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
         state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
-        for (const e of enemies) scene.remove(e);
-        game.enemies.length = 0;
+        EnemyA.clear();
+
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
 
@@ -1158,10 +1122,10 @@ const state = {
         reseedDustAndMeteors();
 
         document.getElementById("gameover").style.display = "none";
-      }
+    }
 
-      function reseedDustAndMeteors() {
-        const posAttr = dust.geometry.attributes.position;
+    function reseedDustAndMeteors()
+    {   const posAttr = dust.geometry.attributes.position;
         for (let i = 0; i < DUST_COUNT; i++) {
           posAttr.setXYZ(
             i,
@@ -1179,7 +1143,7 @@ const state = {
             camera.position.z + (Math.random() - 0.5) * METEOR_RADIUS * 2,
           );
         }
-      }
+    }
 
       let damageTimer = 0;
       function flashDamage(intensity = 1) {
@@ -1224,9 +1188,25 @@ const state = {
     ///------------------------------------------------------------------------|
     /// Игровой цикл ✅
     ///-------------------------------------------------------------------- .an:
-    const clock = new THREE.Clock();
+    const clock  = new THREE.Clock();
     const tmpVec = new THREE.Vector3();
     const playerWorldPos = new THREE.Vector3();
+
+    // Фикс: для коллизии по отрезку пути за кадр
+    const _laserPrev = new THREE.Vector3();
+    const _ab = new THREE.Vector3();
+    const _ap = new THREE.Vector3();
+    const _closest = new THREE.Vector3();
+
+    // Расстояние от точки p до отрезка [a, b]
+    function segDistToPoint(a, b, p) {
+      _ab.subVectors(b, a);
+      _ap.subVectors(p, a);
+      const len2 = _ab.lengthSq();
+      if (len2 === 0) return p.distanceTo(a);
+      const t = THREE.MathUtils.clamp(_ap.dot(_ab) / len2, 0, 1);
+      return _closest.copy(a).addScaledVector(_ab, t).distanceTo(p);
+    }
 
     //----------------|
     // Стыковка.      |
@@ -1260,42 +1240,45 @@ const state = {
         TRADE.open(state.credits);
     }
 
-    function animate() 
-    {
-        const dt = Math.min(clock.getDelta(), 0.05);
-        const time = clock.elapsedTime;
+function animate() 
+{
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const time = clock.elapsedTime;
 
-        //sun.update(dt * 0.1); 
+    //sun.update(dt * 0.1); 
 
+    // Светило и планеты текущей системы
+    if (currentStarHandle && currentStarHandle.update)
+    {   currentStarHandle.update(dt, time);
+    }
+    for (const p of planets) p.update(dt);
+
+    GALAXY.update(dt);
+    updateHyper(dt);
+    HYPERFX.update(dt, clock.elapsedTime);
+
+    // Пока идёт гиперпрыжок — мир заморожен, но рендер идёт
+    if (game.hyper.active) {
+      // Светило текущей системы можно продолжать анимировать для красоты
+      if (currentStarHandle && currentStarHandle.update) {
         currentStarHandle.update(dt, clock.elapsedTime);
+      }
+      composer.render();
+      requestAnimationFrame(animate);
+      return;
+    }
 
-        GALAXY.update(dt);
-        updateHyper(dt);
-        HYPERFX.update(dt, clock.elapsedTime);
-
-        // Пока идёт гиперпрыжок — мир заморожен, но рендер идёт
-        if (game.hyper.active) {
-          // Светило текущей системы можно продолжать анимировать для красоты
-          if (currentStarHandle && currentStarHandle.update) {
-            currentStarHandle.update(dt, clock.elapsedTime);
-          }
-          composer.render();
-          requestAnimationFrame(animate);
-          return;
-        }
-
-        if (HELP.isOpen()) {
-          composer.render();
-          requestAnimationFrame(animate);
-          return;
-        }
+    if (HELP.isOpen())
+    {   composer.render();
+        requestAnimationFrame(animate);
+        return;
+    }
 
 ///////////////////////////////////////////////////////////////// 🟢- ИГРОК ЖИВ!
     if (!state.dead)
     {
-
-          // Автовосстановитель щита
-          if(state.shield < ship.SHIELDMAX) state.shield += dt;
+        // Автовосстановитель щита
+        if(state.shield < ship.SHIELDMAX) state.shield += dt;
 
 ///////////////////////////////////////////////////////////////////// 🔍 .keys:
 
@@ -1308,12 +1291,12 @@ state.speed += thrustIn * ship.THR.accel * dt;
 // Экспоненциальное торможение (не зависит от FPS)
 // Если тяга отпущена — гасим сильнее; если держим — только слегка "вязко" ограничиваем.
 const damping = thrustIn === 0 ? ship.THR.brake : ship.THR.drag;
-state.speed *= Math.exp(-damping * dt);
+state.speed  *= Math.exp(-damping * dt);
 
 // Ограничение диапазона
 state.speed = Math.max(
-  state.minSpeed,
-  Math.min(state.maxSpeed, state.speed),
+    state.minSpeed,
+    Math.min(state.maxSpeed, state.speed),
 );
 
 // Мёртвая зона, чтобы не «полз» вечно возле нуля
@@ -1492,11 +1475,10 @@ if (!game.isDock)
         player.getWorldQuaternion(playerWorldQuat);
         // playerWorldPos уже вычислен выше
         
-        
-const up = new THREE.Vector3(0,1,0).applyQuaternion(playerWorldQuat);
-const nose = new THREE.Vector3(0,0,-1).applyQuaternion(playerWorldQuat);
+const up     = new THREE.Vector3(0,1,0).applyQuaternion(playerWorldQuat);
+const nose   = new THREE.Vector3(0,0,-1).applyQuaternion(playerWorldQuat);
 const gateUp = new THREE.Vector3(0,1,0); // станция не повёрнута
-const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
+const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
 
 //console.log(
 //"up dot gateUp:", up.dot(gateUp).toFixed(3),
@@ -1552,13 +1534,17 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
 ////////////////////////////////////////////////////////////////////////////////
 
         // Дульные вспышки гаснут
-        for (const m of player.userData.muzzles) {
-          m.material.opacity = Math.max(0, m.material.opacity - dt * 12);
+        for (const m of player.userData.muzzles)
+        {   m.material.opacity = Math.max(0, m.material.opacity - dt * 12);
         }
+
+        const enemies = EnemyA.list;
 
         // Лазеры
         for (let i = lasers.length - 1; i >= 0; i--) {
           const l = lasers[i];
+
+          _laserPrev.copy(l.position);            // ★ где был лазер до шага
           l.position.addScaledVector(l.userData.velocity, dt);
           l.userData.life -= dt;
           l.material.opacity = Math.min(1, l.userData.life * 3);
@@ -1570,60 +1556,62 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             continue;
           }
 
-          // Лазер vs враг
-          for (let j = enemies.length - 1; j >= 0; j--) {
-            const e = enemies[j];
-            if (l.position.distanceTo(e.position) < 30) {
-              e.userData.hp -= 1;
+          let dead = false;
+
+          // Лазер vs враг — по отрезку
+          for (let j = EnemyA.list.length - 1; j >= 0; j--) {
+            const e = EnemyA.list[j];
+            if (segDistToPoint(_laserPrev, l.position, e.position) < 30) {
               spawnHitFlash(l.position.clone(), 2.5);
               playDamag();
-
-              scene.remove(l);
-              l.material.dispose();
-              lasers.splice(i, 1);
-
-              if (e.userData.hp <= 0) {
-                scene.remove(e);
-                enemies.splice(j, 1);
+              if (e.hit(1)) {
+                spawnHitFlash(e.position.clone(), 6);
+                EnemyA.remove(e);
                 state.kills++;
                 state.credits += 100;
-                spawnHitFlash(e.position.clone(), 6);
               }
+              dead = true;
               break;
             }
           }
 
-          // Лазер vs метеор
-          for (let k = meteors.length - 1; k >= 0; k--) {
-            const m = meteors[k];
-            if (l.position.distanceTo(m.position) < m.userData.size) {
-              scene.remove(l);
-              l.material.dispose();
-              lasers.splice(i, 1);
-              m.userData.size = Math.max(1, m.userData.size * 0.5);
-              m.scale.setScalar(0.5);
-              break;
+          // Лазер vs метеор — по отрезку, +2 запас
+          if (!dead) {
+            for (const m of meteors) {
+              if (segDistToPoint(_laserPrev, l.position, m.position) < m.userData.size + 12)
+              {   m.userData.size = Math.max(1, m.userData.size * 0.5);
+                  m.scale.multiplyScalar(0.5);   // ★ см. ниже
+                  dead = true;
+                  playDamag();
+                  spawnHitFlash(m.position.clone(), 2); // фидбек попадания
+                  break;
+              }
             }
+          }
+
+          if (dead) {
+            scene.remove(l);
+            l.material.dispose();
+            lasers.splice(i, 1);
           }
         }
 
         // Спавн врагов
-        if (!state.dead && enemies.length < 5 && Math.random() < 0.005)
-          spawnEnemy();
+        if (!state.dead)
+        { //EnemyA.spawn(camera); // Вокруг игрока
+            EnemyA.spawn(null);
+        }
 
         // ИИ врагов
         player.getWorldPosition(playerWorldPos);
 
-        for (const e of enemies) {
-          const toPlayer = new THREE.Vector3().subVectors(
-            playerWorldPos,
-            e.position,
-          );
+        for (const e of EnemyA.list) {
+          const toPlayer = new THREE.Vector3().subVectors(playerWorldPos, e.position);
           const dist = toPlayer.length();
           toPlayer.normalize();
-          e.position.addScaledVector(toPlayer, e.userData.speed * dt);
-          e.rotation.x += dt * 0.5;
-          e.rotation.y += dt * 0.7;
+          e.position.addScaledVector(toPlayer, e.speed * dt);  // ★ e.speed, не userData
+          e.mesh.rotation.x += dt * 0.5;                       // ★ mesh.rotation
+          e.mesh.rotation.y += dt * 0.7;
 
           if (dist < 30 && !state.dead) {
             state.shield -= 30 * dt;
@@ -1636,12 +1624,6 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
             }
           }
         }
-
-        // Светило и планеты текущей системы
-        if (currentStarHandle && currentStarHandle.update) {
-          currentStarHandle.update(dt, time);
-        }
-        for (const p of planets) p.update(dt);
         
         ///-------------------------------------|
         /// Cтанция в системе.
@@ -1660,8 +1642,8 @@ const gateIn = new THREE.Vector3(0,0,1);  // внутрь станции
         engMat.color.setRGB(0.4 * intensity, 0.8 * intensity, 1.0 * intensity);
 
         // Затухание damage flash
-        if (damageTimer > 0) {
-          damageTimer -= dt;
+        if   (damageTimer > 0)
+        {     damageTimer -= dt;
           if (damageTimer <= 0) elDamage.style.opacity = "0";
         }
 
