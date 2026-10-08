@@ -231,6 +231,7 @@
     <!-- Общие глобальный Набор Функций -->
     <script src="./js/foos.js"></script>
     <script src="person/profile-store.js"></script>
+    <script src="./ui/settings.js"></script> 
 
     <!-- Вселенная, Галактика, Игрок и его Корабль -->
     <script src="./galaxy/universe.js"></script>
@@ -248,7 +249,7 @@
     <script src="./station/station.js"></script>
     <script src="./station/station-trade.js"></script>
     
-    <script src="./js/help.js"></script>
+    <script src="./ui/help.js"></script>
     <script src="./snd/g-sound-lib.js"></script>
 
     <script type="module">
@@ -467,15 +468,6 @@ const state = {
         state.credits = credits;
         elCredits.textContent = credits;
       });
-
-      // ------------------------------------------------------------------
-      //  Отладочные переключатели
-      // ------------------------------------------------------------------
-      const DEBUG = {
-        isSpawnEnemies: false, // ← временно выключено для дебага
-        //isSpawnMeteors: true,
-        //isLogJumps: true,
-      };
 
       // ============================================================
       //  Скрытие курсора через 3 секунды бездействия
@@ -930,7 +922,7 @@ const state = {
     const lasers = [];
 
       function spawnEnemy() {
-        if (!DEBUG.isSpawnEnemies) return; // дебаг-выключатель
+        if (!Settings.isSpawnEnemies) return; // дебаг-выключатель
 
         const e = makeEnemyShip();
         const ang = Math.random() * Math.PI * 2;

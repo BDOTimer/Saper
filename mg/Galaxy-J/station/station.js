@@ -146,7 +146,7 @@ class Station
             this.setRotation(options);
         }
         else
-        {   if(DEBUG.isDockTest)
+        {   if(Settings.isTestDockToStation)
             {
                 this.setRotation({
                     rotation: { x: 0, y: Math.PI, z: 0 }

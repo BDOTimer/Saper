@@ -238,7 +238,8 @@ class ProfileStore
             stats: {
                 score: 0,
                 rank:  "HARMLESS"
-            }
+            },
+            settings: { ...this.SETTINGS_DEFAULTS }
         };
 
         // 1. сам профиль
@@ -429,6 +430,44 @@ class ProfileStore
         this.debugDump();
 
         console.groupEnd();
+    }
+
+    // ========================================================= +
+    //  НАСТРОЙКИ ПРОФИЛЯ (settings)
+    // =========================================================
+
+    /** Значения по умолчанию для настроек. */
+    static SETTINGS_DEFAULTS = {
+        isSpawnEnemies:      true,
+        isTestDockToStation: false,
+        volume:              0.5
+    };
+
+    /** Прочитать настройки профиля (с мержем дефолтов). */
+    static getSettings(id)
+    {
+        const p = this.load(id || this.currentId());
+        if (!p) return { ...this.SETTINGS_DEFAULTS };
+
+        return Object.assign(
+            { ...this.SETTINGS_DEFAULTS },
+            (p.settings && typeof p.settings === "object") ? p.settings : {}
+        );
+    }
+
+    /** Обновить часть настроек профиля. patch — объект с изменяемыми полями. */
+    static updateSettings(id, patch)
+    {
+        const p = this.load(id || this.currentId());
+        if (!p) return false;
+
+        const cur = (p.settings && typeof p.settings === "object") ? p.settings : {};
+        p.settings = Object.assign({}, this.SETTINGS_DEFAULTS, cur, patch || {});
+
+        if (!this._writeProfile(p)) return false;
+
+        this._emit(p.id, p);
+        return true;
     }
 }
 

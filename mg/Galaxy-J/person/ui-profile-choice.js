@@ -425,6 +425,7 @@
             // --- клик по строке = активировать ---
             li.addEventListener("click", () => {
                 if (li.querySelector("input")) return; // идёт переименование
+                playClick();
                 activateProfile(id);
             });
 

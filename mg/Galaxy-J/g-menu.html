@@ -335,18 +335,20 @@
         <a href="g-start-loop.html" 
            class="menu-btn" 
            data-action="new"
-           id="btn-new"
+           id="btn-game"
         >
           <span><span class="num">01</span>«В ПУТЬ!»</span>
           <span class="arrow">▶</span>
         </a>
 
+        <!-- class="menu-btn is-disabled" 
+        -->
         <a
           href="mg/elite/g-start-loop.html?continue=1"
-          class="menu-btn is-disabled"
+          class="menu-btn"
           data-action="continue"
           id="btn-continue"
-          aria-disabled="true"
+          aria-disabled="false"
         >
           <span><span class="num">02</span>НАСТРОЙКИ</span>
           <span class="arrow">▶</span>
@@ -393,13 +395,14 @@
     <!--
     <script src="../res/click-sound.js"></script>
     -->
-    <script src="js/g-click-sound.js"></script>
-    <script src="person/profile-store.js"></script>
-    
-    <script src="js/m-note-1.js"></script>
-    <script src="js/heroes-list.js"></script>
-    <script src="person/ui-profile-choice.js"></script>
-    <script src="person/ui-input-name.js"></script>
+    <script src="./js/g-click-sound.js"></script>
+    <script src="./person/profile-store.js"></script>
+    <script src="./ui/tune.js"></script>
+
+    <script src="./ui/m-note-1.js"></script>
+    <script src="./ui/heroes-list.js"></script>
+    <script src="./person/ui-profile-choice.js"></script>
+    <script src="./person/ui-input-name.js"></script>
 
     <script>
       
@@ -495,7 +498,7 @@
     }
 
     // Начать игру
-    document.getElementById("btn-new").addEventListener("click",
+    document.getElementById("btn-game").addEventListener("click",
       function (e) {
         e.preventDefault();
 
@@ -507,16 +510,15 @@
         window.location.href = "g-start-loop.html";
     });
 
-    // Продолжить игру
+    // Настройки
     document.getElementById("btn-continue").addEventListener("click",
       function (e) {
         e.preventDefault();
-
-        console.log("Настройки ...");
-
-        // TODO: ...
-
-        window.location.href = "g-start-loop.html";
+        if (window.TuneMenu) {
+            TuneMenu.open();
+        } else {
+            console.warn("[menu] TuneMenu не подключён");
+        }
     });
 
     // Об игре
