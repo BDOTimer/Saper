@@ -485,10 +485,11 @@ const state = {
     window.   GALAXY = new Galaxy( seedGalaxy);
               GALAXY . init();
 
-
     GALAXY.setPlayerStar(pers.indexStar);
     pers.dataStar = GALAXY.getCurrentStar();
     updateSectorFromStar(pers.dataStar);
+
+    HUD.setSystem(GALAXY.getCurrentStar().name);
     
     HELP .init();
     TRADE.init();
@@ -998,8 +999,6 @@ const state = {
         if (!star) return;
         state.sector.x = Math.round((star.x + 1) * 50);
         state.sector.y = Math.round((star.y + 1) * 50);
-
-        HUD.setSystem(GALAXY.getCurrentStar().name); // Имя звезды на панель
     }
 
     // ------------------------------------------------------------
@@ -1074,8 +1073,6 @@ const state = {
         return;
       }
 
-      EnemyA.doAmount(3, 30);   // Кол-во врагов(всего)
-
       // Обновляем состояние игрока
       state.indexStar = targetIdx;
       state.dataStar  = star;
@@ -1104,10 +1101,12 @@ const state = {
       saveGame();
 
       state.speed = 0;
-
       state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
       EnemyA.clear();
+      EnemyA.doAmount(3, 30);   // Кол-во врагов(всего)
+
+      HUD.setSystem(GALAXY.getCurrentStar().name); // Имя звезды на панель
 
       for (const l of lasers) scene.remove(l);
       lasers.length = 0;
@@ -1141,9 +1140,6 @@ const state = {
 
       if (k >= 1) completeHyperJump();
     }
-
-    state.dataStar = GALAXY.getCurrentStar();
-    updateSectorFromStar(state.dataStar);
 
     // Лог текущей звезды
     const s = state.dataStar;
