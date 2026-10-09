@@ -182,7 +182,7 @@
         </div>
         <div class="panel-body">
           <div class="compass">
-            <b class="cN">N</b><b class="cE">E</b><b class="cS">S</b><b class="cW">W</b>
+            <b class="cN">🔆</b><b class="cE">R</b><b class="cS">🩶</b><b class="cW">L</b>
             <div class="needle" id="compass-needle"></div>
             <div class="compass-dot"></div>
           </div>
@@ -1206,7 +1206,7 @@ const state = {
       elDamage.style.opacity = String(Math.min(0.9, intensity));
     }
 
-    const tmpVecCompas = new THREE.Vector3();
+    const _compassFwd = new THREE.Vector3();
 
     function updateHUD() {
       elSpeed.textContent = Math.round(state.speed);
@@ -1221,17 +1221,16 @@ const state = {
     //elCredits.textContent = state.credits;
 
       // подсветка, когда топлива мало:
-      elFuel.style.color = state.fuel < 10 ? "#ff6666" : "";
+      elFuel.style.color = state.fuel < 10 ? "#f60" : "";
       
       // подсветить режим дебага
       //elFuel.textContent = DEBUG.infiniteFuel ? "∞" : Math.round(state.fuel);
       //elFuelBar.style.width = DEBUG.infiniteFuel ? "100%" : state.fuel + "%";
-      //elFuel.style.color = DEBUG.infiniteFuel ? "#33ff88" : (state.fuel < 10 ? "#ff6666" : "");
 
       // --------------------------------------
       //  Компас: курс в плоскости XZ
       // --------------------------------------
-      const fwd = tmpVecCompas.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      const fwd = _compassFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
       let headingDeg = Math.atan2(fwd.x, -fwd.z) * 180 / Math.PI;
       if (headingDeg < 0) headingDeg += 360;
