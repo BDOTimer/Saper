@@ -269,6 +269,28 @@ class Game
 
         this.renderer = r;
     }
+
+    static randomEulerCamera(camera)
+    {   const T = THREE.MathUtils;
+        camera.rotation.x = T.randFloatSpread(Math.PI  ); // примерно от -PI до PI
+        camera.rotation.y = T.randFloatSpread(Math.PI*2); // полный оборот по Y
+        camera.rotation.z = T.randFloatSpread(Math.PI  ); // небольшой крен
+    }
+
+    static randomQuat() {
+        const u1  = Math.random(), u2 = Math.random(), u3 = Math.random();
+        const sq1 = Math.sqrt(1 - u1), sq2 = Math.sqrt(u1);
+        return new THREE.Quaternion(
+            sq1 * Math.sin(2 * Math.PI * u2),
+            sq1 * Math.cos(2 * Math.PI * u2),
+            sq2 * Math.sin(2 * Math.PI * u3),
+            sq2 * Math.cos(2 * Math.PI * u3),
+        );
+    }
+
+    static randomQuatCamera(camera)
+    {   camera.quaternion.copy(Game.randomQuat());
+    }
 }
 
 class CameraFar

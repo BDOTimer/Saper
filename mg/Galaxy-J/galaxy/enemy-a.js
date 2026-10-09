@@ -19,8 +19,10 @@ class EnemyA
 
     /// Спавн врага (бывшая spawnEnemy)
     static spawn(camera)
-    {   if (!Settings.isSpawnEnemies)  return null;
-        if ( EnemyA.list.length >= 5 || Math.random() > this.RATE) return null;
+    {   if (!Settings.isSpawnEnemies) return null;
+        if (!this.amount) return null;
+             this.amount--; 
+        if (EnemyA.list.length >= 5 || Math.random() > this.RATE) return null;
 
         const c    = camera ? camera.position : { x: 0, y: 0, z: 0 }; // ★ вокруг игрока
         const ang  = Math.random() * Math.PI * 2;
@@ -59,9 +61,9 @@ class EnemyA
     static get count() { return EnemyA.list.length; }
     get rotation() { return this.mesh.rotation; } 
 
-    //--------------------------------------------------------|
-    // ЭКЗЕМПЛЯР                                              |
-    //--------------------------------------------------------:
+    //--------------------------------|
+    // ЭКЗЕМПЛЯР                      |
+    //--------------------------------:
     constructor(position)
     {   this.mesh = EnemyA.buildMesh();
         this.mesh.position.copy(position);
@@ -77,6 +79,9 @@ class EnemyA
         EnemyA.scene.add(this.mesh);
 
         this.RATE = 0.005;
+
+        // Общее число врагов, -1 бессчётно
+        this.amount = 0;
     }
 
     // Доступ к hp/speed и через класс, и через userData
@@ -142,6 +147,12 @@ class EnemyA
                     : o.material.dispose();
             }
         });
+    }
+
+    // this.amount =  0; // врагов нет
+    // this.amount = -1; // врагов ꝏ
+    static doAmount(min, max)
+    {   this.amount = Math.floor(Math.random() * (max - min + 1)) + min;
     }
 }
 

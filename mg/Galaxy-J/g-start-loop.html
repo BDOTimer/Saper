@@ -727,380 +727,384 @@ const state = {
         return mesh;
     }
 
-      const hitEffects = [];
-      const hitFlashGeo = new THREE.SphereGeometry(1, 12, 12);
+    const hitEffects = [];
+    const hitFlashGeo = new THREE.SphereGeometry(1, 12, 12);
 
-      function spawnHitFlash(position, scale = 1) {
-        const mat = new THREE.MeshBasicMaterial({
-          color: 0xff44ff,
-          toneMapped: false,
-          transparent: true,
-          opacity: 0.7,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const mesh = new THREE.Mesh(hitFlashGeo, mat);
-        mesh.position.copy(position);
-        mesh.scale.setScalar(scale);
-        scene.add(mesh);
+    function spawnHitFlash(position, scale = 1) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xff44ff,
+        toneMapped: false,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(hitFlashGeo, mat);
+      mesh.position.copy(position);
+      mesh.scale.setScalar(scale);
+      scene.add(mesh);
 
-        const light = new THREE.PointLight(0xff22ff, 4, 80, 2);
-        light.position.copy(position);
-        scene.add(light);
+      const light = new THREE.PointLight(0xff22ff, 4, 80, 2);
+      light.position.copy(position);
+      scene.add(light);
 
-        hitEffects.push({
-          mesh,
-          light,
-          life: 0.35,
-          maxLife: 0.35,
-          baseScale: scale,
-        });
-      }
+      hitEffects.push({
+        mesh,
+        light,
+        life: 0.35,
+        maxLife: 0.35,
+        baseScale: scale,
+      });
+    }
 
-      function updateHitEffects(dt) {
-        for (let i = hitEffects.length - 1; i >= 0; i--) {
-          const e = hitEffects[i];
-          e.life -= dt;
-          const k = Math.max(0, e.life / e.maxLife);
-          e.mesh.scale.setScalar(e.baseScale * (1 + (1 - k) * 2.5));
-          e.mesh.material.opacity = k;
-          e.light.intensity = 4 * k * k;
-          if (e.life <= 0) {
-            scene.remove(e.mesh);
-            scene.remove(e.light);
-            e.mesh.material.dispose();
-            hitEffects.splice(i, 1);
-          }
+    function updateHitEffects(dt) {
+      for (let i = hitEffects.length - 1; i >= 0; i--) {
+        const e = hitEffects[i];
+        e.life -= dt;
+        const k = Math.max(0, e.life / e.maxLife);
+        e.mesh.scale.setScalar(e.baseScale * (1 + (1 - k) * 2.5));
+        e.mesh.material.opacity = k;
+        e.light.intensity = 4 * k * k;
+        if (e.life <= 0) {
+          scene.remove(e.mesh);
+          scene.remove(e.light);
+          e.mesh.material.dispose();
+          hitEffects.splice(i, 1);
         }
       }
+    }
 
-      // ------------------------------------------------------------------
-      //  Космическая пыль
-      // ------------------------------------------------------------------
-      const DUST_COUNT  = 3000;
-      const DUST_RADIUS = 800;
+    // ------------------------------------------------------------------
+    //  Космическая пыль
+    // ------------------------------------------------------------------
+    const DUST_COUNT  = 3000;
+    const DUST_RADIUS = 800;
 
-      function makeDust() {
-        const positions = new Float32Array(DUST_COUNT * 3);
-        for (let i = 0; i < DUST_COUNT; i++) {
-          positions[i * 3 + 0] =
-            camera.position.x + (Math.random() - 0.5) * DUST_RADIUS * 2;
-          positions[i * 3 + 1] =
-            camera.position.y + (Math.random() - 0.5) * DUST_RADIUS * 2;
-          positions[i * 3 + 2] =
-            camera.position.z + (Math.random() - 0.5) * DUST_RADIUS * 2;
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-        const mat = new THREE.PointsMaterial({
-          color: 0xaaccff,
-          size: 2.0,
-          sizeAttenuation: true,
-          transparent: true,
-          opacity: 0.8,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        });
-        const points = new THREE.Points(geo, mat);
-        points.frustumCulled = false;
-        return points;
+    function makeDust() {
+      const positions = new Float32Array(DUST_COUNT * 3);
+      for (let i = 0; i < DUST_COUNT; i++) {
+        positions[i * 3 + 0] =
+          camera.position.x + (Math.random() - 0.5) * DUST_RADIUS * 2;
+        positions[i * 3 + 1] =
+          camera.position.y + (Math.random() - 0.5) * DUST_RADIUS * 2;
+        positions[i * 3 + 2] =
+          camera.position.z + (Math.random() - 0.5) * DUST_RADIUS * 2;
       }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({
+        color: 0xaaccff,
+        size: 2.0,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const points = new THREE.Points(geo, mat);
+      points.frustumCulled = false;
+      return points;
+    }
 
-      const dust = makeDust();
-      scene.add(dust);
+    const dust = makeDust();
+    scene.add(dust);
 
-      // ------------------------------------------------------------------
-      //  Метеоры
-      // ------------------------------------------------------------------
-      const METEOR_COUNT = 60;
-      const METEOR_RADIUS = 500;
-      const meteors = [];
+    // ------------------------------------------------------------------
+    //  Метеоры
+    // ------------------------------------------------------------------
+    const METEOR_COUNT = 60;
+    const METEOR_RADIUS = 500;
+    const meteors = [];
 
-      function makeMeteor() {
-        const size = 3 + Math.random() * 12;
-        const geo = new THREE.IcosahedronGeometry(size, 0);
-        const pos = geo.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          pos.setXYZ(
-            i,
-            pos.getX(i) * (0.7 + Math.random() * 0.6),
-            pos.getY(i) * (0.7 + Math.random() * 0.6),
-            pos.getZ(i) * (0.7 + Math.random() * 0.6),
-          );
-        }
-        geo.computeVertexNormals();
-
-        const mat = new THREE.MeshStandardMaterial({
-          color: 0x776655,
-          roughness: 0.9,
-          metalness: 0.1,
-          flatShading: true,
-          emissive: 0x221100,
-          emissiveIntensity: 0.3,
-        });
-
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.userData.spin = new THREE.Vector3(
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 2,
+    function makeMeteor() {
+      const size = 3 + Math.random() * 12;
+      const geo = new THREE.IcosahedronGeometry(size, 0);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        pos.setXYZ(
+          i,
+          pos.getX(i) * (0.7 + Math.random() * 0.6),
+          pos.getY(i) * (0.7 + Math.random() * 0.6),
+          pos.getZ(i) * (0.7 + Math.random() * 0.6),
         );
-        mesh.userData.size = size;
-        mesh.position.set(
-          camera.position.x + (Math.random() - 0.5) * METEOR_RADIUS * 2,
-          camera.position.y + (Math.random() - 0.5) * METEOR_RADIUS * 2,
-          camera.position.z + (Math.random() - 0.5) * METEOR_RADIUS * 2,
-        );
-        scene.add(mesh);
-        meteors.push(mesh);
       }
+      geo.computeVertexNormals();
 
-      for (let i = 0; i < METEOR_COUNT; i++) makeMeteor();
-
-      // ------------------------------------------------------------------
-      //  Ввод
-      // ------------------------------------------------------------------
-      const keys = {};
-
-      addEventListener("keydown", (e) => {
-        // F1: справка
-        if (e.code === "F1") {
-          e.preventDefault();
-          HELP.toggle();
-          return;
-        }
-
-        if(state.dead && e.code === "Enter")
-        { resetGame();
-          e.preventDefault();
-          return;
-        }
-
-        if (e.code === "KeyT")
-        {
-          // TRADE уже сам обработал это событие (закрылся)
-          if (e.defaultPrevented) return;
-
-          // Открыть TRADE можно только на пристыкованном корабле
-          if (game.isDock) {
-            e.preventDefault();
-            TRADE.open(state.credits);
-          } else {
-            console.log("TRADE: не пристыкован — T игнорируется");
-          }
-          return;
-        }
-
-        // ESC: закрыть оверлей
-        if (e.code === "Escape") {
-          if (HELP.isOpen()) {
-            HELP.close();
-            e.preventDefault();
-            return;
-          }
-          if (GALAXY.isOpen()) {
-            GALAXY.setOpen(false);
-            e.preventDefault();
-            return;
-          }
-        }
-
-        // Справка открыта — глушим остальное
-        if (HELP.isOpen()) {
-          e.preventDefault();
-          return;
-        }
-
-        if (game.isDock) return;
-
-        // Гиперпрыжок — работает и с открытой картой, и в полёте
-        if (e.code === "KeyJ") {
-          tryHyperJump();
-          e.preventDefault();
-          return;
-        }
-
-        // Карта галактики
-        if (e.code === "KeyM") {
-          GALAXY.toggle();
-          e.preventDefault();
-          return;
-        }
-
-        if (GALAXY.isOpen()) {
-          if (e.code === "ArrowLeft" ) GALAXY.moveSelection(-1, 0);
-          if (e.code === "ArrowRight") GALAXY.moveSelection(1,  0);
-          if (e.code === "ArrowUp"   ) GALAXY.moveSelection(0,  1);
-          if (e.code === "ArrowDown" ) GALAXY.moveSelection(0, -1);
-          if (e.code === "Enter"     )        tryHyperJump ();
-          e.preventDefault();
-          return;
-        }
-
-        // Игра
-        keys[e.code] = true;
-        if (e.code === "Space") e.preventDefault();
-        if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
-        if (e.code === "Enter" && state.dead) resetGame();
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x776655,
+        roughness: 0.9,
+        metalness: 0.1,
+        flatShading: true,
+        emissive: 0x221100,
+        emissiveIntensity: 0.3,
       });
 
-      addEventListener("keyup", (e) => (keys[e.code] = false));
-
-      function updateSectorFromStar(star) {
-        if (!star) return;
-        state.sector.x = Math.round((star.x + 1) * 50);
-        state.sector.y = Math.round((star.y + 1) * 50);
-      }
-
-      // ------------------------------------------------------------
-      //  Гиперпрыжок
-      // ------------------------------------------------------------
-      function distanceBetweenStars(a, b) {
-        if (!a || !b) return 0;
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        return Math.hypot(dx, dy);
-      }
-
-      function tryHyperJump() {
-        if (state.dead || game.hyper.active) return;
-
-        // Если карта закрыта — откроем её, чтобы игрок выбрал цель
-        if (!GALAXY.isOpen()) {
-          GALAXY.toggle();
-          return;
-        }
-
-        const curIdx = GALAXY.currentIndex;
-        const targetIdx = GALAXY.selectedIndex;
-
-        if (targetIdx === curIdx) {
-          console.log("HYPER: цель совпадает с текущей звездой");
-          return;
-        }
-
-        const cur = GALAXY.getCurrentStar();
-        const dst = GALAXY.getStar(targetIdx);
-        if (!cur || !dst) return;
-
-        const dist = distanceBetweenStars(cur, dst);
-
-        const fuelCost = Math.max(
-          ship.TUNING.fuel_hyper_min, Math.round(dist * ship.TUNING.fuel_hyper));
-
-        if (state.fuel < fuelCost) {
-          console.log(
-            `HYPER: недостаточно топлива (нужно ${fuelCost}, есть ${Math.round(state.fuel)})`,
-          );
-          return;
-        }
-
-        // Запускаем анимацию
-        game.hyper.active = true;
-        game.hyper.t = 0;
-        game.hyper.targetIdx = targetIdx;
-        game.hyper.fuelCost = fuelCost;
-
-        elHyperTarget.textContent = `${cur.name} → ${dst.name}`;
-        elHyperProgress.style.width = "0%";
-        elHyper.style.display = "flex";
-
-        kit.sounds.hjump.play();
-        HYPERFX.start(game.hyper.duration); // визуал Гиперпрыжка
-
-        GALAXY.setOpen(false);
-      }
-
-      function completeHyperJump() {
-        const targetIdx = game.hyper.targetIdx;
-        const star = GALAXY.getStar(targetIdx);
-        if (!star) {
-          game.hyper.active = false;
-          
-          HYPERFX.stop(); // Остановка Гиперпрыжка.
-          
-          elHyper.style.display = "none";
-          return;
-        }
-
-        // Списываем топливо
-        state.fuel = Math.max(0, state.fuel - ship.TUNING.fuel_hyper);
-
-        // Обновляем состояние игрока
-        state.indexStar = targetIdx;
-        state.dataStar = star;
-        updateSectorFromStar(star);
-        GALAXY.setPlayerStar(targetIdx);
-
-        // ★ Синхронизируем курсор вселенной
-        GAME.pers.indexStar = targetIdx;
-
-        console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
-
-        // Сброс сцены
-        if(Settings.isTestDockToStation)
-        {   camera.position  .set(0, 0, 0);
-            camera.quaternion.set(0, 0, 0, 1);
-        }
-        else
-        {   camera.position.set(0, 0, 17000);
-            camera.lookAt(0,0,0);
-        }
-
-        saveGame();
-
-        state.speed = 0;
-
-        state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
-
-        EnemyA.clear();
-
-        for (const l of lasers) scene.remove(l);
-        lasers.length = 0;
-
-        reseedDustAndMeteors();
-        clearSystem();
-        buildSystemFromStar(star);
-
-        console.log(
-          "HYPER →",
-          star.name,
-          star.tech,
-          star.dangerLabel,
-          star.economy,
-          `(-${game.hyper.fuelCost} fuel)`,
-        );
-
-        // kit.sounds.hjump.stop(); // ★ звук прибытия
-
-        // Завершаем
-        game.hyper.active = false;
-        elHyper.style.display = "none";
-      }
-
-      function updateHyper(dt) {
-        if (!game.hyper.active) return;
-
-        game.hyper.t += dt;
-        const k = Math.min(1, game.hyper.t / game.hyper.duration);
-        elHyperProgress.style.width = (k * 100).toFixed(1) + "%";
-
-        if (k >= 1) completeHyperJump();
-      }
-
-      state.dataStar = GALAXY.getCurrentStar();
-      updateSectorFromStar(state.dataStar);
-
-      // Лог текущей звезды
-      const s = state.dataStar;
-      console.log(
-        "StarA: ",
-        s.name,
-        s.tech,
-        s.dangerLabel,
-        s.economy,
-        s.population,
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.spin = new THREE.Vector3(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
       );
+      mesh.userData.size = size;
+      mesh.position.set(
+        camera.position.x + (Math.random() - 0.5) * METEOR_RADIUS * 2,
+        camera.position.y + (Math.random() - 0.5) * METEOR_RADIUS * 2,
+        camera.position.z + (Math.random() - 0.5) * METEOR_RADIUS * 2,
+      );
+      scene.add(mesh);
+      meteors.push(mesh);
+    }
+
+    for (let i = 0; i < METEOR_COUNT; i++) makeMeteor();
+
+    // ------------------------------------------------------------------
+    //  Ввод
+    // ------------------------------------------------------------------
+    const keys = {};
+
+    addEventListener("keydown", (e) => {
+      // F1: справка
+      if (e.code === "F1") {
+        e.preventDefault();
+        HELP.toggle();
+        return;
+      }
+
+      if(state.dead && e.code === "Enter")
+      { resetGame();
+        e.preventDefault();
+        return;
+      }
+
+      if (e.code === "KeyT")
+      {
+        // TRADE уже сам обработал это событие (закрылся)
+        if (e.defaultPrevented) return;
+
+        // Открыть TRADE можно только на пристыкованном корабле
+        if (game.isDock) {
+          e.preventDefault();
+          TRADE.open(state.credits);
+        } else {
+          console.log("TRADE: не пристыкован — T игнорируется");
+        }
+        return;
+      }
+
+      // ESC: закрыть оверлей
+      if (e.code === "Escape") {
+        if (HELP.isOpen()) {
+          HELP.close();
+          e.preventDefault();
+          return;
+        }
+        if (GALAXY.isOpen()) {
+          GALAXY.setOpen(false);
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // Справка открыта — глушим остальное
+      if (HELP.isOpen()) {
+        e.preventDefault();
+        return;
+      }
+
+      if (game.isDock) return;
+
+      // Гиперпрыжок — работает и с открытой картой, и в полёте
+      if (e.code === "KeyJ") {
+        tryHyperJump();
+        e.preventDefault();
+        return;
+      }
+
+      // Карта галактики
+      if (e.code === "KeyM") {
+        GALAXY.toggle();
+        e.preventDefault();
+        return;
+      }
+
+      if (GALAXY.isOpen()) {
+        if (e.code === "ArrowLeft" ) GALAXY.moveSelection(-1, 0);
+        if (e.code === "ArrowRight") GALAXY.moveSelection(1,  0);
+        if (e.code === "ArrowUp"   ) GALAXY.moveSelection(0,  1);
+        if (e.code === "ArrowDown" ) GALAXY.moveSelection(0, -1);
+        if (e.code === "Enter"     )        tryHyperJump ();
+        e.preventDefault();
+        return;
+      }
+
+      // Игра
+      keys[e.code] = true;
+      if (e.code === "Space") e.preventDefault();
+      if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
+      if (e.code === "Enter" && state.dead) resetGame();
+    });
+
+    addEventListener("keyup", (e) => (keys[e.code] = false));
+
+    function updateSectorFromStar(star) {
+      if (!star) return;
+      state.sector.x = Math.round((star.x + 1) * 50);
+      state.sector.y = Math.round((star.y + 1) * 50);
+    }
+
+    // ------------------------------------------------------------
+    //  Гиперпрыжок
+    // --------------------------------------------------------- 💥
+    function distanceBetweenStars(a, b) {
+      if (!a || !b) return 0;
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return Math.hypot(dx, dy);
+    }
+
+    function tryHyperJump()
+    {
+      if (state.dead || game.hyper.active) return;
+
+      // Если карта закрыта — откроем её, чтобы игрок выбрал цель
+      if (!GALAXY.isOpen()) {
+            GALAXY.toggle();
+          return;
+      }
+
+      const curIdx = GALAXY.currentIndex;
+      const targetIdx = GALAXY.selectedIndex;
+
+      if (targetIdx === curIdx) {
+        console.log("HYPER: цель совпадает с текущей звездой");
+        return;
+      }
+
+      const cur = GALAXY.getCurrentStar();
+      const dst = GALAXY.getStar(targetIdx);
+      if (!cur || !dst) return;
+
+      const dist = distanceBetweenStars(cur, dst);
+
+      const fuelCost = Math.max(
+        ship.TUNING.fuel_hyper_min, Math.round(dist * ship.TUNING.fuel_hyper));
+
+      if (state.fuel < fuelCost) {
+        console.log(
+          `HYPER: недостаточно топлива (нужно ${fuelCost}, есть ${Math.round(state.fuel)})`,
+        );
+        return;
+      }
+
+      // Запускаем анимацию
+      game.hyper.active = true;
+      game.hyper.t = 0;
+      game.hyper.targetIdx = targetIdx;
+      game.hyper.fuelCost = fuelCost;
+
+      elHyperTarget.textContent = `${cur.name} → ${dst.name}`;
+      elHyperProgress.style.width = "0%";
+      elHyper.style.display = "flex";
+
+      kit.sounds.hjump.play();
+      HYPERFX.start(game.hyper.duration); // визуал Гиперпрыжка
+
+      GALAXY.setOpen(false);
+    }
+
+    function completeHyperJump() {
+      const targetIdx = game.hyper.targetIdx;
+      const star = GALAXY.getStar(targetIdx);
+      if (!star) {
+        game.hyper.active = false;
+        
+        HYPERFX.stop(); // Остановка Гиперпрыжка.
+        
+        elHyper.style.display = "none";
+        return;
+      }
+
+      EnemyA.doAmount(3, 30);
+
+      // Обновляем состояние игрока
+      state.indexStar = targetIdx;
+      state.dataStar  = star;
+      // Списываем топливо
+      state.fuel = Math.max(0, state.fuel - ship.TUNING.fuel_hyper);
+
+      updateSectorFromStar(star);
+      GALAXY.setPlayerStar(targetIdx);
+
+      // ★ Синхронизируем курсор вселенной
+      GAME.pers.indexStar = targetIdx;
+
+      console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
+
+      // Сброс сцены
+      if(Settings.isTestDockToStation)
+      {   camera.position  .set(0, 0, 0);
+          camera.quaternion.set(0, 0, 0, 1);
+      }
+      else
+      {   camera.position.set(0, 0, 17000);
+          //camera.lookAt(0,0,0);
+          Game.randomQuatCamera(camera);
+      }
+
+      saveGame();
+
+      state.speed = 0;
+
+      state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
+
+      EnemyA.clear();
+
+      for (const l of lasers) scene.remove(l);
+      lasers.length = 0;
+
+      reseedDustAndMeteors();
+      clearSystem();
+      buildSystemFromStar(star);
+
+      console.log(
+        "HYPER →",
+        star.name,
+        star.tech,
+        star.dangerLabel,
+        star.economy,
+        `(-${game.hyper.fuelCost} fuel)`,
+      );
+
+      // kit.sounds.hjump.stop(); // ★ звук прибытия
+
+      // Завершаем
+      game.hyper.active = false;
+      elHyper.style.display = "none";
+    }
+
+    function updateHyper(dt) {
+      if (!game.hyper.active) return;
+
+      game.hyper.t += dt;
+      const k = Math.min(1, game.hyper.t / game.hyper.duration);
+      elHyperProgress.style.width = (k * 100).toFixed(1) + "%";
+
+      if (k >= 1) completeHyperJump();
+    }
+
+    state.dataStar = GALAXY.getCurrentStar();
+    updateSectorFromStar(state.dataStar);
+
+    // Лог текущей звезды
+    const s = state.dataStar;
+    console.log(
+      "StarA: ",
+      s.name,
+      s.tech,
+      s.dangerLabel,
+      s.economy,
+      s.population,
+    );
       
     // Стартовая система
     buildSystemFromStar(state.dataStar);
