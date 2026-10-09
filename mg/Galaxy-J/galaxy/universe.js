@@ -164,6 +164,10 @@ class Universe
         return mix32(hashCombine(this.getGalaxySeed(gi), si));
     }
 
+    getStarSeedSG(seedG, si)
+    {   return mix32(hashCombine(seedG, si));
+    }
+
     getStarRng(gi, si) { return new RNG(this.getStarSeed(gi, si)); }
 
     //--- приватные проверки --------------------------------------------------

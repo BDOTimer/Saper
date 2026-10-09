@@ -1129,6 +1129,8 @@ const state = {
       // Завершаем
       game.hyper.active = false;
       elHyper.style.display = "none";
+
+      console.assert(game.pers.seedStar === star.seed);
     }
 
     function updateHyper(dt) {

@@ -16,6 +16,7 @@ class Galaxy
     // ------------------------------------------------------------------
     #seed;
     #rng;
+    #rngName;
     #stars      = [];
     #links      = [];
     #state      = {
@@ -82,17 +83,16 @@ class Galaxy
     {   return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Конструктор
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     /**
      * @param {number|string} seed  - Сид галактики.
      * @param {object}        opts  - { starCount, galaxyR }
      */
     constructor(seed, opts = {})
     {
-        this.#seed  = seed;
-        this.#rng   = Galaxy._mulberry32(Galaxy._toUint32(seed));
+        this.#seed = seed;
 
         this.starCount = opts.starCount ?? Galaxy.STAR_COUNT;
         this.galaxyR   = opts.galaxyR   ?? Galaxy.GALAXY_R;
@@ -101,48 +101,38 @@ class Galaxy
         this.#buildLinks();
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Приватные утилиты
-    // ------------------------------------------------------------------
-    static _toUint32(value) {
-        if (typeof value === "number") return value >>> 0;
-        let hash = 5381;
-        for (let i = 0; i < value.length; i++) {
-            hash = ((hash * 33) ^ value.charCodeAt(i)) >>> 0;
-        }
-        return hash;
-    }
-
-    static _mulberry32(a)
-    {   return function() {
-            a |= 0;
-            a  = (a + 0x6d2b79f5) | 0;
-            let t = Math.imul(a ^ (a >>> 15), 1 | a);
-            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
-    }
-
+    // --------------------------------------------------------------
+    // только из #generateStars()!
     #makeName() {
         const A = Galaxy.NAME_A;
         const B = Galaxy.NAME_B;
         const C = Galaxy.NAME_C;
-        const a = A[Math.floor(this.#rng() * A.length)];
-        const b = B[Math.floor(this.#rng() * B.length)];
-        const c = C[Math.floor(this.#rng() * C.length)];
+        const a = A[Math.floor(this.#rngName() * A.length)];
+        const b = B[Math.floor(this.#rngName() * B.length)];
+        const c = C[Math.floor(this.#rngName() * C.length)];
         return `${a}${b}${c}`;
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Генерация звёзд
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     #generateStars()
     {
         this.#stars.length = 0;
         const N = this.starCount;
         const R = this.galaxyR;
 
+        const G = GAME.universe;
+        const U = UniverseJS.utils;
+
         for (let i = 0; i < N; i++) {
+            
+            const seedStar = G.getStarSeedSG(GAME.pers.seedGalaxy, i);
+            this.#rng      = U.mulberry32(seedStar);
+            this.#rngName  = U.mulberry32(U.hashCombine(seedStar, 'name'));
+            
             const arm   = i % 3;
             const t     = this.#rng();
             const r     = Math.pow(t, 0.6) * R;
@@ -159,6 +149,7 @@ class Galaxy
 
             this.#stars.push({
                 id:   i,
+                seed: seedStar,
                 name: Galaxy.SIGNS[0] + this.#makeName(),
                 x, y, r, color,
                 tech,
@@ -174,9 +165,9 @@ class Galaxy
         }
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Связи между близкими звёздами
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     #buildLinks()
     {
         this.#links.length = 0;
@@ -202,9 +193,9 @@ class Galaxy
         }
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  DOM
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     #ensureDOM()
     {
         if (this.#state.canvas) return;
@@ -251,9 +242,9 @@ class Galaxy
         this.#state.ctx    = canvas.getContext("2d");
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Публичное API — открытие / закрытие
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     init() {
         this.#ensureDOM();
     }
@@ -268,9 +259,9 @@ class Galaxy
     toggle() { this.setOpen(!this.#state.open); }
     isOpen() { return this.#state.open; }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Управление
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     moveSelection(dx, dy)
     {
         const cur = this.#stars[this.#state.selected];
@@ -292,8 +283,7 @@ class Galaxy
     }
 
     confirmJump()
-    {
-        if (this.#state.selected === this.#state.playerStar) return;
+    {   if (this.#state.selected === this.#state.playerStar) return;
         if (this.#state.jumpCb) {
             this.#state.jumpCb(
                 this.#state.selected,
@@ -304,9 +294,9 @@ class Galaxy
 
     onJumpRequest(cb) { this.#state.jumpCb = cb; }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Отрисовка
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     #draw()
     {
         const ctx   = this.#state.ctx;
@@ -352,8 +342,8 @@ class Galaxy
         }
 
         // звёзды
-        for (const s of this.#stars) {
-            const px = cx + s.x * scale;
+        for (const s of this.#stars)
+        {   const px = cx + s.x * scale;
             const py = cy - s.y * scale;
 
             const grad = ctx.createRadialGradient(px, py, 0, px, py, 10);
@@ -417,9 +407,9 @@ class Galaxy
         ctx.stroke();
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Геттеры
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     get stars()         { return this.#stars; }
     get currentIndex()  { return this.#state.playerStar; }
     get selectedIndex() { return this.#state.selected; }
@@ -434,9 +424,9 @@ class Galaxy
         this.#state.selected   = i;
     }
 
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     //  Update — вызывать каждый кадр
-    // ------------------------------------------------------------------
+    // --------------------------------------------------------------
     update(dt) {
         this.#state.time += dt;
         if (this.#state.open) this.#draw();
