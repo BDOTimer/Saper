@@ -69,10 +69,15 @@ class Ship
 
         // --- Тюнинг расхода топлива ---
         this.TUNING = options.TUNING ?? {
-            fuel_rate:      0,     // топливо/сек на единицу скорости
-            fuel_hyper:     0,     // топлива на 1.0 расстояния между звёздами
-            fuel_hyper_min: 5,     // минимум, чтобы стартовать гиперпрыжок
+            fuel_rate:  0.001,  // топливо/сек на единицу скорости
+            fuel_hyper:    10,  // топлива на 1.0 расстояния между звёздами
+            fuel_hyper_min: 5,  // минимум, чтобы стартовать гиперпрыжок
         };
+
+        if(!Settings.isSpawnEnemies)
+        {   this.TUNING.fuel_rate  = 0;
+            this.TUNING.fuel_hyper = 0;
+        }
 
         // Загрузка профиля (пока заглушка)
         this.load();

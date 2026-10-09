@@ -42,11 +42,11 @@ class Game
         this.ship = options.ship ?? new Ship(options.shipOptions);
 
         this.hyper = options.hyper ?? {
-            active:    false,
-            t:         0,
-            duration:  2.2,
+            active: false,
+            t:          0,
+            duration: 2.2,
             targetIdx: -1,
-            fuelCost:  0,
+            fuelCost:   0,
         };
 
         this.enemies = [];

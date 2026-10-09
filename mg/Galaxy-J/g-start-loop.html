@@ -258,54 +258,54 @@
     <script src="./ui/help.js"></script>
     <script src="./snd/g-sound-lib.js"></script>
 
-    <script type="module">
-      import * as THREE from "three";
-      window.THREE = THREE;
+  <script type="module">
+    import * as THREE from "three";
+    window.THREE = THREE;
 
-      import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
-      import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
-      import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+    import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
-      console.log("KEY_EXIT: ", KEY_EXIT); 
+    console.log("KEY_EXIT: ", KEY_EXIT); 
 
-      function requestFs() {
-          //if (isFullscreen()) return Promise.resolve();
+    function requestFs() {
+        //if (isFullscreen()) return Promise.resolve();
 
-          const e = document.documentElement;
-          let p;
-          if (e.requestFullscreen) p = e.requestFullscreen();
-          else if (e.webkitRequestFullscreen) p = e.webkitRequestFullscreen();
-          else if (e.msRequestFullscreen) p = e.msRequestFullscreen();
-          else return Promise.resolve();
+        const e = document.documentElement;
+        let p;
+        if (e.requestFullscreen) p = e.requestFullscreen();
+        else if (e.webkitRequestFullscreen) p = e.webkitRequestFullscreen();
+        else if (e.msRequestFullscreen) p = e.msRequestFullscreen();
+        else return Promise.resolve();
 
-          // webkit возвращает undefined — нормализуем
-          return Promise.resolve(p);
-      }
+        // webkit возвращает undefined — нормализуем
+        return Promise.resolve(p);
+    }
 
-      function tryFs() {
-        requestFs()
-          .then(function () {
-            // успех — снимаем обработчики
-            removeListeners();
-          })
-          .catch(function () {
-            // не получилось — оставляем обработчики, попробуем на следующем жесте
-          });
-      }
-
-      /// ПОЛНЫЙ ЭКРАН
-      function removeListeners() {
-        ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
-          function (evt) {
-            // document.removeEventListener(evt, tryFs);
+    function tryFs() {
+      requestFs()
+        .then(function () {
+          // успех — снимаем обработчики
+          removeListeners();
+        })
+        .catch(function () {
+          // не получилось — оставляем обработчики, попробуем на следующем жесте
         });
-      }
+    }
 
-      // Навешиваем только на реальные жесты
+    /// ПОЛНЫЙ ЭКРАН
+    function removeListeners() {
       ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
         function (evt) {
-          //document.addEventListener(evt, tryFs, { passive: true });
+          // document.removeEventListener(evt, tryFs);
       });
+    }
+
+    // Навешиваем только на реальные жесты
+    ["pointerdown", "mousedown", "touchstart", "keydown"].forEach(
+      function (evt) {
+        //document.addEventListener(evt, tryFs, { passive: true });
+    });
 
     // --------------------------------------------------------------
     //  HUD
@@ -329,9 +329,12 @@
     const elDamage    = $("damage-flash");
     const elGameover  = $("gameover");
 
-    // --------------------------------------------------------------
+    const elCompassNeedle = $("compass-needle");
+    const elHdg           = $("hdg");
+
+// --------------------------------------------------------
 //  Верхняя панель: индикаторы D / S
-// --------------------------------------------------------------
+// --------------------------------------------------------
 const elIndD = document.getElementById("ind-d");
 const elIndS = document.getElementById("ind-s");
 
@@ -1197,45 +1200,62 @@ const state = {
         }
     }
 
-      let damageTimer = 0;
-      function flashDamage(intensity = 1) {
-        damageTimer = 0.25;
-        elDamage.style.opacity = String(Math.min(0.9, intensity));
+    let damageTimer = 0;
+    function flashDamage(intensity = 1) {
+      damageTimer = 0.25;
+      elDamage.style.opacity = String(Math.min(0.9, intensity));
+    }
+
+    const tmpVecCompas = new THREE.Vector3();
+
+    function updateHUD() {
+      elSpeed.textContent = Math.round(state.speed);
+      elSpeedBar.style.width =
+        Math.min(100, (Math.abs(state.speed) / state.maxSpeed) * 100) + "%";
+      elShield.textContent = Math.round(state.shield);
+      elShieldBar.style.width = state.shield + "%";
+      elFuel.textContent    = Math.round(state.fuel);
+      elFuelBar.style.width = state.fuel + "%";
+      elKills .textContent  = state.kills;
+      elSector.textContent  = `${state.sector.x},${state.sector.y}`;
+    //elCredits.textContent = state.credits;
+
+      // подсветка, когда топлива мало:
+      elFuel.style.color = state.fuel < 10 ? "#ff6666" : "";
+      
+      // подсветить режим дебага
+      //elFuel.textContent = DEBUG.infiniteFuel ? "∞" : Math.round(state.fuel);
+      //elFuelBar.style.width = DEBUG.infiniteFuel ? "100%" : state.fuel + "%";
+      //elFuel.style.color = DEBUG.infiniteFuel ? "#33ff88" : (state.fuel < 10 ? "#ff6666" : "");
+
+      // --------------------------------------
+      //  Компас: курс в плоскости XZ
+      // --------------------------------------
+      const fwd = tmpVecCompas.set(0, 0, -1).applyQuaternion(camera.quaternion);
+
+      let headingDeg = Math.atan2(fwd.x, -fwd.z) * 180 / Math.PI;
+      if (headingDeg < 0) headingDeg += 360;
+
+      if (elCompassNeedle) {
+          elCompassNeedle.style.transform = `rotate(${headingDeg}deg)`;
       }
-
-      function updateHUD() {
-        elSpeed.textContent = Math.round(state.speed);
-        elSpeedBar.style.width =
-          Math.min(100, (Math.abs(state.speed) / state.maxSpeed) * 100) + "%";
-        elShield.textContent = Math.round(state.shield);
-        elShieldBar.style.width = state.shield + "%";
-        elFuel.textContent    = Math.round(state.fuel);
-        elFuelBar.style.width = state.fuel + "%";
-        elKills .textContent  = state.kills;
-        elSector.textContent  = `${state.sector.x},${state.sector.y}`;
-      //elCredits.textContent = state.credits;
-
-        // подсветка, когда топлива мало:
-        elFuel.style.color = state.fuel < 10 ? "#ff6666" : "";
-        
-        // подсветить режим дебага
-        //elFuel.textContent = DEBUG.infiniteFuel ? "∞" : Math.round(state.fuel);
-        //elFuelBar.style.width = DEBUG.infiniteFuel ? "100%" : state.fuel + "%";
-        //elFuel.style.color = DEBUG.infiniteFuel ? "#33ff88" : (state.fuel < 10 ? "#ff6666" : "");
+      if (elHdg) {
+          elHdg.textContent = String(Math.round(headingDeg)).padStart(3, "0") + "°";
       }
+    }
 
-      // ------------------------------------------------------------------
-      //  Стрельба
-      // ------------------------------------------------------------------
-      let fireCooldown = 0;
+    // ------------------------------------------------------------
+    //  Стрельба
+    // ------------------------------------------------------------
+    let fireCooldown = 0;
 
-      function fire() {
-        if (fireCooldown > 0 || state.dead) return;
+    function fire()
+    {   if (fireCooldown > 0 || state.dead) return;
         fireCooldown = 0.12;
         const laser = spawnLaser();
         lasers.push(laser);
         playLaser();
-      }
+    }
 
     ///------------------------------------------------------------------------|
     /// Игровой цикл ✅
