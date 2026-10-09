@@ -71,6 +71,17 @@ class Galaxy
         ""," I"," II"," III"," IV"," V"," Prime"," Major"," Minor"," Alpha"," Beta",
     ];
 
+    static SIGNS = 
+    [   '🔆', '🌓', '💧', '👽', '🌳', '💻',
+        '🐞', '💀', '🐸', '❄️', '🌀', '🪐'
+    ];
+
+    #rndSign(){ return Galaxy.SIGNS[Galaxy.rnd(0, Galaxy.SIGNS.length)] }
+
+    static rnd(min, max)
+    {   return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
     // ------------------------------------------------------------------
     //  Конструктор
     // ------------------------------------------------------------------
@@ -102,8 +113,8 @@ class Galaxy
         return hash;
     }
 
-    static _mulberry32(a) {
-        return function () {
+    static _mulberry32(a)
+    {   return function() {
             a |= 0;
             a  = (a + 0x6d2b79f5) | 0;
             let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -148,7 +159,7 @@ class Galaxy
 
             this.#stars.push({
                 id:   i,
-                name: this.#makeName(),
+                name: Galaxy.SIGNS[0] + this.#makeName(),
                 x, y, r, color,
                 tech,
                 danger,

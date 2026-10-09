@@ -291,6 +291,10 @@ class Game
     static randomQuatCamera(camera)
     {   camera.quaternion.copy(Game.randomQuat());
     }
+
+    static rnd(min, max)
+    {   return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
 }
 
 class CameraFar

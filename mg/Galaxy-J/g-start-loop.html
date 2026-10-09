@@ -207,6 +207,11 @@
     <span class="hint-text">ПОМОЩЬ</span>
   </button>
 
+  <div id="sys-info">
+    <span class="sys-info__label">Звёздная система:</span>
+    <span class="sys-info__value" id="sys-info-value">???</span>
+  </div>
+
   <div id="gameover">
     GAME OVER
     <small>нажми ENTER чтобы начать заново</small>
@@ -344,8 +349,12 @@ const elIndS = document.getElementById("ind-s");
  */
 
 const HUD = (() => {
-  const map = { D: elIndD, S: elIndS };
-  const state = { D: false, S: false };
+  const map   = { D: elIndD, S: elIndS };
+  const state = { D: false , S: false  };
+
+  // ★ ссылки на элементы строки звёздной системы
+  const elSysValue = document.getElementById("sys-info-value");
+  let sysName = "";
 
   function setStatus(kind, on, opts = {}) {
     const el = map[kind];
@@ -375,11 +384,48 @@ const HUD = (() => {
     setStatus("S", false);
   }
 
-  return { setStatus, getStatus, toggle, reset, state };
+  // ------------------------------------------------------------
+  //  Строка «Звёздная система: <текст>»
+  // ------------------------------------------------------------
+  /**
+   * Записать название звёздной системы в HUD.
+   * @param {string|number|null|undefined} name
+   */
+
+// HUD.setSystem("Sol");               // → «Звёздная система: Sol»
+// HUD.setSystem("Alpha Centauri");    // → обновит
+// HUD.setSystem(GALAXY.current.name); // из объекта галактики
+// HUD.setSystem(null);                // → сброс в «— — —»
+
+  function setSystem(name) {
+    const text =
+      name === null || name === undefined || name === ""
+        ? " . . ."
+        : String(name);
+
+    if (text === sysName) return;  // без изменений — не дёргаем DOM
+    sysName = text;
+
+    if (!elSysValue) return;
+    elSysValue.textContent = text;
+
+    // перезапуск анимации вспышки
+    elSysValue.classList.remove("is-updated");
+    // форсируем reflow, чтобы анимация проигралась заново
+    void elSysValue.offsetWidth;
+    elSysValue.classList.add("is-updated");
+  }
+
+  function getSystem() {
+    return sysName;
+  }
+
+  return { setStatus, getStatus, toggle, reset, setSystem, getSystem, state };
 })();
 
-// Удобный глобальный доступ (например, из других скриптов)
 window.HUD = HUD;
+
+//HUD.setSystem("Alpha Centauri"); 
 
     // ----------------------------------------------------
     //  Игровая сессия: Pers + Ship + Universe
@@ -438,6 +484,7 @@ const state = {
     const seedGalaxy = GAME.pers.seedGalaxy;
     window.   GALAXY = new Galaxy( seedGalaxy);
               GALAXY . init();
+
 
     GALAXY.setPlayerStar(pers.indexStar);
     pers.dataStar = GALAXY.getCurrentStar();
@@ -946,10 +993,13 @@ const state = {
 
     addEventListener("keyup", (e) => (keys[e.code] = false));
 
-    function updateSectorFromStar(star) {
-      if (!star) return;
-      state.sector.x = Math.round((star.x + 1) * 50);
-      state.sector.y = Math.round((star.y + 1) * 50);
+    function updateSectorFromStar(star)
+    {
+        if (!star) return;
+        state.sector.x = Math.round((star.x + 1) * 50);
+        state.sector.y = Math.round((star.y + 1) * 50);
+
+        HUD.setSystem(GALAXY.getCurrentStar().name); // Имя звезды на панель
     }
 
     // ------------------------------------------------------------
@@ -972,7 +1022,7 @@ const state = {
           return;
       }
 
-      const curIdx = GALAXY.currentIndex;
+      const curIdx    = GALAXY.currentIndex;
       const targetIdx = GALAXY.selectedIndex;
 
       if (targetIdx === curIdx) {
@@ -1024,7 +1074,7 @@ const state = {
         return;
       }
 
-      EnemyA.doAmount(3, 30);
+      EnemyA.doAmount(3, 30);   // Кол-во врагов(всего)
 
       // Обновляем состояние игрока
       state.indexStar = targetIdx;

@@ -1,704 +1,706 @@
-    html,
-    body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #000;
-    }
-    canvas {
-        display: block;
-    }
+/* main.css */
 
-    body.hide-cursor {
-        cursor: none;
-    }
-
-    #cockpit-svg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      filter: 
-        drop-shadow(0 0 6px #00ff88) 
-        drop-shadow(0 0 18px rgba(0, 255, 136, 0.35));
-    }
-
-  /* ==================================================================
-     HUD — объёмная приборная панель
-     ================================================================== */
-  @property --p {
-    syntax: "<number>";
-    inherits: true;
-    initial-value: 100;
-  }
-
-  #hud {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    font-family: "Share Tech Mono", "Courier New", monospace;
-    color: #33ff88;
-    text-shadow:
-      0 0 6px rgba(0, 255, 136, 0.6),
-      0 0 2px rgba(0, 255, 136, 0.7);
-    user-select: none;
-
-    /* общая точка схода для 3D-наклона консолей */
-    perspective: 1100px;
-    perspective-origin: 50% 60%;
-  }
-
-  #cockpit-svg {
-    position: absolute;
-    inset: 0;
+html,
+body {
+    margin: 0;
+    padding: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none;
-  }
-  #cockpit-svg path,
-  #cockpit-svg line,
-  #cockpit-svg polyline {
-    fill: none;
-    stroke: #33ff88;
-    stroke-width: 2;
-    filter: drop-shadow(0 0 4px #00ff88);
-  }
-
-  /* ---------- боковые консоли (общий 3D-наклон) ---------- */
-  .console {
-    position: absolute;
-    bottom: 46px;
-    width: 288px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .console-left {
-    left: 64px;
-    transform: rotateX(5deg) rotateY(-14deg);
-  }
-  .console-right {
-    right: 64px;
-    transform: rotateX(5deg) rotateY(14deg);
-  }
-
-  /* ---------- приборная панель ---------- */
-  .indicator {
-    position: relative;
-  }
-
-  .panel {
-    position: relative;
-    padding: 8px 12px 10px;
-    border-radius: 10px;
-    border: 1px solid rgba(72, 255, 150, 0.42);
-    background:
-      /* сканлайны */
-      repeating-linear-gradient(
-        0deg,
-        rgba(0, 255, 136, 0.035) 0 1px,
-        transparent 1px 3px
-      ),
-      /* диагональный блик стекла */
-      linear-gradient(
-        105deg,
-        transparent 40%,
-        rgba(180, 255, 220, 0.05) 46%,
-        rgba(180, 255, 220, 0.02) 60%,
-        transparent 66%
-      ),
-      /* верхний отблеск */
-      linear-gradient(180deg, rgba(0, 255, 136, 0.1), transparent 46%),
-      /* корпус */
-      linear-gradient(180deg, rgba(5, 33, 20, 0.9), rgba(1, 11, 6, 0.94));
-    box-shadow:
-      0 0 0 1px rgba(0, 255, 136, 0.08),
-      0 0 16px rgba(0, 255, 136, 0.16),
-      0 0 44px rgba(0, 255, 136, 0.07),
-      /* «толщина» панели — экструзия */
-      0 2px 0 rgba(0, 96, 48, 0.55),
-      0 4px 0 rgba(0, 58, 29, 0.55),
-      0 8px 16px rgba(0, 0, 0, 0.6),
-      /* внутренний рельеф */
-      inset 0 1px 0 rgba(170, 255, 210, 0.22),
-      inset 0 -8px 16px rgba(0, 0, 0, 0.5),
-      inset 0 0 24px rgba(0, 255, 136, 0.05);
     overflow: hidden;
-    animation: panel-boot 0.55s cubic-bezier(0.18, 0.8, 0.3, 1.18) backwards;
-  }
-  .console-right .panel {
-    --boot-x: 22px;
-  }
+    background: #000;
+}
+canvas {
+    display: block;
+}
 
-  #ind-speed .panel {
-    animation-delay: 0.1s;
-  }
-  #ind-shield .panel {
-    animation-delay: 0.24s;
-  }
-  #ind-fuel .panel {
-    animation-delay: 0.38s;
-  }
-  #ind-credits .panel {
-    animation-delay: 0.1s;
-  }
-  #ind-kills .panel {
-    animation-delay: 0.24s;
-  }
-  #ind-sector .panel {
-    animation-delay: 0.38s;
-  }
+body.hide-cursor {
+    cursor: none;
+}
 
-  @keyframes panel-boot {
-    from {
-      opacity: 0;
-      transform: translateX(var(--boot-x, -22px)) translateY(14px) scale(0.94);
-      filter: brightness(2.4);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-      filter: none;
-    }
-  }
+#cockpit-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: 
+    drop-shadow(0 0 6px #00ff88) 
+    drop-shadow(0 0 18px rgba(0, 255, 136, 0.35));
+}
 
-  /* угловые «скобки» */
-  .panel::before,
-  .panel::after {
-    content: "";
-    position: absolute;
-    width: 13px;
-    height: 13px;
-    border: 2px solid rgba(125, 255, 176, 0.75);
-    filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.7));
-    pointer-events: none;
-    z-index: 3;
-  }
-  .panel::before {
-    top: 5px;
-    left: 5px;
-    border-right: 0;
-    border-bottom: 0;
-    border-top-left-radius: 4px;
-  }
-  .panel::after {
-    bottom: 5px;
-    right: 5px;
-    border-left: 0;
-    border-top: 0;
-    border-bottom-right-radius: 4px;
-  }
+/* ==================================================================
+    HUD — объёмная приборная панель
+    ================================================================== */
+@property --p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 100;
+}
 
-  /* шапка панели */
-  .panel-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 6px;
-    margin-bottom: 9px;
-    border-bottom: 1px solid rgba(0, 255, 136, 0.16);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
-  }
-  .led {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle at 35% 30%,
-      #dffff0,
-      #37ff92 45%,
-      #0a7f42 95%
-    );
-    box-shadow:
-      0 0 6px rgba(0, 255, 136, 0.95),
-      0 0 14px rgba(0, 255, 136, 0.4),
-      inset 0 -1px 2px rgba(0, 60, 30, 0.8);
-    animation: led-blink 2.6s ease-in-out infinite;
-  }
-  #ind-shield .led {
-    animation-delay: 0.4s;
-  }
-  #ind-fuel .led {
-    animation-delay: 0.8s;
-  }
-  #ind-credits .led {
-    animation-delay: 0.4s;
-  }
-  #ind-kills .led {
-    animation-delay: 0.8s;
-  }
-  @keyframes led-blink {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.35;
-    }
-  }
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: "Share Tech Mono", "Courier New", monospace;
+  color: #33ff88;
+  text-shadow:
+    0 0 6px rgba(0, 255, 136, 0.6),
+    0 0 2px rgba(0, 255, 136, 0.7);
+  user-select: none;
 
-  .panel-title {
-    font-size: 11px;
-    letter-spacing: 3.5px;
-    color: #baffd6;
-    text-shadow: 0 0 8px rgba(0, 255, 136, 0.7);
-  }
-  .panel-tag {
-    margin-left: auto;
-    font-size: 9px;
-    letter-spacing: 2px;
-    padding: 2px 6px;
-    color: rgba(125, 255, 176, 0.65);
-    border: 1px solid rgba(0, 255, 136, 0.28);
-    border-radius: 4px;
-    background: rgba(0, 255, 136, 0.05);
-    box-shadow: inset 0 0 6px rgba(0, 255, 136, 0.08);
-    text-shadow: none;
-  }
+  /* общая точка схода для 3D-наклона консолей */
+  perspective: 1100px;
+  perspective-origin: 50% 60%;
+}
 
-  .panel-body {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    min-height: 44px;
-  }
-  .side-col {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 6px;
-    flex: 1;
-    min-width: 0;
-  }
+#cockpit-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+#cockpit-svg path,
+#cockpit-svg line,
+#cockpit-svg polyline {
+  fill: none;
+  stroke: #33ff88;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px #00ff88);
+}
 
-  /* ---------- цифровое значение ---------- */
-  .value-block {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
-    flex: none;
-    min-width: 92px;
-  }
-  .value {
-    font-family: "Orbitron", "Share Tech Mono", monospace;
-    font-weight: 700;
-    font-size: 27px;
-    line-height: 1;
-    color: #ecfff4;
-    font-variant-numeric: tabular-nums;
-    text-shadow:
-      0 0 2px #b6ffd2,
-      0 0 14px rgba(0, 255, 136, 0.9),
-      0 0 36px rgba(0, 255, 136, 0.35),
-      0 2px 0 rgba(0, 66, 33, 0.95);
-  }
-  .value-s {
-    font-size: 21px;
-  }
-  .unit {
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: rgba(150, 255, 196, 0.6);
-    text-shadow: 0 0 5px rgba(0, 255, 136, 0.35);
-  }
-  .micro {
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: rgba(125, 255, 176, 0.5);
-    text-shadow: none;
-  }
+/* ---------- боковые консоли (общий 3D-наклон) ---------- */
+.console {
+  position: absolute;
+  bottom: 46px;
+  width: 288px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.console-left {
+  left: 64px;
+  transform: rotateX(5deg) rotateY(-14deg);
+}
+.console-right {
+  right: 64px;
+  transform: rotateX(5deg) rotateY(14deg);
+}
 
-  /* ---------- сегментная шкала ---------- */
-  .bar {
-    position: relative;
-    flex: 1;
-    height: 17px;
-    border-radius: 4px;
-    border: 1px solid rgba(72, 255, 150, 0.38);
-    background: linear-gradient(180deg, rgba(0, 22, 12, 0.95), rgba(0, 7, 4, 0.98));
-    box-shadow:
-      inset 0 2px 5px rgba(0, 0, 0, 0.85),
-      inset 0 -1px 0 rgba(0, 255, 136, 0.1),
-      0 1px 0 rgba(170, 255, 210, 0.07);
-    overflow: hidden;
-  }
-  .bar.slim {
-    height: 11px;
-  }
-  .side-col .bar {
-    flex: none;
-  }
+/* ---------- приборная панель ---------- */
+.indicator {
+  position: relative;
+}
 
-  .bar > i {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 50%;
-    box-sizing: border-box;
-    border-right: 2px solid #eafff3;
-    background-image:
-      /* бегущий блик */
-      linear-gradient(
-        115deg,
-        transparent 35%,
-        rgba(255, 255, 255, 0.35) 50%,
-        transparent 65%
-      ),
-      /* глянцевый цилиндр */
-      linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.28),
-        transparent 42%,
-        rgba(0, 0, 0, 0.3)
-      ),
-      /* базовый цвет */
-      linear-gradient(
-        180deg,
-        var(--c1, #c8ffe0),
-        var(--c2, #37ff92) 45%,
-        var(--c3, #0b9e55)
-      );
-    background-size: 200% 100%, 100% 100%, 100% 100%;
-    box-shadow:
-      0 0 9px var(--glow, rgba(0, 255, 136, 0.9)),
-      0 0 24px var(--glow, rgba(0, 255, 136, 0.5)),
-      inset 0 -3px 6px rgba(0, 0, 0, 0.35);
-    animation: bar-shimmer 3.6s linear infinite;
-    transition: width 0.16s ease-out;
-  }
-  @keyframes bar-shimmer {
-    from {
-      background-position: 100% 0, 0 0, 0 0;
-    }
-    to {
-      background-position: -100% 0, 0 0, 0 0;
-    }
-  }
+.panel {
+  position: relative;
+  padding: 8px 12px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(72, 255, 150, 0.42);
+  background:
+    /* сканлайны */
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 255, 136, 0.035) 0 1px,
+      transparent 1px 3px
+    ),
+    /* диагональный блик стекла */
+    linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(180, 255, 220, 0.05) 46%,
+      rgba(180, 255, 220, 0.02) 60%,
+      transparent 66%
+    ),
+    /* верхний отблеск */
+    linear-gradient(180deg, rgba(0, 255, 136, 0.1), transparent 46%),
+    /* корпус */
+    linear-gradient(180deg, rgba(5, 33, 20, 0.9), rgba(1, 11, 6, 0.94));
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 136, 0.08),
+    0 0 16px rgba(0, 255, 136, 0.16),
+    0 0 44px rgba(0, 255, 136, 0.07),
+    /* «толщина» панели — экструзия */
+    0 2px 0 rgba(0, 96, 48, 0.55),
+    0 4px 0 rgba(0, 58, 29, 0.55),
+    0 8px 16px rgba(0, 0, 0, 0.6),
+    /* внутренний рельеф */
+    inset 0 1px 0 rgba(170, 255, 210, 0.22),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.5),
+    inset 0 0 24px rgba(0, 255, 136, 0.05);
+  overflow: hidden;
+  animation: panel-boot 0.55s cubic-bezier(0.18, 0.8, 0.3, 1.18) backwards;
+}
+.console-right .panel {
+  --boot-x: 22px;
+}
 
-  /* сегменты + стекло поверх */
-  .bar::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.16),
-        transparent 30%,
-        rgba(0, 0, 0, 0.3) 92%
-      ),
-      linear-gradient(
-        90deg,
-        transparent calc(100% - 2px),
-        rgba(0, 12, 6, 0.85) calc(100% - 2px)
-      );
-    background-size: 100% 100%, calc(100% / 22) 100%;
-  }
-  .bar.pips::after {
-    background-size: 100% 100%, calc(100% / 10) 100%;
-  }
+#ind-speed .panel {
+  animation-delay: 0.1s;
+}
+#ind-shield .panel {
+  animation-delay: 0.24s;
+}
+#ind-fuel .panel {
+  animation-delay: 0.38s;
+}
+#ind-credits .panel {
+  animation-delay: 0.1s;
+}
+#ind-kills .panel {
+  animation-delay: 0.24s;
+}
+#ind-sector .panel {
+  animation-delay: 0.38s;
+}
 
-  /* опасные зоны */
-  .bar .zone {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 14%;
-    z-index: 1;
-    background: repeating-linear-gradient(
-      -45deg,
-      rgba(255, 70, 70, 0.3) 0 4px,
-      rgba(255, 70, 70, 0.1) 4px 8px
-    );
-    box-shadow: inset 0 0 6px rgba(255, 60, 60, 0.25);
+@keyframes panel-boot {
+  from {
+    opacity: 0;
+    transform: translateX(var(--boot-x, -22px)) translateY(14px) scale(0.94);
+    filter: brightness(2.4);
   }
-  .zone.right {
-    right: 0;
-    border-left: 1px solid rgba(255, 90, 90, 0.55);
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
   }
-  .zone.left {
-    left: 0;
-    border-right: 1px solid rgba(255, 90, 90, 0.55);
-  }
+}
 
-  /* ---------- круговой индикатор щита ---------- */
-  .gauge {
-    position: relative;
-    width: 64px;
-    height: 64px;
-    flex: none;
-    filter:
-      drop-shadow(0 0 5px rgba(0, 255, 136, 0.45))
-      drop-shadow(0 0 14px rgba(0, 255, 136, 0.22));
-  }
-  .gauge::before {
-    /* риски по окружности */
-    content: "";
-    position: absolute;
-    inset: -5px;
-    border-radius: 50%;
-    background: repeating-conic-gradient(
-      from -90deg,
-      rgba(125, 255, 176, 0.5) 0 1.3deg,
-      transparent 1.3deg 30deg
-    );
-    -webkit-mask: radial-gradient(circle, transparent 82%, #000 85%);
-    mask: radial-gradient(circle, transparent 82%, #000 85%);
-  }
-  .gauge-ring {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: conic-gradient(
-      from -90deg,
-      var(--c2, #37ff92) calc(var(--p, 100) * 1%),
-      rgba(0, 255, 136, 0.08) 0
-    );
-    -webkit-mask: radial-gradient(circle, transparent 61%, #000 64%);
-    mask: radial-gradient(circle, transparent 61%, #000 64%);
-    transition: --p 0.2s ease-out;
-  }
-  .gauge-hub {
-    position: absolute;
-    inset: 9px;
-    border-radius: 50%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    background:
-      radial-gradient(circle at 32% 26%, rgba(0, 255, 136, 0.16), transparent 55%),
-      linear-gradient(180deg, #07301d, #020d07);
-    border: 1px solid rgba(72, 255, 150, 0.35);
-    box-shadow:
-      inset 0 2px 6px rgba(0, 0, 0, 0.8),
-      inset 0 -2px 5px rgba(0, 255, 136, 0.1),
-      0 2px 5px rgba(0, 0, 0, 0.55);
-  }
-  .gauge-num {
-    font-family: "Orbitron", "Share Tech Mono", monospace;
-    font-weight: 700;
-    font-size: 16px;
-    line-height: 1;
-    color: #ecfff4;
-    font-variant-numeric: tabular-nums;
-    text-shadow:
-      0 0 10px rgba(0, 255, 136, 0.9),
-      0 0 24px rgba(0, 255, 136, 0.4),
-      0 1px 0 rgba(0, 66, 33, 0.95);
-  }
-  .gauge-sub {
-    font-size: 8px;
-    letter-spacing: 2px;
-    color: rgba(150, 255, 196, 0.55);
-    text-shadow: none;
-  }
+/* угловые «скобки» */
+.panel::before,
+.panel::after {
+  content: "";
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(125, 255, 176, 0.75);
+  filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.7));
+  pointer-events: none;
+  z-index: 3;
+}
+.panel::before {
+  top: 5px;
+  left: 5px;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: 4px;
+}
+.panel::after {
+  bottom: 5px;
+  right: 5px;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: 4px;
+}
 
-  /* строка статуса */
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 10px;
-    letter-spacing: 2px;
+/* шапка панели */
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 9px;
+  border-bottom: 1px solid rgba(0, 255, 136, 0.16);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+.led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #dffff0,
+    #37ff92 45%,
+    #0a7f42 95%
+  );
+  box-shadow:
+    0 0 6px rgba(0, 255, 136, 0.95),
+    0 0 14px rgba(0, 255, 136, 0.4),
+    inset 0 -1px 2px rgba(0, 60, 30, 0.8);
+  animation: led-blink 2.6s ease-in-out infinite;
+}
+#ind-shield .led {
+  animation-delay: 0.4s;
+}
+#ind-fuel .led {
+  animation-delay: 0.8s;
+}
+#ind-credits .led {
+  animation-delay: 0.4s;
+}
+#ind-kills .led {
+  animation-delay: 0.8s;
+}
+@keyframes led-blink {
+  0%,
+  100% {
+    opacity: 1;
   }
-  .status-lamp {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #37ff92;
-    box-shadow:
-      0 0 6px rgba(0, 255, 136, 0.9),
-      0 0 12px rgba(0, 255, 136, 0.4);
+  50% {
+    opacity: 0.35;
   }
-  .status-text {
-    color: rgba(184, 255, 216, 0.85);
-  }
-  .status-text::after {
-    content: "NOMINAL";
-  }
+}
 
-  /* ---------- эквалайзер банка ---------- */
-  .eq-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 5px;
-    margin-left: auto;
-  }
-  .eq {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
-    height: 16px;
-  }
-  .eq i {
-    width: 4px;
-    border-radius: 1px;
-    background: linear-gradient(180deg, #8dffb8, #0f8f4e);
-    box-shadow: 0 0 6px rgba(0, 255, 136, 0.45);
-    animation: eq-bounce 1.15s ease-in-out infinite;
-  }
-  .eq i:nth-child(1) {
-    animation-duration: 0.9s;
-  }
-  .eq i:nth-child(2) {
-    animation-duration: 1.25s;
-    animation-delay: 0.15s;
-  }
-  .eq i:nth-child(3) {
-    animation-duration: 0.75s;
-    animation-delay: 0.3s;
-  }
-  .eq i:nth-child(4) {
-    animation-duration: 1.05s;
-    animation-delay: 0.05s;
-  }
-  .eq i:nth-child(5) {
-    animation-duration: 1.35s;
-    animation-delay: 0.22s;
-  }
-  @keyframes eq-bounce {
-    0%,
-    100% {
-      height: 22%;
-    }
-    50% {
-      height: 100%;
-    }
-  }
+.panel-title {
+  font-size: 11px;
+  letter-spacing: 3.5px;
+  color: #baffd6;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.7);
+}
+.panel-tag {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 2px 6px;
+  color: rgba(125, 255, 176, 0.65);
+  border: 1px solid rgba(0, 255, 136, 0.28);
+  border-radius: 4px;
+  background: rgba(0, 255, 136, 0.05);
+  box-shadow: inset 0 0 6px rgba(0, 255, 136, 0.08);
+  text-shadow: none;
+}
 
-  /* ---------- компас ---------- */
-  .compass {
-    position: relative;
-    width: 64px;
-    height: 64px;
-    flex: none;
-    border-radius: 50%;
-    border: 1px solid rgba(72, 255, 150, 0.4);
-    background:
-      radial-gradient(circle at 50% 36%, rgba(0, 255, 136, 0.1), transparent 62%),
-      linear-gradient(180deg, rgba(3, 24, 14, 0.95), rgba(0, 8, 4, 0.98));
-    box-shadow:
-      inset 0 2px 8px rgba(0, 0, 0, 0.8),
-      inset 0 0 18px rgba(0, 255, 136, 0.06),
-      0 2px 5px rgba(0, 0, 0, 0.5),
-      0 0 14px rgba(0, 255, 136, 0.14);
-  }
-  .compass::before {
-    content: "";
-    position: absolute;
-    inset: 3px;
-    border-radius: 50%;
-    background: repeating-conic-gradient(
-      from -90deg,
-      rgba(125, 255, 176, 0.55) 0 1.2deg,
-      transparent 1.2deg 30deg
-    );
-    -webkit-mask: radial-gradient(circle, transparent 85%, #000 88%);
-    mask: radial-gradient(circle, transparent 85%, #000 88%);
-  }
-  .compass b {
-    position: absolute;
-    font-weight: normal;
-    font-size: 9px;
-    color: rgba(125, 255, 176, 0.6);
-    text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
-  }
-  .compass .cN {
-    top: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #d9ffe9;
-    font-size: 10px;
-    text-shadow: 0 0 7px #00ff88;
-  }
-  .compass .cE {
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  .compass .cS {
-    bottom: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  .compass .cW {
-    left: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  .needle {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 9px;
-    height: 40px;
-    margin: -20px 0 0 -4.5px;
-    background: linear-gradient(
+.panel-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+}
+.side-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- цифровое значение ---------- */
+.value-block {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex: none;
+  min-width: 92px;
+}
+.value {
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-weight: 700;
+  font-size: 27px;
+  line-height: 1;
+  color: #ecfff4;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 2px #b6ffd2,
+    0 0 14px rgba(0, 255, 136, 0.9),
+    0 0 36px rgba(0, 255, 136, 0.35),
+    0 2px 0 rgba(0, 66, 33, 0.95);
+}
+.value-s {
+  font-size: 21px;
+}
+.unit {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(150, 255, 196, 0.6);
+  text-shadow: 0 0 5px rgba(0, 255, 136, 0.35);
+}
+.micro {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(125, 255, 176, 0.5);
+  text-shadow: none;
+}
+
+/* ---------- сегментная шкала ---------- */
+.bar {
+  position: relative;
+  flex: 1;
+  height: 17px;
+  border-radius: 4px;
+  border: 1px solid rgba(72, 255, 150, 0.38);
+  background: linear-gradient(180deg, rgba(0, 22, 12, 0.95), rgba(0, 7, 4, 0.98));
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(0, 255, 136, 0.1),
+    0 1px 0 rgba(170, 255, 210, 0.07);
+  overflow: hidden;
+}
+.bar.slim {
+  height: 11px;
+}
+.side-col .bar {
+  flex: none;
+}
+
+.bar > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  box-sizing: border-box;
+  border-right: 2px solid #eafff3;
+  background-image:
+    /* бегущий блик */
+    linear-gradient(
+      115deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.35) 50%,
+      transparent 65%
+    ),
+    /* глянцевый цилиндр */
+    linear-gradient(
       180deg,
-      #eafff3 0 50%,
-      rgba(0, 255, 136, 0.22) 50% 100%
+      rgba(255, 255, 255, 0.28),
+      transparent 42%,
+      rgba(0, 0, 0, 0.3)
+    ),
+    /* базовый цвет */
+    linear-gradient(
+      180deg,
+      var(--c1, #c8ffe0),
+      var(--c2, #37ff92) 45%,
+      var(--c3, #0b9e55)
     );
-    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-    filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.8));
-    transform: rotate(var(--hdg, 0deg));
-    transition: transform 0.12s linear;
-    z-index: 2;
+  background-size: 200% 100%, 100% 100%, 100% 100%;
+  box-shadow:
+    0 0 9px var(--glow, rgba(0, 255, 136, 0.9)),
+    0 0 24px var(--glow, rgba(0, 255, 136, 0.5)),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+  animation: bar-shimmer 3.6s linear infinite;
+  transition: width 0.16s ease-out;
+}
+@keyframes bar-shimmer {
+  from {
+    background-position: 100% 0, 0 0, 0 0;
   }
-  .compass-dot {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 6px;
-    height: 6px;
-    margin: -3px 0 0 -3px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #eafff3, #37ff92 60%, #0a7f42);
-    box-shadow: 0 0 8px rgba(0, 255, 136, 0.9);
-    z-index: 3;
+  to {
+    background-position: -100% 0, 0 0, 0 0;
   }
-  .hdg-row {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
-  }
-  .hdg-val {
-    font-family: "Orbitron", "Share Tech Mono", monospace;
-    font-size: 13px;
-    color: #baffd6;
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 8px rgba(0, 255, 136, 0.7);
-  }
+}
 
-  /* ---------- состояния WARN / CRIT ---------- */
-  .indicator.warn .panel {
-    border-color: rgba(255, 198, 61, 0.55);
+/* сегменты + стекло поверх */
+.bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16),
+      transparent 30%,
+      rgba(0, 0, 0, 0.3) 92%
+    ),
+    linear-gradient(
+      90deg,
+      transparent calc(100% - 2px),
+      rgba(0, 12, 6, 0.85) calc(100% - 2px)
+    );
+  background-size: 100% 100%, calc(100% / 22) 100%;
+}
+.bar.pips::after {
+  background-size: 100% 100%, calc(100% / 10) 100%;
+}
+
+/* опасные зоны */
+.bar .zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14%;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 70, 70, 0.3) 0 4px,
+    rgba(255, 70, 70, 0.1) 4px 8px
+  );
+  box-shadow: inset 0 0 6px rgba(255, 60, 60, 0.25);
+}
+.zone.right {
+  right: 0;
+  border-left: 1px solid rgba(255, 90, 90, 0.55);
+}
+.zone.left {
+  left: 0;
+  border-right: 1px solid rgba(255, 90, 90, 0.55);
+}
+
+/* ---------- круговой индикатор щита ---------- */
+.gauge {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  filter:
+    drop-shadow(0 0 5px rgba(0, 255, 136, 0.45))
+    drop-shadow(0 0 14px rgba(0, 255, 136, 0.22));
+}
+.gauge::before {
+  /* риски по окружности */
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from -90deg,
+    rgba(125, 255, 176, 0.5) 0 1.3deg,
+    transparent 1.3deg 30deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 82%, #000 85%);
+  mask: radial-gradient(circle, transparent 82%, #000 85%);
+}
+.gauge-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    var(--c2, #37ff92) calc(var(--p, 100) * 1%),
+    rgba(0, 255, 136, 0.08) 0
+  );
+  -webkit-mask: radial-gradient(circle, transparent 61%, #000 64%);
+  mask: radial-gradient(circle, transparent 61%, #000 64%);
+  transition: --p 0.2s ease-out;
+}
+.gauge-hub {
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(0, 255, 136, 0.16), transparent 55%),
+    linear-gradient(180deg, #07301d, #020d07);
+  border: 1px solid rgba(72, 255, 150, 0.35);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.8),
+    inset 0 -2px 5px rgba(0, 255, 136, 0.1),
+    0 2px 5px rgba(0, 0, 0, 0.55);
+}
+.gauge-num {
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  color: #ecfff4;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 10px rgba(0, 255, 136, 0.9),
+    0 0 24px rgba(0, 255, 136, 0.4),
+    0 1px 0 rgba(0, 66, 33, 0.95);
+}
+.gauge-sub {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(150, 255, 196, 0.55);
+  text-shadow: none;
+}
+
+/* строка статуса */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.status-lamp {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #37ff92;
+  box-shadow:
+    0 0 6px rgba(0, 255, 136, 0.9),
+    0 0 12px rgba(0, 255, 136, 0.4);
+}
+.status-text {
+  color: rgba(184, 255, 216, 0.85);
+}
+.status-text::after {
+  content: "NOMINAL";
+}
+
+/* ---------- эквалайзер банка ---------- */
+.eq-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  margin-left: auto;
+}
+.eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+.eq i {
+  width: 4px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #8dffb8, #0f8f4e);
+  box-shadow: 0 0 6px rgba(0, 255, 136, 0.45);
+  animation: eq-bounce 1.15s ease-in-out infinite;
+}
+.eq i:nth-child(1) {
+  animation-duration: 0.9s;
+}
+.eq i:nth-child(2) {
+  animation-duration: 1.25s;
+  animation-delay: 0.15s;
+}
+.eq i:nth-child(3) {
+  animation-duration: 0.75s;
+  animation-delay: 0.3s;
+}
+.eq i:nth-child(4) {
+  animation-duration: 1.05s;
+  animation-delay: 0.05s;
+}
+.eq i:nth-child(5) {
+  animation-duration: 1.35s;
+  animation-delay: 0.22s;
+}
+@keyframes eq-bounce {
+  0%,
+  100% {
+    height: 22%;
   }
-  .indicator.warn .bar > i {
-    --c1: #fff3c9;
-    --c2: #ffc63d;
-    --c3: #b06f00;
-    --glow: rgba(255, 179, 0, 0.85);
+  50% {
+    height: 100%;
   }
-  .indicator.warn .gauge-ring {
-    --c2: #ffc63d;
-  }
-  .indicator.warn .value,
-  .indicator.warn .gauge-num {
-    color: #fff1c2;
-    text-shadow:
-      0 0 14px rgba(255, 179, 0, 0.9),
-      0 0 30px rgba(255, 140, 0, 0.35),
-      0 2px 0 rgba(92, 60, 0, 0.95);
-  }
+}
+
+/* ---------- компас ---------- */
+.compass {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid rgba(72, 255, 150, 0.4);
+  background:
+    radial-gradient(circle at 50% 36%, rgba(0, 255, 136, 0.1), transparent 62%),
+    linear-gradient(180deg, rgba(3, 24, 14, 0.95), rgba(0, 8, 4, 0.98));
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.8),
+    inset 0 0 18px rgba(0, 255, 136, 0.06),
+    0 2px 5px rgba(0, 0, 0, 0.5),
+    0 0 14px rgba(0, 255, 136, 0.14);
+}
+.compass::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from -90deg,
+    rgba(125, 255, 176, 0.55) 0 1.2deg,
+    transparent 1.2deg 30deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 85%, #000 88%);
+  mask: radial-gradient(circle, transparent 85%, #000 88%);
+}
+.compass b {
+  position: absolute;
+  font-weight: normal;
+  font-size: 9px;
+  color: rgba(125, 255, 176, 0.6);
+  text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+}
+.compass .cN {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #d9ffe9;
+  font-size: 10px;
+  text-shadow: 0 0 7px #00ff88;
+}
+.compass .cE {
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.compass .cS {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.compass .cW {
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 40px;
+  margin: -20px 0 0 -4.5px;
+  background: linear-gradient(
+    180deg,
+    #eafff3 0 50%,
+    rgba(0, 255, 136, 0.22) 50% 100%
+  );
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.8));
+  transform: rotate(var(--hdg, 0deg));
+  transition: transform 0.12s linear;
+  z-index: 2;
+}
+.compass-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #eafff3, #37ff92 60%, #0a7f42);
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.9);
+  z-index: 3;
+}
+.hdg-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.hdg-val {
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-size: 13px;
+  color: #baffd6;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.7);
+}
+
+/* ---------- состояния WARN / CRIT ---------- */
+.indicator.warn .panel {
+  border-color: rgba(255, 198, 61, 0.55);
+}
+.indicator.warn .bar > i {
+  --c1: #fff3c9;
+  --c2: #ffc63d;
+  --c3: #b06f00;
+  --glow: rgba(255, 179, 0, 0.85);
+}
+.indicator.warn .gauge-ring {
+  --c2: #ffc63d;
+}
+.indicator.warn .value,
+.indicator.warn .gauge-num {
+  color: #fff1c2;
+  text-shadow:
+    0 0 14px rgba(255, 179, 0, 0.9),
+    0 0 30px rgba(255, 140, 0, 0.35),
+    0 2px 0 rgba(92, 60, 0, 0.95);
+}
   .indicator.warn .led {
     background: radial-gradient(circle at 35% 30%, #fff6d9, #ffc63d 45%, #8a5a00 95%);
     box-shadow:
@@ -866,7 +868,7 @@
   #hint {
     position: absolute;
     left: 50%;
-    top: 18px;
+    top: 8px;
     transform: translateX(-50%);
     display: inline-flex;
     align-items: center;
@@ -988,82 +990,82 @@
     }
   }
 
-  #gameover {
-    position: absolute;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    background: rgba(0, 0, 0, 0.75);
-    color: #ff4444;
-    font-size: 32px;
-    text-shadow: 0 0 12px #f00;
-    letter-spacing: 3px;
-  }
-  #gameover small {
-    font-size: 14px;
-    color: #33ff88;
-    margin-top: 20px;
-    letter-spacing: 2px;
-  }
+#gameover {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ff4444;
+  font-size: 32px;
+  text-shadow: 0 0 12px #f00;
+  letter-spacing: 3px;
+}
+#gameover small {
+  font-size: 14px;
+  color: #33ff88;
+  margin-top: 20px;
+  letter-spacing: 2px;
+}
 
-  #hyper {
-    position: absolute;
-    inset: 0;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(
-      ellipse at center,
-      rgba(0, 60, 30, 0.55),
-      rgba(0, 0, 0, 0.95)
-    );
-    color: #b6ffd2;
-    font-family: "Share Tech Mono", "Courier New", monospace;
-    letter-spacing: 3px;
-    text-shadow: 0 0 12px #00ff88;
-    z-index: 40;
-    pointer-events: none;
+#hyper {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 60, 30, 0.55),
+    rgba(0, 0, 0, 0.95)
+  );
+  color: #b6ffd2;
+  font-family: "Share Tech Mono", "Courier New", monospace;
+  letter-spacing: 3px;
+  text-shadow: 0 0 12px #00ff88;
+  z-index: 40;
+  pointer-events: none;
+}
+#hyper .hyper-title {
+  font-size: 28px;
+  margin-bottom: 12px;
+  animation: hyper-flicker 0.6s infinite alternate;
+}
+#hyper .hyper-sub {
+  font-size: 16px;
+  opacity: 0.85;
+  margin-bottom: 18px;
+}
+#hyper .hyper-bar {
+  width: 260px;
+  height: 8px;
+  border: 1px solid #33ff88;
+  position: relative;
+}
+#hyper .hyper-bar > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: #33ff88;
+  box-shadow: 0 0 10px #00ff88;
+}
+@keyframes hyper-flicker {
+  from {
+    opacity: 1;
   }
-  #hyper .hyper-title {
-    font-size: 28px;
-    margin-bottom: 12px;
-    animation: hyper-flicker 0.6s infinite alternate;
+  to {
+    opacity: 0.55;
   }
-  #hyper .hyper-sub {
-    font-size: 16px;
-    opacity: 0.85;
-    margin-bottom: 18px;
-  }
-  #hyper .hyper-bar {
-    width: 260px;
-    height: 8px;
-    border: 1px solid #33ff88;
-    position: relative;
-  }
-  #hyper .hyper-bar > i {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 0%;
-    background: #33ff88;
-    box-shadow: 0 0 10px #00ff88;
-  }
-  @keyframes hyper-flicker {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0.55;
-    }
-  }
-  
+}
+
 html, body {
-  margin: 0 !important;
-  padding: 0 !important;
+margin: 0 !important;
+padding: 0 !important;
 }
 
 /* ============================================================
@@ -1154,4 +1156,87 @@ html, body {
 }
 .round-ind.is-on.is-pulse {
   animation: round-ind-pulse 1.2s ease-in-out infinite;
+}
+
+/* ============================================================
+   СТРОКА СТАТУСА ЗВЁЗДНОЙ СИСТЕМЫ (под кнопкой F1 ПОМОЩЬ)
+   ============================================================ */
+#sys-info {
+  position: absolute;
+  left: 50%;
+  top: 48px;                 /* ниже #hint (top:18px + высота ~34px) */
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 14px;
+  font-family: "Share Tech Mono", "Courier New", monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  white-space: nowrap;
+  color: #b6ffd2;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 40, 20, 0.45),
+    rgba(0, 20, 10, 0.65)
+  );
+  border: 1px solid rgba(51, 255, 136, 0.35);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 136, 0.1) inset,
+    0 0 10px rgba(0, 255, 136, 0.25),
+    0 0 22px rgba(0, 255, 136, 0.12);
+  text-shadow:
+    0 0 6px rgba(0, 255, 136, 0.6),
+    0 0 2px rgba(0, 255, 136, 0.7);
+  pointer-events: none;
+  opacity: 0;
+  animation: sysinfo-appear 0.6s ease-out 1s forwards;
+  transition: opacity 0.25s ease;
+}
+
+#sys-info .sys-info__label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(150, 255, 196, 0.65);
+  text-shadow: none;
+}
+
+#sys-info .sys-info__value {
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-weight: 600;
+  font-size: 13px;
+  color: #ecfff4;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 8px rgba(0, 255, 136, 0.8),
+    0 0 20px rgba(0, 255, 136, 0.35);
+}
+
+/* лёгкая вспышка при обновлении значения */
+#sys-info .sys-info__value.is-updated {
+  animation: sysinfo-flash 0.5s ease-out;
+}
+@keyframes sysinfo-flash {
+  0%   { filter: brightness(2.2); }
+  100% { filter: none; }
+}
+
+@keyframes sysinfo-appear {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sys-info { animation: sysinfo-appear 0.4s ease-out forwards; }
+  #sys-info .sys-info__value.is-updated { animation: none; }
+}
+
+@media (max-width: 840px) {
+  #sys-info {
+    top: 58px;
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+  #sys-info .sys-info__value { font-size: 12px; }
 }
