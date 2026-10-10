@@ -229,6 +229,27 @@
     //=========================================================================|
     FO.version = () => { return "FOOS-v:0.1"; };
 
+    FO.debounce = function debounce(fn, delay = 300)
+    {
+        if (typeof fn !== 'function') {
+            throw new TypeError('«Ожидается функция»');
+        }
+        let timer;
+        return function (...args)
+        {   const context = this; // явно сохраняем контекст
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                fn.apply(context, args);
+            }, delay);
+        };
+    };
+    // Пример
+    // const debouncedInput = FO.debounce((e) => {
+    //     console.log('Ввод стабилизировался:', e.target.value);
+    // }, 300);
+    //
+    // inputElement.addEventListener('input', debouncedInput);
+
     //=========================================================================|
     //  ЭКСПОРТ В ГЛОБАЛЬНУЮ ОБЛАСТЬ ВИДИМОСТИ
     //=========================================================================|
