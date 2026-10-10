@@ -23,24 +23,142 @@
 let onCreditsChangedCallback = null;
 
 const TRADE = (() => {
+
+  const tune = {
+    minAmount : 0.4,
+    maxAmount : 0.7,
+    rangeBuy  : 0.2,
+    minussell : 0.2,
+    rangeStock: 0.5
+  };
+
   // --- Товары станции: { name, buy, sell, stock } ---
   // buy  — сколько платит игрок при покупке (станция продаёт)
   // sell — сколько станция платит игроку при продаже
   // stock — сколько единиц на складе станции (для покупки)
-  const GOODS = [
+  const GoodsBase = [
     { name: "ВОДОРОДНОЕ ТОПЛИВО", buy: 12, sell: 8, stock: 240 },
     { name: "ПИЩЕВЫЕ ПАЙКИ", buy: 22, sell: 15, stock: 120 },
     { name: "МЕДИКАМЕНТЫ", buy: 68, sell: 52, stock: 40 },
     { name: "РУДА (ЖЕЛЕЗО)", buy: 34, sell: 26, stock: 300 },
+    { name: "КОФЕ (СИНТ.)", buy: 95, sell: 70, stock: 150 },
+  ];
+
+  const GoodsUp = [
     { name: "РУДА (ТИТАН)", buy: 145, sell: 118, stock: 60 },
     { name: "ДРАГОЦЕННЫЕ МЕТАЛЛЫ", buy: 890, sell: 760, stock: 12 },
     { name: "КОМПЬЮТЕРНЫЕ ЧИПЫ", buy: 320, sell: 260, stock: 45 },
-    { name: "ОРУЖИЕ (ЛАЗЕР)", buy: 1250, sell: 980, stock: 8 },
     { name: "ЩИТЫ", buy: 2100, sell: 1700, stock: 5 },
     { name: "РАБЫ? НЕТ, КОНТРАКТНИКИ", buy: 450, sell: 380, stock: 15 },
     { name: "ЧАЙ (ЭЛИТНЫЙ)", buy: 180, sell: 140, stock: 80 },
-    { name: "КОФЕ (СИНТ.)", buy: 95, sell: 70, stock: 150 },
   ];
+
+  const GoodsAllContra = [
+    { name: "ОРУЖИЕ (ЛАЗЕР)", buy: 1250, sell: 980, stock: 8 },
+    { name: "РАБЫ? НЕТ, КОНТРАКТНИКИ", buy: 450, sell: 380, stock: 15 },
+  ];
+
+  const GOODS = [];
+
+  // Сгенерировать общее amount товаров от tune
+  // Сгенерировать levelStation
+  // Сгенерировать от levelStation типы товаров: 0,1,2
+  // Положить случайно выбранные товары в GOODS
+  // assert(amount == GOODS.length)
+
+  // Поправить стоимость покупки товара на  ±rangeBuy
+  // Поправить стоимость продажи товара на -minussell
+  // Поправить количество товара на ±rangeStock
+    // --- Генерация ассортимента станции (вызывать при стыковке) ---
+  function introStation(star) {
+    const U = UniverseJS.utils;
+
+    // Детерминизм: одна и та же звезда -> один и тот же рынок.
+    // star может быть числом-сидом, объектом { seed } или отсутствовать.
+    const seedStar =
+      typeof star === "number"    ? star :
+      (star && star.seed != null) ? star.seed :
+      GAME.pers.seedStar;
+    const rng = U.mulberry32(seedStar);
+
+    // float в [min, max)
+    const rndF = (min, max) => min + rng() * (max - min);
+
+    // 0) Очистить ассортимент (у массива нет .clear())
+    GOODS.length = 0;
+
+    // Сгенерировать общее amount товаров от tune
+    //    (доля полного каталога: 0.4 .. 0.7)
+    const totalCatalog = new Set(
+      [...GoodsBase, ...GoodsUp, ...GoodsAllContra].map(g => g.name)
+    ).size;
+    const frac   = rndF(tune.minAmount, tune.maxAmount);
+    let   amount = Math.max(1, Math.round(totalCatalog * frac));
+
+    // Сгенерировать levelStation (0..2, взвешенно: захолустий больше, чем хабов)
+    //    равномерный вариант: const levelStation = Math.floor(rng() * 3);
+    const r = rng();
+    const levelStation = r < 0.45 ? 0 : r < 0.85 ? 1 : 2;
+
+    // Сгенерировать от levelStation типы товаров: 0,1,2
+    //    тип 0 — всегда, тип 1 — с level>=1, тип 2 — с level>=2
+    const pool = [];
+    const seen = new Set();
+    const addToPool = (arr) => {
+      for (const g of arr) {
+        if (!seen.has(g.name)) { seen.add(g.name); pool.push(g); } // дедуп «КОНТРАКТНИКОВ»
+      }
+    };
+    addToPool(GoodsBase);                             // тип 0
+    if (levelStation >= 1) addToPool(GoodsUp);        // тип 1
+    if (levelStation >= 2) addToPool(GoodsAllContra); // тип 2
+
+    // Нельзя продавать больше позиций, чем есть в пуле этого уровня
+    amount = Math.min(amount, pool.length);
+
+    // Положить случайно выбранные товары в GOODS
+    //    (Фишер—Йетс по копии пула)
+    const shuffled = pool.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    for (const base of shuffled.slice(0, amount)) {
+      // Поправить стоимость покупки товара на  ±rangeBuy
+      const buy = Math.max(1, Math.round(
+        base.buy * (1 + rndF(-tune.rangeBuy, tune.rangeBuy))));
+      // Поправить стоимость продажи товара на -minussell
+      //    (если нужен разброс: base.sell * (1 - rng() * tune.minussell))
+      const sell = Math.max(1, Math.round(base.sell * (1 - tune.minussell)));
+      // Поправить количество товара на ±rangeStock
+      const stock = Math.max(0, Math.round(
+        base.stock * (1 + rndF(-tune.rangeStock, tune.rangeStock))));
+
+      GOODS.push({ name: base.name, buy, sell, stock });
+    }
+
+    // assert(amount == GOODS.length)
+    if (amount !== GOODS.length) {
+      console.error("[TRADE] introStation: amount =", 
+        amount, "!= GOODS.length =", GOODS.length);
+    }
+
+    // Синхронизировать состояние экрана (goods — копия, как и раньше)
+    state.goods      = GOODS.map(g => ({ ...g }));
+    state.list1Index = 0;
+
+    // Обновить подзаголовок (уровень станции) и перерисовать, если DOM собран
+    if (state.root) {
+      const sub = state.root.querySelector(".trade-subtitle");
+      const levelNames = ["ЗАХОЛУСТЬЕ", "ТОРГОВЫЙ УЗЕЛ", "КРУПНЫЙ ХАБ"];
+      if (sub) sub.textContent = `─ станция «КОРИОЛИС» ─ ${levelNames[levelStation]} ─`;
+      renderAll();
+    }
+
+    return levelStation;
+  }
+
 
   // --- Состояние ---
   const state = {
@@ -480,6 +598,7 @@ const TRADE = (() => {
 
   // --- Публичный API ---
   return {
+    introStation,
     init() {
       ensureDOM();
       if (!window.__trade_keydown_bound) {
