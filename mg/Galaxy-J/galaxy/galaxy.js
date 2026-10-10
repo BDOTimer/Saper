@@ -417,7 +417,7 @@ class Galaxy
 
     getCurrentStar()  { return this.#stars[this.#state.playerStar] || null; }
     getSelectedStar() { return this.#stars[this.#state.selected]   || null; }
-    getStar(i)        { return this.#stars[i] || null; }
+    getStar(i)        {return this.#stars[i] || null; }
 
     setPlayerStar(i) {
         this.#state.playerStar = i;

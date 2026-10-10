@@ -86,6 +86,8 @@ class Game
                 speed : this.ship.speed,
             },
 
+            cargo: this.ship.cargo.toJSON(),
+
             // Навигация Перса
             nav: this.pers.toJSON(),
 
@@ -149,6 +151,16 @@ class Game
             //     this.isDock = saveData.world.isDock;
             // }
         }
+
+        // --- cargo ---
+        // Восстанавливаем ДО проверки world, чтобы даже без world данные были на месте.
+        const cargo = this.ship.cargo;
+        if (cargo && typeof cargo.fromJSON === 'function')
+        {
+            // fromJSON сам сбросит #items и провалидирует через inCargo.
+            // Если в сейве cargo нет — получим пустой трюм, это корректно.
+            cargo.fromJSON(saveData.cargo ?? null);
+        }
     }
 
     load()
@@ -159,7 +171,6 @@ class Game
         if (!profile || !profile.save) return;
 
         this.pers.name = profile.name;
-
         this._restore(profile.save);
     }
 
@@ -192,6 +203,8 @@ class Game
         this.lasers.length  = 0;
 
         this.isDock = false;
+
+        this.ship.cargo.fromJSON(null);
     }
 
     /// «Новая игра»: стереть save активного профиля.
@@ -385,6 +398,7 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
 //                  v: 1,
 //                  pers:     { credits, kills, sector, dead },
 //                  ship:     { shield, fuel, speed },
+//                  cargo:    { items: [ { name, costUp, amount }, ... ] },
 //                  universe: { seedRoot, amount, indexGalaxy, indexStar }
 //              },
 //              stats: { score, rank }

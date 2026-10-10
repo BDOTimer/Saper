@@ -1,22 +1,38 @@
 // station-trade.js — экран торговли на станции. Стиль совместим с help.js.
 // Все стили вынесены в station-trade.css (лежит рядом со скриптом).
-// API:
-//   TRADE.init()          — подготовить DOM
-//   TRADE.open()          — открыть экран торговли
-//   TRADE.close()         — закрыть
-//   TRADE.isOpen()        — открыт ли экран
-//   TRADE.toggle()        — переключить
-//   TRADE.setGoods([...]) — задать список товаров станции (опционально)
 //
-// Данные товаров лежат в GOODS ниже — правьте только её.
+// ★ СПИСОК 2 (правая колонка) — это грузовой отсек корабля (класс CargoA
+//   из ship-cargo-a.js). Экран торговли купленные товары НЕ хранит:
+//     читает   — cargo.outCargo()
+//     покупает — cargo.inCargo({ name, costUp, amount })
+//     продаёт  — cargo.takeOut({ name, amount })
+//   Единственное место хранения товаров — CargoA#items.
+//
+// Поток данных:
+//   стыковка    cargo.connect(TRADE)  → TRADE.connectCargo(cargo)
+//   покупка     buySelected()         → cargo.inCargo(...)
+//   продажа     sellSelected()        → cargo.takeOut(...)
+//   отображение renderList2()         ← cargo.outCargo()
+//   отстыковка  cargo.disconnect()    → TRADE.disconnectCargo(cargo)
+//
+// API:
+//   TRADE.init()                 — подготовить DOM
+//   TRADE.dock(cargo, credits)   — СТЫКОВКА: подключить отсек + открыть терминал
+//   TRADE.undock()               — ОТСТЫКОВКА: закрыть терминал + отключить отсек
+//   TRADE.connectCargo(cargo)    — низкоуровневое подключение (зовёт CargoA.connect)
+//   TRADE.disconnectCargo(cargo) — низкоуровневое отключение (зовёт CargoA.disconnect)
+//   TRADE.open(credits)          — открыть терминал (стыковку не трогает)
+//   TRADE.close() / toggle()     — закрыть/переключить (стыковку НЕ трогают!)
+//   TRADE.isOpen()               — открыт ли терминал
+//   TRADE.getCargo()             — подключённый отсек или null
+//   TRADE.setGoods([...])        — задать список товаров станции
+//   TRADE.introStation(star)     — сгенерировать рынок под звезду
 //
 // Управление:
-//   ↑ / ↓       — перемещение по списку 1 (товары станции)
-//   ENTER       — купить выделенный товар (в инвентарь игрока)
+//   ↑ / ↓       — перемещение по активному списку
+//   ENTER       — купить (список 1) / продать (список 2)
 //   TAB         — переключить активный список (1 <-> 2)
-//   ↑ / ↓       — в списке 2 работает так же
-//   ENTER       — продать выделенный товар (из инвентаря)
-//   KeyT        — открыть/закрыть
+//   KeyT / Esc  — закрыть терминал (отстыковки НЕ происходит)
 
 
 // ---- Колбэк «кредиты изменились» ----
@@ -60,48 +76,34 @@ const TRADE = (() => {
 
   const GOODS = [];
 
-  // Сгенерировать общее amount товаров от tune
-  // Сгенерировать levelStation
-  // Сгенерировать от levelStation типы товаров: 0,1,2
-  // Положить случайно выбранные товары в GOODS
-  // assert(amount == GOODS.length)
-
-  // Поправить стоимость покупки товара на  ±rangeBuy
-  // Поправить стоимость продажи товара на -minussell
-  // Поправить количество товара на ±rangeStock
-    // --- Генерация ассортимента станции (вызывать при стыковке) ---
+  // --- Генерация ассортимента станции (без изменений с прошлого шага) ---
   function introStation(star) {
     const U = UniverseJS.utils;
 
     // Детерминизм: одна и та же звезда -> один и тот же рынок.
-    // star может быть числом-сидом, объектом { seed } или отсутствовать.
     const seedStar =
       typeof star === "number"    ? star :
       (star && star.seed != null) ? star.seed :
       GAME.pers.seedStar;
     const rng = U.mulberry32(seedStar);
 
-    // float в [min, max)
     const rndF = (min, max) => min + rng() * (max - min);
 
-    // 0) Очистить ассортимент (у массива нет .clear())
+    // Очистить ассортимент
     GOODS.length = 0;
 
-    // Сгенерировать общее amount товаров от tune
-    //    (доля полного каталога: 0.4 .. 0.7)
+    // amount — доля полного каталога (0.4 .. 0.7)
     const totalCatalog = new Set(
       [...GoodsBase, ...GoodsUp, ...GoodsAllContra].map(g => g.name)
     ).size;
     const frac   = rndF(tune.minAmount, tune.maxAmount);
     let   amount = Math.max(1, Math.round(totalCatalog * frac));
 
-    // Сгенерировать levelStation (0..2, взвешенно: захолустий больше, чем хабов)
-    //    равномерный вариант: const levelStation = Math.floor(rng() * 3);
+    // levelStation 0..2
     const r = rng();
     const levelStation = r < 0.45 ? 0 : r < 0.85 ? 1 : 2;
 
-    // Сгенерировать от levelStation типы товаров: 0,1,2
-    //    тип 0 — всегда, тип 1 — с level>=1, тип 2 — с level>=2
+    // Пул товаров, доступных уровню станции (тип 0,1,2)
     const pool = [];
     const seen = new Set();
     const addToPool = (arr) => {
@@ -113,11 +115,9 @@ const TRADE = (() => {
     if (levelStation >= 1) addToPool(GoodsUp);        // тип 1
     if (levelStation >= 2) addToPool(GoodsAllContra); // тип 2
 
-    // Нельзя продавать больше позиций, чем есть в пуле этого уровня
     amount = Math.min(amount, pool.length);
 
-    // Положить случайно выбранные товары в GOODS
-    //    (Фишер—Йетс по копии пула)
+    // Фишер—Йетс
     const shuffled = pool.slice();
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
@@ -125,30 +125,21 @@ const TRADE = (() => {
     }
 
     for (const base of shuffled.slice(0, amount)) {
-      // Поправить стоимость покупки товара на  ±rangeBuy
-      const buy = Math.max(1, Math.round(
-        base.buy * (1 + rndF(-tune.rangeBuy, tune.rangeBuy))));
-      // Поправить стоимость продажи товара на -minussell
-      //    (если нужен разброс: base.sell * (1 - rng() * tune.minussell))
-      const sell = Math.max(1, Math.round(base.sell * (1 - tune.minussell)));
-      // Поправить количество товара на ±rangeStock
-      const stock = Math.max(0, Math.round(
-        base.stock * (1 + rndF(-tune.rangeStock, tune.rangeStock))));
-
+      const buy   = Math.max(1, Math.round(base.buy   * (1 + rndF(-tune.rangeBuy,   tune.rangeBuy))));
+      const sell  = Math.max(1, Math.round(base.sell  * (1 - tune.minussell)));
+      const stock = Math.max(0, Math.round(base.stock * (1 + rndF(-tune.rangeStock, tune.rangeStock))));
       GOODS.push({ name: base.name, buy, sell, stock });
     }
 
     // assert(amount == GOODS.length)
     if (amount !== GOODS.length) {
-      console.error("[TRADE] introStation: amount =", 
-        amount, "!= GOODS.length =", GOODS.length);
+      console.error("[TRADE] introStation: amount =", amount, "!= GOODS.length =", GOODS.length);
     }
 
-    // Синхронизировать состояние экрана (goods — копия, как и раньше)
+    // Синхронизировать копию для экрана
     state.goods      = GOODS.map(g => ({ ...g }));
     state.list1Index = 0;
 
-    // Обновить подзаголовок (уровень станции) и перерисовать, если DOM собран
     if (state.root) {
       const sub = state.root.querySelector(".trade-subtitle");
       const levelNames = ["ЗАХОЛУСТЬЕ", "ТОРГОВЫЙ УЗЕЛ", "КРУПНЫЙ ХАБ"];
@@ -159,19 +150,19 @@ const TRADE = (() => {
     return levelStation;
   }
 
-
   // --- Состояние ---
   const state = {
     open: false,
     root: null,
     // Данные
-    goods: GOODS.map(g => ({ ...g })),    // копия, чтобы не мутировать оригинал
-    inventory: [],                         // [{ name, qty, buyPrice }]
-    credits: 15000,                        // стартовый капитал
+    goods: GOODS.map(g => ({ ...g })),  // товары станции (копия базовых цен)
+    cargo: null,                        // ★ подключённый CargoA или null.
+                                        //   Купленные товары здесь НЕ хранятся.
+    credits: 15000,
     // UI
-    list1Index: 0,                         // выделение в списке товаров
-    list2Index: 0,                         // выделение в списке инвентаря
-    activeList: 1,                         // 1 = товары станции, 2 = инвентарь
+    list1Index: 0,
+    list2Index: 0,
+    activeList: 1,
     // DOM-узлы
     list1El: null,
     list2El: null,
@@ -189,6 +180,56 @@ const TRADE = (() => {
 
   // --- Внутренние помощники ---
   const fmt = n => n.toLocaleString("ru-RU");
+
+  /* ============ ★ Стыковка: CargoA <-> TradeStation ============ */
+  // Имена connectCargo / disconnectCargo — ровно те, что вызывает
+  // CargoA.connect() / CargoA.disconnect(), поэтому ship-cargo-a.js не меняем.
+
+  // Товары отсека для отображения (копии записей; [] если отсека нет)
+  function cargoItems() {
+    return state.cargo ? state.cargo.outCargo() : [];
+  }
+
+  // Подключить отсек к станции (вызывается из cargo.connect(TRADE)).
+  function connectCargo(cargo) {
+    if (!cargo) return false;
+    if (state.cargo === cargo) return true;      // уже подключён
+
+    if (state.cargo) state.cargo.disconnect();   // вежливо увести прежний отсек
+
+    state.cargo = cargo;
+    state.list2Index = 0;
+    if (state.activeList === 2) state.activeList = 1;
+    if (state.open) renderAll();                 // список 2 перечитается из отсека
+    return true;
+  }
+
+  // Отключить отсек (вызывается из cargo.disconnect()).
+  function disconnectCargo(cargo) {
+    if (!state.cargo) return false;
+    if (cargo && state.cargo !== cargo) return false; // чужой отсек — игнорируем
+
+    state.cargo = null;
+    state.list2Index = 0;
+    if (state.activeList === 2) state.activeList = 1;
+    if (state.open) renderAll();
+    return true;
+  }
+
+  // Стыковка-посещение: подключить отсек и открыть терминал одним вызовом.
+  function dock(cargo, credits) {
+    if (!cargo) return false;
+    if (credits !== undefined) state.credits = credits;
+    cargo.connect(TRADE);   // внутри вызовет TRADE.connectCargo(this)
+    setOpen(true);
+    return true;
+  }
+
+  // Отстыковка: закрыть терминал и отключить отсек (корабль улетает).
+  function undock() {
+    setOpen(false);
+    if (state.cargo) state.cargo.disconnect(); // внутри вызовет TRADE.disconnectCargo(this)
+  }
 
   // --- Построение DOM (вся стилистика — в station-trade.css) ---
   function ensureDOM() {
@@ -250,7 +291,7 @@ const TRADE = (() => {
     col1.appendChild(list1);
     state.list1El = list1;
 
-    // --- Список 2: инвентарь ---
+    // --- Список 2: грузовой отсек корабля (CargoA) ---
     const col2 = document.createElement("div");
     col2.className = "trade-col";
 
@@ -268,7 +309,7 @@ const TRADE = (() => {
     cols.appendChild(col2);
     paper.appendChild(cols);
 
-    ///+
+    // Делегирование для списка 1
     list1.addEventListener("click", (e) => {
       const row = e.target.closest(".trade-row");
       if (!row) return;
@@ -284,7 +325,7 @@ const TRADE = (() => {
       buySelected();
     });
 
-    // --- Делегирование для списка 2 (инвентарь) ---
+    // --- Делегирование для списка 2 (грузовой отсек) ---
     list2.addEventListener("click", (e) => {
       const row = e.target.closest(".trade-row");
       if (!row) return;
@@ -320,7 +361,7 @@ const TRADE = (() => {
     state.goods.forEach((g, i) => {
       const row = document.createElement("div");
       row.className = "trade-row";
-      row.dataset.index = i;   // ← ЕДИНСТВЕННОЕ добавление (вместо слушателей на строке)
+      row.dataset.index = i;
       row.classList.toggle(
         "selected",
         i === state.list1Index && state.activeList === 1
@@ -348,7 +389,7 @@ const TRADE = (() => {
       row.appendChild(sell);
       row.appendChild(stock);
 
-      el.appendChild(row);     // ← append остаётся один
+      el.appendChild(row);
     });
 
     if (el.children[state.list1Index]) {
@@ -356,11 +397,23 @@ const TRADE = (() => {
     }
   }
 
+  // ★ Список 2 полностью читается из грузового отсека (CargoA)
   function renderList2() {
     const el = state.list2El;
     el.innerHTML = "";
 
-    if (state.inventory.length === 0) {
+    // Отсек не подключён — корабль не пристыкован
+    if (!state.cargo) {
+      const empty = document.createElement("div");
+      empty.textContent = "— грузовой отсек не подключён —";
+      empty.className = "trade-empty";
+      el.appendChild(empty);
+      return;
+    }
+
+    const items = cargoItems();   // [{ name, costUp, amount }] — только из CargoA
+
+    if (items.length === 0) {
       const empty = document.createElement("div");
       empty.textContent = "— трюм пуст —";
       empty.className = "trade-empty";
@@ -368,10 +421,15 @@ const TRADE = (() => {
       return;
     }
 
-    state.inventory.forEach((item, i) => {
+    // выделение могло остаться за пределами после продажи
+    if (state.list2Index >= items.length) {
+      state.list2Index = Math.max(0, items.length - 1);
+    }
+
+    items.forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "trade-row";
-      row.dataset.index = i;   // ← добавление
+      row.dataset.index = i;
       row.classList.toggle(
         "selected",
         i === state.list2Index && state.activeList === 2
@@ -382,16 +440,16 @@ const TRADE = (() => {
       name.className = "trade-cell-name";
 
       const qty = document.createElement("div");
-      qty.textContent = "×" + item.qty;
+      qty.textContent = "×" + item.amount;                        // ★ CargoA: amount
       qty.className = "trade-cell-qty";
 
       const buyPrice = document.createElement("div");
-      buyPrice.textContent = "куп:" + fmt(item.buyPrice);
+      buyPrice.textContent = "куп:" + fmt(Math.round(item.costUp)); // ★ CargoA: costUp
       buyPrice.className = "trade-cell-buyprice";
 
       const sellPrice = document.createElement("div");
       const g = state.goods.find(x => x.name === item.name);
-      const curSell = g ? g.sell : Math.round(item.buyPrice * 0.85);
+      const curSell = g ? g.sell : Math.round(item.costUp * 0.85);
       sellPrice.textContent = "▼" + fmt(curSell);
       sellPrice.className = "trade-cell-sell";
 
@@ -411,13 +469,12 @@ const TRADE = (() => {
   function renderCredits() {
     const el = state.creditsEl;
     el.textContent = fmt(state.credits) + " cr";
-    // Красный цвет при отрицательном балансе — класс .negative в CSS
     el.classList.toggle("negative", state.credits < 0);
   }
 
   function renderHint() {
     const el = state.hintEl;
-    const activeName = state.activeList === 1 ? "ТОВАРЫ СТАНЦИИ" : "ИНВЕНТАРЬ";
+    const activeName = state.activeList === 1 ? "ТОВАРЫ СТАНЦИИ" : "ГРУЗОВОЙ ОТСЕК";
     el.innerHTML = `
       <span class="key">↑ ↓</span> — навигация &nbsp;·&nbsp;
       <span class="key">ENTER</span> — ${
@@ -437,12 +494,18 @@ const TRADE = (() => {
   }
 
   // --- Действия ---
+
+  // ★ Покупка: товар уходит в грузовой отсек корабля
   function buySelected() {
     if (state.activeList !== 1) return;
 
     const g = state.goods[state.list1Index];
     if (!g) return;
 
+    if (!state.cargo) {
+      flashHint("ГРУЗОВОЙ ОТСЕК НЕ ПОДКЛЮЧЁН", "error");
+      return;
+    }
     if (g.stock <= 0) {
       flashHint("НЕТ В НАЛИЧИИ", "error");
       return;
@@ -452,57 +515,54 @@ const TRADE = (() => {
       return;
     }
 
-    // Списываем кредиты и склад
+    // Списываем кредиты и склад станции
     state.credits -= g.buy;
     g.stock -= 1;
 
-    // Ищем такой товар в инвентаре
-    const existing = state.inventory.find(x => x.name === g.name);
-    if (existing) {
-      // Пересчёт средней цены закупки
-      const totalQty = existing.qty + 1;
-      existing.buyPrice = Math.round(
-        (existing.buyPrice * existing.qty + g.buy) / totalQty
-      );
-      existing.qty = totalQty;
-    } else {
-      state.inventory.push({ name: g.name, qty: 1, buyPrice: g.buy });
-    }
+    // Товар кладём в отсек: CargoA сам склеит партии и пересчитает
+    // средневзвешенную costUp.
+    state.cargo.inCargo({ name: g.name, costUp: g.buy, amount: 1 });
 
-    fireCreditsChanged();   // ★
+    fireCreditsChanged();
 
     flashHint("КУПЛЕНО: " + g.name, "ok");
     renderAll();
   }
 
+  // ★ Продажа: единица забирается из отсека через takeOut()
   function sellSelected() {
     if (state.activeList !== 2) return;
 
-    const item = state.inventory[state.list2Index];
+    if (!state.cargo) {
+      flashHint("ГРУЗОВОЙ ОТСЕК НЕ ПОДКЛЮЧЁН", "error");
+      return;
+    }
+
+    const item = cargoItems()[state.list2Index];
     if (!item) return;
 
     const g = state.goods.find(x => x.name === item.name);
-    const sellPrice = g ? g.sell : Math.round(item.buyPrice * 0.85);
+    const sellPrice = g ? g.sell : Math.round(item.costUp * 0.85);
 
-    // Начисляем кредиты
+    // Забираем единицу из отсека (данные меняет только CargoA)
+    const taken = state.cargo.takeOut({ name: item.name, amount: 1 });
+    if (!taken) return; // страховка: содержимое отсека изменилось извне
+
+    // Начисляем кредиты, возвращаем единицу на склад станции
     state.credits += sellPrice;
-
-    // Возвращаем на склад (если товар есть в списке станции)
     if (g) g.stock += 1;
 
-    // Уменьшаем количество
-    item.qty -= 1;
-    if (item.qty <= 0) {
-      state.inventory.splice(state.list2Index, 1);
-      if (state.list2Index >= state.inventory.length) {
-        state.list2Index = Math.max(0, state.inventory.length - 1);
-      }
+    // поправить выделение, если запись исчезла
+    const rest = cargoItems();
+    if (state.list2Index >= rest.length) {
+      state.list2Index = Math.max(0, rest.length - 1);
     }
 
     fireCreditsChanged();
 
     flashHint(
-      `ПРОДАНО: ${item.name} за ${fmt(sellPrice)} cr`,
+      `ПРОДАНО: ${item.name} за ${fmt(sellPrice)} cr` +
+      ` (прибыль ${fmt(Math.round(sellPrice - taken.costUp))})`,
       "ok"
     );
     renderAll();
@@ -521,21 +581,21 @@ const TRADE = (() => {
   }
 
   // --- Открытие / закрытие ---
-  function setOpen(v) {
+  function setOpen(v)
+  {
+    if(v) SNDS.winopen .play();
+    else  SNDS.winclose.play();
+
     ensureDOM();
     state.open = v;
-    state.root.classList.toggle("open", v); // display: flex/none — в CSS
+    state.root.classList.toggle("open", v);
     if (v) {
-      // Сброс выделения при открытии
       state.activeList = 1;
       state.list1Index = Math.min(
         state.list1Index,
         Math.max(0, state.goods.length - 1)
       );
-      state.list2Index = Math.min(
-        state.list2Index,
-        Math.max(0, state.inventory.length - 1)
-      );
+      // ★ list2Index клампится в renderList2 по фактической длине cargoItems()
       renderAll();
     }
   }
@@ -544,18 +604,14 @@ const TRADE = (() => {
   function onKeyDown(e) {
     if (!state.open) return;
 
-    // Навигация и действия — только когда экран открыт
     if (e.code === "KeyT") {
       e.preventDefault();
-      e.stopPropagation(); // ← Чтобы HTML-листенер не съел событие
+      e.stopPropagation();
       setOpen(false);
-
-    //console.log("TRADE: closed by key T");
-
       return;
     }
 
-    const key = e.key; // ← фикс: раньше переменная key не была объявлена (ReferenceError)
+    const key = e.key;
 
     if (key === "Escape") {
       e.preventDefault();
@@ -579,10 +635,10 @@ const TRADE = (() => {
         state.list1Index =
           (state.list1Index + dir + state.goods.length) % state.goods.length;
       } else {
-        if (state.inventory.length === 0) return;
-        state.list2Index =
-          (state.list2Index + dir + state.inventory.length) %
-          state.inventory.length;
+        // ★ длина списка 2 берётся из грузового отсека
+        const n = cargoItems().length;
+        if (n === 0) return;
+        state.list2Index = (state.list2Index + dir + n) % n;
       }
       renderAll();
       return;
@@ -598,7 +654,6 @@ const TRADE = (() => {
 
   // --- Публичный API ---
   return {
-    introStation,
     init() {
       ensureDOM();
       if (!window.__trade_keydown_bound) {
@@ -606,49 +661,35 @@ const TRADE = (() => {
         window.__trade_keydown_bound = true;
       }
     },
+
+    /* ★ Стыковка-посещение */
+    dock,                 // (cargo, credits) — подключить отсек + открыть терминал
+    undock,               // закрыть терминал + отключить отсек
+    connectCargo,         // вызывается из CargoA.connect(station)
+    disconnectCargo,      // вызывается из CargoA.disconnect()
+    getCargo() { return state.cargo; },
+    isCargoConnected() { return state.cargo !== null; },
+
     open(credits) {
-      state.credits = credits;
+      if (credits !== undefined) state.credits = credits; // ★ не затираем, если не передали
       setOpen(true);
     },
-    close() {
-      setOpen(false);
-    },
-    toggle() {
-      setOpen(!state.open);
-    },
-    isOpen() {
-      return state.open;
-    },
-    // Внешний доступ к данным (для сохранения/загрузки)
-    getCredits() {
-      return state.credits;
-    },
-    setCredits(v) {
-      state.credits = v;
-      renderCredits();
-      fireCreditsChanged();
-    },
-    getGoods() {
-      return state.goods;
-    },
-    setGoods(arr) {
-      state.goods = arr.map(g => ({ ...g }));
-      renderAll();
-    },
-    getInventory() {
-      return state.inventory;
-    },
-    setInventory(arr) {
-      state.inventory = arr.map(i => ({ ...i }));
-      state.list2Index = 0;
-      renderAll();
-    },
-    setOnCreditsChanged,   // ← новое
+    close()  { setOpen(false); },
+    toggle() { setOpen(!state.open); },
+    isOpen() { return state.open; },
+
+    getCredits() { return state.credits; },
+    setCredits(v) { state.credits = v; renderCredits(); fireCreditsChanged(); },
+    getGoods() { return state.goods; },
+    setGoods(arr) { state.goods = arr.map(g => ({ ...g })); renderAll(); },
+
+    // ★ getInventory()/setInventory() удалены: товары живут только в CargoA.
+    //   Сохранение:  JSON.stringify(ship.cargo)
+    //   Загрузка:    ship.cargo.fromJSON(JSON.parse(saved))
+
+    introStation,
+    setOnCreditsChanged,
   };
 })();
 
-// Подключение как в help.js:
-//   <script src="./station/station-trade.js"></script>
-//   CSS подгрузится сам; либо подключите вручную:
-//   <link rel="stylesheet" href="./station/station-trade.css">
-// В игровом коде вызывайте TRADE.open() при стыковке со станцией.
+window.TRADE = TRADE; // доступ из любого скрипта (как window.CargoA)

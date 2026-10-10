@@ -235,3 +235,23 @@
 .trade-hint .flash-ok {
   color: #88ff88;
 }
+
+/* Оверлей трюма (ship-cargo-a.js) — использует те же стили, что и терминал */
+.trade-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center,
+              rgba(0, 40, 20, 0.55) 0%,
+              rgba(0, 0, 0, 0.92) 70%);
+  z-index: 100;
+  font-family: "Courier New", monospace;
+  color: #33ff88;
+  user-select: none;
+}
+
+.trade-overlay.open {
+  display: flex;
+}

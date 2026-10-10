@@ -185,6 +185,22 @@ class Ship
         group.userData.muzzles = [muzzle1, muzzle2];
         return group;
     }
+
+    // ship.cargo.connect(TRADE);   // == TRADE.connectCargo(ship.cargo)
+    // ship.cargo.disconnect();     // == TRADE.disconnectCargo(ship.cargo)
+    // Подключаемся к Trade
+    tradeOn(star, credits)
+    {
+      TRADE.introStation(star);             // рынок под звезду (можно один раз при генерации системы)
+      TRADE.dock(this.cargo, credits); // подключить отсек + открыть терминал
+    }
+
+    // Отключаемся к Trade
+    tradeOut()
+    {
+      this.credits = TRADE.getCredits();    // или через TRADE.setOnCreditsChanged(fn)
+      TRADE.undock();                       // закрыть терминал + отключить отсек 
+    }
 }
 
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {

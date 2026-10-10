@@ -526,20 +526,25 @@ const state = {
     // ============================================================
     const Vol = Settings.volume;
     const kit = SND.createSoundKit({
-        laser  : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 3 },
+        laser  : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 4 },
         death  : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
-        damag  : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 3 },
+        damag  : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 4 },
         hjump  : { src: "snd/ship-HJ-1.mp3"   , volume: Vol, pool: 1 },
         docking: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
-        dockout: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
+        dockout: { src: "snd/fly-start-1.mp3" , volume: Vol, pool: 1 },
+
+        winopen : { src: "snd/winopen-1.mp3"  , volume: Vol, pool: 1 },
+        winclose: { src: "snd/winclose-1.mp3" , volume: Vol, pool: 1 },
     });
 
     kit.autoUnlock();
 
+    window.SNDS = kit.sounds;
+
     const playLaser = () => kit.sounds.laser.play();
     const playDeath = () => kit.sounds.death.play();
     const playDamag = () => kit.sounds.damag.play();
-    // kit.sounds.hjump.play();
+//  kit.sounds.hjump.play();
 
     // ------------------------------------------------------------------
     //  Утилиты
@@ -1281,9 +1286,9 @@ const state = {
       return _closest.copy(a).addScaledVector(_ab, t).distanceTo(p);
     }
 
-    //----------------|
-    // Стыковка.      |
-    //----------------:
+    // -------------------------------|
+    //  Стыковка к станции.           |
+    // -------------------------------:
     function setOnDock()
     {
         if(game.isDock === true) return;
@@ -1300,17 +1305,41 @@ const state = {
         state.shield = ship.SHIELDMAX;
         state.speed  = 3;
 
+        const star = GALAXY.getCurrentStar();
+
         // Открываем торговлю (один раз, не каждый кадр)
-        TRADE.open(state.credits);
+        // TRADE.open(state.credits);
+        ship.tradeOn(star, state.credits);
 
         saveGame();
     };
+
+    // -------------------------------|
+    //  Отстыковка от станции.        |
+    // -------------------------------:
+    function setOutDock()
+    {
+        GAME.isDock = false;
+        console.log("🚩 UNDOCK: отстыковка от станции");
+        HUD.setStatus("D", false); // серый
+
+        kit.sounds.dockout.play();
+
+        if (TRADE.isOpen()) TRADE.close();
+
+        state.speed = 500;
+
+        ship.tradeOut();
+    }
 
     /// В начале игры
     if(game.isDock)
     {
         HUD.setStatus("D", true, { pulse: false }); // зелёный
         TRADE.open(state.credits);
+
+        const star = GALAXY.getCurrentStar();
+        ship.tradeOn(star, state.credits);
     }
 
 function animate() 
@@ -1749,7 +1778,13 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
     resize();
 
     window.addEventListener("keydown", (e) =>
-    {   if (e.code !== "KeyO") return;
+    {   if (e.code === "KeyG" && !GAME.isDock)
+        {   GAME.ship.cargo.view();
+            console.log("KeyG");
+            return;
+        }
+
+        if (e.code !== "KeyO") return;
         if (!GAME.isDock     ) return;
 
         e.preventDefault();
@@ -1758,13 +1793,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         // ------------------------------------------------
         //  Отстыковка извне (для keydown-обработчика)
         // ------------------------------------------------
-        GAME.isDock = false;
-        console.log("🚩 UNDOCK: отстыковка от станции");
-        HUD.setStatus("D", false); // серый
-
-        kit.sounds.dockout.play();
-
-        if (TRADE.isOpen()) TRADE.close();
+        setOutDock();
 
         // // Отодвинуть корабль от шлюза, чтобы status стал 0
         // if (currentStationHandle) {
@@ -1779,8 +1808,6 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         //   const push = currentStationHandle.params.gateLength * 1.5 + 50;
         //   camera.position.addScaledVector(outAxis, push);
         // }
-
-        state.speed = 500;
     });
 
 </script>
