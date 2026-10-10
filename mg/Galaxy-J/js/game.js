@@ -71,8 +71,7 @@ class Game
     //  SNAPSHOT — единый снимок: pers + ship + universe
     // ------------------------------------------------------------
     _snapshot()
-    {
-        return {
+    {   return {
             v: Game.SAVE_FORMAT_VERSION,
             pers: {
                 credits: this.pers.credits,
@@ -209,7 +208,7 @@ class Game
     {   this.camera = new THREE.PerspectiveCamera(
             75,
             innerWidth / innerHeight,
-            0.1,
+            0.3,
             20000,
         );
 
