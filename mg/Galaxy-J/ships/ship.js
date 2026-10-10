@@ -39,6 +39,9 @@ class Ship
         // --- Пределы ---
         this.SHIELDMAX = options.SHIELDMAX ?? 100;
 
+        // --- Трюм ---
+        this.cargo = new CargoA();
+
         // --- Ресурсы ---
         this.shield = options.shield ?? this.SHIELDMAX;
         this.fuel   = options.fuel   ?? 100;

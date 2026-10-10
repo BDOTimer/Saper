@@ -15,7 +15,7 @@
 //   TAB         — переключить активный список (1 <-> 2)
 //   ↑ / ↓       — в списке 2 работает так же
 //   ENTER       — продать выделенный товар (из инвентаря)
-//   ESC         — закрыть
+//   KeyT        — открыть/закрыть
 
 // ---- Колбэк «кредиты изменились» ----
 let onCreditsChangedCallback = null;
@@ -545,10 +545,8 @@ const TRADE = (() => {
   function onKeyDown(e) {
     if (!state.open) return;
 
-    const key = e.key;
-
     // Навигация и действия — только когда экран открыт
-    if (e.code === "KeyT" || key === "t" || key === "T" || key === "е" || key === "Е")
+    if (e.code === "KeyT")
     {
       e.preventDefault();
       e.stopPropagation(); // ← Чтобы HTML-листенер не съел событие
@@ -556,6 +554,12 @@ const TRADE = (() => {
 
     //console.log("TRADE: closed by key T");
 
+      return;
+    }
+
+    if (key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
       return;
     }
 
