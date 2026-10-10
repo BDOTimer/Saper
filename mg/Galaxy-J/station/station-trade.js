@@ -150,6 +150,38 @@ const TRADE = (() => {
     cols.appendChild(col2);
     paper.appendChild(cols);
 
+    ///+
+    list1.addEventListener("click", (e) => {
+      const row = e.target.closest(".trade-row");
+      if (!row) return;
+      state.activeList = 1;
+      state.list1Index = +row.dataset.index;
+      renderAll();
+    });
+    list1.addEventListener("dblclick", (e) => {
+      const row = e.target.closest(".trade-row");
+      if (!row) return;
+      state.activeList = 1;
+      state.list1Index = +row.dataset.index;
+      buySelected();
+    });
+
+    // --- Делегирование для списка 2 (инвентарь) ---
+    list2.addEventListener("click", (e) => {
+      const row = e.target.closest(".trade-row");
+      if (!row) return;
+      state.activeList = 2;
+      state.list2Index = +row.dataset.index;
+      renderAll();
+    });
+    list2.addEventListener("dblclick", (e) => {
+      const row = e.target.closest(".trade-row");
+      if (!row) return;
+      state.activeList = 2;
+      state.list2Index = +row.dataset.index;
+      sellSelected();
+    });
+
     // Нижняя подсказка
     const hint = document.createElement("div");
     hint.className = "trade-hint";
@@ -170,6 +202,7 @@ const TRADE = (() => {
     state.goods.forEach((g, i) => {
       const row = document.createElement("div");
       row.className = "trade-row";
+      row.dataset.index = i;   // ← ЕДИНСТВЕННОЕ добавление (вместо слушателей на строке)
       row.classList.toggle(
         "selected",
         i === state.list1Index && state.activeList === 1
@@ -197,22 +230,9 @@ const TRADE = (() => {
       row.appendChild(sell);
       row.appendChild(stock);
 
-      // Клик мышью — тоже работает
-      row.addEventListener("click", () => {
-        state.activeList = 1;
-        state.list1Index = i;
-        renderAll();
-      });
-      row.addEventListener("dblclick", () => {
-        state.activeList = 1;
-        state.list1Index = i;
-        buySelected();
-      });
-
-      el.appendChild(row);
+      el.appendChild(row);     // ← append остаётся один
     });
 
-    // Прокрутка к выделенному
     if (el.children[state.list1Index]) {
       el.children[state.list1Index].scrollIntoView({ block: "nearest" });
     }
@@ -233,6 +253,7 @@ const TRADE = (() => {
     state.inventory.forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "trade-row";
+      row.dataset.index = i;   // ← добавление
       row.classList.toggle(
         "selected",
         i === state.list2Index && state.activeList === 2
@@ -251,7 +272,6 @@ const TRADE = (() => {
       buyPrice.className = "trade-cell-buyprice";
 
       const sellPrice = document.createElement("div");
-      // Узнаём текущую цену продажи на станции
       const g = state.goods.find(x => x.name === item.name);
       const curSell = g ? g.sell : Math.round(item.buyPrice * 0.85);
       sellPrice.textContent = "▼" + fmt(curSell);
@@ -261,17 +281,6 @@ const TRADE = (() => {
       row.appendChild(qty);
       row.appendChild(buyPrice);
       row.appendChild(sellPrice);
-
-      row.addEventListener("click", () => {
-        state.activeList = 2;
-        state.list2Index = i;
-        renderAll();
-      });
-      row.addEventListener("dblclick", () => {
-        state.activeList = 2;
-        state.list2Index = i;
-        sellSelected();
-      });
 
       el.appendChild(row);
     });
