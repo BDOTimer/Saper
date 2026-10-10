@@ -1,4 +1,5 @@
 // station-trade.js — экран торговли на станции. Стиль совместим с help.js.
+// Все стили вынесены в station-trade.css (лежит рядом со скриптом).
 // API:
 //   TRADE.init()          — подготовить DOM
 //   TRADE.open()          — открыть экран торговли
@@ -16,6 +17,7 @@
 //   ↑ / ↓       — в списке 2 работает так же
 //   ENTER       — продать выделенный товар (из инвентаря)
 //   KeyT        — открыть/закрыть
+
 
 // ---- Колбэк «кредиты изменились» ----
 let onCreditsChangedCallback = null;
@@ -70,105 +72,43 @@ const TRADE = (() => {
   // --- Внутренние помощники ---
   const fmt = n => n.toLocaleString("ru-RU");
 
-  function creditsColor(v) {
-    if (v < 0) return "#ff5555";
-    return "#ffff88";
-  }
-
-  // --- Построение DOM ---
+  // --- Построение DOM (вся стилистика — в station-trade.css) ---
   function ensureDOM() {
     if (state.root) return;
 
     // Затемняющий фон
     const root = document.createElement("div");
     root.id = "trade-overlay";
-    root.style.cssText = `
-      position: fixed; inset: 0;
-      display: none;
-      align-items: center; justify-content: center;
-      background: radial-gradient(ellipse at center,
-                  rgba(0, 40, 20, 0.55) 0%,
-                  rgba(0, 0, 0, 0.92) 70%);
-      z-index: 100;
-      font-family: "Courier New", monospace;
-      color: #33ff88;
-      user-select: none;
-    `;
 
     // «Бумага» — панель
     const paper = document.createElement("div");
-    paper.style.cssText = `
-      position: relative;
-      padding: 36px 44px 32px 44px;
-      min-width: 720px;
-      max-width: 96vmin;
-      max-height: 92vmin;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-
-      background:
-        linear-gradient(180deg,
-          rgba(4, 26, 14, 0.96) 0%,
-          rgba(2, 12, 8, 0.98) 100%);
-      border: 1px solid #33ff88;
-      box-shadow:
-        0 0 0 1px rgba(51, 255, 136, 0.25),
-        0 0 28px rgba(0, 255, 136, 0.35),
-        inset 0 0 60px rgba(0, 255, 136, 0.08);
-      border-radius: 4px;
-    `;
+    paper.className = "trade-paper";
 
     // Уголки
     const corners = document.createElement("div");
-    corners.style.cssText = `
-      position: absolute; inset: 8px; pointer-events: none;
-      border: 1px solid rgba(51, 255, 136, 0.18);
-      border-radius: 2px;
-    `;
+    corners.className = "trade-corners";
     paper.appendChild(corners);
 
     // Заголовок
     const title = document.createElement("div");
     title.textContent = "ТОРГОВЫЙ ТЕРМИНАЛ — СТАНЦИЯ";
-    title.style.cssText = `
-      text-align: center;
-      font-size: 20px;
-      letter-spacing: 6px;
-      margin-bottom: 4px;
-      color: #a8ffd0;
-      text-shadow: 0 0 10px #00ff88, 0 0 3px #00ff88;
-    `;
+    title.className = "trade-title";
     paper.appendChild(title);
 
     // Подзаголовок
     const sub = document.createElement("div");
     sub.textContent = "─ станция «КОРИОЛИС» ─ сектор 7-Б ─";
-    sub.style.cssText = `
-      text-align: center;
-      font-size: 11px;
-      letter-spacing: 3px;
-      opacity: 0.55;
-      margin-bottom: 18px;
-    `;
+    sub.className = "trade-subtitle";
     paper.appendChild(sub);
 
     // Строка кредитов
     const creditsBar = document.createElement("div");
-    creditsBar.style.cssText = `
-      display: flex; justify-content: space-between;
-      font-size: 13px;
-      letter-spacing: 3px;
-      padding: 6px 4px;
-      margin-bottom: 12px;
-      border-top: 1px dashed rgba(51, 255, 136, 0.25);
-      border-bottom: 1px dashed rgba(51, 255, 136, 0.25);
-    `;
+    creditsBar.className = "trade-credits-bar";
     const creditsLabel = document.createElement("div");
     creditsLabel.textContent = "КРЕДИТЫ:";
-    creditsLabel.style.cssText = `color: #7dffb0; opacity: 0.8;`;
+    creditsLabel.className = "trade-credits-label";
     const creditsValue = document.createElement("div");
-    creditsValue.style.cssText = `font-weight: bold; letter-spacing: 2px;`;
+    creditsValue.className = "trade-credits-value";
     creditsBar.appendChild(creditsLabel);
     creditsBar.appendChild(creditsValue);
     paper.appendChild(creditsBar);
@@ -176,59 +116,33 @@ const TRADE = (() => {
 
     // Основная область: два списка
     const cols = document.createElement("div");
-    cols.style.cssText = `
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-      flex: 1;
-      min-height: 0;
-    `;
+    cols.className = "trade-cols";
 
     // --- Список 1: товары станции ---
     const col1 = document.createElement("div");
-    col1.style.cssText = `display: flex; flex-direction: column; min-height: 0;`;
+    col1.className = "trade-col";
 
     const h1 = document.createElement("div");
     h1.textContent = "ТОВАРЫ СТАНЦИИ";
-    h1.style.cssText = `
-      font-size: 12px; letter-spacing: 4px; color: #7dffb0;
-      margin: 0 0 6px 0; padding-bottom: 4px;
-      border-bottom: 1px dashed rgba(51, 255, 136, 0.35);
-    `;
+    h1.className = "trade-col-title";
     col1.appendChild(h1);
 
     const list1 = document.createElement("div");
-    list1.style.cssText = `
-      flex: 1; overflow-y: auto;
-      border: 1px solid rgba(51, 255, 136, 0.25);
-      padding: 4px;
-      background: rgba(0, 0, 0, 0.25);
-      min-height: 220px;
-    `;
+    list1.className = "trade-list";
     col1.appendChild(list1);
     state.list1El = list1;
 
     // --- Список 2: инвентарь ---
     const col2 = document.createElement("div");
-    col2.style.cssText = `display: flex; flex-direction: column; min-height: 0;`;
+    col2.className = "trade-col";
 
     const h2 = document.createElement("div");
     h2.textContent = "ИНВЕНТАРЬ КОРАБЛЯ";
-    h2.style.cssText = `
-      font-size: 12px; letter-spacing: 4px; color: #7dffb0;
-      margin: 0 0 6px 0; padding-bottom: 4px;
-      border-bottom: 1px dashed rgba(51, 255, 136, 0.35);
-    `;
+    h2.className = "trade-col-title";
     col2.appendChild(h2);
 
     const list2 = document.createElement("div");
-    list2.style.cssText = `
-      flex: 1; overflow-y: auto;
-      border: 1px solid rgba(51, 255, 136, 0.25);
-      padding: 4px;
-      background: rgba(0, 0, 0, 0.25);
-      min-height: 220px;
-    `;
+    list2.className = "trade-list";
     col2.appendChild(list2);
     state.list2El = list2;
 
@@ -238,14 +152,7 @@ const TRADE = (() => {
 
     // Нижняя подсказка
     const hint = document.createElement("div");
-    hint.style.cssText = `
-      text-align: center;
-      font-size: 11px;
-      letter-spacing: 2px;
-      margin-top: 16px;
-      opacity: 0.7;
-      line-height: 1.6;
-    `;
+    hint.className = "trade-hint";
     paper.appendChild(hint);
     state.hintEl = hint;
 
@@ -262,45 +169,28 @@ const TRADE = (() => {
 
     state.goods.forEach((g, i) => {
       const row = document.createElement("div");
-      const isSelected = i === state.list1Index && state.activeList === 1;
-
-      row.style.cssText = `
-        display: grid;
-        grid-template-columns: 1fr auto auto auto;
-        gap: 10px;
-        padding: 4px 8px;
-        font-size: 12px;
-        line-height: 1.4;
-        cursor: pointer;
-        ${
-          isSelected
-            ? "background: rgba(51,255,136,0.18); outline: 1px solid rgba(51,255,136,0.5);"
-            : ""
-        }
-        ${g.stock <= 0 ? "opacity: 0.35;" : ""}
-      `;
+      row.className = "trade-row";
+      row.classList.toggle(
+        "selected",
+        i === state.list1Index && state.activeList === 1
+      );
+      row.classList.toggle("out-of-stock", g.stock <= 0);
 
       const name = document.createElement("div");
       name.textContent = g.name;
-      name.style.cssText = `
-        color: ${isSelected ? "#ffff88" : "#bfffd6"};
-        letter-spacing: 1px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      `;
+      name.className = "trade-cell-name";
 
       const buy = document.createElement("div");
       buy.textContent = "▲" + fmt(g.buy);
-      buy.style.cssText = `color: #ff8888; letter-spacing: 1px;`;
+      buy.className = "trade-cell-buy";
 
       const sell = document.createElement("div");
       sell.textContent = "▼" + fmt(g.sell);
-      sell.style.cssText = `color: #88ff88; letter-spacing: 1px;`;
+      sell.className = "trade-cell-sell";
 
       const stock = document.createElement("div");
       stock.textContent = "×" + g.stock;
-      stock.style.cssText = `color: #7dffb0; opacity: 0.7; letter-spacing: 1px;`;
+      stock.className = "trade-cell-stock";
 
       row.appendChild(name);
       row.appendChild(buy);
@@ -335,57 +225,37 @@ const TRADE = (() => {
     if (state.inventory.length === 0) {
       const empty = document.createElement("div");
       empty.textContent = "— трюм пуст —";
-      empty.style.cssText = `
-        text-align: center; opacity: 0.4; padding: 24px;
-        font-size: 12px; letter-spacing: 3px;
-      `;
+      empty.className = "trade-empty";
       el.appendChild(empty);
       return;
     }
 
     state.inventory.forEach((item, i) => {
       const row = document.createElement("div");
-      const isSelected = i === state.list2Index && state.activeList === 2;
-
-      row.style.cssText = `
-        display: grid;
-        grid-template-columns: 1fr auto auto auto;
-        gap: 10px;
-        padding: 4px 8px;
-        font-size: 12px;
-        line-height: 1.4;
-        cursor: pointer;
-        ${
-          isSelected
-            ? "background: rgba(51,255,136,0.18); outline: 1px solid rgba(51,255,136,0.5);"
-            : ""
-        }
-      `;
+      row.className = "trade-row";
+      row.classList.toggle(
+        "selected",
+        i === state.list2Index && state.activeList === 2
+      );
 
       const name = document.createElement("div");
       name.textContent = item.name;
-      name.style.cssText = `
-        color: ${isSelected ? "#ffff88" : "#bfffd6"};
-        letter-spacing: 1px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      `;
+      name.className = "trade-cell-name";
 
       const qty = document.createElement("div");
       qty.textContent = "×" + item.qty;
-      qty.style.cssText = `color: #7dffb0; letter-spacing: 1px;`;
+      qty.className = "trade-cell-qty";
 
       const buyPrice = document.createElement("div");
       buyPrice.textContent = "куп:" + fmt(item.buyPrice);
-      buyPrice.style.cssText = `color: #ff8888; opacity: 0.75; letter-spacing: 1px; font-size: 11px;`;
+      buyPrice.className = "trade-cell-buyprice";
 
       const sellPrice = document.createElement("div");
       // Узнаём текущую цену продажи на станции
       const g = state.goods.find(x => x.name === item.name);
       const curSell = g ? g.sell : Math.round(item.buyPrice * 0.85);
       sellPrice.textContent = "▼" + fmt(curSell);
-      sellPrice.style.cssText = `color: #88ff88; letter-spacing: 1px;`;
+      sellPrice.className = "trade-cell-sell";
 
       row.appendChild(name);
       row.appendChild(qty);
@@ -414,20 +284,21 @@ const TRADE = (() => {
   function renderCredits() {
     const el = state.creditsEl;
     el.textContent = fmt(state.credits) + " cr";
-    el.style.color = creditsColor(state.credits);
+    // Красный цвет при отрицательном балансе — класс .negative в CSS
+    el.classList.toggle("negative", state.credits < 0);
   }
 
   function renderHint() {
     const el = state.hintEl;
     const activeName = state.activeList === 1 ? "ТОВАРЫ СТАНЦИИ" : "ИНВЕНТАРЬ";
     el.innerHTML = `
-      <span style="color:#ffff88;">↑ ↓</span> — навигация &nbsp;·&nbsp;
-      <span style="color:#ffff88;">ENTER</span> — ${
+      <span class="key">↑ ↓</span> — навигация &nbsp;·&nbsp;
+      <span class="key">ENTER</span> — ${
         state.activeList === 1 ? "купить" : "продать"
       } &nbsp;·&nbsp;
-      <span style="color:#ffff88;">TAB</span> — переключить список &nbsp;·&nbsp;
-      <span style="color:#ffff88;">~ (Ё)</span> — закрыть<br>
-      <span style="opacity:0.6;">активный список: <b style="color:#a8ffd0;">${activeName}</b></span>
+      <span class="key">TAB</span> — переключить список &nbsp;·&nbsp;
+      <span class="key">~ (Ё)</span> — закрыть<br>
+      <span class="muted">активный список: <b class="active-list">${activeName}</b></span>
     `;
   }
 
@@ -446,11 +317,11 @@ const TRADE = (() => {
     if (!g) return;
 
     if (g.stock <= 0) {
-      flashHint("НЕТ В НАЛИЧИИ", "#ff5555");
+      flashHint("НЕТ В НАЛИЧИИ", "error");
       return;
     }
     if (state.credits < g.buy) {
-      flashHint("НЕДОСТАТОЧНО КРЕДИТОВ", "#ff5555");
+      flashHint("НЕДОСТАТОЧНО КРЕДИТОВ", "error");
       return;
     }
 
@@ -473,7 +344,7 @@ const TRADE = (() => {
 
     fireCreditsChanged();   // ★
 
-    flashHint("КУПЛЕНО: " + g.name, "#88ff88");
+    flashHint("КУПЛЕНО: " + g.name, "ok");
     renderAll();
   }
 
@@ -505,16 +376,17 @@ const TRADE = (() => {
 
     flashHint(
       `ПРОДАНО: ${item.name} за ${fmt(sellPrice)} cr`,
-      "#88ff88"
+      "ok"
     );
     renderAll();
   }
 
   let flashTimer = null;
-  function flashHint(text, color) {
+  // kind: "error" (красный) | "ok" (зелёный) — классы .flash-error / .flash-ok в CSS
+  function flashHint(text, kind) {
     if (!state.hintEl) return;
-    const original = state.hintEl.innerHTML;
-    state.hintEl.innerHTML = `<span style="color:${color}; letter-spacing:3px; font-weight:bold;">${text}</span>`;
+    const cls = kind === "error" ? "flash-error" : "flash-ok";
+    state.hintEl.innerHTML = `<span class="flash ${cls}">${text}</span>`;
     if (flashTimer) clearTimeout(flashTimer);
     flashTimer = setTimeout(() => {
       renderHint();
@@ -525,7 +397,7 @@ const TRADE = (() => {
   function setOpen(v) {
     ensureDOM();
     state.open = v;
-    state.root.style.display = v ? "flex" : "none";
+    state.root.classList.toggle("open", v); // display: flex/none — в CSS
     if (v) {
       // Сброс выделения при открытии
       state.activeList = 1;
@@ -546,8 +418,7 @@ const TRADE = (() => {
     if (!state.open) return;
 
     // Навигация и действия — только когда экран открыт
-    if (e.code === "KeyT")
-    {
+    if (e.code === "KeyT") {
       e.preventDefault();
       e.stopPropagation(); // ← Чтобы HTML-листенер не съел событие
       setOpen(false);
@@ -556,6 +427,8 @@ const TRADE = (() => {
 
       return;
     }
+
+    const key = e.key; // ← фикс: раньше переменная key не была объявлена (ReferenceError)
 
     if (key === "Escape") {
       e.preventDefault();
@@ -647,5 +520,7 @@ const TRADE = (() => {
 })();
 
 // Подключение как в help.js:
-// <script src="./station/station-trade.js"></script>
+//   <script src="./station/station-trade.js"></script>
+//   CSS подгрузится сам; либо подключите вручную:
+//   <link rel="stylesheet" href="./station/station-trade.css">
 // В игровом коде вызывайте TRADE.open() при стыковке со станцией.

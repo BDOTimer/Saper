@@ -1,0 +1,237 @@
+/* station-trade.css — стили экрана торговли на станции.
+   Подключается автоматически из station-trade.js,
+   либо вручную: <link rel="stylesheet" href="./station/station-trade.css"> */
+
+/* ===== Оверлей ===== */
+#trade-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center,
+              rgba(0, 40, 20, 0.55) 0%,
+              rgba(0, 0, 0, 0.92) 70%);
+  z-index: 100;
+  font-family: "Courier New", monospace;
+  color: #33ff88;
+  user-select: none;
+}
+
+#trade-overlay.open {
+  display: flex;
+}
+
+/* ===== Панель («бумага») ===== */
+.trade-paper {
+  position: relative;
+  padding: 36px 44px 32px 44px;
+  min-width: 720px;
+  max-width: 96vmin;
+  max-height: 92vmin;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg,
+    rgba(4, 26, 14, 0.96) 0%,
+    rgba(2, 12, 8, 0.98) 100%);
+  border: 1px solid #33ff88;
+  box-shadow:
+    0 0 0 1px rgba(51, 255, 136, 0.25),
+    0 0 28px rgba(0, 255, 136, 0.35),
+    inset 0 0 60px rgba(0, 255, 136, 0.08);
+  border-radius: 4px;
+}
+
+/* Декоративная рамка-уголки */
+.trade-corners {
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  border: 1px solid rgba(51, 255, 136, 0.18);
+  border-radius: 2px;
+}
+
+/* ===== Заголовок / подзаголовок ===== */
+.trade-title {
+  text-align: center;
+  font-size: 20px;
+  letter-spacing: 6px;
+  margin-bottom: 4px;
+  color: #a8ffd0;
+  text-shadow: 0 0 10px #00ff88, 0 0 3px #00ff88;
+}
+
+.trade-subtitle {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 3px;
+  opacity: 0.55;
+  margin-bottom: 18px;
+}
+
+/* ===== Строка кредитов ===== */
+.trade-credits-bar {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  letter-spacing: 3px;
+  padding: 6px 4px;
+  margin-bottom: 12px;
+  border-top: 1px dashed rgba(51, 255, 136, 0.25);
+  border-bottom: 1px dashed rgba(51, 255, 136, 0.25);
+}
+
+.trade-credits-label {
+  color: #7dffb0;
+  opacity: 0.8;
+}
+
+.trade-credits-value {
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #ffff88;
+}
+
+.trade-credits-value.negative {
+  color: #ff5555;
+}
+
+/* ===== Две колонки со списками ===== */
+.trade-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+}
+
+.trade-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.trade-col-title {
+  font-size: 12px;
+  letter-spacing: 4px;
+  color: #7dffb0;
+  margin: 0 0 6px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(51, 255, 136, 0.35);
+}
+
+.trade-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid rgba(51, 255, 136, 0.25);
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  min-height: 220px;
+}
+
+/* ===== Строки списков ===== */
+.trade-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.trade-row.selected {
+  background: rgba(51, 255, 136, 0.18);
+  outline: 1px solid rgba(51, 255, 136, 0.5);
+}
+
+.trade-row.out-of-stock {
+  opacity: 0.35;
+}
+
+/* Ячейки строки */
+.trade-cell-name {
+  color: #bfffd6;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trade-row.selected .trade-cell-name {
+  color: #ffff88;
+}
+
+.trade-cell-buy {
+  color: #ff8888;
+  letter-spacing: 1px;
+}
+
+.trade-cell-buyprice {
+  color: #ff8888;
+  opacity: 0.75;
+  letter-spacing: 1px;
+  font-size: 11px;
+}
+
+.trade-cell-sell {
+  color: #88ff88;
+  letter-spacing: 1px;
+}
+
+.trade-cell-stock {
+  color: #7dffb0;
+  opacity: 0.7;
+  letter-spacing: 1px;
+}
+
+.trade-cell-qty {
+  color: #7dffb0;
+  letter-spacing: 1px;
+}
+
+/* ===== Пустой инвентарь ===== */
+.trade-empty {
+  text-align: center;
+  opacity: 0.4;
+  padding: 24px;
+  font-size: 12px;
+  letter-spacing: 3px;
+}
+
+/* ===== Подсказка внизу ===== */
+.trade-hint {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 2px;
+  margin-top: 16px;
+  opacity: 0.7;
+  line-height: 1.6;
+}
+
+.trade-hint .key {
+  color: #ffff88;
+}
+
+.trade-hint .muted {
+  opacity: 0.6;
+}
+
+.trade-hint .active-list {
+  color: #a8ffd0;
+}
+
+/* Вспышка сообщения (flashHint) */
+.trade-hint .flash {
+  letter-spacing: 3px;
+  font-weight: bold;
+}
+
+.trade-hint .flash-error {
+  color: #ff5555;
+}
+
+.trade-hint .flash-ok {
+  color: #88ff88;
+}
