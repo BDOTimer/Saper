@@ -250,6 +250,10 @@ class Galaxy
     }
 
     setOpen(v) {
+        
+        if(v) SNDS.winclose2.play();
+        else  SNDS.winclose2.play();
+        
         this.#ensureDOM();
         this.#state.open = v;
         this.#state.wrap.style.display = v ? "flex" : "none";

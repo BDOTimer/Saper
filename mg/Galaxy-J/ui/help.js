@@ -206,6 +206,10 @@ const HELP = (() => {
 
   // --- Переключение ---
   function setOpen(v) {
+
+    if(v) SNDS.winopen2.play();
+    else  SNDS.winopen2.play();
+
     ensureDOM();
     state.open = v;
     state.root.style.display = v ? "flex" : "none";

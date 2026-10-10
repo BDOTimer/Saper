@@ -526,15 +526,19 @@ const state = {
     // ============================================================
     const Vol = Settings.volume;
     const kit = SND.createSoundKit({
-        laser  : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 4 },
-        death  : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
-        damag  : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 4 },
-        hjump  : { src: "snd/ship-HJ-1.mp3"   , volume: Vol, pool: 1 },
-        docking: { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
-        dockout: { src: "snd/fly-start-1.mp3" , volume: Vol, pool: 1 },
+        laser   : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 4 },
+        death   : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
+        damag   : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 4 },
+        hjump   : { src: "snd/ship-HJ-1.mp3"   , volume: Vol, pool: 1 },
+        docking : { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
+        dockout : { src: "snd/fly-start-1.mp3" , volume: Vol, pool: 1 },
 
-        winopen : { src: "snd/winopen-1.mp3"  , volume: Vol, pool: 1 },
-        winclose: { src: "snd/winclose-1.mp3" , volume: Vol, pool: 1 },
+        winopen  : { src: "snd/winopen-1.mp3"  , volume: Vol, pool: 1 },
+        winclose : { src: "snd/winclose-1.mp3" , volume: Vol, pool: 1 },
+        winopen2 : { src: "snd/winopen-2.mp3"  , volume: Vol, pool: 1 },
+        winclose2: { src: "snd/winclose-3.mp3" , volume: Vol, pool: 1 },
+
+        bassDrop1: { src: "snd/bass_drop_01.mp3", volume: Vol, pool: 1 },
     });
 
     kit.autoUnlock();
@@ -1213,6 +1217,35 @@ const state = {
       elDamage.style.opacity = String(Math.min(0.9, intensity));
     }
 
+    // ============================================
+    //  Shake — тряска камеры при ударах
+    // ============================================
+    const SHAKE = (() => {
+      let amp = 0;
+      const off = new THREE.Vector3();
+
+      function trigger(strength = 1.0) { amp = Math.max(amp, strength); }
+
+      function update(dt, camera) {
+        // снять прошлое
+        camera.position.sub(off);
+        off.set(0, 0, 0);
+
+        if (amp < 1e-4) { amp = 0; return; }
+        amp *= Math.exp(-5 * dt);
+
+        const t = performance.now() * 0.001;
+        off.set(
+          (Math.sin(t * 42) + Math.sin(t * 27)) * amp * 0.5,
+          (Math.sin(t * 37) + Math.sin(t * 23)) * amp * 0.5,
+          (Math.sin(t * 31) + Math.sin(t * 19)) * amp * 0.5,
+        );
+        camera.position.add(off);
+      }
+
+      return { trigger, update };
+    })();
+
     const _compassFwd = new THREE.Vector3();
 
     function updateHUD() {
@@ -1518,7 +1551,17 @@ if (!game.isDock)
 
             state.shield -= damag;
 
+            const a = SNDS.bassDrop1._pool[0];
+            if (!a || a.paused || a.ended) // Защита от спама
+            {   SNDS.bassDrop1.play();
+            }
+
             flashDamage(0.6);
+
+            // 🔥 тряска — сила зависит от скорости удара
+            const power = Math.min(6, 0.5 + state.speed * 0.02);
+            SHAKE.trigger(power);
+
             if (state.shield <= 0) {
               state.shield = 0;
               state.dead = true;
@@ -1748,6 +1791,8 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         {     damageTimer -= dt;
           if (damageTimer <= 0) elDamage.style.opacity = "0";
         }
+
+        SHAKE.update(dt, camera);   // накладываем тряску
 
         updateHitEffects(dt);
         updateHUD();
