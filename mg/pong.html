@@ -146,6 +146,36 @@
         body.hide-cursor * {
             cursor: none !important;
         }
+
+        /* Подсказка о выходе из Pointer Lock */
+        .lock-hint {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0ff;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #0ff;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: clamp(12px, 3vw, 15px);
+            text-shadow: 0 0 8px #0ff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+            pointer-events: none;
+            z-index: 22;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            white-space: nowrap;
+        }
+
+        .lock-hint.visible {
+            opacity: 1;
+        }
+
+        .lock-hint b {
+            color: #fff;
+            text-shadow: 0 0 10px #fff;
+        }
     </style>
 </head>
 <body>
@@ -163,6 +193,8 @@
         <div class="control-btn" id="btnUp">▲</div>
         <div class="control-btn" id="btnDown">▼</div>
     </div>
+
+    <div class="lock-hint" id="lockHint">Нажмите <b>Esc</b>, чтобы выйти из захвата курсора</div>
 
     <div class="winner-screen" id="winScreen">
         <h2 id="winnerText"></h2>
@@ -188,13 +220,10 @@
         cursorTimer = setTimeout(hideCursor, 3000);
     }
 
-    // Любое движение мыши/тап/нажатие клавиши — показать и перезапустить таймер
-    // 'mousemove', 
-    ['mousedown', 'pointerdown', 'touchstart', 'keydown', 'wheel']
+    ['mousemove', 'mousedown', 'pointerdown', 'touchstart', 'keydown', 'wheel']
         .forEach(evt => document.addEventListener(evt, showCursor, { passive: true }));
 
-    // Запускаем таймер сразу при загрузке
-    showCursor();
+    hideCursor();
 
 // ============================================================
 //                    ЗВУК НАЖАТИЙ
@@ -206,12 +235,6 @@ const SOUNDS = {
 
 const audioUnlocked = { value: false };
 
-/**
- * Создаёт объект-плеер: пул Audio + метод play().
- * @param {string} src
- * @param {number} volume
- * @param {number} poolSize
- */
 function createSound(src, volume, poolSize = 2) {
     const pool = Array.from({ length: poolSize }, () => {
         const a = new Audio(src);
@@ -232,7 +255,6 @@ function createSound(src, volume, poolSize = 2) {
                 if (p && p.catch) p.catch(() => {});
             } catch (_) {}
         },
-        // «Прогрев» для разблокировки аудио на мобильных
         warmup() {
             const a = pool[0];
             const prev = a.volume;
@@ -247,7 +269,6 @@ function createSound(src, volume, poolSize = 2) {
     };
 }
 
-// Создаём звуки
 const sounds = Object.fromEntries(
     Object.entries(SOUNDS).map(([name, cfg]) => [
         name,
@@ -255,20 +276,16 @@ const sounds = Object.fromEntries(
     ])
 );
 
-// Удобные обёртки
 const playClick = () => sounds.kick.play();
 const playGoal  = () => sounds.goal.play();
 
-// ---------- Разблокировка аудио (нужен жест пользователя) ----------
 function unlockAudio() {
     if (audioUnlocked.value) return;
     audioUnlocked.value = true;
     Object.values(sounds).forEach(s => s.warmup());
 }
 
-//unlockAudio();
-
-['mousemove', 'pointerdown', 'touchstart', 'keydown', 'mousemove'].forEach(evt => {
+['mousemove', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => {
     document.addEventListener(evt, unlockAudio, { passive: true });
 });
     
@@ -305,9 +322,17 @@ function unlockAudio() {
     const paddleWidth = canvas.width * 0.015;
     const paddleHeight = canvas.height * 0.15;
 
-    const player = { x: 15, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, dy: 0, speed: 6 };
-    const computer = { x: canvas.width - 25, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, dy: 0, speed: 4 };
-    const ball = { x: canvas.width / 2, y: canvas.height / 2, radius: canvas.width * 0.012, dx: 4, dy: Math.random() > 0.5 ? 3 : -3, speed: 4 };
+    // Скорости в пикселях в СЕКУНДУ (было за кадр при 60 FPS → умножили на 60)
+    const player   = { x: 15, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, dy: 0, speed: 360 };
+    const computer = { x: canvas.width - 25, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, dy: 0, speed: 240 };
+    const ball     = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: canvas.width * 0.012,
+        dx: 240,
+        dy: Math.random() > 0.5 ? 180 : -180,
+        speed: 240
+    };
 
     let isPaused = false;
     let activeTouches = {};
@@ -331,12 +356,57 @@ function unlockAudio() {
         btn.addEventListener('pointercancel', (e) => { e.preventDefault(); handleTouchEnd(e.target.id.includes('Up') ? 'up' : 'down'); });
     });
 
-    canvas.addEventListener('mousemove', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const mouseY = e.clientY - rect.top;
-        player.y = mouseY - player.height / 2;
+    // ============================================================
+    //  УПРАВЛЕНИЕ МЫШКОЙ
+    //  - Pointer Lock: мышь захватывается, движение работает
+    //    даже за пределами окна (относительное смещение movementY)
+    //  - Фолбэк: обычное абсолютное позиционирование по mousemove
+    // ============================================================
+
+    let pointerLocked = false;
+    const MOUSE_SENSITIVITY = 1.0;
+
+    const lockHint = document.getElementById('lockHint');
+
+    // --- Запрос захвата по клику на канвас ---
+    canvas.addEventListener('click', () => {
+        if (!pointerLocked && canvas.requestPointerLock) {
+            canvas.requestPointerLock();
+        }
+    });
+
+    // --- Отслеживаем состояние захвата ---
+    document.addEventListener('pointerlockchange', () => {
+        pointerLocked = (document.pointerLockElement === canvas);
+        lockHint.classList.toggle('visible', pointerLocked);
+    });
+
+    // --- Движение мыши ---
+    document.addEventListener('mousemove', (e) => {
+        if (pointerLocked) {
+            // Относительное движение — работает за пределами окна
+            player.y += e.movementY * MOUSE_SENSITIVITY;
+        } else {
+            // Абсолютное позиционирование — только когда курсор над канвасом
+            const rect = canvas.getBoundingClientRect();
+            if (
+                e.clientX < rect.left || e.clientX > rect.right ||
+                e.clientY < rect.top  || e.clientY > rect.bottom
+            ) return;
+
+            const mouseY = e.clientY - rect.top;
+            const scaleY = canvas.height / rect.height;
+            player.y = mouseY * scaleY - player.height / 2;
+        }
+
+        // Общие ограничения по вертикали
         if (player.y < 0) player.y = 0;
-        if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+        if (player.y + player.height > canvas.height) {
+            player.y = canvas.height - player.height;
+        }
+
+        // Сбрасываем скорость, чтобы не конфликтовать с кнопками/клавиатурой
+        player.dy = 0;
     });
 
     window.addEventListener('keydown', (e) => {
@@ -377,23 +447,24 @@ function unlockAudio() {
         ctx.beginPath(); ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2, canvas.height); ctx.stroke(); ctx.setLineDash([]);
     }
 
-    function update() {
+    // dt — время в секундах с прошлого кадра
+    function update(dt) {
         if (isPaused) return;
 
         if (activeTouches['up']) player.dy = -player.speed;
         if (activeTouches['down']) player.dy = player.speed;
 
-        player.y += player.dy;
+        player.y += player.dy * dt;
         if (player.y < 0) player.y = 0;
         if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
 
         moveComputer();
-        computer.y += computer.dy;
+        computer.y += computer.dy * dt;
         if (computer.y < 0) computer.y = 0;
         if (computer.y + computer.height > canvas.height) computer.y = canvas.height - computer.height;
 
-        ball.x += ball.dx;
-        ball.y += ball.dy;
+        ball.x += ball.dx * dt;
+        ball.y += ball.dy * dt;
 
         if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
             ball.dy *= -1;
@@ -401,18 +472,16 @@ function unlockAudio() {
 
         if (collides(ball, player)) {
             ball.dx = Math.abs(ball.dx);
-            ball.dx += 0.3;
-            ball.dy += (ball.y - (player.y + player.height / 2)) * 0.1;
-            
-            playClick(); 
+            ball.dx += 0.3 * 60 * dt;   // ускорение, нормированное к 60 FPS
+            ball.dy += (ball.y - (player.y + player.height / 2)) * 0.1 * 60 * dt;
+            playClick();
         }
 
         if (collides(ball, computer)) {
             ball.dx = -Math.abs(ball.dx);
-            ball.dx -= 0.3;
-            ball.dy += (ball.y - (computer.y + computer.height / 2)) * 0.1;
-            
-            playClick(); 
+            ball.dx -= 0.3 * 60 * dt;
+            ball.dy += (ball.y - (computer.y + computer.height / 2)) * 0.1 * 60 * dt;
+            playClick();
         }
 
         if (ball.x - ball.radius < 0) {
@@ -438,7 +507,7 @@ function unlockAudio() {
         ball.x = canvas.width / 2;
         ball.y = canvas.height / 2;
         ball.dx = toRight ? ball.speed : -ball.speed;
-        ball.dy = (Math.random() > 0.5 ? 1 : -1) * 3;
+        ball.dy = (Math.random() > 0.5 ? 1 : -1) * 180;  // 3 * 60
     }
 
     function render() {
@@ -447,6 +516,16 @@ function unlockAudio() {
         drawRect(player.x, player.y, player.width, player.height, '#0ff');
         drawRect(computer.x, computer.y, computer.width, computer.height, '#0ff');
         drawCircle(ball.x, ball.y, ball.radius, '#fff');
+
+        // Подсказка по управлению внизу канваса
+        ctx.font = `${Math.round(canvas.height * 0.028)}px 'Courier New', monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.55)';
+        if (pointerLocked) {
+            ctx.fillText('Esc — выйти из захвата курсора', canvas.width / 2, canvas.height - 10);
+        } else {
+            ctx.fillText('Клик — захватить курсор мыши', canvas.width / 2, canvas.height - 10);
+        }
     }
 
     function endGame() {
@@ -466,13 +545,27 @@ function unlockAudio() {
         document.getElementById('winScreen').style.display = 'none';
     }
 
-    function gameLoop() {
-        update();
+    // ============================================================
+    //  ИГРОВОЙ ЦИКЛ с delta time
+    // ============================================================
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+        if (now === undefined) now = performance.now();
+
+        let dt = (now - lastTime) / 1000; // секунды
+        lastTime = now;
+
+        // Ограничение, чтобы при лагах/сворачивании вкладки шарик
+        // не телепортировался сквозь ракетку
+        if (dt > 1 / 30) dt = 1 / 30;
+
+        update(dt);
         render();
         requestAnimationFrame(gameLoop);
     }
 
-    gameLoop();
+    requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
