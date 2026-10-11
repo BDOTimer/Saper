@@ -228,4 +228,13 @@ const HELP = (() => {
   };
 })();
 
+const elHint = document.getElementById("hint");
+if (elHint) {
+    elHint.addEventListener("click", (e) => {
+        e.preventDefault ();
+        e.stopPropagation();
+        HELP.toggle();
+    });
+}
+
 //export default HELP;

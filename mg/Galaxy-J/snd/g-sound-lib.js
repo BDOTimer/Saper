@@ -157,3 +157,35 @@
     createSoundKit: createSoundKit,
   };
 })(window);
+
+// ============================================================
+//  Звук
+// ============================================================
+const Vol = Settings.volume;
+const kit = SND.createSoundKit({
+    laser   : { src: "snd/laser-1.mp3"     , volume: Vol, pool: 4 },
+    death   : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
+    damag   : { src: "snd/damag-1.mp3"     , volume: Vol, pool: 4 },
+    hjump   : { src: "snd/ship-HJ-1.mp3"   , volume: Vol, pool: 1 },
+    docking : { src: "snd/good-dock-1.mp3" , volume: Vol, pool: 1 },
+    dockout : { src: "snd/fly-start-1.mp3" , volume: Vol, pool: 1 },
+
+    winopen  : { src: "snd/winopen-1.mp3"  , volume: Vol, pool: 1 },
+    winclose : { src: "snd/winclose-1.mp3" , volume: Vol, pool: 1 },
+    winopen2 : { src: "snd/winopen-2.mp3"  , volume: Vol, pool: 1 },
+    winclose2: { src: "snd/winclose-3.mp3" , volume: Vol, pool: 1 },
+
+    bassDrop1: { src: "snd/bass_drop_01.mp3", volume: Vol, pool: 1 },
+    startG   : { src: "snd/mus/start-g-1.mp3",volume: Vol, pool: 1 },
+});
+
+kit.autoUnlock();
+window.SNDS = kit.sounds;
+
+function playMusOnStart()
+{   window.removeEventListener("click", playMusOnStart);
+    if(Date.now() % 5 < 1)
+        SNDS.startG.play();
+}
+
+window.addEventListener("click", playMusOnStart);
