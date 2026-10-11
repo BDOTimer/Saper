@@ -463,7 +463,7 @@ window.HUD = HUD;
 
     // ----------------------------------------------------
     //  Сцена / камера / рендерер
-    // ----------------------------------------------------
+    // ------------------------------------------------- 💥
     const scene      = new THREE.Scene();
     scene.background = new THREE.Color(0x000005);
 
@@ -1105,8 +1105,7 @@ const state = {
       clearSystem();
       buildSystemFromStar(star);
 
-      EnemyA.clear();
-      EnemyA.doAmount(3, 30);   // Кол-во врагов(всего)
+      //EnemyA.clear();
 
       console.log(
         "HYPER →",
@@ -1374,6 +1373,9 @@ const state = {
         ship.tradeOn(star, state.credits);
     }
 
+// ------------------------------------------------------------------
+//  Стыковка к станции.
+// --------------------------------------------------------------- 💥
 function animate() 
 {
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -1689,10 +1691,10 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
           let dead = false;
 
           // Лазер vs враг — по отрезку
-          for (let j = EnemyA.list.length - 1; j >= 0; j--) {
-            const e = EnemyA.list[j];
-            if (segDistToPoint(_laserPrev, l.position, e.position) < 30) {
-              spawnHitFlash(l.position.clone(), 2.5);
+          for (let j = enemies.length - 1; j >= 0; j--)
+          {  const e = enemies[j];
+            if (segDistToPoint(_laserPrev, l.position, e.position) < 30)
+            { spawnHitFlash(l.position.clone(), 2.5);
 
               SNDS.damag.play();
 
@@ -1729,27 +1731,28 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         }
 
         // Спавн врагов
-        if (!state.dead)
-        { //EnemyA.spawn(camera); // Вокруг игрока
-            EnemyA.spawn(null);
-        }
+        if (!state.dead && !game.isDock)
+        {
+        //EnemyA.spawn(camera); // Вокруг игрока
+          EnemyA.spawn(null);
 
-        // ИИ врагов
-        player.getWorldPosition(playerWorldPos);
+          // ИИ врагов
+          player.getWorldPosition(playerWorldPos);
 
-        for (const e of EnemyA.list) {
-          const toPlayer = new THREE.Vector3().subVectors(playerWorldPos, e.position);
-          const dist = toPlayer.length();
-          toPlayer.normalize();
-          e.position.addScaledVector(toPlayer, e.speed * dt);  // ★ e.speed, не userData
-          e.mesh.rotation.x += dt * 0.5;                       // ★ mesh.rotation
-          e.mesh.rotation.y += dt * 0.7;
+          for (const e of enemies)
+          { const toPlayer = new THREE.Vector3().subVectors(playerWorldPos, e.position);
+            const dist = toPlayer.length();
+            toPlayer.normalize();
+            e.position.addScaledVector(toPlayer, e.speed * dt);  // ★ e.speed, не userData
+            e.mesh.rotation.x += dt * 0.5;                       // ★ mesh.rotation
+            e.mesh.rotation.y += dt * 0.7;
 
-          if (dist < 30 && !state.dead) {
-            state.shield -= 30 * dt;
-            flashDamage(0.4);
-            if (state.shield <= 0) {
-              killPlayer();
+            if (dist < 30 && !state.dead) {
+              state.shield -= 30 * dt;
+              flashDamage(0.4);
+              if (state.shield <= 0) {
+                killPlayer();
+              }
             }
           }
         }

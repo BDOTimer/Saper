@@ -55,10 +55,10 @@ class Galaxy
         "Feudal",
         "Multi-Gov",
         "Dictatorship",
-        "Communist",
         "Confederacy",
         "Democracy",
         "Corporate",
+        "Communist",
     ];
 
     static NAME_A = [
@@ -75,9 +75,15 @@ class Galaxy
         ""," I"," II"," III"," IV"," V"," Prime"," Major"," Minor"," Alpha"," Beta",
     ];
 
+    // Ряды - уровень опасности,
+    // Столбцы - правтильство 0: из 1-группы, 1: из 2-группы 
     static SIGNS = 
-    [   '🔆', '🌓', '💧', '👽', '🌳', '💻',
-        '🐞', '💀', '🐸', '❄️', '🌀', '🪐'
+    [   ['🌓', '🔆'],
+        ['🌳', '🐞'],
+        ['💧', '❄️'],
+        ['🌀', '💻'],
+        ['🪐', '🐸'],
+        ['👽', '💀']
     ];
 
     #rndSign(){ return Galaxy.SIGNS[Galaxy.rnd(0, Galaxy.SIGNS.length)] }
@@ -170,10 +176,13 @@ class Galaxy
             const tech   = 1 + Math.floor(this.#rng() * 15);
             const danger = this.#rng();
 
+            const iGovernment
+                = Math.floor(this.#rng() * Galaxy.GOVERNMENTS.length);
+
             this.#stars.push({
                 id:   i,
                 seed: seedStar,
-                name: Galaxy.SIGNS[0] + this.#makeName(),
+                name: Galaxy.calcSign(danger, iGovernment) + this.#makeName(),
                 x, y, r, color,
                 tech,
                 danger,
@@ -182,7 +191,10 @@ class Galaxy
                 techLabel:   tech <= 5 ? "LOW" : tech <= 10 ? "MID" : "HIGH",
                 economy:     Galaxy.ECONOMIES[Math.floor(this.#rng() * Galaxy.ECONOMIES.length)],
                 population:  Math.floor(1e3 + this.#rng() * 9e9),
-                government:  Galaxy.GOVERNMENTS[Math.floor(this.#rng() * Galaxy.GOVERNMENTS.length)],
+
+                iGovernment: iGovernment,
+                government:  Galaxy.GOVERNMENTS[iGovernment],
+                
                 links:       [],
             });
         }
@@ -650,6 +662,25 @@ class Galaxy
     update(dt) {
         this.#state.time += dt;
         if (this.#state.open) this.#draw();
+    }
+
+    static calcSign(danger, iGovernment)
+    {   const S = Galaxy.SIGNS;
+        const indexD = Galaxy.getSegment(danger, S.length);
+        const indexG = Galaxy.getSegment(
+            iGovernment / Galaxy.GOVERNMENTS.length, S[0].length);
+
+        console.assert(indexD < S   .length);
+        console.assert(indexG < S[0].length);
+
+        return Galaxy.SIGNS[indexD][indexG];
+    }
+
+    static getSegment(val, n)
+    {   // val обычно в [0, 1], но работает и для других диапазонов
+        const segment = Math.floor(val * n);
+        // Ограничиваем, чтобы не выйти за границы при val === 1
+        return Math.min(segment, n - 1);
     }
 }
 
