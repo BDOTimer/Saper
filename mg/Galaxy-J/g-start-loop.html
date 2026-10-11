@@ -277,7 +277,7 @@
         return;
       }
 
-      const voices = speechSynthesis.getVoices();
+      const voices  = speechSynthesis.getVoices();
       const ruVoice = voices.find(v => v.lang.includes('ru'));
       
       const utterance  = new SpeechSynthesisUtterance(text);
@@ -288,9 +288,8 @@
       
       window.speechSynthesis.speak(utterance);
     }
-
     // Использование:
-    speak("Добро пожаловать!");
+    // speak("Добро пожаловать!");
 
     function requestFs() {
         //if (isFullscreen()) return Promise.resolve();
@@ -331,16 +330,14 @@
         //document.addEventListener(evt, tryFs, { passive: true });
     });
 
-    // --------------------------------------------------------------
-    //  HUD
-    // --------------------------------------------------------------
-    // ★ HUD-элементы, нужные гиперпрыжку
+    // ----------------------------------------------------
+    //  ★ HUD-элементы
+    // ----------------------------------------------------
     const $ = (id) => document.getElementById(id);
-    const elHyper = $("hyper");
+    const elHyper    = $("hyper");
     const elHyperTarget = $("hyper-target");
     const elHyperProgress = $("hyper-progress");
 
-    //const $ = (id)  => document.getElementById(id);
     const elSpeed     = $("speed");
     const elSpeedBar  = $("speed-bar");
     const elShield    = $("shield");
@@ -356,11 +353,11 @@
     const elCompassNeedle = $("compass-needle");
     const elHdg           = $("hdg");
 
-// --------------------------------------------------------
-//  Верхняя панель: индикаторы D / S
-// --------------------------------------------------------
-const elIndD = document.getElementById("ind-d");
-const elIndS = document.getElementById("ind-s");
+    // ----------------------------------------------
+    //  Верхняя панель: индикаторы D / S
+    // ----------------------------------------------
+    const elIndD = document.getElementById("ind-d");
+    const elIndS = document.getElementById("ind-s");
 
 /**
  * Управление круглыми индикаторами верхней панели.
@@ -374,7 +371,6 @@ const elIndS = document.getElementById("ind-s");
  * @param {boolean} on
  * @param {{pulse?: boolean}} [opts]
  */
-
 const HUD = (() => {
   const map   = { D: elIndD, S: elIndS };
   const state = { D: false , S: false  };
@@ -1303,6 +1299,16 @@ const state = {
     }
 
     // -------------------------------|
+    //  Смерть героя.                 |
+    // -------------------------------:
+    function killPlayer(sound = SNDS.death)
+    {   sound.play();
+        state.shield = 0;
+        state.dead = true;
+        elGameover.style.display = "flex";
+    }
+
+    // -------------------------------|
     //  Стыковка к станции.           |
     // -------------------------------:
     function setOnDock()
@@ -1546,10 +1552,7 @@ if (!game.isDock)
             SHAKE.trigger(power);
 
             if (state.shield <= 0) {
-              state.shield = 0;
-              state.dead = true;
-              elGameover.style.display = "flex";
-              SNDS.death.play();
+                killPlayer();
             }
           }
         }
@@ -1562,11 +1565,7 @@ if (!game.isDock)
             const dangerLevel = p.getDangerLevel(playerWorldPos);
             
             if(dangerLevel > 0.99)
-            {
-                state.shield = 0;
-                state.dead = true;
-                elGameover.style.display = "flex";
-                SNDS.death.play();
+            {   killPlayer();
             }
             else if(dangerLevel > 0.1)
             {
@@ -1583,11 +1582,7 @@ if (!game.isDock)
             const starDanger = currentStarHandle.getDangerLevel(playerWorldPos);
 
             if (starDanger > 0.99)
-            {
-                state.shield = 0;
-                state.dead = true;
-                elGameover.style.display = "flex";
-                SNDS.death.play();
+            {   killPlayer();
             }
             else if (starDanger > 0.1)
             {
@@ -1629,10 +1624,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
           {
             // авария
             game.isDock = false;
-            state.shield = 0;
-            state.dead = true;
-            elGameover.style.display = "flex";
-            SNDS.death.play();
+            killPlayer();
           }
           else if (status === 1) {
             // успешная посадка — например, пополнить топливо/щит,
@@ -1747,10 +1739,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
             state.shield -= 30 * dt;
             flashDamage(0.4);
             if (state.shield <= 0) {
-              state.shield = 0;
-              state.dead = true;
-              elGameover.style.display = "flex";
-              SNDS.death.play();
+              killPlayer();
             }
           }
         }
@@ -1815,7 +1804,6 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
     window.addEventListener("keydown", (e) =>
     {   if (e.code === "KeyG" && !GAME.isDock)
         {   GAME.ship.cargo.view();
-        //  console.log("KeyG");
             return;
         }
 

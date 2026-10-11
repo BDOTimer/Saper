@@ -184,7 +184,7 @@ window.SNDS = kit.sounds;
 
 function playMusOnStart()
 {   window.removeEventListener("click", playMusOnStart);
-    if(Date.now() % 5 < 1)
+    if(Date.now() % 7 < 1)
         SNDS.startG.play();
 }
 
