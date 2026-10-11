@@ -38,6 +38,9 @@ class Galaxy
     static STAR_COUNT = 64;
     static GALAXY_R   = 1.0;
 
+    // ширина правой панели информации (в пикселях canvas)
+    static PANEL_W    = 300;
+
     static ECONOMIES = [
         "Industrial",
         "Agricultural",
@@ -113,6 +116,26 @@ class Galaxy
         const b = B[Math.floor(this.#rngName() * B.length)];
         const c = C[Math.floor(this.#rngName() * C.length)];
         return `${a}${b}${c}`;
+    }
+
+    // форматирование населения
+    #fmtPop(n) {
+        if (n >= 1e9) return (n / 1e9).toFixed(2) + " млрд";
+        if (n >= 1e6) return (n / 1e6).toFixed(2) + " млн";
+        if (n >= 1e3) return (n / 1e3).toFixed(1) + " тыс.";
+        return String(n);
+    }
+
+    // форматирование расстояния (галактические единицы -> «св. лет»)
+    #fmtDist(d) {
+        return (d * 100).toFixed(1); // условные световые годы
+    }
+
+    // цвет для уровня LOW/MED/HIGH
+    #lvlColor(label) {
+        if (label === "LOW")  return "#66ff99";
+        if (label === "MID")  return "#ffdd55";
+        return "#ff6666";
     }
 
     // --------------------------------------------------------------
@@ -209,19 +232,19 @@ class Galaxy
         wrap.id = "galaxy-map";
         wrap.style.cssText = `
             position: fixed; inset: 0;
-            display: none; align-items: center; justify-content: center;
+            display: none; align-items: stretch; justify-content: stretch;
             background: radial-gradient(ellipse at center, rgba(0,20,10,0.85), rgba(0,0,0,0.95));
             z-index: 50; pointer-events: none;
             font-family: "Courier New", monospace;
             color: #33ff88;
+            overflow: hidden;
         `;
 
         const canvas = document.createElement("canvas");
-        canvas.width  = 900;
-        canvas.height = 900;
         canvas.style.cssText = `
-            max-width: 92vmin; max-height: 92vmin;
-            width: 92vmin; height: 92vmin;
+            display: block;
+            width: 100%;
+            height: 100%;
             filter: drop-shadow(0 0 12px #00ff88);
         `;
 
@@ -231,6 +254,7 @@ class Galaxy
             position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
             font-size: 13px; letter-spacing: 2px; opacity: 0.7;
             text-shadow: 0 0 6px #00ff88;
+            pointer-events: none;
         `;
 
         wrap.appendChild(canvas);
@@ -240,6 +264,34 @@ class Galaxy
         this.#state.wrap   = wrap;
         this.#state.canvas = canvas;
         this.#state.ctx    = canvas.getContext("2d");
+
+        // подгоняем буфер canvas под физический размер окна
+        this.#resizeCanvas();
+        window.addEventListener("resize", () => this.#resizeCanvas());
+    }
+
+    // --------------------------------------------------------------
+    //  Подгонка размеров canvas под окно (с учётом DPR)
+    // --------------------------------------------------------------
+    #resizeCanvas()
+    {
+        const canvas = this.#state.canvas;
+        if (!canvas) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const w   = window.innerWidth;
+        const h   = window.innerHeight;
+
+        canvas.width  = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+
+        // css-размер оставляем на 100% / 100%
+        canvas.style.width  = w + "px";
+        canvas.style.height = h + "px";
+
+        // сбрасываем трансформацию и учитываем DPR
+        const ctx = this.#state.ctx;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     // --------------------------------------------------------------
@@ -299,16 +351,154 @@ class Galaxy
     onJumpRequest(cb) { this.#state.jumpCb = cb; }
 
     // --------------------------------------------------------------
+    //  Отрисовка — правая панель информации
+    // --------------------------------------------------------------
+    #drawInfoPanel(W, H, PANEL_W)
+    {
+        const ctx = this.#state.ctx;
+        const sel = this.#stars[this.#state.selected];
+        const ps  = this.#stars[this.#state.playerStar];
+
+        const x0  = W - PANEL_W;
+        const pad = 18;
+
+        // фон панели
+        ctx.fillStyle = "rgba(0,30,15,0.55)";
+        ctx.fillRect(x0, 0, PANEL_W, H);
+
+        // разделитель
+        ctx.strokeStyle = "rgba(51,255,136,0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x0, 0);
+        ctx.lineTo(x0, H);
+        ctx.stroke();
+
+        let y = 40;
+        const lineH = 20;
+
+        // заголовок
+        ctx.fillStyle = "#aaffcc";
+        ctx.font = 'bold 18px "Courier New", monospace';
+        ctx.fillText("STAR INFO", x0 + pad, y);
+        y += 8;
+
+        ctx.strokeStyle = "rgba(51,255,136,0.35)";
+        ctx.beginPath();
+        ctx.moveTo(x0 + pad, y);
+        ctx.lineTo(x0 + PANEL_W - pad, y);
+        ctx.stroke();
+        y += 26;
+
+        // имя
+        ctx.fillStyle = "#eaffea";
+        ctx.font = 'bold 16px "Courier New", monospace';
+        ctx.fillText(sel.name, x0 + pad, y);
+        y += lineH + 4;
+
+        // «ВЫ ЗДЕСЬ»
+        if (sel.id === this.#state.playerStar) {
+            ctx.fillStyle = "#ffff66";
+            ctx.font = 'bold 12px "Courier New", monospace';
+            ctx.fillText("★ ВЫ ЗДЕСЬ", x0 + pad, y);
+            y += lineH;
+        }
+
+        y += 6;
+
+        // строки с данными
+        const row = (label, value, color) => {
+            ctx.fillStyle = "rgba(51,255,136,0.75)";
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillText(label, x0 + pad, y);
+
+            ctx.fillStyle = color || "#eaffea";
+            ctx.font = 'bold 13px "Courier New", monospace';
+            ctx.fillText(String(value), x0 + pad + 110, y);
+            y += lineH;
+        };
+
+        row("ЭКОНОМИКА:",  sel.economy);
+        row("ПРАВИТЕЛЬСТВО:", sel.government, "#cfe");
+        row("НАСЕЛЕНИЕ:",  this.#fmtPop(sel.population));
+
+        row("ТЕХНОЛОГИИ:",
+            `${sel.tech} (${sel.techLabel})`,
+            this.#lvlColor(sel.techLabel));
+
+        row("ОПАСНОСТЬ:",
+            `${(sel.danger * 100) | 0}% (${sel.dangerLabel})`,
+            this.#lvlColor(sel.dangerLabel));
+
+        y += 6;
+
+        row("КООРД. X:", sel.x.toFixed(3));
+        row("КООРД. Y:", sel.y.toFixed(3));
+
+        const dx = sel.x - ps.x;
+        const dy = sel.y - ps.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        row("ДО ВАС:", `${this.#fmtDist(dist)} св. лет`);
+
+        y += 10;
+
+        // секция «соседи»
+        ctx.fillStyle = "rgba(51,255,136,0.75)";
+        ctx.font = 'bold 12px "Courier New", monospace';
+        ctx.fillText("СОСЕДИ:", x0 + pad, y);
+        y += lineH;
+
+        if (!sel.links || sel.links.length === 0) {
+            ctx.fillStyle = "rgba(234,255,234,0.5)";
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillText("— нет связей —", x0 + pad + 8, y);
+            y += lineH;
+        } else {
+            ctx.font = '12px "Courier New", monospace';
+            for (const nid of sel.links) {
+                if (y > H - 40) break;
+                const nb = this.#stars[nid];
+                const ndx = nb.x - sel.x;
+                const ndy = nb.y - sel.y;
+                const nd  = Math.sqrt(ndx * ndx + ndy * ndy);
+                ctx.fillStyle = "rgba(234,255,234,0.85)";
+                ctx.fillText(`• ${nb.name}`, x0 + pad + 8, y);
+                ctx.fillStyle = "rgba(51,255,136,0.6)";
+                ctx.fillText(`${this.#fmtDist(nd)} св.л.`, x0 + PANEL_W - 90, y);
+                y += lineH;
+            }
+        }
+
+        ctx.fillStyle = "rgba(51,255,136,0.4)";
+        ctx.font = '10px "Courier New", monospace';
+        ctx.fillText("Выбор: стрелки", x0 + pad, H - 34);
+        ctx.fillText("Прыжок: ENTER", x0 + pad, H - 20);
+    }
+
+    // --------------------------------------------------------------
     //  Отрисовка
     // --------------------------------------------------------------
     #draw()
     {
-        const ctx   = this.#state.ctx;
-        const W     = this.#state.canvas.width;
-        const H     = this.#state.canvas.height;
-        const cx    = W / 2;
+        const ctx    = this.#state.ctx;
+        const canvas = this.#state.canvas;
+        const dpr    = window.devicePixelRatio || 1;
+
+        // логические размеры (CSS-пиксели)
+        const W = canvas.width  / dpr;
+        const H = canvas.height / dpr;
+
+        // ширина панели — адаптивная
+        const PANEL_W = Math.max(220, Math.min(320, W * 0.28));
+
+        // область карты
+        const mapW  = W - PANEL_W;
+        const cx    = mapW / 2;
         const cy    = H / 2;
-        const scale = Math.min(W, H) * 0.42;
+
+        // ★ масштаб по МИНИМУМУ из ширины карты и высоты —
+        //   круг галактики всегда круглый.
+        const scale = Math.min(mapW, H) * 0.42;
 
         ctx.clearRect(0, 0, W, H);
 
@@ -409,6 +599,9 @@ class Galaxy
         ctx.moveTo(sx + k, sy - k);     ctx.lineTo(sx + k, sy - k / 2);
         ctx.moveTo(sx + k, sy - k);     ctx.lineTo(sx + k / 2, sy - k);
         ctx.stroke();
+
+        // правая панель
+        this.#drawInfoPanel(W, H, PANEL_W);
     }
 
     // --------------------------------------------------------------
