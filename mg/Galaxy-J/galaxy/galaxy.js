@@ -251,7 +251,7 @@ class Galaxy
         const hint = document.createElement("div");
         hint.textContent = "Стрелки — выбор | ENTER — прыжок | M — закрыть";
         hint.style.cssText = `
-            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 24px; left: 40%; transform: translateX(-50%);
             font-size: 13px; letter-spacing: 2px; opacity: 0.7;
             text-shadow: 0 0 6px #00ff88;
             pointer-events: none;
@@ -359,48 +359,71 @@ class Galaxy
         const sel = this.#stars[this.#state.selected];
         const ps  = this.#stars[this.#state.playerStar];
 
-        const x0  = W - PANEL_W;
-        const pad = 18;
+        const MARGIN = 10;                        // отступ от краёв экрана
+        const pad    = 18;                        // внутренний padding
 
-        // фон панели
-        ctx.fillStyle = "rgba(0,30,15,0.55)";
-        ctx.fillRect(x0, 0, PANEL_W, H);
+        // координаты панели с учётом отступа
+        const x0 = W - PANEL_W + MARGIN;          // левый край панели
+        const y0 = MARGIN;                        // верхний край
+        const pw = PANEL_W - MARGIN * 2;          // ширина панели (минус отступы слева/справа)
+        const ph = H - MARGIN * 2;                // высота панели (минус отступы сверху/снизу)
 
-        // разделитель
-        ctx.strokeStyle = "rgba(51,255,136,0.45)";
-        ctx.lineWidth = 1.5;
+        // --- фон панели (скруглённый прямоугольник) ---
+        const radius = 8;
         ctx.beginPath();
-        ctx.moveTo(x0, 0);
-        ctx.lineTo(x0, H);
+        ctx.moveTo(x0 + radius, y0);
+        ctx.lineTo(x0 + pw - radius, y0);
+        ctx.quadraticCurveTo(x0 + pw, y0, x0 + pw, y0 + radius);
+        ctx.lineTo(x0 + pw, y0 + ph - radius);
+        ctx.quadraticCurveTo(x0 + pw, y0 + ph, x0 + pw - radius, y0 + ph);
+        ctx.lineTo(x0 + radius, y0 + ph);
+        ctx.quadraticCurveTo(x0, y0 + ph, x0, y0 + ph - radius);
+        ctx.lineTo(x0, y0 + radius);
+        ctx.quadraticCurveTo(x0, y0, x0 + radius, y0);
+        ctx.closePath();
+
+        ctx.fillStyle = "rgba(0,0,15,0.72)";
+        ctx.fill();
+
+        // --- рамка панели ---
+        ctx.strokeStyle = "rgba(51,255,136,0.55)";
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        let y = 40;
+        // внутренние координаты для контента
+        const cx0 = x0 + pad;
+        const cx1 = x0 + pw - pad;
+        const cyTop = y0 + 40;
+        const cyBot = y0 + ph - 20;
+
+        let y = cyTop;
         const lineH = 20;
 
         // заголовок
         ctx.fillStyle = "#aaffcc";
         ctx.font = 'bold 18px "Courier New", monospace';
-        ctx.fillText("STAR INFO", x0 + pad, y);
+        ctx.fillText("STAR INFO", cx0, y);
         y += 8;
 
+        // разделитель
         ctx.strokeStyle = "rgba(51,255,136,0.35)";
         ctx.beginPath();
-        ctx.moveTo(x0 + pad, y);
-        ctx.lineTo(x0 + PANEL_W - pad, y);
+        ctx.moveTo(cx0, y);
+        ctx.lineTo(cx1, y);
         ctx.stroke();
         y += 26;
 
         // имя
         ctx.fillStyle = "#eaffea";
         ctx.font = 'bold 16px "Courier New", monospace';
-        ctx.fillText(sel.name, x0 + pad, y);
+        ctx.fillText(sel.name, cx0, y);
         y += lineH + 4;
 
         // «ВЫ ЗДЕСЬ»
         if (sel.id === this.#state.playerStar) {
             ctx.fillStyle = "#ffff66";
             ctx.font = 'bold 12px "Courier New", monospace';
-            ctx.fillText("★ ВЫ ЗДЕСЬ", x0 + pad, y);
+            ctx.fillText("★ ВЫ ЗДЕСЬ", cx0, y);
             y += lineH;
         }
 
@@ -410,11 +433,11 @@ class Galaxy
         const row = (label, value, color) => {
             ctx.fillStyle = "rgba(51,255,136,0.75)";
             ctx.font = '12px "Courier New", monospace';
-            ctx.fillText(label, x0 + pad, y);
+            ctx.fillText(label, cx0, y);
 
             ctx.fillStyle = color || "#eaffea";
             ctx.font = 'bold 13px "Courier New", monospace';
-            ctx.fillText(String(value), x0 + pad + 110, y);
+            ctx.fillText(String(value), cx0 + 110, y);
             y += lineH;
         };
 
@@ -445,34 +468,35 @@ class Galaxy
         // секция «соседи»
         ctx.fillStyle = "rgba(51,255,136,0.75)";
         ctx.font = 'bold 12px "Courier New", monospace';
-        ctx.fillText("СОСЕДИ:", x0 + pad, y);
+        ctx.fillText("СОСЕДИ:", cx0, y);
         y += lineH;
 
         if (!sel.links || sel.links.length === 0) {
             ctx.fillStyle = "rgba(234,255,234,0.5)";
             ctx.font = '12px "Courier New", monospace';
-            ctx.fillText("— нет связей —", x0 + pad + 8, y);
+            ctx.fillText("— нет связей —", cx0 + 8, y);
             y += lineH;
         } else {
             ctx.font = '12px "Courier New", monospace';
             for (const nid of sel.links) {
-                if (y > H - 40) break;
+                if (y > cyBot - 40) break;
                 const nb = this.#stars[nid];
                 const ndx = nb.x - sel.x;
                 const ndy = nb.y - sel.y;
                 const nd  = Math.sqrt(ndx * ndx + ndy * ndy);
                 ctx.fillStyle = "rgba(234,255,234,0.85)";
-                ctx.fillText(`• ${nb.name}`, x0 + pad + 8, y);
+                ctx.fillText(`• ${nb.name}`, cx0 + 8, y);
                 ctx.fillStyle = "rgba(51,255,136,0.6)";
-                ctx.fillText(`${this.#fmtDist(nd)} св.л.`, x0 + PANEL_W - 90, y);
+                ctx.fillText(`${this.#fmtDist(nd)} св.л.`, cx1 - 70, y);
                 y += lineH;
             }
         }
 
+        // подсказка внизу панели
         ctx.fillStyle = "rgba(51,255,136,0.4)";
         ctx.font = '10px "Courier New", monospace';
-        ctx.fillText("Выбор: стрелки", x0 + pad, H - 34);
-        ctx.fillText("Прыжок: ENTER", x0 + pad, H - 20);
+        ctx.fillText("Выбор: стрелки", cx0, cyBot - 14);
+        ctx.fillText("Прыжок: ENTER", cx0, cyBot);
     }
 
     // --------------------------------------------------------------
@@ -484,21 +508,18 @@ class Galaxy
         const canvas = this.#state.canvas;
         const dpr    = window.devicePixelRatio || 1;
 
-        // логические размеры (CSS-пиксели)
         const W = canvas.width  / dpr;
         const H = canvas.height / dpr;
 
-        // ширина панели — адаптивная
         const PANEL_W = Math.max(220, Math.min(320, W * 0.28));
 
-        // область карты
-        const mapW  = W - PANEL_W;
-        const cx    = mapW / 2;
-        const cy    = H / 2;
+        const mapW = W - PANEL_W;
+        const cx   = mapW / 2;
+        const cy   = H / 2;
 
-        // ★ масштаб по МИНИМУМУ из ширины карты и высоты —
-        //   круг галактики всегда круглый.
-        const scale = Math.min(mapW, H) * 0.42;
+        // ★ раздельные масштабы по осям → круг превращается в эллипс
+        const scaleX = mapW * 0.42;              // ← растяжение по горизонтали
+        const scaleY = Math.min(mapW, H) * 0.42; // ← как было по вертикали
 
         ctx.clearRect(0, 0, W, H);
 
@@ -506,21 +527,22 @@ class Galaxy
         ctx.strokeStyle = "rgba(51,255,136,0.10)";
         ctx.lineWidth = 1;
         for (let g = -10; g <= 10; g++) {
-            const p = (g / 10) * scale;
+            const px = (g / 10) * scaleX;
+            const py = (g / 10) * scaleY;
             ctx.beginPath();
-            ctx.moveTo(cx + p, cy - scale);
-            ctx.lineTo(cx + p, cy + scale);
+            ctx.moveTo(cx + px, cy - scaleY);
+            ctx.lineTo(cx + px, cy + scaleY);
             ctx.stroke();
             ctx.beginPath();
-            ctx.moveTo(cx - scale, cy + p);
-            ctx.lineTo(cx + scale, cy + p);
+            ctx.moveTo(cx - scaleX, cy + py);
+            ctx.lineTo(cx + scaleX, cy + py);
             ctx.stroke();
         }
 
-        // граница
+        // граница — эллипс
         ctx.strokeStyle = "rgba(51,255,136,0.35)";
         ctx.beginPath();
-        ctx.arc(cx, cy, scale, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy, scaleX, scaleY, 0, 0, Math.PI * 2);
         ctx.stroke();
 
         // связи
@@ -530,15 +552,16 @@ class Galaxy
             const A = this.#stars[a];
             const B = this.#stars[b];
             ctx.beginPath();
-            ctx.moveTo(cx + A.x * scale, cy - A.y * scale);
-            ctx.lineTo(cx + B.x * scale, cy - B.y * scale);
+            ctx.moveTo(cx + A.x * scaleX, cy - A.y * scaleY);
+            ctx.lineTo(cx + B.x * scaleX, cy - B.y * scaleY);
             ctx.stroke();
         }
 
         // звёзды
         for (const s of this.#stars)
-        {   const px = cx + s.x * scale;
-            const py = cy - s.y * scale;
+        {
+            const px = cx + s.x * scaleX;   // ← было scale
+            const py = cy - s.y * scaleY;   // ← было scale
 
             const grad = ctx.createRadialGradient(px, py, 0, px, py, 10);
             grad.addColorStop(0, s.color);
@@ -567,8 +590,8 @@ class Galaxy
 
         // маркер игрока
         const ps  = this.#stars[this.#state.playerStar];
-        const ppx = cx + ps.x * scale;
-        const ppy = cy - ps.y * scale;
+        const ppx = cx + ps.x * scaleX;
+        const ppy = cy - ps.y * scaleY;
         const pulse = 8 + Math.sin(this.#state.time * 4) * 2;
 
         ctx.strokeStyle = "#ffff66";
@@ -583,8 +606,8 @@ class Galaxy
 
         // перекрестие
         const sel = this.#stars[this.#state.selected];
-        const sx  = cx + sel.x * scale;
-        const sy  = cy - sel.y * scale;
+        const sx  = cx + sel.x * scaleX;
+        const sy  = cy - sel.y * scaleY;
         const k   = 7;
 
         ctx.strokeStyle = "#33ff88";
