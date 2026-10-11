@@ -1096,9 +1096,6 @@ const state = {
       state.speed = 0;
       state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
-      EnemyA.clear();
-      EnemyA.doAmount(3, 30);   // Кол-во врагов(всего)
-
       HUD.setSystem(GALAXY.getCurrentStar().name); // Имя звезды на панель
 
       for (const l of lasers) scene.remove(l);
@@ -1107,6 +1104,9 @@ const state = {
       reseedDustAndMeteors();
       clearSystem();
       buildSystemFromStar(star);
+
+      EnemyA.clear();
+      EnemyA.doAmount(3, 30);   // Кол-во врагов(всего)
 
       console.log(
         "HYPER →",
@@ -1149,6 +1149,16 @@ const state = {
       
     // Стартовая система
     buildSystemFromStar(state.dataStar);
+
+    // ----------------------------------------
+    // Вход в игру.
+    // ----------------------------------------
+    function StartGame()
+    {
+        // ...
+        EnemyA.doAmount(1, 2);
+    };
+    StartGame();
 
     function resetGame()
     {   game.reset();
@@ -1246,9 +1256,9 @@ const state = {
       //elFuel.textContent = DEBUG.infiniteFuel ? "∞" : Math.round(state.fuel);
       //elFuelBar.style.width = DEBUG.infiniteFuel ? "100%" : state.fuel + "%";
 
-      // --------------------------------------
+      // ----------------------------------------
       //  Компас: курс в плоскости XZ
-      // --------------------------------------
+      // ----------------------------------------
       const fwd = _compassFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
       let headingDeg = Math.atan2(fwd.x, -fwd.z) * 180 / Math.PI;
