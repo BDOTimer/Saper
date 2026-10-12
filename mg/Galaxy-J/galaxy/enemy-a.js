@@ -7,6 +7,7 @@ class EnemyA
     static RATE      = 0.005; // шанс спавна за вызов
     static amount    = 0;     // осталось заспавнить, -1 = ∞
     static MAX_ALIVE = 5;
+    static MAXBASE   = 50;
 
     static _assets = null;    // общие геометрия/материалы
     static _v      = null;    // переиспользуемый вектор
@@ -135,6 +136,13 @@ class EnemyA
     // this.amount = -1; // врагов ꝏ
     static doAmount(min, max)
     {   this.amount = Math.floor(Math.random() * (max - min)) + min;
+    }
+
+    static start(danger)
+    {      EnemyA.clear();
+           this.amount = Math.round(EnemyA.MAXBASE * danger);
+
+           console.log("💀 EnemyA.amount: ", this.amount);
     }
 }
 

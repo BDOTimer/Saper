@@ -502,8 +502,6 @@ const state = {
 };
 ///////////////////////////////////////////////////////////////////////////////.
 
-state.fuel = 100; // 🔴⚠️
-
     ///---------------------------------------|
     /// Галактика:                            |
     ///---------------------------------------|
@@ -589,14 +587,16 @@ state.fuel = 100; // 🔴⚠️
     //  Единая точка сохранения игры (со снимком мира)
     // ----------------------------------------------------
     function saveGame()
-    {   game.world = game.buildWorldSnapshot();
+    {   
+        if(Settings.isTestDockToStation)
+        {   state.fuel = 100; // 🔴⚠️
+        }
+      
+        game.world = game.buildWorldSnapshot();
         game.save();
 
         HUD.setStatus("S", true, { pulse: true }); 
         setTimeout(() => HUD.setStatus("S", false), 3000);
-
-        // Начисляем очки! 🟩
-        //pers.score = ;
 
         commitHeroRecord();
     }
@@ -1046,9 +1046,11 @@ state.fuel = 100; // 🔴⚠️
         console.log(
 `1HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(state.fuel)})`,
         );
-        /// TODO: звук фейла ...
+        SNDS.fail1.play();
         return;
       }
+
+      if(!HYPERFX.isSuccess) SNDS.fail2.play();
 
       // Запускаем анимацию
       game.hyper.active = true;
@@ -1077,7 +1079,6 @@ state.fuel = 100; // 🔴⚠️
         elHyper.style.display = "none";
         return;
       }
-
       // Списываем топливо
       state.fuel = Math.max(0, state.fuel - HYPERFX.fuelCost);
 
@@ -1086,16 +1087,18 @@ state.fuel = 100; // 🔴⚠️
         console.log(
 `HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(state.fuel)})`,
         );
-        // TODO: звук фейла ...
-
-        // saveGame({fuel: state.fuel});
+        SNDS.fail1.play();
 
         // Завершаем
         game.hyper.active = false;
         elHyper.style.display = "none";
+
+        // GAME.({ship: { fuel: this.ship.fuel} });
+        saveGame();
         return;
       }
 
+      
     //console.log("🔍 dist: ", dist),
 
       // ------------------------------
@@ -1121,9 +1124,6 @@ state.fuel = 100; // 🔴⚠️
           Game.randomQuatCamera(camera);
       }
 
-      console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
-      saveGame();
-
       state.speed = 0;
       state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
@@ -1136,7 +1136,7 @@ state.fuel = 100; // 🔴⚠️
       clearSystem();
       buildSystemFromStar(star);
 
-      //EnemyA.clear();
+      EnemyA.start(GALAXY.getCurrentStar().danger);
 
       console.log(
         "HYPER →",
@@ -1150,8 +1150,11 @@ state.fuel = 100; // 🔴⚠️
       // kit.sounds.hjump.stop(); // ★ звук прибытия
 
       // Завершаем
-      game.hyper.active = false;
+      game.hyper.active     = false;
       elHyper.style.display = "none";
+
+      console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
+      saveGame();
 
       console.assert(game.pers.seedStar === star.seed);
     }

@@ -189,6 +189,14 @@ class Game
         // ★ Ушло: this.universe.save() — теперь всё через ProfileStore
     }
 
+    // saveUp({ship: { fuel: this.ship.fuel} });
+    saveUp(option={})
+    {   const profile = ProfileStore.current();
+        if (profile && profile.id) {
+            ProfileStore.saveGame(profile.id, option);
+        }
+    }
+
     reset()
     {
         this.pers.reset();
