@@ -28,6 +28,7 @@ class Galaxy
         ctx:        null,
         wrap:       null,
         time:       0,
+        fuelR:      Infinity,   // радиус доступного хода (в гал.ед.)
     };
 
     get seed() { return this.#seed; }
@@ -567,6 +568,9 @@ class Galaxy
             ctx.stroke();
         }
 
+        // круг доступного хода по топливу (под звёздами)
+        this.drawCircleFuel(cx, cy, scaleX, scaleY);
+
         // звёзды
         for (const s of this.#stars)
         {
@@ -652,6 +656,106 @@ class Galaxy
     setPlayerStar(i) {
         this.#state.playerStar = i;
         this.#state.selected   = i;
+    }
+
+    // --------------------------------------------------------------
+    //  Круг доступных звёзд по топливу (центр — текущая звезда)
+    // --------------------------------------------------------------
+    /**
+     * Рисует на карте круг (эллипс) радиуса, доступного на текущем
+     * запасе топлива. Центр круга — текущая звезда игрока
+     * (this.getCurrentStar()).
+     *
+     * Вызывается из #draw() ПОСЛЕ сетки/связей, но ДО звёзд.
+     *
+     * @param {number} cx      - экранный X центра карты
+     * @param {number} cy      - экранный Y центра карты
+     * @param {number} scaleX  - масштаб по X (пикс/гал.ед.)
+     * @param {number} scaleY  - масштаб по Y (пикс/гал.ед.)
+     */
+    drawCircleFuel(cx, cy, scaleX, scaleY)
+    {
+        const ctx = this.#state.ctx;
+        if  (!ctx) return;
+
+        // по умолчанию — «хватает на всю галактику»
+        this.#state.fuelR = Infinity;
+
+        const ship = (typeof GAME !== "undefined" && GAME.ship) ? GAME.ship : null;
+        if (!ship || !ship.TUNING) return;
+
+        const fuel        = ship.fuel;                     // текущее топливо
+        const fuelCost1LY = ship.TUNING.fuel_hyper;        // расход на 1 св.год
+
+        if(fuelCost1LY === -1) return;
+
+        if (!(fuelCost1LY > 0) || !(fuel >= 0)) return;
+
+        // текущая звезда игрока — центр круга
+        const ps = this.getCurrentStar();
+        if (!ps) return;
+
+        // сколько световых лет можем пролететь
+        const maxLY = fuel / fuelCost1LY;
+
+        // 1 гал.ед. == 100 св.лет (см. Galaxy.#fmtDist)
+        const LY_PER_GU = 100;
+        const maxR = maxLY / LY_PER_GU;                    // радиус в гал.ед.
+
+        // запоминаем радиус для приглушения звёзд в #draw()
+        this.#state.fuelR = maxR;
+
+        // --- если хватает на всю галактику — круг не рисуем ---
+        if (maxR >= this.galaxyR * 1.05) {
+            this.#state.fuelR = Infinity;
+            return;
+        }
+
+        // экранные координаты центра круга (в текущей звезде)
+        const px = cx + ps.x * scaleX;
+        const py = cy - ps.y * scaleY;
+
+        // экранные полуоси эллипса
+        const rx = maxR * scaleX;
+        const ry = maxR * scaleY;
+        if (rx < 2 || ry < 2) return;
+
+        const t = this.#state.time;
+        const pulse = 1 + Math.sin(t * 2) * 0.01;          // лёгкое «дыхание»
+
+        ctx.save();
+
+        // полупрозрачная заливка доступной зоны
+        ctx.beginPath();
+        ctx.ellipse(px, py, rx * pulse, ry * pulse, 0, 0, Math.PI * 2);
+        const g = ctx.createRadialGradient(px, py, 0, px, py, Math.max(rx, ry));
+        g.addColorStop(0.0,  "rgba(51,255,136,0.10)");
+        g.addColorStop(0.75, "rgba(51,255,136,0.05)");
+        g.addColorStop(1.0,  "rgba(51,255,136,0.00)");
+        ctx.fillStyle = g;
+        ctx.fill();
+
+        // пунктирная граница с бегущим штрихом
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -(t * 20) % 14;
+        ctx.strokeStyle = "rgba(51,255,136,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+
+        // подпись радиуса рядом с верхней точкой эллипса
+        ctx.fillStyle = "rgba(170,255,204,0.85)";
+        ctx.font = '11px "Courier New", monospace';
+        ctx.textAlign = "center";
+        ctx.fillText(
+            `ЗАПАС ХОДА: ${maxLY.toFixed(1)} св. лет`,
+            px, py - ry * pulse - 6,
+        );
+        ctx.textAlign = "start";
+
+        ctx.restore();
     }
 
     // --------------------------------------------------------------
