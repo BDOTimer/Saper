@@ -36,8 +36,40 @@
 
   var STYLE_ID = "heroes-list-styles";
 
+      /**
+     * Определяет название ранга по количеству очков.
+     * Индекс в массиве RANKS растёт вместе со счётом.
+     *
+     * @param {number} score - очки игрока (может быть отрицательным / NaN)
+     * @returns {string} название ранга из RANKS
+     */
+    function getRankName(score)
+    {
+        const RANKS = [
+            "HARMLESS",
+            "MOSTLY_HARMLESS",
+            "POOR",
+            "AVERAGE",
+            "COMPETENT",
+            "DANGEROUS",
+            "DEADLY",
+            "ELITE",
+        ];
+
+        // пороги очков для каждого ранга (по возрастанию)
+        const THRESHOLDS = [0, 1000, 5000, 15000, 40000, 90000, 200000, 500000];
+
+        const s = Number(score) || 0;
+
+        // идём с конца: как только дошли до подходящего порога — вернули ранг
+        for (let i = RANKS.length - 1; i >= 0; i--) {
+            if (s >= THRESHOLDS[i]) return RANKS[i];
+        }
+        return RANKS[0];
+    }
+
   /* ---------- Демо-данные (если хранилище пустое) ---------- */
-  // Ранг НЕ хранится в демо-записях: он вычисляется через Pers.getRankName(score),
+  // Ранг НЕ хранится в демо-записях: он вычисляется через getRankName(score),
   // чтобы всегда соответствовать актуальной таблице рангов из pers.js.
   var DEMO_ROWS = [
     { name: "X-01_Razor"   , score: 528400, date: "2025-01-12" },
@@ -50,7 +82,7 @@
   ];
 
   /**
-   * Собрать демо-список с рангами, вычисленными через Pers.getRankName(score).
+   * Собрать демо-список с рангами, вычисленными через getRankName(score).
    * Если Pers недоступен (не подключён / упал) — падаем на строку "HARMLESS",
    * чтобы heroes-list.js оставался самодостаточным.
    */
@@ -65,14 +97,8 @@
     });
   }
 
-  /** Безопасный вызов Pers.getRankName(score). */
-  function rankOf(score) {
-    try {
-      if (window.Pers && typeof window.Pers.getRankName === "function") {
-        return String(window.Pers.getRankName(score) || "HARMLESS");
-      }
-    } catch (e) { /* ignore */ }
-    return "HARMLESS";
+  function rankOf(score)
+  {   return String(getRankName(score) || "HARMLESS");
   }
 
   /* ============================================================
@@ -659,12 +685,13 @@ window.HeroesList = {
         build();
         return overlay;
     },
-
+    
     getPlayer: getPlayer,
     setPlayer: setPlayer,
     upHero   : upHero,
     dedupe   : dedupe,
     _all: loadAll,   // для отладки
+    getRankName,
 };
 
 })();
