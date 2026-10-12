@@ -469,6 +469,33 @@ class ProfileStore
         this._emit(p.id, p);
         return true;
     }
+
+    /** Глубокое слияние plain-объектов. Массивы и примитивы — заменяются. */
+    static #deepMerge(base, patch)
+    {
+        if (patch === null || typeof patch !== "object" || Array.isArray(patch)) {
+            return patch;
+        }
+        const out = (base && typeof base === "object" && !Array.isArray(base))
+            ? Object.assign({}, base)
+            : {};
+
+        for (const k of Object.keys(patch)) {
+            out[k] = deepMerge(out[k], patch[k]);
+        }
+        return out;
+    }
+
+    // saveUp({ ship: { fuel: 100, hull: 50 } });
+    // saveUp({ ship: { fuel: this.ship.fuel } });
+    static saveUp(option = {})
+    {
+        const profile = ProfileStore.current();
+        if (!profile || !profile.id) return false;
+
+        const merged = ProfileStore.#deepMerge(profile.save || {}, option);
+        return ProfileStore.saveGame(profile.id, merged);
+    }
 }
 
 // -----------------------------------------|
