@@ -501,6 +501,8 @@ const state = {
 };
 ///////////////////////////////////////////////////////////////////////////////.
 
+state.fuel = 100; // 🔴⚠️
+
     ///---------------------------------------|
     /// Галактика:                            |
     ///---------------------------------------|
@@ -997,20 +999,14 @@ const state = {
     // ------------------------------------------------------------
     //  Гиперпрыжок
     // --------------------------------------------------------- 💥
-    function distanceBetweenStars(a, b) {
-      if (!a || !b) return 0;
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      return Math.hypot(dx, dy);
-    }
-
+    // Карта Галактики - открывается по KeyJ
     function tryHyperJump()
     {
       if (state.dead || game.hyper.active) return;
 
       // Если карта закрыта — откроем её, чтобы игрок выбрал цель
       if (!GALAXY.isOpen()) {
-            GALAXY.toggle();
+           GALAXY.toggle();
           return;
       }
 
@@ -1026,15 +1022,25 @@ const state = {
       const dst = GALAXY.getStar(targetIdx);
       if (!cur || !dst) return;
 
-      const dist = distanceBetweenStars(cur, dst);
+      const dist = Galaxy.getDistanceLY(cur, dst);
 
-      const fuelCost = Math.max(
-        ship.TUNING.fuel_hyper_min, Math.round(dist * ship.TUNING.fuel_hyper));
+      HYPERFX.fuelNeed  = dist * ship.TUNING.fuel_hyper;
+      HYPERFX.isSuccess = HYPERFX.fuelNeed < state.fuel;
+      HYPERFX.fuelCost  = HYPERFX.isSuccess ? HYPERFX.fuelNeed
+                                    : ship.TUNING.fuel_hyper_min;
 
-      if (state.fuel < fuelCost) {
+      //const fuelCost = HYPERFX.fuelCost;
+      // console.log("🔍 ship.TUNING.fuel_hyper: ", ship.TUNING.fuel_hyper);
+      // console.log("🔍 dist      : ", dist);
+      // console.log("🔍 state.fuel: ", state.fuel);
+      // console.log("🔍 fuelCost  : ", fuelCost);
+      // console.log("🔍 isSuccess : ", HYPERFX.isSuccess);
+
+      if (state.fuel < HYPERFX.fuelCost) {
         console.log(
-          `HYPER: недостаточно топлива (нужно ${fuelCost}, есть ${Math.round(state.fuel)})`,
+`1HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(state.fuel)})`,
         );
+        /// TODO: звук фейла ...
         return;
       }
 
@@ -1042,22 +1048,22 @@ const state = {
       game.hyper.active = true;
       game.hyper.t = 0;
       game.hyper.targetIdx = targetIdx;
-      game.hyper.fuelCost = fuelCost;
+      game.hyper.fuelCost  = HYPERFX.fuelCost;
 
       elHyperTarget.textContent = `${cur.name} → ${dst.name}`;
       elHyperProgress.style.width = "0%";
       elHyper.style.display = "flex";
 
-      kit.sounds.hjump.play();
+      SNDS.hjump.play();
       HYPERFX.start(game.hyper.duration); // визуал Гиперпрыжка
 
       GALAXY.setOpen(false);
     }
 
-    function completeHyperJump() {
-      const targetIdx = game.hyper.targetIdx;
+    function completeHyperJump()
+    { const targetIdx = game.hyper.targetIdx;
       const star = GALAXY.getStar(targetIdx);
-      if (!star) {
+      if  (!star) {
         game.hyper.active = false;
         
         HYPERFX.stop(); // Остановка Гиперпрыжка.
@@ -1066,19 +1072,37 @@ const state = {
         return;
       }
 
-      // Обновляем состояние игрока
+      // Списываем топливо
+      state.fuel = Math.max(0, state.fuel - HYPERFX.fuelCost);
+
+      if(!HYPERFX.isSuccess)
+      {
+        console.log(
+`HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(state.fuel)})`,
+        );
+        // TODO: звук фейла ...
+
+        // saveGame({fuel: state.fuel});
+
+        // Завершаем
+        game.hyper.active = false;
+        elHyper.style.display = "none";
+        return;
+      }
+
+    //console.log("🔍 dist: ", dist),
+
+      // ------------------------------
+      // Успех! (прыжок удался)
+      // ------------------------------
       state.indexStar = targetIdx;
       state.dataStar  = star;
-      // Списываем топливо
-      state.fuel = Math.max(0, state.fuel - ship.TUNING.fuel_hyper);
 
       updateSectorFromStar(star);
       GALAXY.setPlayerStar(targetIdx);
 
       // ★ Синхронизируем курсор вселенной
       GAME.pers.indexStar = targetIdx;
-
-      console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
 
       // Сброс сцены
       if(Settings.isTestDockToStation)
@@ -1091,6 +1115,7 @@ const state = {
           Game.randomQuatCamera(camera);
       }
 
+      console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
       saveGame();
 
       state.speed = 0;

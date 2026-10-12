@@ -133,7 +133,7 @@ class Galaxy
     }
 
     // форматирование расстояния (галактические единицы -> «св. лет»)
-    #fmtDist(d) {
+    static #fmtDist(d) {
         return (d * 100).toFixed(1); // условные световые годы
     }
 
@@ -470,10 +470,8 @@ class Galaxy
         row("КООРД. X:", sel.x.toFixed(3));
         row("КООРД. Y:", sel.y.toFixed(3));
 
-        const dx = sel.x - ps.x;
-        const dy = sel.y - ps.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        row("ДО ВАС:", `${this.#fmtDist(dist)} св. лет`);
+        const dist = Galaxy.getDistance(ps, sel);
+        row("ДО ВАС:", `${Galaxy.#fmtDist(dist)} св. лет`);
 
         y += 10;
 
@@ -499,7 +497,7 @@ class Galaxy
                 ctx.fillStyle = "rgba(234,255,234,0.85)";
                 ctx.fillText(`• ${nb.name}`, cx0 + 8, y);
                 ctx.fillStyle = "rgba(51,255,136,0.6)";
-                ctx.fillText(`${this.#fmtDist(nd)} св.л.`, cx1 - 70, y);
+                ctx.fillText(`${Galaxy.#fmtDist(nd)} св.л.`, cx1 - 70, y);
                 y += lineH;
             }
         }
@@ -681,6 +679,18 @@ class Galaxy
         const segment = Math.floor(val * n);
         // Ограничиваем, чтобы не выйти за границы при val === 1
         return Math.min(segment, n - 1);
+    }
+
+    static getDistance(now, sel)
+    {   const dx = sel.x - now.x;
+        const dy = sel.y - now.y;
+        return Math.hypot(dx, dy)
+    }
+
+    // Получить расстояние между Stars в светоовых годах
+    static getDistanceLY(now, sel)
+    {   const  d = Galaxy.getDistance(now, sel);
+        return this.#fmtDist(d);
     }
 }
 

@@ -17,6 +17,11 @@
 // DOM — создаёт сам (элемент #hyper-flash).
 
 const HYPERFX = (() => {
+  
+  let isSuccess = false; /// Успешен ли прыжок?
+  let fuelCost  = 0;     /// Стоимость прыжка
+  let fuelNeed  = 0;     /// Нужно топлива на прыжок
+  
   let THREE = null;
   let scene = null;
   let camera = null;
