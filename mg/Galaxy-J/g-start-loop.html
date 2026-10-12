@@ -237,7 +237,8 @@
     <!-- Общие глобальный Набор Функций -->
     <script src="./js/foos.js"></script>
     <script src="person/profile-store.js"></script>
-    <script src="./ui/settings.js"></script> 
+    <script src="./ui/settings.js"></script>
+    <script src="./ui/heroes-list.js"></script>
 
     <!-- Вселенная, Галактика, Игрок и его Корабль -->
     <script src="./galaxy/universe.js"></script>
@@ -593,6 +594,11 @@ state.fuel = 100; // 🔴⚠️
 
         HUD.setStatus("S", true, { pulse: true }); 
         setTimeout(() => HUD.setStatus("S", false), 3000);
+
+        // Начисляем очки! 🟩
+        //pers.score = ;
+
+        commitHeroRecord();
     }
 
     const composer = new EffectComposer(renderer);
@@ -1340,6 +1346,10 @@ state.fuel = 100; // 🔴⚠️
         state.shield = 0;
         state.dead = true;
         elGameover.style.display = "flex";
+
+        /// TODO: тут добавить штрафы за смерть ...
+
+        saveGame();
     }
 
     // -------------------------------|
@@ -1870,6 +1880,25 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         //   camera.position.addScaledVector(outAxis, push);
         // }
     });
+
+// Обновить рекорд героя после смерти/игры/в точках сохранения.
+function commitHeroRecord()
+{   const profile = ProfileStore.ensure();       // всегда есть
+    if (!profile) return;
+
+    const score = GAME.pers.getScore();
+    const rank  = GAME.pers?.getRank();
+
+    console.log("🔍 commitHeroRecord().score: ", score);
+
+    // upHero сам найдёт запись по имени и обновит её (не создаст дубль)
+    HeroesList.upHero({
+        name:  profile.name,
+        score: score,
+        rank:  rank,
+        date:  new Date().toISOString().slice(0, 10),
+    });
+}
 
 </script>
 </body>

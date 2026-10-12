@@ -37,15 +37,43 @@
   var STYLE_ID = "heroes-list-styles";
 
   /* ---------- Демо-данные (если хранилище пустое) ---------- */
-  var DEMO = [
-    { name: "X-01_Razor"   , score: 128400, rank: "ELITE",    date: "2025-01-12" },
-    { name: "ARCTURUS"     , score: 92150,  rank: "DEADLY",   date: "2025-01-09" },
-    { name: "LISSA"        , score: 67400,  rank: "DANGEROUS",date: "2025-01-07" },
-    { name: "SYN-Drifter"  , score: 41200,  rank: "COMPETENT",date: "2025-01-05" },
-    { name: "NAV-Error"    , score: 25800,  rank: "AVERAGE",  date: "2025-01-03" },
-    { name: "G-Lock"       , score: 12400,  rank: "POOR",     date: "2024-12-28" },
-    { name: "VOID_Protocol", score: 5300,   rank: "HARMLESS", date: "2024-12-22" },
+  // Ранг НЕ хранится в демо-записях: он вычисляется через Pers.getRankName(score),
+  // чтобы всегда соответствовать актуальной таблице рангов из pers.js.
+  var DEMO_ROWS = [
+    { name: "X-01_Razor"   , score: 528400, date: "2025-01-12" },
+    { name: "ARCTURUS"     , score: 292150, date: "2025-01-09" },
+    { name: "LISSA"        , score: 167400, date: "2025-01-07" },
+    { name: "SYN-Drifter"  , score: 41200,  date: "2025-01-05" },
+    { name: "NAV-Error"    , score: 25800,  date: "2025-01-03" },
+    { name: "G-Lock"       , score: 12400,  date: "2024-12-28" },
+    { name: "VOID_Protocol", score: 4300,   date: "2024-12-22" },
   ];
+
+  /**
+   * Собрать демо-список с рангами, вычисленными через Pers.getRankName(score).
+   * Если Pers недоступен (не подключён / упал) — падаем на строку "HARMLESS",
+   * чтобы heroes-list.js оставался самодостаточным.
+   */
+  function makeDemo() {
+    return DEMO_ROWS.map(function (row) {
+      return {
+        name:  row.name,
+        score: row.score,
+        rank:  rankOf(row.score),
+        date:  row.date,
+      };
+    });
+  }
+
+  /** Безопасный вызов Pers.getRankName(score). */
+  function rankOf(score) {
+    try {
+      if (window.Pers && typeof window.Pers.getRankName === "function") {
+        return String(window.Pers.getRankName(score) || "HARMLESS");
+      }
+    } catch (e) { /* ignore */ }
+    return "HARMLESS";
+  }
 
   /* ============================================================
    * Хранилище
@@ -54,14 +82,15 @@
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        save(DEMO);
-        return DEMO.slice();
+        var demo = makeDemo();
+        save(demo);
+        return demo;
       }
       var data = JSON.parse(raw);
-      if (!Array.isArray(data)) return DEMO.slice();
+      if (!Array.isArray(data)) return makeDemo();
       return data;
     } catch (e) {
-      return DEMO.slice();
+      return makeDemo();
     }
   }
 
@@ -469,7 +498,7 @@
     list.push({
       name: String(entry.name || "ANONYMOUS").slice(0, 24),
       score: +entry.score || 0,
-      rank: String(entry.rank || "HARMLESS").slice(0, 24),
+      rank: rankOf(+entry.score || 0),
       date:
         entry.date ||
         new Date().toISOString().slice(0, 10),
@@ -493,15 +522,20 @@
 
   function loadAll() {
     try {
-        var raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO));
-        return Object.assign({}, DEMO);
-        }
-        var data = JSON.parse(raw);
-        return (data && typeof data === "object") ? data : Object.assign({}, DEMO);
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        var demo = makeDemo();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(demo));
+        // ВНИМАНИЕ: исходный код здесь делал Object.assign({}, DEMO),
+        // что для массива даёт {0:..., 1:...}. Оставляю как было:
+        return Object.assign({}, demo);
+      }
+      var data = JSON.parse(raw);
+      return (data && typeof data === "object")
+        ? data
+        : Object.assign({}, makeDemo());
     } catch (e) {
-        return Object.assign({}, DEMO);
+      return Object.assign({}, makeDemo());
     }
   }
 
@@ -556,7 +590,7 @@ function upHero(entry) {
   var rec = {
     name:  name,
     score: +entry.score || 0,
-    rank:  String(entry.rank || "HARMLESS").slice(0, 24),
+    rank: rankOf(+entry.score || 0),
     date:  entry.date || new Date().toISOString().slice(0, 10),
   };
 
@@ -588,7 +622,7 @@ function dedupe() {
     var row = {
       name:  name,
       score: Number(r.score) || 0,
-      rank:  String(r.rank || "HARMLESS").slice(0, 24),
+      rank: rankOf(Number(r.score) || 0),
       date:  String(r.date || "")
     };
 

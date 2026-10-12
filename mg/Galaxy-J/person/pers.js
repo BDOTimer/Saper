@@ -14,6 +14,17 @@
 ///     - load()/save() — заглушки для будущей интеграции с profile-store.
 ///     - Доступ из любой точки игры = GAME.pers.indexGalaxy / GAME.pers.indexStar (через get).
 
+const RANKS = [
+  "HARMLESS",
+  "MOSTLY_HARMLESS",
+  "POOR",
+  "AVERAGE",
+  "COMPETENT",
+  "DANGEROUS",
+  "DEADLY",
+  "ELITE",
+];
+
 class Pers
 {
     // Приватные поля
@@ -53,6 +64,32 @@ class Pers
     get seedGalaxy()  { return this.#seedGalaxy; }
     get seedStar()    { return this.#seedStar; }
 
+    getScore()
+    {
+        return this.kills;
+    }
+
+    /**
+     * Определяет название ранга по количеству очков.
+     * Индекс в массиве RANKS растёт вместе со счётом.
+     *
+     * @param {number} score - очки игрока (может быть отрицательным / NaN)
+     * @returns {string} название ранга из RANKS
+     */
+    static getRankName(score)
+    {
+        // пороги очков для каждого ранга (по возрастанию)
+        const THRESHOLDS = [0, 1000, 5000, 15000, 40000, 90000, 200000, 500000];
+
+        const s = Number(score) || 0;
+
+        // идём с конца: как только дошли до подходящего порога — вернули ранг
+        for (let i = RANKS.length - 1; i >= 0; i--) {
+            if (s >= THRESHOLDS[i]) return RANKS[i];
+        }
+        return RANKS[0];
+    }
+
     // --- Сеттеры индексов (сиды пересчитываются автоматически) ---
 
     /// Установка индекса галактики. Пересчитывает seedGalaxy и seedStar.
@@ -83,7 +120,7 @@ class Pers
     /// Сброс метрик игрока после смерти / рестарта
     reset()
     {
-        this.kills  = 0;
+        // this.kills  = 0;
         this.dead   = false;
         // credits сохраняем — это накопление игрока
     }
