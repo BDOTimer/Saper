@@ -234,6 +234,13 @@
       }
     </script>
 
+    <!-- Сначала грузим THREE как глобал, потом ЖДЁМ его появления -->
+    <script type="module">
+      import * as THREE from "three";
+      window.THREE = THREE;
+      window.dispatchEvent(new Event("three-ready"));
+    </script>
+
     <!-- Общие глобальный Набор Функций -->
     <script src="./js/foos.js"></script>
     <script src="person/profile-store.js"></script>
@@ -257,13 +264,17 @@
     <script src="./station/station.js"></script>
     <script src="./station/station-trade.js"></script>
     <script src="./galaxy/enemy-a.js"></script>
-    
+
+    <!--
+    <script src="./ships/radar-holo.js"></script>
+    -->
+
     <script src="./ui/help.js"></script>
     <script src="./snd/g-sound-lib.js"></script>
 
   <script type="module">
-    import * as THREE from "three";
-    window.THREE = THREE;
+    // import * as THREE from "three";
+    // window.THREE = THREE;
 
     import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
@@ -480,20 +491,22 @@ window.HUD = HUD;
     // ----------------------------------------------------
     EnemyA.init(scene, camera);
 
+    // ----------------------------------------------------
+    //  Радар
+    // ----------------------------------------------------
+    // const radar = new RadarHolo(
+    //     renderer, { size: 240, range: 2000, anchor: "bottom-right" });
+
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 // ------------|
 //  Состояние  |
 // ------------:
 // Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
 const state = {
-  get indexStar() { return pers.starIndex; }, set indexStar(v) { pers.indexStar = v; },
-  get dataStar()  { return pers.dataStar;  }, set dataStar(v)  { pers.dataStar  = v; },
   get credits()   { return pers.credits;   }, set credits(v)   { pers.credits   = v; },
   get kills()     { return pers.kills;     }, set kills(v)     { pers.kills     = v; },
   get sector()    { return pers.sector;    }, set sector(v)    { pers.sector    = v; },
   get dead()      { return pers.dead;      }, set dead(v)      { pers.dead      = v; },
-
-  get angVel()    { return ship.angVel;    },
 };
 ///////////////////////////////////////////////////////////////////////////////.
 
@@ -697,7 +710,7 @@ const state = {
     function buildSystemFromStar(star)
     {   if (!star) return;
 
-        // sun.rebuild(state.dataStar);
+        // sun.rebuild(pers.dataStar);
         // sun.setPosition(0, 2000, 8000);
         // sun.setVisible(false);
 
@@ -1101,8 +1114,8 @@ const state = {
       // ----------------------------------------
       // Успех! (прыжок удался)
       // ------------------------------------- 🌍
-      state.indexStar = targetIdx;
-      state.dataStar  = star;
+      pers.starIndex = targetIdx;
+      pers.dataStar  = star;
 
       updateSectorFromStar(star);
       GALAXY.setPlayerStar(targetIdx);
@@ -1122,7 +1135,7 @@ const state = {
       }
 
       ship.speed = 0;
-      state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
+      ship.angVel.pitch = ship.angVel.yaw = ship.angVel.roll = 0;
 
       HUD.setSystem(GALAXY.getCurrentStar().name); // Имя звезды на панель
 
@@ -1167,7 +1180,7 @@ const state = {
     }
 
     // Лог текущей звезды
-    const s = state.dataStar;
+    const s = pers.dataStar;
     console.log(
       "StarA: ",
       s.name,
@@ -1178,7 +1191,7 @@ const state = {
     );
       
     // Стартовая система
-    buildSystemFromStar(state.dataStar);
+    buildSystemFromStar(pers.dataStar);
 
     // ----------------------------------------
     // Вход в игру.
@@ -1196,7 +1209,7 @@ const state = {
     {   game.reset();
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
-        state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
+        ship.angVel.pitch = ship.angVel.yaw = ship.angVel.roll = 0;
 
         EnemyA.clear();
 
@@ -1490,31 +1503,31 @@ if (!game.isDock)
   const az = (keys["KeyA"     ] ? 1 : 0) - (keys["KeyD"      ] ? 1 : 0); // roll
 
   // Разгон по осям
-  state.angVel.pitch += ax * ship.ROT.accel * dt;
-  state.angVel.yaw   += ay * ship.ROT.accel * dt;
-  state.angVel.roll  += az * ship.ROT.accel * dt;
+  ship.angVel.pitch += ax * ship.ROT.accel * dt;
+  ship.angVel.yaw   += ay * ship.ROT.accel * dt;
+  ship.angVel.roll  += az * ship.ROT.accel * dt;
 
   // Экспоненциальное торможение (работает и при отпущенной клавише,
   // и как «вязкое» ограничение сверху)
   const damp = Math.exp(-ship.ROT.damping * dt);
-  state.angVel.pitch *= damp;
-  state.angVel.yaw   *= damp;
-  state.angVel.roll  *= damp;
+  ship.angVel.pitch *= damp;
+  ship.angVel.yaw   *= damp;
+  ship.angVel.roll  *= damp;
 
   // Ограничение максимальной угловой скорости
-  state.angVel.pitch = THREE.MathUtils.clamp(state.angVel.pitch, -ship.ROT.maxPitch, ship.ROT.maxPitch);
-  state.angVel.yaw   = THREE.MathUtils.clamp(state.angVel.yaw,   -ship.ROT.maxYaw,   ship.ROT.maxYaw);
-  state.angVel.roll  = THREE.MathUtils.clamp(state.angVel.roll,  -ship.ROT.maxRoll,  ship.ROT.maxRoll);
+  ship.angVel.pitch = THREE.MathUtils.clamp(ship.angVel.pitch, -ship.ROT.maxPitch, ship.ROT.maxPitch);
+  ship.angVel.yaw   = THREE.MathUtils.clamp(ship.angVel.yaw,   -ship.ROT.maxYaw,   ship.ROT.maxYaw);
+  ship.angVel.roll  = THREE.MathUtils.clamp(ship.angVel.roll,  -ship.ROT.maxRoll,  ship.ROT.maxRoll);
 
   // Мёртвая зона, чтобы не «дрожал» на нуле
-  if (Math.abs(state.angVel.pitch) < 1e-4) state.angVel.pitch = 0;
-  if (Math.abs(state.angVel.yaw)   < 1e-4) state.angVel.yaw   = 0;
-  if (Math.abs(state.angVel.roll)  < 1e-4) state.angVel.roll  = 0;
+  if (Math.abs(ship.angVel.pitch) < 1e-4) ship.angVel.pitch = 0;
+  if (Math.abs(ship.angVel.yaw)   < 1e-4) ship.angVel.yaw   = 0;
+  if (Math.abs(ship.angVel.roll)  < 1e-4) ship.angVel.roll  = 0;
 
   // Применяем вращение
-  camera.rotateX(state.angVel.pitch * dt);
-  camera.rotateY(state.angVel.yaw   * dt);
-  camera.rotateZ(state.angVel.roll  * dt);
+  camera.rotateX(ship.angVel.pitch * dt);
+  camera.rotateY(ship.angVel.yaw   * dt);
+  camera.rotateZ(ship.angVel.roll  * dt);
 }
 else
 {
@@ -1825,6 +1838,9 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         updateHitEffects(dt);
         updateHUD();
         composer.render();
+
+      //radar.render();
+
         requestAnimationFrame(animate);
     }
 
@@ -1907,5 +1923,3 @@ function commitHeroRecord()
 </script>
 </body>
 </html>
-
-

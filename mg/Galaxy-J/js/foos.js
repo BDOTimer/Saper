@@ -262,5 +262,4 @@ class SpeedEngine
 {
 
 }
-
 window.SpeedEngine = SpeedEngine;
