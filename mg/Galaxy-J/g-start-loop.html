@@ -225,56 +225,54 @@
   </div>
 </div>
 
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-        }
-      }
-    </script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
 
-    <!-- Сначала грузим THREE как глобал, потом ЖДЁМ его появления -->
-    <script type="module">
-      import * as THREE from "three";
-      window.THREE = THREE;
-      window.dispatchEvent(new Event("three-ready"));
-    </script>
+<!-- Сначала грузим THREE как глобал, потом ЖДЁМ его появления -->
+<script type="module">
+  import * as THREE from "three";
+  window.THREE = THREE;
+  window.dispatchEvent(new Event("three-ready"));
+</script>
 
-    <!-- Общие глобальный Набор Функций -->
-    <script src="./js/foos.js"></script>
-    <script src="person/profile-store.js"></script>
-    <script src="./ui/settings.js"></script>
-    <script src="./ui/heroes-list.js"></script>
+<!-- Общие глобальный Набор Функций -->
+<script src="./js/foos.js"></script>
+<script src="person/profile-store.js"></script>
+<script src="./ui/settings.js"></script>
+<script src="./ui/heroes-list.js"></script>
 
-    <!-- Вселенная, Галактика, Игрок и его Корабль -->
-    <script src="./galaxy/universe.js"></script>
-    <script src="./galaxy/galaxy.js"></script>
-    <script src="./person/pers.js"></script>
-    <script src="./ships/ship-cargo-a.js"></script>
-    <script src="./ships/ship.js"></script>
-    <script src="./js/game.js"></script>
+<!-- Вселенная, Галактика, Игрок и его Корабль -->
+<script src="./galaxy/universe.js"></script>
+<script src="./galaxy/galaxy.js"></script>
+<script src="./person/pers.js"></script>
+<script src="./ships/ship-cargo-a.js"></script>
+<script src="./ships/ship.js"></script>
+<script src="./js/game.js"></script>
 
-    <!-- Классические скрипты: кладут GALAXY, StarA, PLANET, HELP в глобал -->
-    <script src="./galaxy/star-A.js"></script>
-    <script src="./galaxy/star-G.js"></script>
-    <script src="./galaxy/planet.js"></script>
-    <script src="./galaxy/hyperfx.js"></script>
-    <script src="./galaxy/skystar.js"></script>
-    <script src="./station/station.js"></script>
-    <script src="./station/station-trade.js"></script>
-    <script src="./galaxy/enemy-a.js"></script>
+<!-- Классические скрипты: кладут GALAXY, StarA, PLANET, HELP в глобал -->
+<script src="./galaxy/star-A.js"></script>
+<script src="./galaxy/star-G.js"></script>
+<script src="./galaxy/planet.js"></script>
+<script src="./galaxy/hyperfx.js"></script>
+<script src="./galaxy/skystar.js"></script>
+<script src="./station/station.js"></script>
+<script src="./station/station-trade.js"></script>
+<script src="./galaxy/enemy-a.js"></script>
 
-    <!--
-    <script src="./ships/radar-holo.js"></script>
-    -->
+<!--   -->
+<script src="./ships/radar-holo.js"></script>
 
-    <script src="./ui/help.js"></script>
-    <script src="./snd/g-sound-lib.js"></script>
 
-  <script type="module">
-    // import * as THREE from "three";
-    // window.THREE = THREE;
+<script src="./ui/help.js"></script>
+<script src="./snd/g-sound-lib.js"></script>
+
+<script type="module">
 
     import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
@@ -494,8 +492,11 @@ window.HUD = HUD;
     // ----------------------------------------------------
     //  Радар
     // ----------------------------------------------------
-    // const radar = new RadarHolo(
-    //     renderer, { size: 240, range: 2000, anchor: "bottom-right" });
+    const radar = new RadarHolo(
+        renderer,
+        camera,
+        { range: 1000, size: 100 }
+    );
 
 //////////////////////////////////////////////////////////////////// 🔍 .state:
 // ------------|
@@ -1426,12 +1427,64 @@ const state = {
     }
 
 // ------------------------------------------------------------------
+//  Радар: синхронизация с игровым состоянием
+// ------------------------------------------------------------------
+function updateRadar(dt) {
+    const contacts = [];
+
+    // Враги
+    if (window.EnemyA && EnemyA.list) {
+        for (const e of EnemyA.list) {
+            contacts.push({
+                id:   "en_" + e.mesh.id,
+                pos:  e.position,
+                kind: "enemy",
+            });
+        }
+    }
+
+    // Станция
+    if (currentStationHandle && currentStationHandle.group) {
+        contacts.push({
+            id:   "station",
+            pos:  currentStationHandle.group.position,
+            kind: "station",
+        });
+    }
+
+    // Планеты
+    for (let i = 0; i < planets.length; i++) {
+        contacts.push({
+            id:   "pl_" + i,
+            pos:  planets[i].mesh.position,
+            kind: "neutral",
+        });
+    }
+
+    // Звезда
+    if (currentStarHandle && currentStarHandle.mesh) {
+        contacts.push({
+            id:   "star",
+            pos:  currentStarHandle.mesh.position,
+            kind: "neutral",
+        });
+    }
+
+    radar.setContacts(contacts);
+    radar.update(dt, camera.position, camera.quaternion);
+}
+
+// ------------------------------------------------------------------
 //  Стыковка к станции.
 // --------------------------------------------------------------- 💥
 function animate() 
 {
     const dt = Math.min(clock.getDelta(), 0.05);
     const time = clock.elapsedTime;
+
+    // updateRadar(dt);
+    // radar.render();
+    // return;
 
     //sun.update(dt * 0.1); 
 
@@ -1837,9 +1890,11 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
 
         updateHitEffects(dt);
         updateHUD();
-        composer.render();
 
-      //radar.render();
+        updateRadar(dt);
+
+        composer.render();
+        radar.render(); 
 
         requestAnimationFrame(animate);
     }
