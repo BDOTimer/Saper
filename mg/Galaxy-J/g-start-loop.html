@@ -1538,6 +1538,8 @@ function animate()
         return;
     }
 
+    player.getWorldPosition(playerWorldPos);
+
 ///////////////////////////////////////////////////////////////// 🟢- ИГРОК ЖИВ!
     if (!state.dead)
     {
@@ -1670,8 +1672,6 @@ else
         }
 
         // Метеоры
-        player.getWorldPosition(playerWorldPos);
-
         for (const m of meteors) {
           m.position.x += dustDrift.x;
           m.position.y += dustDrift.y;
@@ -1867,8 +1867,6 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
           EnemyA.spawn(null);
 
           // ИИ врагов
-          player.getWorldPosition(playerWorldPos);
-
           for (const e of enemies)
           { const toPlayer = new THREE.Vector3().subVectors(playerWorldPos, e.position);
             const dist = toPlayer.length();
