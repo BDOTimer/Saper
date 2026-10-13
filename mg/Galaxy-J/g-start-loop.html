@@ -215,6 +215,11 @@
 
   <div id="gameover">
     GAME OVER
+
+    <div id="deathBanner">
+      <span id="deathReason">ПРИЧИНА СМЕРТИ НЕИЗВЕСТНА</span>
+    </div>
+
     <small>нажми ENTER чтобы начать заново</small>
   </div>
 
@@ -359,6 +364,7 @@
     const elSector    = $("sector");
     const elDamage    = $("damage-flash");
     const elGameover  = $("gameover");
+    const elDeathReason = $("deathReason");
 
     const elCompassNeedle = $("compass-needle");
     const elHdg           = $("hdg");
@@ -368,6 +374,20 @@
     // ----------------------------------------------
     const elIndD = document.getElementById("ind-d");
     const elIndS = document.getElementById("ind-s");
+
+/**
+ * Установить текст причины смерти на экране GAME OVER.
+ * @param {string} [text] — если не передать, ставится дефолт.
+ */
+function setDeathReason(text) {
+    const msg = (text && String(text).trim()) || "ПРИЧИНА СМЕРТИ НЕИЗВЕСТНА";
+    elDeathReason.textContent = msg;
+
+    // перезапуск анимации вспышки
+    elDeathReason.classList.remove("is-updated");
+    void elDeathReason.offsetWidth;
+    elDeathReason.classList.add("is-updated");
+}
 
 /**
  * Управление круглыми индикаторами верхней панели.
@@ -1221,6 +1241,7 @@ const state = {
         camera.quaternion.set(0, 0, 0, 1);
 
         reseedDustAndMeteors();
+        setDeathReason  (null);  
 
         document.getElementById("gameover").style.display = "none";
     }
@@ -1357,10 +1378,12 @@ const state = {
     // -------------------------------|
     //  Смерть героя.                 |
     // -------------------------------:
-    function killPlayer(sound = SNDS.death)
+    function killPlayer(reason = null, sound = SNDS.death)
     {   sound.play();
         ship.shield = 0;
         state.dead  = true;
+
+        setDeathReason(reason); 
         elGameover.style.display = "flex";
 
         /// TODO: тут добавить штрафы за смерть ...
@@ -1681,7 +1704,7 @@ else
             SHAKE.trigger(power);
 
             if (ship.shield <= 0) {
-                killPlayer();
+                killPlayer("СТОЛКНОВЕНИЕ С МЕТЕОРИТОМ");
             }
           }
         }
@@ -1694,7 +1717,7 @@ else
             const dangerLevel = p.getDangerLevel(playerWorldPos);
             
             if(dangerLevel > 0.99)
-            {   killPlayer();
+            {   killPlayer("СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ");
             }
             else if(dangerLevel > 0.1)
             {
@@ -1711,7 +1734,7 @@ else
             const starDanger = currentStarHandle.getDangerLevel(playerWorldPos);
 
             if (starDanger > 0.99)
-            {   killPlayer();
+            {   killPlayer("ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ");
             }
             else if (starDanger > 0.1)
             {
@@ -1753,7 +1776,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
           {
             // авария
             game.isDock = false;
-            killPlayer();
+            killPlayer("ЖЁСТКАЯ ПОСАДКА НА СТАНЦИЮ");
           }
           else if (status === 1) {
             // успешная посадка — например, пополнить топливо/щит,
@@ -1858,7 +1881,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
               ship.shield -= 30 * dt;
               flashDamage(0.4);
               if (ship.shield <= 0) {
-                killPlayer();
+                killPlayer("УНИЧТОЖЕН ВРАЖЕСКИМ ОГНЁМ");
               }
             }
           }

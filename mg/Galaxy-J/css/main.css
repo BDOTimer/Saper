@@ -1240,3 +1240,90 @@ padding: 0 !important;
   }
   #sys-info .sys-info__value { font-size: 12px; }
 }
+
+/* ============================================================
+   ПЛАШКА «ПРИЧИНА СМЕРТИ» на экране GAME OVER
+   ============================================================ */
+#deathBanner {
+  position: relative;
+  display: inline-block;
+  margin: 10px auto 4px;
+  padding: 14px 42px;
+  min-width: 360px;
+  max-width: 80vw;
+  text-align: center;
+
+  /* ВСЕ слои в одном background: сверху блик, под ним — тёмно-красный градиент */
+  background:
+    /* верхний блик (полупрозрачный) */
+    linear-gradient(180deg,
+      rgba(255, 120, 120, 0.22) 0%,
+      rgba(255, 120, 120, 0.05) 40%,
+      transparent 55%,
+      rgba(0, 0, 0, 0.40) 100%),
+    /* основной тёмно-красный фон */
+    linear-gradient(180deg,
+      #8c1414 0%,
+      #5a0a0a 42%,
+      #300505 100%);
+
+  border: 2px solid #5a0a0a;
+  border-top-color:    #ff7a7a;
+  border-left-color:   #c23a3a;
+  border-right-color:  #7a1414;
+  border-bottom-color: #2a0303;
+  border-radius: 10px;
+
+  box-shadow:
+    0 0 0 1px rgba(255, 130, 130, 0.30) inset,
+    0 2px 0 rgba(255, 150, 150, 0.22) inset,
+    0 -3px 10px rgba(0, 0, 0, 0.70) inset,
+    0 6px 18px rgba(0, 0, 0, 0.70),
+    0 0 26px rgba(255, 40, 40, 0.35),
+    0 0 60px rgba(255, 0, 0, 0.18);
+
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+
+  animation: deathBannerIn 0.45s cubic-bezier(0.18, 0.9, 0.3, 1.2) both;
+}
+
+#deathBanner #deathReason {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1.3;
+  color: #ffffff;                                 /* белый текст */
+  text-shadow:
+    0 0 4px rgba(255, 255, 255, 0.9),
+    0 0 14px rgba(255, 90, 90, 0.85),
+    0 0 30px rgba(255, 0, 0, 0.45),
+    0 2px 0 rgba(0, 0, 0, 0.9);
+  transition: filter 0.2s ease;
+}
+
+/* вспышка при смене текста */
+#deathBanner #deathReason.is-updated {
+  animation: deathReasonFlash 0.55s ease-out;
+}
+
+@keyframes deathBannerIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.94); filter: brightness(2.2); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes deathReasonFlash {
+  0%   { filter: brightness(2.4); }
+  100% { filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #deathBanner { animation: none; }
+  #deathBanner #deathReason.is-updated { animation: none; }
+}
+
+@media (max-width: 840px) {
+  #deathBanner { min-width: 240px; padding: 10px 22px; }
+  #deathBanner #deathReason { font-size: 14px; letter-spacing: 2px; }
+}
