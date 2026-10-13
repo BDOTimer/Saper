@@ -94,11 +94,11 @@ class RadarHolo
     // -----------------------------------------------------------------
     #createRadarSphere()
     {
-        const geo = new THREE.SphereGeometry(this.#size, 32, 24);
+        const geo = new THREE.SphereGeometry(this.#size, 8, 8); // 32, 24
         const mat = new THREE.MeshBasicMaterial({
             color: 0x44aaff,
             transparent: true,
-            opacity: 0.08,
+            opacity: 0.04,
             wireframe: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
@@ -111,7 +111,7 @@ class RadarHolo
     #createTacticalPlane()
     {
         // Плоскость-диск (чтобы не торчали углы квадрата)
-        const geo = new THREE.CircleGeometry(this.#size, 64);
+        const geo = new THREE.CircleGeometry(this.#size, 128);
         const mat = new THREE.MeshBasicMaterial({
             color: 0x2255aa,
             transparent: true,
@@ -302,7 +302,7 @@ class RadarHolo
         if (shipQuat) this.#shipQuat.copy(shipQuat);
 
         // Легкое вращение сферы для «жизни»
-        this.#group.rotation.y += dt * 0.15;
+        // this.#group.rotation.y += dt * 0.15;
     }
 
     render()
