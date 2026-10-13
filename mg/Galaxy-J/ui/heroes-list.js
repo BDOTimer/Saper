@@ -400,7 +400,7 @@
 
     var title = document.createElement("h2");
     title.className = "hl-title";
-    title.textContent = "ТАБЛИЦА ГЕРОЕВ";
+    title.textContent = "Galaxy-J::ТАБЛИЦА ГЕРОЕВ";
 
     var closeBtn = document.createElement("button");
     closeBtn.type = "button";

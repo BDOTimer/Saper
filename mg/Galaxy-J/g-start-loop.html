@@ -493,11 +493,6 @@ const state = {
   get sector()    { return pers.sector;    }, set sector(v)    { pers.sector    = v; },
   get dead()      { return pers.dead;      }, set dead(v)      { pers.dead      = v; },
 
-  get speed()     { return ship.speed;     }, set speed(v)     { ship.speed     = v; },
-  get maxSpeed()  { return ship.maxSpeed;  }, set maxSpeed(v)  { ship.maxSpeed  = v; },
-  get minSpeed()  { return ship.minSpeed;  }, set minSpeed(v)  { ship.minSpeed  = v; },
-  get shield()    { return ship.shield;    }, set shield(v)    { ship.shield    = v; },
-  get fuel()      { return ship.fuel;      }, set fuel(v)      { ship.fuel      = v; },
   get angVel()    { return ship.angVel;    },
 };
 ///////////////////////////////////////////////////////////////////////////////.
@@ -589,7 +584,7 @@ const state = {
     function saveGame()
     {   
         if(Settings.isTestDockToStation)
-        {   state.fuel = 100; // 🔴⚠️
+        {   ship.fuel = 100; // 🔴⚠️
         }
       
         game.world = game.buildWorldSnapshot();
@@ -911,7 +906,7 @@ const state = {
     // ------------------------------------------------------------------
     const keys = {};
 
-    addEventListener("keydown", (e) => {
+    addEventListener("keydown", (e) =>{
       // F1: справка
       if (e.code === "F1") {
         e.preventDefault();
@@ -1034,20 +1029,20 @@ const state = {
       const dist = Galaxy.getDistanceLY(cur, dst);
 
       HYPERFX.fuelNeed  = dist * ship.TUNING.fuel_hyper;
-      HYPERFX.isSuccess = HYPERFX.fuelNeed < state.fuel;
+      HYPERFX.isSuccess = HYPERFX.fuelNeed < ship.fuel;
       HYPERFX.fuelCost  = HYPERFX.isSuccess ? HYPERFX.fuelNeed
                                     : ship.TUNING.fuel_hyper_min;
 
       //const fuelCost = HYPERFX.fuelCost;
       // console.log("🔍 ship.TUNING.fuel_hyper: ", ship.TUNING.fuel_hyper);
       // console.log("🔍 dist      : ", dist);
-      // console.log("🔍 state.fuel: ", state.fuel);
+      // console.log("🔍 ship.fuel : ", ship.fuel);
       // console.log("🔍 fuelCost  : ", fuelCost);
       // console.log("🔍 isSuccess : ", HYPERFX.isSuccess);
 
-      if (state.fuel < HYPERFX.fuelCost) {
+      if (ship.fuel < HYPERFX.fuelCost) {
         console.log(
-`1HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(state.fuel)})`,
+`1HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(ship.fuel)})`,
         );
         SNDS.fail1.play();
         return;
@@ -1083,12 +1078,12 @@ const state = {
         return;
       }
       // Списываем топливо
-      state.fuel = Math.max(0, state.fuel - HYPERFX.fuelCost);
+      ship.fuel = Math.max(0, ship.fuel - HYPERFX.fuelCost);
 
       if(!HYPERFX.isSuccess)
       {
         console.log(
-`HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(state.fuel)})`,
+`HYPER: недостаточно топлива (нужно ${HYPERFX.fuelNeed}, есть ${Math.round(ship.fuel)})`,
         );
         SNDS.fail1.play();
 
@@ -1101,12 +1096,11 @@ const state = {
         return;
       }
 
-      
     //console.log("🔍 dist: ", dist),
 
-      // ------------------------------
+      // ----------------------------------------
       // Успех! (прыжок удался)
-      // ------------------------------
+      // ------------------------------------- 🌍
       state.indexStar = targetIdx;
       state.dataStar  = star;
 
@@ -1127,7 +1121,7 @@ const state = {
           Game.randomQuatCamera(camera);
       }
 
-      state.speed = 0;
+      ship.speed = 0;
       state.angVel.pitch = state.angVel.yaw = state.angVel.roll = 0;
 
       HUD.setSystem(GALAXY.getCurrentStar().name); // Имя звезды на панель
@@ -1193,7 +1187,8 @@ const state = {
     {
         // ...
         EnemyA.doAmount(1, 2);
-        state.dead = false;
+        state.dead  = false;
+        ship.shield = ship.SHIELDMAX;
     };
     StartGame();
 
@@ -1275,23 +1270,23 @@ const state = {
     const _compassFwd = new THREE.Vector3();
 
     function updateHUD() {
-      elSpeed.textContent = Math.round(state.speed);
+      elSpeed.textContent = Math.round(ship.speed);
       elSpeedBar.style.width =
-        Math.min(100, (Math.abs(state.speed) / state.maxSpeed) * 100) + "%";
-      elShield.textContent = Math.round(state.shield);
-      elShieldBar.style.width = state.shield + "%";
-      elFuel.textContent    = Math.round(state.fuel);
-      elFuelBar.style.width = state.fuel + "%";
-      elKills .textContent  = state.kills;
-      elSector.textContent  = `${state.sector.x},${state.sector.y}`;
+        Math.min(100, (Math.abs(ship.speed) / ship.maxSpeed) * 100) + "%";
+      elShield.textContent = Math.round(ship.shield);
+      elShieldBar.style.width = ship.shield + "%";
+      elFuel.textContent    = Math.round(ship.fuel);
+      elFuelBar.style.width = ship.fuel + "%";
+      elKills  .textContent = state.kills;
+      elSector .textContent = `${state.sector.x},${state.sector.y}`;
     //elCredits.textContent = state.credits;
 
       // подсветка, когда топлива мало:
-      elFuel.style.color = state.fuel < 10 ? "#f60" : "";
+      elFuel.style.color = ship.fuel < 20 ? "#f60" : "";
       
       // подсветить режим дебага
-      //elFuel.textContent = DEBUG.infiniteFuel ? "∞" : Math.round(state.fuel);
-      //elFuelBar.style.width = DEBUG.infiniteFuel ? "100%" : state.fuel + "%";
+      //elFuel.textContent = DEBUG.infiniteFuel ? "∞" : Math.round(ship.fuel);
+      //elFuelBar.style.width = DEBUG.infiniteFuel ? "100%" : ship.fuel + "%";
 
       // ----------------------------------------
       //  Компас: курс в плоскости XZ
@@ -1350,11 +1345,13 @@ const state = {
     // -------------------------------:
     function killPlayer(sound = SNDS.death)
     {   sound.play();
-        state.shield = 0;
-        state.dead = true;
+        ship.shield = 0;
+        state.dead  = true;
         elGameover.style.display = "flex";
 
         /// TODO: тут добавить штрафы за смерть ...
+
+        SNDS.death.play();
 
         saveGame();
     }
@@ -1374,9 +1371,9 @@ const state = {
         kit.sounds.docking.play();
 
         // Пополняем ресурсы
-        state.fuel   = 100;
-        state.shield = ship.SHIELDMAX;
-        state.speed  = 3;
+        ship.fuel   = 100;
+        ship.shield = ship.SHIELDMAX;
+        ship.speed  = 3;
 
         const star = GALAXY.getCurrentStar();
 
@@ -1400,7 +1397,7 @@ const state = {
 
         if (TRADE.isOpen()) TRADE.close();
 
-        state.speed = 500;
+        ship.speed = 40;
 
         ship.tradeOut();
     }
@@ -1456,36 +1453,41 @@ function animate()
     if (!state.dead)
     {
         // Автовосстановитель щита
-        if(state.shield < ship.SHIELDMAX) state.shield += dt;
+        if(ship.shield < ship.SHIELDMAX) ship.shield += dt;
 
 ///////////////////////////////////////////////////////////////////// 🔍 .keys:
 
 // ------- Плавная тяга с инерцией -------
 const thrustIn = (keys["ArrowUp"] ? 1 : 0) - (keys["ArrowDown"] ? 1 : 0);
 
-// Разгон
-state.speed += thrustIn * ship.THR.accel * dt;
-
-// Экспоненциальное торможение (не зависит от FPS)
-// Если тяга отпущена — гасим сильнее; если держим — только слегка "вязко" ограничиваем.
-const damping = thrustIn === 0 ? ship.THR.brake : ship.THR.drag;
-state.speed  *= Math.exp(-damping * dt);
+// Топливо
+if (thrustIn !== 0)
+{   ship.fuel -= Math.abs(ship.speed) * dt * ship.TUNING.fuel_rate;
+    if (ship.fuel <= 0)
+    {   ship.fuel  = 0;
+    }
+    
+    // Разгон/торможение
+    if (ship.fuel != 0)
+    {   ship.speed += thrustIn * ship.THR.accel * dt;
+    }
+}
 
 // Ограничение диапазона
-state.speed = Math.max(
-    state.minSpeed,
-    Math.min(state.maxSpeed, state.speed),
+ship.speed = Math.max(
+    ship.minSpeed,
+    Math.min(ship.maxSpeed, ship.speed),
 );
 
 // Мёртвая зона, чтобы не «полз» вечно возле нуля
-if (Math.abs(state.speed) < 0.05 && thrustIn === 0) state.speed = 0;
+if (Math.abs(ship.speed) < 0.05 && thrustIn === 0) ship.speed = 0;
 
 if (!game.isDock)
 {
   // ------- Плавное вращение с инерцией -------
-  const ax = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0); // pitch
+  const ax = (keys["KeyW"     ] ? 1 : 0) - (keys["KeyS"      ] ? 1 : 0); // pitch
   const ay = (keys["ArrowLeft"] ? 1 : 0) - (keys["ArrowRight"] ? 1 : 0); // yaw
-  const az = (keys["KeyA"] ? 1 : 0) - (keys["KeyD"] ? 1 : 0); // roll
+  const az = (keys["KeyA"     ] ? 1 : 0) - (keys["KeyD"      ] ? 1 : 0); // roll
 
   // Разгон по осям
   state.angVel.pitch += ax * ship.ROT.accel * dt;
@@ -1514,6 +1516,13 @@ if (!game.isDock)
   camera.rotateY(state.angVel.yaw   * dt);
   camera.rotateZ(state.angVel.roll  * dt);
 }
+else
+{
+  // Экспоненциальное торможение (не зависит от FPS)
+  // Если тяга отпущена — гасим сильнее; если держим — только слегка "вязко" ограничиваем.
+  const damping = thrustIn === 0 ? ship.THR.brake : ship.THR.drag;
+  ship.speed  *= Math.exp(-damping * dt);
+}
 ////////////////////////////////////////////////////////////////////////////////
 
         // Движение вперёд
@@ -1521,10 +1530,10 @@ if (!game.isDock)
           .set(0, 0, -1)
           .applyQuaternion(camera.quaternion)
           .clone();
-        camera.position.addScaledVector(forward, state.speed * dt);
+        camera.position.addScaledVector(forward, ship.speed * dt);
 
         // Дрейф метеоров (мир летит на игрока — минус корректный)
-        //const drift = forward.multiplyScalar(-state.speed * dt);
+        //const drift = forward.multiplyScalar(-ship.speed * dt);
 
         // Пыль частично «догоняет» камеру.
         //   0.0 = пыль стоит в мире → летит на игрока на полной скорости
@@ -1534,7 +1543,7 @@ if (!game.isDock)
         const METEOR_FOLLOW = 0.0;
         const dustDrift = forward
           .clone()
-          .multiplyScalar((state.speed - 5) * dt * DUST_FOLLOW);
+          .multiplyScalar((ship.speed - 5) * dt * DUST_FOLLOW);
 
         // Пыль
         {
@@ -1565,7 +1574,7 @@ if (!game.isDock)
 
           const speedFactor = Math.min(
             1,
-            Math.abs(state.speed) / state.maxSpeed,
+            Math.abs(ship.speed) / ship.maxSpeed,
           );
           dust.material.opacity = 0.35 + speedFactor * 0.65;
           dust.material.size = 1.2 + speedFactor * 2.0;
@@ -1590,9 +1599,9 @@ if (!game.isDock)
           if (d < m.userData.size + 12) {
 
             let damag = 5*dt;
-            if(state.speed > 10) damag = 0.4*state.speed * dt;
+            if(ship.speed > 10) damag = 0.4*ship.speed * dt;
 
-            state.shield -= damag;
+            ship.shield -= damag;
 
             const a = SNDS.bassDrop1._pool[0];
             if (!a || a.paused || a.ended) // Защита от спама
@@ -1602,10 +1611,10 @@ if (!game.isDock)
             flashDamage(0.6);
 
             // 🔥 тряска — сила зависит от скорости удара
-            const power = Math.min(6, 0.5 + state.speed * 0.02);
+            const power = Math.min(6, 0.5 + ship.speed * 0.02);
             SHAKE.trigger(power);
 
-            if (state.shield <= 0) {
+            if (ship.shield <= 0) {
                 killPlayer();
             }
           }
@@ -1623,7 +1632,7 @@ if (!game.isDock)
             }
             else if(dangerLevel > 0.1)
             {
-                state.shield -= 0.001 * dt;
+                ship.shield -= 0.001 * dt;
                 flashDamage(0.6 * dangerLevel);
             }
         }
@@ -1640,7 +1649,7 @@ if (!game.isDock)
             }
             else if (starDanger > 0.1)
             {
-                state.shield -= 0.001 * dt;
+                ship.shield -= 0.001 * dt;
                 flashDamage(starDanger);
             }
         }
@@ -1691,16 +1700,6 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         // Стрельба
         fireCooldown -= dt;
         if (keys["Space"]) fire();
-
-        // Топливо
-        if (state.speed !== 0)
-        {
-            state.fuel -= Math.abs(state.speed) * dt * ship.TUNING.fuel_rate;
-            if (state.fuel <= 0)
-            {   state.fuel  = 0;
-                state.speed *= 0.98;
-            }
-        }
             
     } else
     {   fireCooldown -= dt;
@@ -1790,9 +1789,9 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
             e.mesh.rotation.y += dt * 0.7;
 
             if (dist < 30 && !state.dead) {
-              state.shield -= 30 * dt;
+              ship.shield -= 30 * dt;
               flashDamage(0.4);
-              if (state.shield <= 0) {
+              if (ship.shield <= 0) {
                 killPlayer();
               }
             }
@@ -1812,7 +1811,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
 
         // Пульсация двигателей
         const engMat = player.userData.engines[0].material;
-        const intensity = 0.6 + (Math.abs(state.speed) / state.maxSpeed) * 0.8;
+        const intensity = 0.6 + (Math.abs(ship.speed) / ship.maxSpeed) * 0.8;
         engMat.color.setRGB(0.4 * intensity, 0.8 * intensity, 1.0 * intensity);
 
         // Затухание damage flash

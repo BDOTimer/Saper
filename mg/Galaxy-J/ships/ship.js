@@ -12,6 +12,7 @@
 /// Поведение:
 ///     - load()/save() — заглушки для будущей интеграции с profile-store.
 ///     - reset() — сброс ресурсов и физики (без тюнинга).
+///     - расход топлива от тяги.
 
 // Тяжёлый грузовик — долгий разгон, долгое торможение
 // const ROT = { accel: 1.6, damping: 0.9, maxPitch: 0.7, maxYaw: 0.6, maxRoll: 0.9 };
@@ -47,8 +48,8 @@ class Ship
         this.fuel   = options.fuel   ?? 100;
 
         // --- Движение ---
-        this.speed    = options.speed    ?? 0;
-        this.maxSpeed = options.maxSpeed ?? 120;
+        this.speed    = options.speed    ??   0;
+        this.maxSpeed = options.maxSpeed ??  60;
         this.minSpeed = options.minSpeed ?? -20;
 
         // --- Угловые скорости (рад/сек) ---
@@ -72,7 +73,7 @@ class Ship
 
         // --- Тюнинг расхода топлива ---
         this.TUNING = options.TUNING ?? {
-            fuel_rate:  0.001,  // топливо/сек на единицу скорости
+            fuel_rate:  0.003,  // топливо/сек на единицу тяги
             fuel_hyper:     2,  // топлива на 1.0 расстояния между звёздами
             fuel_hyper_min: 5,  // минимум, чтобы стартовать гиперпрыжок
         };

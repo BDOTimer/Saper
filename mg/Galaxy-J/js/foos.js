@@ -256,3 +256,11 @@
     global.FO = FO;
 
 })(typeof window !== 'undefined' ? window : this);
+
+
+class SpeedEngine
+{
+
+}
+
+window.SpeedEngine = SpeedEngine;

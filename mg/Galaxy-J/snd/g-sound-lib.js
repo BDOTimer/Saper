@@ -177,6 +177,7 @@ const kit = SND.createSoundKit({
 
     bassDrop1: { src: "snd/bass_drop_01.mp3", volume: Vol, pool: 1 },
     startG   : { src: "snd/mus/start-g-1.mp3",volume: Vol, pool: 1 },
+    death    : { src: "snd/mus/start-g-1.mp3",volume: Vol, pool: 1 },
 
     fail1    : { src: "snd/fail-3.mp3"     , volume: Vol, pool: 1 },
     fail2    : { src: "snd/fail-4.mp3"     , volume: Vol, pool: 1 },
@@ -193,4 +194,4 @@ function playMusOnStart()
         SNDS.startG.play();
 }
 
-window.addEventListener("click", playMusOnStart);
+//window.addEventListener("click", playMusOnStart);
