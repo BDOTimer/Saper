@@ -190,16 +190,22 @@ class RadarHolo
             let mesh = this.#contactMeshes.get(c.id);
             let line = this.#contactLines.get(c.id);
 
-            const color = this.#getContactColor(c);
-            const r     = (c.kind === "enemy") ? 5 : 3;
+            const color   = this.#getContactColor(c);
+            const r       = this.#getContactSize(c);
+            const opacity = this.#getContactOpacity(c);
 
             if (!mesh) {
                 const geo = new THREE.SphereGeometry(r, 8, 8);
                 const mat = new THREE.MeshBasicMaterial({
-                    color, blending: THREE.AdditiveBlending,
-                    depthWrite: false, toneMapped: false,
+                    color,
+                    transparent: true,
+                    opacity,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    toneMapped: false,
                 });
                 mesh = new THREE.Mesh(geo, mat);
+
                 this.#group.add(mesh);
                 this.#contactMeshes.set(c.id, mesh);
 
@@ -207,8 +213,11 @@ class RadarHolo
                 lineGeo.setAttribute("position",
                     new THREE.BufferAttribute(new Float32Array(6), 3));
                 const lineMat = new THREE.LineBasicMaterial({
-                    color, transparent: true, opacity: 0.6,
-                    blending: THREE.AdditiveBlending, depthWrite: false,
+                    color,
+                    transparent: true,
+                    opacity: opacity * 0.6,   // ★ ножка наследует прозрачность
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
                 });
                 line = new THREE.Line(lineGeo, lineMat);
                 this.#group.add(line);
@@ -260,10 +269,28 @@ class RadarHolo
 
     #getContactColor(c)
     {
-        if (c.kind === "enemy")   return 0xff3333;
-        if (c.kind === "station") return 0x33ff55;
-        if (c.kind === "neutral") return 0xffdd44;
+        if (c.kind === "enemy")   return 0xff3333;   // враг — красный
+        if (c.kind === "station") return 0x33ff55;   // станция — зелёный
+        if (c.kind === "star")    return 0xffee66;   // ★ звезда — ярко-жёлтый
+        if (c.kind === "planet")  return 0xaa7777;   // ★ планета — тускло-оранжевый
         return 0xffffff;
+    }
+
+    // ★ Радиус точки и её прозрачность — по типу контакта
+    #getContactSize(c)
+    {
+        if (c.kind === "enemy")   return 5;
+        if (c.kind === "station") return 4;
+        if (c.kind === "star")    return 5;   // звезда покрупнее
+        if (c.kind === "planet")  return 4;   // планеты — мелкие
+        return 3;
+    }
+
+    #getContactOpacity(c)
+    {
+        if (c.kind === "star")   return 1.0;   // ★ звезда — непрозрачная, яркая
+        if (c.kind === "planet") return 0.9;   // ★ планеты — притушены
+        return 0.9;
     }
 
     // -----------------------------------------------------------------

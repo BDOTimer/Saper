@@ -1457,7 +1457,7 @@ function updateRadar(dt) {
         contacts.push({
             id:   "pl_" + i,
             pos:  planets[i].mesh.position,
-            kind: "neutral",
+            kind: "planet",
         });
     }
 
@@ -1466,7 +1466,7 @@ function updateRadar(dt) {
         contacts.push({
             id:   "star",
             pos:  currentStarHandle.mesh.position,
-            kind: "neutral",
+            kind: "star",
         });
     }
 
