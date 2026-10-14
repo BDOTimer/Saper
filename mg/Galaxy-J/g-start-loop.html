@@ -514,11 +514,7 @@ window.HUD = HUD;
     // ----------------------------------------------------
     //  Радар
     // ----------------------------------------------------
-    const radar = new RadarHolo(
-        renderer,
-        camera,
-        { range: 1000, size: 100 }
-    );
+    const radar = new RadarHolo( renderer, { range: 500, size: 220 } );
 
     // ----------------------------------------------------
     /// Галактика.
@@ -1861,7 +1857,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
             e.mesh.rotation.x += dt * 0.5;                       // ★ mesh.rotation
             e.mesh.rotation.y += dt * 0.7;
 
-            if (dist < 30 && !pers.dead) {
+            if (dist < 30) {
               ship.shield -= 30 * dt;
               flashDamage(0.4);
               if (ship.shield <= 0) {

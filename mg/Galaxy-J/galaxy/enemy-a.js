@@ -76,7 +76,7 @@ class EnemyA
         this.mesh.userData.enemy = true;
         this.mesh.userData.owner = this;
         this.mesh.userData.hp    = 3;
-        this.mesh.userData.speed = 20 + Math.random() * 40;
+        this.mesh.userData.speed = 20 + Math.random() * 20;
 
         this.alive = true;
         EnemyA.scene.add(this.mesh);
