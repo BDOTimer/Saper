@@ -478,7 +478,9 @@ const HUD = (() => {
 
 window.HUD = HUD;
 
-//HUD.setSystem("Alpha Centauri"); 
+//HUD.setSystem("Alpha Centauri");
+
+    //////////////////////////////////////////////////////////////////////// ⭐
 
     // ----------------------------------------------------
     //  Игровая сессия: Pers + Ship + Universe
@@ -518,22 +520,9 @@ window.HUD = HUD;
         { range: 1000, size: 100 }
     );
 
-//////////////////////////////////////////////////////////////////// 🔍 .state:
-// ------------|
-//  Состояние  |
-// ------------:
-// Псевдоним для совместимости со старым кодом — чтобы не переписывать всё сразу
-const state = {
-  get credits()   { return pers.credits;   }, set credits(v)   { pers.credits   = v; },
-  get kills()     { return pers.kills;     }, set kills(v)     { pers.kills     = v; },
-  get sector()    { return pers.sector;    }, set sector(v)    { pers.sector    = v; },
-  get dead()      { return pers.dead;      }, set dead(v)      { pers.dead      = v; },
-};
-///////////////////////////////////////////////////////////////////////////////.
-
-    ///---------------------------------------|
-    /// Галактика:                            |
-    ///---------------------------------------|
+    // ----------------------------------------------------
+    /// Галактика.
+    // ----------------------------------------------------
     const seedGalaxy = GAME.pers.seedGalaxy;
     window.   GALAXY = new Galaxy( seedGalaxy);
               GALAXY . init();
@@ -547,9 +536,11 @@ const state = {
     HELP .init();
     TRADE.init();
     TRADE.setOnCreditsChanged((credits) => {
-        state.credits = credits;
+        pers.credits = credits;
         elCredits.textContent = credits;
     });
+    
+    ////////////////////////////////////////////////////////////////////////////
 
     // ============================================================
     //  Скрытие курсора через 3 секунды бездействия
@@ -664,10 +655,10 @@ const state = {
     //  Звёздное небо (дальний фон).
     // ---------------------------------------:
     const skystars = SKYSTAR.makeStarfield(12345, {
-        count: 4000,
-        radius: 4000,
-        sizeMax: 8,
-        opacity: 0.9,
+        count  : 4000,
+        radius : 4000,
+        sizeMax:    8,
+        opacity:  0.9,
         starPoints: 6,
           
         // Цвет
@@ -782,7 +773,6 @@ const state = {
     //  Лазеры / эффекты
     // ------------------------------------------------------------------------:
     const lasers  = [];
-
     let shotCounter = 0;
 
     function spawnLaser()
@@ -948,7 +938,7 @@ const state = {
         return;
       }
 
-      if(state.dead)
+      if(pers.dead)
       {
           if(e.code === "Enter")
           { resetGame();
@@ -966,7 +956,7 @@ const state = {
         // Открыть TRADE можно только на пристыкованном корабле
         if (game.isDock) {
           e.preventDefault();
-          TRADE.open(state.credits);
+          TRADE.open(pers.credits);
         } else {
           console.log("TRADE: не пристыкован — T игнорируется");
         }
@@ -1030,8 +1020,8 @@ const state = {
     function updateSectorFromStar(star)
     {
         if (!star) return;
-        state.sector.x = Math.round((star.x + 1) * 50);
-        state.sector.y = Math.round((star.y + 1) * 50);
+        pers.sector.x = Math.round((star.x + 1) * 50);
+        pers.sector.y = Math.round((star.y + 1) * 50);
     }
 
     // ------------------------------------------------------------
@@ -1040,7 +1030,7 @@ const state = {
     // Карта Галактики - открывается по KeyJ
     function tryHyperJump()
     {
-      if (state.dead || game.hyper.active) return;
+      if (pers.dead || game.hyper.active) return;
 
       // Если карта закрыта — откроем её, чтобы игрок выбрал цель
       if (!GALAXY.isOpen()) {
@@ -1184,7 +1174,6 @@ const state = {
       game.hyper.active     = false;
       elHyper.style.display = "none";
 
-      console.log("completeHyperJump(): сохранит universe + pers + ship в один профиль");
       saveGame();
 
       console.assert(game.pers.seedStar === star.seed);
@@ -1221,7 +1210,7 @@ const state = {
     {
         // ...
         EnemyA.doAmount(1, 2);
-        state.dead  = false;
+        pers.dead  = false;
         ship.shield = ship.SHIELDMAX;
     };
     StartGame();
@@ -1310,11 +1299,11 @@ const state = {
         Math.min(100, (Math.abs(ship.speed) / ship.maxSpeed) * 100) + "%";
       elShield.textContent = Math.round(ship.shield);
       elShieldBar.style.width = ship.shield + "%";
-      elFuel.textContent    = Math.round(ship.fuel);
+      elFuel   .textContent = Math.round(ship.fuel);
       elFuelBar.style.width = ship.fuel + "%";
-      elKills  .textContent = state.kills;
-      elSector .textContent = `${state.sector.x},${state.sector.y}`;
-    //elCredits.textContent = state.credits;
+      elKills  .textContent = pers.kills;
+      elSector .textContent = `${pers.sector.x},${pers.sector.y}`;
+    //elCredits.textContent = pers.credits;
 
       // подсветка, когда топлива мало:
       elFuel.style.color = ship.fuel < 20 ? "#f60" : "";
@@ -1345,7 +1334,7 @@ const state = {
     let fireCooldown = 0;
 
     function fire()
-    {   if (fireCooldown > 0 || state.dead) return;
+    {   if (fireCooldown > 0 || pers.dead) return;
         fireCooldown = 0.12;
         const laser = spawnLaser();
         lasers.push(laser);
@@ -1357,13 +1346,15 @@ const state = {
     ///-------------------------------------------------------------------- .an:
     const clock  = new THREE.Clock();
     const tmpVec = new THREE.Vector3();
-    const playerWorldPos = new THREE.Vector3();
+    const playerWorldPos  = new THREE.Vector3();
+    const playerWorldQuat = new THREE.Quaternion();
 
     // Фикс: для коллизии по отрезку пути за кадр
     const _laserPrev = new THREE.Vector3();
-    const _ab = new THREE.Vector3();
-    const _ap = new THREE.Vector3();
-    const _closest = new THREE.Vector3();
+    const _ab        = new THREE.Vector3();
+    const _ap        = new THREE.Vector3();
+    const _closest   = new THREE.Vector3();
+    const V          = new THREE.Vector3();
 
     // Расстояние от точки p до отрезка [a, b]
     function segDistToPoint(a, b, p) {
@@ -1381,14 +1372,14 @@ const state = {
     function killPlayer(reason = null, sound = SNDS.death)
     {   sound.play();
         ship.shield = 0;
-        state.dead  = true;
+        pers.dead  = true;
 
         setDeathReason(reason); 
         elGameover.style.display = "flex";
 
         /// TODO: тут добавить штрафы за смерть ...
 
-        SNDS.death.play();
+        //SNDS.death.play();
 
         saveGame();
     }
@@ -1415,8 +1406,8 @@ const state = {
         const star = GALAXY.getCurrentStar();
 
         // Открываем торговлю (один раз, не каждый кадр)
-        // TRADE.open(state.credits);
-        ship.tradeOn(star, state.credits);
+        // TRADE.open(pers.credits);
+        ship.tradeOn(star, pers.credits);
 
         saveGame();
     };
@@ -1443,10 +1434,10 @@ const state = {
     if(game.isDock)
     {
         HUD.setStatus("D", true, { pulse: false }); // зелёный
-        TRADE.open(state.credits);
+        TRADE.open(pers.credits);
 
         const star = GALAXY.getCurrentStar();
-        ship.tradeOn(star, state.credits);
+        ship.tradeOn(star, pers.credits);
     }
 
 // ------------------------------------------------------------------
@@ -1512,9 +1503,8 @@ function animate()
     //sun.update(dt * 0.1); 
 
     // Светило и планеты текущей системы
-    if (currentStarHandle && currentStarHandle.update)
-    {   currentStarHandle.update(dt, time);
-    }
+    currentStarHandle.update(dt, time);
+    
     for (const p of planets) p.update(dt);
 
     GALAXY.update(dt);
@@ -1524,9 +1514,8 @@ function animate()
     // Пока идёт гиперпрыжок — мир заморожен, но рендер идёт
     if (game.hyper.active) {
       // Светило текущей системы можно продолжать анимировать для красоты
-      if (currentStarHandle && currentStarHandle.update) {
-        currentStarHandle.update(dt, clock.elapsedTime);
-      }
+      currentStarHandle.update(dt, clock.elapsedTime);
+
       composer.render();
       requestAnimationFrame(animate);
       return;
@@ -1541,7 +1530,7 @@ function animate()
     player.getWorldPosition(playerWorldPos);
 
 ///////////////////////////////////////////////////////////////// 🟢- ИГРОК ЖИВ!
-    if (!state.dead)
+    if (!pers.dead)
     {
         // Автовосстановитель щита
         if(ship.shield < ship.SHIELDMAX) ship.shield += dt;
@@ -1631,7 +1620,6 @@ else
         //   0.8 = пыль почти «прилипла» к камере → почти не набегает
         //   1.0 = пыль движется вместе с кораблём → стоит на месте визуально
         const DUST_FOLLOW = 0.7;
-        const METEOR_FOLLOW = 0.0;
         const dustDrift = forward
           .clone()
           .multiplyScalar((ship.speed - 5) * dt * DUST_FOLLOW);
@@ -1717,7 +1705,7 @@ else
             const dangerLevel = p.getDangerLevel(playerWorldPos);
             
             if(dangerLevel > 0.99)
-            {   killPlayer("СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ");
+            {   killPlayer("СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ", SNDS.startG);
             }
             else if(dangerLevel > 0.1)
             {
@@ -1734,7 +1722,7 @@ else
             const starDanger = currentStarHandle.getDangerLevel(playerWorldPos);
 
             if (starDanger > 0.99)
-            {   killPlayer("ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ");
+            {   killPlayer("ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ", SNDS.startG);
             }
             else if (starDanger > 0.1)
             {
@@ -1746,7 +1734,6 @@ else
         ///-------------------------------------|
         /// Cтанция в системе[СТЫКОВКА].
         ///-------------------------------------:
-        const playerWorldQuat = new THREE.Quaternion();
         player.getWorldQuaternion(playerWorldQuat);
         // playerWorldPos уже вычислен выше
         
@@ -1831,8 +1818,8 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
               if (e.hit(1)) {
                 spawnHitFlash(e.position.clone(), 6);
                 EnemyA.remove(e);
-                state.kills++;
-                state.credits += 100;
+                pers.kills++;
+                pers.credits += 100;
               }
               dead = true;
               break;
@@ -1861,21 +1848,21 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         }
 
         // Спавн врагов
-        if (!state.dead && !game.isDock)
+        if (!pers.dead && !game.isDock)
         {
         //EnemyA.spawn(camera); // Вокруг игрока
           EnemyA.spawn(null);
 
           // ИИ врагов
           for (const e of enemies)
-          { const toPlayer = new THREE.Vector3().subVectors(playerWorldPos, e.position);
+          { const toPlayer = V.subVectors(playerWorldPos, e.position);
             const dist = toPlayer.length();
             toPlayer.normalize();
             e.position.addScaledVector(toPlayer, e.speed * dt);  // ★ e.speed, не userData
             e.mesh.rotation.x += dt * 0.5;                       // ★ mesh.rotation
             e.mesh.rotation.y += dt * 0.7;
 
-            if (dist < 30 && !state.dead) {
+            if (dist < 30 && !pers.dead) {
               ship.shield -= 30 * dt;
               flashDamage(0.4);
               if (ship.shield <= 0) {
