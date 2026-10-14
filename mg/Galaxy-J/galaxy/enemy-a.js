@@ -82,11 +82,11 @@ class EnemyA
         EnemyA.scene.add(this.mesh);
     }
 
-    get hp     ()  { return this.mesh.userData.hp; }
-    set hp     (v)  { this.mesh.userData.hp = v; }
-    get speed  ()  { return this.mesh.userData.speed; }
-    set speed  (v)  { this.mesh.userData.speed = v; }
-    get position() { return this.mesh.position; }
+    get hp      ( )  { return this.mesh.userData.hp; }
+    set hp      (v)  { this.mesh.userData.hp = v; }
+    get speed   ( )  { return this.mesh.userData.speed; }
+    set speed   (v)  { this.mesh.userData.speed = v; }
+    get position( )  { return this.mesh.position; }
 
     static buildMesh()
     {
@@ -138,9 +138,9 @@ class EnemyA
     {   this.amount = Math.floor(Math.random() * (max - min)) + min;
     }
 
-    static start(danger)
+    static start(star)
     {      EnemyA.clear();
-           this.amount = Math.round(EnemyA.MAXBASE * danger);
+           this.amount = Math.round(EnemyA.MAXBASE * star.danger);
 
            console.log("💀 EnemyA.amount: ", this.amount);
     }
