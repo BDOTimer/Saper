@@ -996,20 +996,18 @@ window.HUD = HUD;
       }
 
       if (GALAXY.isOpen()) {
-        if (e.code === "ArrowLeft" ) GALAXY.moveSelection(-1, 0);
-        if (e.code === "ArrowRight") GALAXY.moveSelection(1,  0);
-        if (e.code === "ArrowUp"   ) GALAXY.moveSelection(0,  1);
-        if (e.code === "ArrowDown" ) GALAXY.moveSelection(0, -1);
-        if (e.code === "Enter"     )        tryHyperJump ();
+        GALAXY.keyboard(e.code);
+        if (e.code === "Enter") tryHyperJump ();
         e.preventDefault();
         return;
       }
 
       // Игра
       keys[e.code] = true;
-      if (e.code === "Space") e.preventDefault();
+      if (e.code === "Space") { --pers.credits; e.preventDefault(); }
       if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
     });
+    
 
     addEventListener("keyup", (e) => (keys[e.code] = false));
 
@@ -1308,7 +1306,7 @@ window.HUD = HUD;
       elFuelBar.style.width = ship.fuel + "%";
       elKills  .textContent = pers.kills;
       elSector .textContent = `${pers.sector.x},${pers.sector.y}`;
-    //elCredits.textContent = pers.credits;
+      elCredits.textContent = pers.credits;
 
       // подсветка, когда топлива мало:
       elFuel.style.color = ship.fuel < 20 ? "#f60" : "";
@@ -1637,11 +1635,11 @@ else
             const dx = arr[ix + 0] - cx;
             const dy = arr[ix + 1] - cy;
             const dz = arr[ix + 2] - cz;
-            if (dx > H) arr[ix + 0] -= H * 2;
+            if (dx >  H) arr[ix + 0] -= H * 2;
             if (dx < -H) arr[ix + 0] += H * 2;
-            if (dy > H) arr[ix + 1] -= H * 2;
+            if (dy >  H) arr[ix + 1] -= H * 2;
             if (dy < -H) arr[ix + 1] += H * 2;
-            if (dz > H) arr[ix + 2] -= H * 2;
+            if (dz >  H) arr[ix + 2] -= H * 2;
             if (dz < -H) arr[ix + 2] += H * 2;
           }
           attr.needsUpdate = true;
@@ -1732,7 +1730,7 @@ else
         player.getWorldQuaternion(playerWorldQuat);
         // playerWorldPos уже вычислен выше
         
-const up     = new THREE.Vector3(0,1,0).applyQuaternion(playerWorldQuat);
+const up     = new THREE.Vector3(0,1, 0).applyQuaternion(playerWorldQuat);
 const nose   = new THREE.Vector3(0,0,-1).applyQuaternion(playerWorldQuat);
 const gateUp = new THREE.Vector3(0,1,0); // станция не повёрнута
 const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
@@ -1770,7 +1768,9 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
         
         // Стрельба
         fireCooldown -= dt;
-        if (keys["Space"]) fire();
+        if (keys["Space"])
+        {   fire();
+        }
             
     } else
     {   fireCooldown -= dt;
@@ -1814,7 +1814,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
                 spawnHitFlash(e.position.clone(), 6);
                 EnemyA.remove(e);
                 pers.kills++;
-                pers.credits += 100;
+                pers.credits += 5;
               }
               dead = true;
               break;

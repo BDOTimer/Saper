@@ -375,26 +375,66 @@ static GOVERNMENTS = [
     isOpen() { return this.#state.open; }
 
     // --------------------------------------------------------------
-    //  Управление
+    //  Перемещает курсор к БЛИЖАЙШЕЙ звезде в направлении (dx, dy).
+    //  (dx, dy) — в осях ГАЛАКТИКИ, где +Y — ВВЕРХ на экране,
+    //  т.к. на карте py = cy - y * scaleY.
     // --------------------------------------------------------------
     moveSelection(dx, dy)
     {
-        const cur = this.#stars[this.#state.selected];
-        let best  = null;
-        let bestScore = Infinity;
+        const cur = this.#stars[this.#state.selected]
+                ?? this.#stars[this.#state.playerStar];
+        if (!cur) return;
 
-        for (const s of this.#stars) {
-            if (s.id === this.#state.selected) continue;
-            const vx = s.x - cur.x;
-            const vy = s.y - cur.y;
-            const along = vx * dx + vy * dy;
-            if (along <= 0) continue;
-            const perp = Math.abs(vx * dy - vy * dx);
-            const score = perp * 10 - along;
-            if (score < bestScore) { bestScore = score; best = s; }
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-9) return;
+        const nx = dx / len;
+        const ny = dy / len;
+
+        const CONE = 0.5;   // cos(60°) — полуширина сектора выбора.
+                            // 0.7 = строже (±45°), 0.34 = свободнее (±70°)
+
+        let best = null, bestScore = Infinity;            // лучший в конусе
+        let fb = null, fbCos = -Infinity, fbDist = Infinity; // запасной
+
+        for (const s of this.#stars)
+        {
+            if (s.id === cur.id) continue;
+
+            const vx = s.x - cur.x, vy = s.y - cur.y;
+            const d  = Math.hypot(vx, vy);
+            if (d < 1e-9) continue;
+
+            const cosA = (vx * nx + vy * ny) / d;   // 1 = ровно по направлению
+
+            if (cosA >= CONE)
+            {
+                // ближняя звезда «дешевле», отклонение от направления — штраф
+                const score = d * (1 + 2 * (1 - cosA));
+                if (score < bestScore) { bestScore = score; best = s; }
+            }
+            else if (cosA > 0 && (cosA > fbCos || (cosA === fbCos && d < fbDist)))
+            {
+                fb = s; fbCos = cosA; fbDist = d;
+            }
         }
 
-        if (best) this.#state.selected = best.id;
+        const target = best || fb;
+        if (target) this.#state.selected = target.id;
+    }
+
+    // Обёртки для стрелок — экранные направления (Y уже учтён!)
+    #moveSelectionUp()    { this.moveSelection( 0,  1); }
+    #moveSelectionDown()  { this.moveSelection( 0, -1); }
+    #moveSelectionLeft()  { this.moveSelection(-1,  0); }
+    #moveSelectionRight() { this.moveSelection( 1,  0); }
+
+    keyboard(key)
+    {   switch (key) {
+            case "ArrowUp":    this.#moveSelectionUp   (); break;
+            case "ArrowDown":  this.#moveSelectionDown (); break;
+            case "ArrowLeft":  this.#moveSelectionLeft (); break;
+            case "ArrowRight": this.#moveSelectionRight(); break;
+        }
     }
 
     confirmJump()
