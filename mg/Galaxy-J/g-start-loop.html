@@ -1212,6 +1212,15 @@ window.HUD = HUD;
         EnemyA.doAmount(1, 2);
         pers.dead  = false;
         ship.shield = ship.SHIELDMAX;
+
+        if(game.isDock)
+        {
+            HUD.setStatus("D", true, { pulse: false }); // зелёный
+            TRADE.open(pers.credits);
+
+            const star = GALAXY.getCurrentStar();
+            ship.tradeOn(star, pers.credits);
+        }
     };
     StartGame();
 
@@ -1428,16 +1437,6 @@ window.HUD = HUD;
         ship.speed = 40;
 
         ship.tradeOut();
-    }
-
-    /// В начале игры
-    if(game.isDock)
-    {
-        HUD.setStatus("D", true, { pulse: false }); // зелёный
-        TRADE.open(pers.credits);
-
-        const star = GALAXY.getCurrentStar();
-        ship.tradeOn(star, pers.credits);
     }
 
 // ------------------------------------------------------------------
