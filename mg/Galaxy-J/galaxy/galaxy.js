@@ -31,22 +31,6 @@ class Galaxy
         fuelR:      Infinity,   // радиус доступного хода (в гал.ед.)
     };
 
-    //--------------------|
-    // Текущая Звезда.    |
-    //    - idEconomic    |
-    //    - idGovernment  |
-    //    - kDanger       |
-    //--------------------:
-    getDataTrade()
-    {   return {
-            idEconomic  : this.#state.playerStar.idEconomic,
-            szEconomic  : this.#state.playerStar.ECONOMIES.length,
-            idGovernment: this.#state.playerStar.idGovernment,
-            szGovernment: this.#state.playerStar.GOVERNMENTS.length,
-            kDanger     : this.#state.playerStar.danger,
-        };
-    }
-
     get seed() { return this.#seed; }
 
     // ------------------------------------------------------------------
@@ -245,6 +229,8 @@ static GOVERNMENTS = [
                 links:       [],
             });
         }
+
+        this.#state.playerStar = this.#stars[0];
     }
 
     // --------------------------------------------------------------
@@ -360,6 +346,7 @@ static GOVERNMENTS = [
         this.#ensureDOM();
     }
 
+    close(){ this.setOpen(false); }
     setOpen(v) {
         
         if(v) SNDS.winclose2.play();

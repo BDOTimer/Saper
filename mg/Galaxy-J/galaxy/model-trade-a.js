@@ -18,7 +18,7 @@
 // stock - сколько единиц на складе станции (для покупки)
 const GoodsBase = [
   // --- All (базовые, нужны везде) ---
-  { name: "ВОДОРОДНОЕ ТОПЛИВО", buy: 12, sell: 8, stock: 240, category: "All", desc: "Основное топливо для двигателей и реакторов." },
+  { name: "ВОДОРОДНОЕ ТОПЛИВО", buy: 12, sell: 8, stock: 240, category: "All",  desc: "Основное топливо для двигателей и реакторов." },
   { name: "КИСЛОРОДНЫЕ КАНИСТРЫ", buy: 45, sell: 32, stock: 180, category: "All", desc: "Сжатый кислород для систем жизнеобеспечения." },
   { name: "ФИЛЬТРЫ ДЛЯ ВОЗДУХА", buy: 38, sell: 28, stock: 200, category: "All", desc: "Критически важны для поддержания пригодной для дыхания атмосферы." },
 
@@ -56,23 +56,64 @@ const GoodsBase = [
   { name: "ЗАПРЕЩЁННЫЕ ПРЕПАРАТЫ", buy: 1100, sell: 920, stock: 8, category: "Criminal", desc: "Сильнодействующие вещества — высокая прибыль, но и высокий риск." },
 ];
 
-
-
 class ModelTradeA
 {
     #star;
 
     constructor()
     {
-
+       this.goods = [];
     }
 
-    go2Star(star) { this.#star = star; }
+    go2CurrentStar() {
+        this.#star = GALAXY.getCurrentStar();
+    }
 
     calcGoods()
-    {
-        
+    {   if(this.#star === null) return;
+
+        this.goods = [];
+
+        const count = 8; // сколько товаров показать на станции
+        const N     = GoodsBase.length;
+
+        for (let i = 0, j = 0; i < N && j < count; i++)
+        {
+            const baseItem = GoodsBase[i]; // тут ссылка
+
+            if(baseItem.category != this.#star.economy)
+            {
+                continue;
+            }
+
+            // Копируем объект, чтобы не менять оригинал в GoodsBase
+            const item = { ...baseItem };
+
+            // // Пересчитываем цены с учётом звезды/правительства/преступности и т.д.
+            // item.buy = this.calcPrice(baseItem.buy, this.#star, 'buy');
+            // item.sell = this.calcPrice(baseItem.sell, this.#star, 'sell');
+
+            // // Важно: цена продажи не может быть меньше цены покупки
+            // if (item.sell > item.buy) {
+            //     item.sell = item.buy;
+            // }
+
+            console.log("🔍 item.name", item.name);
+            // console.log("🔍 this.#star.economy: ", this.#star.economy);
+            // console.log("🔍 baseItem.category : ", baseItem.category );
+
+            this.goods.push(item);
+            ++j;
+        }
     }
 }
 
 window.ModelTradeA = ModelTradeA;
+
+class Helper
+{
+    static Filter(name)
+    {
+        
+    }
+}

@@ -261,6 +261,7 @@
 <script src="./js/game.js"></script>
 
 <!-- Классические скрипты: кладут GALAXY, StarA, PLANET, HELP в глобал -->
+<script src="./galaxy/model-trade-a.js"></script>
 <script src="./galaxy/star-A.js"></script>
 <script src="./galaxy/star-G.js"></script>
 <script src="./galaxy/planet.js"></script>
@@ -537,6 +538,11 @@ window.HUD = HUD;
     });
     
     ////////////////////////////////////////////////////////////////////////////
+
+    // Тест: 🔴🔴🔴
+    const MT = new ModelTradeA();
+    MT.go2CurrentStar();
+    MT.calcGoods     ();
 
     // ============================================================
     //  Скрытие курсора через 3 секунды бездействия
@@ -1382,7 +1388,7 @@ window.HUD = HUD;
 
         /// TODO: тут добавить штрафы за смерть ...
 
-        //SNDS.death.play();
+        GALAXY.close();
 
         saveGame();
     }
