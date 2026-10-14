@@ -509,8 +509,7 @@ class Station
     }
 
     isDockingEnabled()
-    {
-        return this._dockingEnabled;
+    {   return this._dockingEnabled;
     }
 
     // ---------------------------------------------------------------

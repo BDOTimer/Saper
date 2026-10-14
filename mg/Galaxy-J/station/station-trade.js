@@ -53,25 +53,24 @@ const TRADE = (() => {
   // sell — сколько станция платит игроку при продаже
   // stock — сколько единиц на складе станции (для покупки)
   const GoodsBase = [
-    { name: "ВОДОРОДНОЕ ТОПЛИВО", buy: 12, sell: 8, stock: 240 },
-    { name: "ПИЩЕВЫЕ ПАЙКИ", buy: 22, sell: 15, stock: 120 },
-    { name: "МЕДИКАМЕНТЫ", buy: 68, sell: 52, stock: 40 },
-    { name: "РУДА (ЖЕЛЕЗО)", buy: 34, sell: 26, stock: 300 },
-    { name: "КОФЕ (СИНТ.)", buy: 95, sell: 70, stock: 150 },
+    { name: "ВОДОРОДНОЕ ТОПЛИВО", buy: 12, sell:  8, stock: 240 },
+    { name: "ПИЩЕВЫЕ ПАЙКИ"     , buy: 22, sell: 15, stock: 120 },
+    { name: "МЕДИКАМЕНТЫ"       , buy: 68, sell: 52, stock:  40 },
+    { name: "РУДА (ЖЕЛЕЗО)"     , buy: 34, sell: 26, stock: 300 },
+    { name: "КОФЕ (СИНТ.)"      , buy: 95, sell: 70, stock: 150 },
   ];
 
   const GoodsUp = [
-    { name: "РУДА (ТИТАН)", buy: 145, sell: 118, stock: 60 },
-    { name: "ДРАГОЦЕННЫЕ МЕТАЛЛЫ", buy: 890, sell: 760, stock: 12 },
-    { name: "КОМПЬЮТЕРНЫЕ ЧИПЫ", buy: 320, sell: 260, stock: 45 },
-    { name: "ЩИТЫ", buy: 2100, sell: 1700, stock: 5 },
-    { name: "РАБЫ? НЕТ, КОНТРАКТНИКИ", buy: 450, sell: 380, stock: 15 },
-    { name: "ЧАЙ (ЭЛИТНЫЙ)", buy: 180, sell: 140, stock: 80 },
+    { name: "РУДА (ТИТАН)"       , buy: 145 , sell: 118 , stock: 60 },
+    { name: "ДРАГОЦЕННЫЕ МЕТАЛЛЫ", buy: 890 , sell: 760 , stock: 12 },
+    { name: "КОМПЬЮТЕРНЫЕ ЧИПЫ"  , buy: 320 , sell: 260 , stock: 45 },
+    { name: "ЩИТЫ"               , buy: 2100, sell: 1700, stock:  5 },
+    { name: "ЧАЙ (ЭЛИТНЫЙ)"      , buy: 180 , sell: 140 , stock: 80 },
   ];
 
   const GoodsAllContra = [
-    { name: "ОРУЖИЕ (ЛАЗЕР)", buy: 1250, sell: 980, stock: 8 },
-    { name: "РАБЫ? НЕТ, КОНТРАКТНИКИ", buy: 450, sell: 380, stock: 15 },
+    { name: "ОРУЖИЕ (ЛАЗЕР)"         , buy: 1250, sell: 980, stock:  8 },
+    { name: "РАБЫ? НЕТ, КОНТРАКТНИКИ", buy: 450 , sell: 380, stock: 15 },
   ];
 
   const GOODS = [];
