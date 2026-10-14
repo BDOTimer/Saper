@@ -31,36 +31,78 @@ class Galaxy
         fuelR:      Infinity,   // радиус доступного хода (в гал.ед.)
     };
 
+    //--------------------|
+    // Текущая Звезда.    |
+    //    - idEconomic    |
+    //    - idGovernment  |
+    //    - kDanger       |
+    //--------------------:
+    getDataTrade()
+    {   return {
+            idEconomic  : this.#state.playerStar.idEconomic,
+            szEconomic  : this.#state.playerStar.ECONOMIES.length,
+            idGovernment: this.#state.playerStar.idGovernment,
+            szGovernment: this.#state.playerStar.GOVERNMENTS.length,
+            kDanger     : this.#state.playerStar.danger,
+        };
+    }
+
     get seed() { return this.#seed; }
 
     // ------------------------------------------------------------------
     //  Константы
     // ------------------------------------------------------------------
-    static STAR_COUNT = 64;
+    static STAR_COUNT = 128;
     static GALAXY_R   = 1.0;
 
     // ширина правой панели информации (в пикселях canvas)
-    static PANEL_W    = 300;
+    static PANEL_W    = 360;
 
-    static ECONOMIES = [
-        "Industrial",
-        "Agricultural",
-        "Mining",
-        "Refinery",
-        "High-Tech",
-        "Tourism",
-    ];
+static ECONOMIES = [
+  {
+    name: "Industrial",
+    link: [5, 4, 3, 7, 6], // Democracy, Corporate, Dictatorship, Communist, Multi-Gov — те, где возможна плановая/рыночная координация
+    desc: "требует планирования и цепочек поставок, стабильной логистики"
+  },
+  {
+    name: "Agricultural",
+    link: [0, 1, 6, 7], // Anarchy, Feudal, Confederacy, Communist — системы, где земля и самообеспечение играют ключевую роль
+    desc: "устойчива при слабой централизации; основа феодальных и общинных систем"
+  },
+  {
+    name: "Mining",
+    link: [0, 1, 2, 3], // Anarchy, Feudal, Multi-Gov, Dictatorship — добыча легко ложится на локальные или жёстко контролируемые структуры
+    desc: "возможна при любой власти; часто становится базой для «сырьевых» режимов"
+  },
+  {
+    name: "Refinery",
+    link: [3, 7, 0, 2], // Dictatorship, Communist, Anarchy, Multi-Gov — от госмонополий до полулегальных мини-переработок
+    desc: "зависит от контроля над ресурсами; в анархии — полулегальная добыча, в диктатурах — госмонополия"
+  },
+  {
+    name: "High-Tech",
+    link: [4, 5, 6, 2], // Democracy, Corporate, Confederacy, Multi-Gov — нужны институты, рынок и кооперация
+    desc: "нужны институты, R&D, долгосрочные инвестиции; лучше всего сочетается с развитыми правительствами"
+  },
+  {
+    name: "Tourism",
+    link: [4, 5, 6], // Democracy, Corporate, Confederacy — безопасность, сервис и маркетинг как основа экономики
+    desc: "требует безопасности, инфраструктуры, сервиса; стабильно работает при демократии и корпорациях"
+  }
+];
 
-    static GOVERNMENTS = [
-        "Anarchy",
-        "Feudal",
-        "Multi-Gov",
-        "Dictatorship",
-        "Confederacy",
-        "Democracy",
-        "Corporate",
-        "Communist",
-    ];
+
+static GOVERNMENTS = [
+  { name: "Anarchy"     , link: [2, 1, 3], desc: "локальные кланы, бартер, добыча без централизованного контроля" },
+  { name: "Feudal"      , link: [1, 2   ], desc: "земля и рента как основа; локальные мастерские и шахты" },
+  { name: "Multi-Gov"   , link: [0, 4, 5], desc: "межгосударственная координация позволяет строить сложные цепочки и сервисы" },
+  { name: "Dictatorship", link: [0, 3, 2], desc: "централизованный контроль ресурсов и производств; High-Tech — при фокусе на ВПК" },
+  { name: "Confederacy" , link: [1, 0, 5], desc: "баланс автономии регионов и общих инфраструктурных проектов" },
+  { name: "Democracy"   , link: [4, 5, 0], desc: "институты, конкуренция и сервисная экономика" },
+  { name: "Corporate"   , link: [4, 0, 5], desc: "рыночные стимулы, инвестиции в технологии и комфорт" },
+  { name: "Communist"   , link: [0, 2, 3], desc: "плановое распределение ресурсов, упор на базовые отрасли и переработку" }
+];
+
 
     static NAME_A = [
         "Al","Be","Ce","Dra","Eri","Fo","Ga","Hy","Ix","Ju",
@@ -146,7 +188,7 @@ class Galaxy
     }
 
     // --------------------------------------------------------------
-    //  Генерация звёзд
+    //  Генерация всех this.starCount звёзд
     // --------------------------------------------------------------
     #generateStars()
     {
@@ -177,25 +219,29 @@ class Galaxy
             const tech   = 1 + Math.floor(this.#rng() * 15);
             const danger = this.#rng();
 
-            const iGovernment
+            const idEconomic = Math.floor(this.#rng() * Galaxy.ECONOMIES.length);
+
+            const idGovernment
                 = Math.floor(this.#rng() * Galaxy.GOVERNMENTS.length);
 
             this.#stars.push({
                 id:   i,
                 seed: seedStar,
-                name: Galaxy.calcSign(danger, iGovernment) + this.#makeName(),
+                name: Galaxy.calcSign(danger, idGovernment) + this.#makeName(),
                 x, y, r, color,
                 tech,
                 danger,
                 hue,
                 dangerLabel: danger < 0.33 ? "LOW" : danger < 0.66 ? "MED" : "HIGH",
-                techLabel:   tech <= 5 ? "LOW" : tech <= 10 ? "MID" : "HIGH",
-                economy:     Galaxy.ECONOMIES[Math.floor(this.#rng() * Galaxy.ECONOMIES.length)],
-                population:  Math.floor(1e3 + this.#rng() * 9e9),
+                techLabel  : tech   <= 5   ? "LOW" : tech  <= 10   ? "MID" : "HIGH",
 
-                iGovernment: iGovernment,
-                government:  Galaxy.GOVERNMENTS[iGovernment],
-                
+                idEconomic,
+                economy   :    Galaxy.ECONOMIES[idEconomic].name,
+
+                idGovernment,
+                government  :  Galaxy.GOVERNMENTS[idGovernment].name,
+
+                population:  Math.floor(1e3 + this.#rng() * 12e9),
                 links:       [],
             });
         }
