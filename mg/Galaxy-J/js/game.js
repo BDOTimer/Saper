@@ -74,7 +74,7 @@ class Game
     {   return {
             v: Game.SAVE_FORMAT_VERSION,
             pers: {
-                credits: this.pers.credits,
+                credits: ED.e(this.pers.credits),
                 kills  : this.pers.kills,
                 sector : { ...this.pers.sector },
                 dead   : this.pers.dead,
@@ -160,6 +160,13 @@ class Game
             // fromJSON сам сбросит #items и провалидирует через inCargo.
             // Если в сейве cargo нет — получим пустой трюм, это корректно.
             cargo.fromJSON(saveData.cargo ?? null);
+        }
+
+        const r = ED.d(this.pers.credits);
+        this.pers.credits = r.v;
+        if(r.x)
+        {   this.pers.credits = 543 + 456;
+            console.log("🌀🌀🌀");
         }
     }
 

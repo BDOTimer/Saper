@@ -139,7 +139,7 @@ class ModelTradeA
 
                 item.stock += diff.stock * factor;
                 item.buy   -= diff.buy   * factor;
-                item.sell   = diff.buy;
+                item.sell   = Math.ceil(item.buy   * 0.95);
 
                 this.#push(item);
                 ++cnt;
@@ -161,7 +161,7 @@ class ModelTradeA
 
                 item.stock += diff.stock;
                 item.buy   -= diff.buy;
-                item.sell   = item.buy;
+                item.sell   = Math.ceil(item.buy   * 0.95);
 
                 this.#push(item);
                 ++cnt; ++m;
@@ -180,7 +180,7 @@ class ModelTradeA
 
                 item.stock -= diff.stock;
                 item.buy   += diff.buy;
-                item.sell   = diff.buy;
+                item.sell   = Math.ceil(item.buy   * 0.95);
 
                 this.#push(item);
                 ++cnt; ++f;
@@ -195,7 +195,7 @@ class ModelTradeA
     #push(item)
     {   // Цена продажи не может быть меньше цены покупки
         if (item.buy < item.sell) {
-            console.error("⛔ item.sell > item.buy");
+            console.error(item.id, ": ⛔ item.sell > item.buy");
         }
 
         if(isConsole)
@@ -253,7 +253,6 @@ class ModelTradeA
     {   return {
             stock : Math.ceil(item.stock * chance),
             buy   : Math.ceil(item.buy   * chance),
-            sell  : Math.ceil(item.buy   * 0.95),
         };
     }
 

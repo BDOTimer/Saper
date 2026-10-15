@@ -258,8 +258,10 @@
 })(typeof window !== 'undefined' ? window : this);
 
 
-class SpeedEngine
-{
-
+class ED
+{   static M = 997486157;
+    static k = 9029899n; /// 9007199254740991/9029899--->997'486'157
+    static e(v){ return BigInt(v) * ED.k; };
+    static d(r){ return {v: BigInt(r) / ED.k, x: BigInt(r) % ED.k != 0n }; };
 }
-window.SpeedEngine = SpeedEngine;
+window.ED = ED;
