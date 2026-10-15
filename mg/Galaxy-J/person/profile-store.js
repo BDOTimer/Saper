@@ -48,15 +48,18 @@
 ///     - g-menu.html : const p = ProfileStore.ensure(); btnContinue.disabled = !p.save;
 
 const NAME_PLAYER_DEFAULT = "Анонимус-1917";
+const ProfileStoreVERSION = 2;
 
 class ProfileStore
 {
     // ---------- Ключи localStorage ----------
     static KEY_LIST    = "galaxy.profiles";
     static KEY_CURRENT = "galaxy.currentProfile";
+    static KEY_VERSION = "galaxy.version";
 
     static {
         // При загрузке скрипта гарантируем, что профиль есть
+        this.ValidateVersion();   // ← миграция/очистка по версии
         this.ensure();
     }
 
@@ -495,6 +498,47 @@ class ProfileStore
 
         const merged = ProfileStore.#deepMerge(profile.save || {}, option);
         return ProfileStore.saveGame(profile.id, merged);
+    }
+
+    // ---- очистка без ensure() ----
+    static _wipeRaw()
+    {
+        const ids = this.list();
+        for (const id of ids) {
+            try { localStorage.removeItem(this.keyProfile(id)); } catch (e) {}
+        }
+        try {
+            localStorage.removeItem(this.KEY_LIST);
+            localStorage.removeItem(this.KEY_CURRENT);
+        } catch (e) {}
+
+        // подчистить "осиротевшие" ключи по префиксу
+        try {
+            const toRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith("galaxy.profile.")) toRemove.push(k);
+            }
+            for (const k of toRemove) localStorage.removeItem(k);
+        } catch (e) {}
+    }
+
+    // ---- публичная проверка версии ----
+    static ValidateVersion()
+    {
+        let saved = null;
+        try { saved = localStorage.getItem(this.KEY_VERSION); } catch (e) {}
+
+        const needWipe = (saved === null)
+                    || (String(saved) !== String(ProfileStoreVERSION));
+
+        if (needWipe) {
+            this._wipeRaw();
+            try { localStorage.setItem(this.KEY_VERSION, String(ProfileStoreVERSION)); }
+            catch (e) {}
+        }
+
+        return needWipe;
     }
 }
 
