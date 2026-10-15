@@ -9,7 +9,7 @@
 //  -   Важный уровень товара: доступность === 4 уровня
 //  -   Цена продажи(рынком) не может быть меньше, чем цена покупки!
 
-const isConsole = true;
+const isConsole = false;
 
 const Spec         =-2;
 const All          =-1;
@@ -77,11 +77,13 @@ const GoodsBase = [
 class ModelTradeA
 {
     #star;
+    #rng;
 
     constructor()
     {
        this.goods    = [];
        this.Criminal = [22, 23];
+       this.#rng     = GALAXY.getRNGStarDate();
     }
 
     go2CurrentStar() {
@@ -91,6 +93,8 @@ class ModelTradeA
 
     #calcGoods()
     {   if(this.#star === null) return;
+
+        const rng = this.#rng; // Math.random
 
         this.goods = [];
 
@@ -114,15 +118,15 @@ class ModelTradeA
             if(baseItem.economy[0] === All)
             {
                 /// Хаотичный спрос ---> Нужно смотерь ...
-                if(Math.random() < 0.3) continue;
+                if(rng() < 0.3) continue;
 
                 console.log("\n🟩 All:");
 
                 // Копируем объект
                 const item = { ...baseItem };
 
-                const factor = Math.random() <  0.5 ?  -1  :   1;
-                const chance = Math.random() * (0.7 - 0.2) + 0.2;
+                const factor = rng() <  0.5 ?  -1  :   1;
+                const chance = rng() * (0.7 - 0.2) + 0.2;
 
                 const diff = this.#getDiff(item, chance);
 
@@ -140,7 +144,7 @@ class ModelTradeA
 
                 //console.log(i,". baseItem.economy: ", baseItem.economy);
 
-                if(Math.random() < 0.2) continue;
+                if(rng() < 0.2) continue;
 
                 console.log("\n🟩 Много:");
 
@@ -159,7 +163,7 @@ class ModelTradeA
             {
                 /// Товара мало! ---> Игроку выгодно продавать
 
-                if(Math.random() < 0.5) continue;
+                if(rng() < 0.5) continue;
 
                 console.log("\n🟩 Мало:");
 
@@ -214,7 +218,7 @@ class ModelTradeA
                 // Копируем объект
                 const item = { ...baseItem };
 
-                const factor = Math.random() <  0.5 ?  -1  :   1;
+                const factor = this.#rng() <  0.5 ?  -1  :   1;
                 const chance = this.#star.danger - 0.1;
                 const diff   = this.#getDiff(item, chance);
 

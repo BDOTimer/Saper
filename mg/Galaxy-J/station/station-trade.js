@@ -41,7 +41,9 @@ let onCreditsChangedCallback = null;
 const TRADE = (() => {
 
   // --- Генерация ассортимента станции (без изменений с прошлого шага) ---
-  function introStation(star) {
+  function introStation() {
+
+    const star = GALAXY.getCurrentStar();
 
     const rng = UniverseJS.utils.mulberry32(star.seed);
     const r   = rng();
@@ -501,7 +503,12 @@ const TRADE = (() => {
     ensureDOM();
     state.open = v;
     state.root.classList.toggle("open", v);
-    if (v) {
+    if (v)
+    {
+      if (!Array.isArray(state.goods) || state.goods.length === 0)
+      { introStation();
+      }
+
       state.activeList = 1;
       state.list1Index = Math.min(
         state.list1Index,

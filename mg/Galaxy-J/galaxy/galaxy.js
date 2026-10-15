@@ -140,6 +140,7 @@ static GOVERNMENTS = [
      */
     constructor(seed, opts = {})
     {
+        this.name  = "Galaxy-J";
         this.#seed = seed;
 
         this.starCount = opts.starCount ?? Galaxy.STAR_COUNT;
@@ -849,6 +850,21 @@ static GOVERNMENTS = [
     update(dt) {
         this.#state.time += dt;
         if (this.#state.open) this.#draw();
+    }
+
+    getRNGStar()
+    {   const  U    = UniverseJS.utils;
+        const  seed = this.getCurrentStar().seed; 
+        return U.mulberry32(U.hashCombine(seed, this.name));
+    }
+
+    getRNGStarDate()
+    {   const U    = UniverseJS.utils;
+        const seed = this.getCurrentStar().seed;
+        // Менять date каждые 2 часа:
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;            // 7 200 000 мс
+        const date = Math.floor(Date.now() / TWO_HOURS_MS); // целое «окно»
+        return U.mulberry32(U.hashCombine(seed, date));
     }
 
     static calcSign(danger, iGovernment)
