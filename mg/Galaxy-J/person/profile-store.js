@@ -48,7 +48,7 @@
 ///     - g-menu.html : const p = ProfileStore.ensure(); btnContinue.disabled = !p.save;
 
 const NAME_PLAYER_DEFAULT = "Анонимус-1917";
-const ProfileStoreVERSION = 2;
+const ProfileStoreVERSION = 1;
 
 class ProfileStore
 {
@@ -538,6 +538,8 @@ class ProfileStore
             catch (e) {}
         }
 
+        showVersionToast({ from: saved, to: ProfileStoreVERSION });
+
         return needWipe;
     }
 }
@@ -550,3 +552,106 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
 } else {
     window.ProfileStore = ProfileStore;
 }
+
+/**
+ * Показать плашку «версия обновлена».
+ * Все стили — внутри функции (инжектятся один раз).
+ * @param {object} info  — { from, to }
+ * @param {number} ms    — сколько держать на экране (по умолчанию 4500)
+ */
+function showVersionToast(info, ms = 10000)
+{
+    if (!info) return;
+
+    // 1. Инжект стилей — один раз на всю страницу
+    if (!document.getElementById("version-toast-style")) {
+        const style = document.createElement("style");
+        style.id = "version-toast-style";
+        style.textContent = `
+            .version-toast {
+                position: fixed;
+                left: 50%;
+                bottom: 28px;
+                transform: translate(-50%, 20px);
+                min-width: 260px;
+                max-width: 420px;
+                padding: 10px 14px;
+                background: rgba(18, 24, 32, 0.94);
+                color: #cfe9ff;
+                border: 1px solid #3a5068;
+                border-radius: 4px;
+                font: 13px/1.35 "Consolas", "Courier New", monospace;
+                letter-spacing: 0.02em;
+                box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+                opacity: 0;
+                transition: opacity 0.35s ease, transform 0.35s ease;
+                cursor: pointer;
+                z-index: 99999;
+                pointer-events: auto;
+                user-select: none;
+            }
+            .version-toast.show {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+            .version-toast-title {
+                color: #7fd0ff;
+                font-weight: 700;
+                font-size: 12px;
+                letter-spacing: 0.12em;
+                margin-bottom: 4px;
+            }
+            .version-toast-body b { color: #ffe08a; }
+            .version-toast-note {
+                color: #8fa8bd;
+                font-size: 11px;
+            }
+        `;
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    // 2. Ждём body, если его ещё нет (скрипт в <head>)
+    if (!document.body) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            () => showVersionToast(info, ms),
+            { once: true }
+        );
+        return;
+    }
+
+    // 3. Убираем предыдущую, если была
+    const prev = document.getElementById("version-toast");
+    if (prev) prev.remove();
+
+    // 4. Собираем DOM
+    const el = document.createElement("div");
+    el.id = "version-toast";
+    el.className = "version-toast";
+
+    const from = info.from ? `v${info.from}` : "—";
+    el.innerHTML = `
+      <div class="version-toast-title">ОБНОВЛЕНИЕ</div>
+      <div class="version-toast-body">
+        версия сохранения: <b>${from}</b> → <b>v${info.to}</b><br>
+        <span class="version-toast-note">
+          профиль сброшен до начального состояния
+        </span>
+      </div>
+    `;
+
+    document.body.appendChild(el);
+
+    requestAnimationFrame(() => el.classList.add("show"));
+
+    const hide = () => {
+        el.classList.remove("show");
+        setTimeout(() => el.remove(), 400);
+    };
+    const timer = setTimeout(hide, ms);
+    el.addEventListener("click", () => { clearTimeout(timer); hide(); });
+
+    return el;
+}
+
+window.showVersionToast = showVersionToast;
