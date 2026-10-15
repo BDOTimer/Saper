@@ -48,7 +48,7 @@
 ///     - g-menu.html : const p = ProfileStore.ensure(); btnContinue.disabled = !p.save;
 
 const NAME_PLAYER_DEFAULT = "Анонимус-1917";
-const ProfileStoreVERSION = 1;
+const ProfileStoreVERSION = 0.1;
 
 class ProfileStore
 {
@@ -534,11 +534,12 @@ class ProfileStore
 
         if (needWipe) {
             this._wipeRaw();
-            try { localStorage.setItem(this.KEY_VERSION, String(ProfileStoreVERSION)); }
+            try
+            {   localStorage.setItem(this.KEY_VERSION, String(ProfileStoreVERSION)); 
+                showVersionToast({ from: saved, to: ProfileStoreVERSION });
+            }
             catch (e) {}
         }
-
-        showVersionToast({ from: saved, to: ProfileStoreVERSION });
 
         return needWipe;
     }
