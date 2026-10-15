@@ -75,6 +75,18 @@ static ECONOMIES = [
   }
 ];
 
+static idGOVERNMENTS =
+{
+    Anarchy     : 0,
+    Feudal      : 1,
+    MultiGov    : 2,
+    Dictatorship: 3,
+    Confederacy : 4,
+    Democracy   : 5,
+    Corporate   : 6,
+    Communist   : 7,
+};
+
 
 static GOVERNMENTS = [
   { name: "Anarchy"     , link: [2, 1, 3], desc: "локальные кланы, бартер, добыча без централизованного контроля" },
@@ -203,7 +215,7 @@ static GOVERNMENTS = [
             const tech   = 1 + Math.floor(this.#rng() * 15);
             const danger = this.#rng();
 
-            const idEconomic = Math.floor(this.#rng() * Galaxy.ECONOMIES.length);
+            const idEconomy = Math.floor(this.#rng() * Galaxy.ECONOMIES.length);
 
             const idGovernment
                 = Math.floor(this.#rng() * Galaxy.GOVERNMENTS.length);
@@ -219,8 +231,8 @@ static GOVERNMENTS = [
                 dangerLabel: danger < 0.33 ? "LOW" : danger < 0.66 ? "MED" : "HIGH",
                 techLabel  : tech   <= 5   ? "LOW" : tech  <= 10   ? "MID" : "HIGH",
 
-                idEconomic,
-                economy   :    Galaxy.ECONOMIES[idEconomic].name,
+                idEconomy,
+                economy   :    Galaxy.ECONOMIES[idEconomy].name,
 
                 idGovernment,
                 government  :  Galaxy.GOVERNMENTS[idGovernment].name,
