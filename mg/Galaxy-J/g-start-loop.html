@@ -538,8 +538,7 @@ window.HUD = HUD;
     });
 
     // Модель Галактической Экономики 🪙🪙🪙
-    const  MT = new ModelTradeA();
-    window.ModelTrade = MT;
+    window.ModelTrade = new ModelTradeA();
     
     ////////////////////////////////////////////////////////////////////////////
 
@@ -1172,7 +1171,7 @@ window.HUD = HUD;
       // Завершаем
       game.hyper.active     = false;
       elHyper.style.display = "none";
-      MT.go2CurrentStar();
+      ModelTrade.go2CurrentStar();
 
       saveGame();
 
@@ -1212,7 +1211,7 @@ window.HUD = HUD;
         EnemyA.doAmount(1, 2);
         pers.dead  = false;
         ship.shield = ship.SHIELDMAX;
-        MT.go2CurrentStar();
+        ModelTrade.go2CurrentStar();
 
         if(game.isDock)
         {

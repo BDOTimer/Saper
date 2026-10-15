@@ -192,7 +192,7 @@ class Ship
     // Подключаемся к Trade
     tradeOn(star, credits)
     {
-      TRADE.introStation(star);             // рынок под звезду (можно один раз при генерации системы)
+      TRADE.introStation(star);        // рынок под звезду (можно один раз при генерации системы)
       TRADE.dock(this.cargo, credits); // подключить отсек + открыть терминал
     }
 

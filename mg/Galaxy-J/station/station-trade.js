@@ -40,26 +40,17 @@ let onCreditsChangedCallback = null;
 
 const TRADE = (() => {
 
-  let GOODS = null;
-
   // --- Генерация ассортимента станции (без изменений с прошлого шага) ---
   function introStation(star) {
 
-    // Очистить ассортимент
-    GOODS.length = 0;
-
-    // levelStation 0..2
-    const r = rng();
+    const rng = UniverseJS.utils.mulberry32(star.seed);
+    const r   = rng();
     const levelStation = r < 0.45 ? 0 : r < 0.85 ? 1 : 2;
 
+    const model = window.ModelTrade;
+    const src   = (model && Array.isArray(model.goods)) ? model.goods : [];
 
-    /// TODO: загрузить товары из window.ModelTrade.goods в GOODS
-    /// ...
-
-    GOODS = window.ModelTrade.goods;
-
-    // Синхронизировать копию для экрана
-    state.goods      = GOODS.map(g => ({ ...g }));
+    state.goods      = src.map(g => ({ ...g }));  // копия записей
     state.list1Index = 0;
 
     if (state.root) {
@@ -77,7 +68,6 @@ const TRADE = (() => {
     open: false,
     root: null,
     // Данные
-    goods: GOODS.map(g => ({ ...g })),  // товары станции (копия базовых цен)
     cargo: null,                        // ★ подключённый CargoA или null.
                                         //   Купленные товары здесь НЕ хранятся.
     credits: 15000,
