@@ -163,10 +163,11 @@ class Game
         }
 
         const r = ED.d(this.pers.credits);
-        this.pers.credits = r.v;
+        this.pers.credits = Number(r.v);
+    /// this.pers.credits = r.v;
         if(r.x)
         {   this.pers.credits = 543 + 456;
-            console.log("🌀🌀🌀");
+        /// console.log("🌀🌀🌀");
         }
     }
 

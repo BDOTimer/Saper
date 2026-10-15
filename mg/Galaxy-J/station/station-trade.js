@@ -52,6 +52,8 @@ const TRADE = (() => {
     const levelStation = model.levelStation;
     const src   = (model && Array.isArray(model.goods)) ? model.goods : [];
 
+    console.log("🔍 model.goods.length: ", model.goods.length);
+
     state.goods      = src.map(g => ({ ...g }));  // копия записей
     state.list1Index = 0;
 

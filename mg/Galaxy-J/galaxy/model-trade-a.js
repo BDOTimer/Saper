@@ -231,7 +231,7 @@ class ModelTradeA
 
                 item.stock += diff.stock * factor;
                 item.buy   -= diff.buy   * factor;
-                item.sell   = diff.sell;
+                item.sell   = Math.ceil(item.buy   * 0.95);
 
                 this.#push(item);
             }
