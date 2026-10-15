@@ -47,9 +47,9 @@ const TRADE = (() => {
 
     const rng = UniverseJS.utils.mulberry32(star.seed);
     const r   = rng();
-    const levelStation = r < 0.45 ? 0 : r < 0.85 ? 1 : 2;
 
     const model = window.ModelTrade;
+    const levelStation = model.levelStation;
     const src   = (model && Array.isArray(model.goods)) ? model.goods : [];
 
     state.goods      = src.map(g => ({ ...g }));  // копия записей

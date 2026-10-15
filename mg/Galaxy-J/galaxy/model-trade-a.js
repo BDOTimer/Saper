@@ -81,9 +81,10 @@ class ModelTradeA
 
     constructor()
     {
-       this.goods    = [];
-       this.Criminal = [22, 23];
-       this.#rng     = GALAXY.getRNGStarDate();
+       this.goods        = [];
+       this.Criminal     = [22, 23];
+       this.#rng         = GALAXY.getRNGStarDate(); /// Сид обновляется датой
+       this.levelStation = 0;
     }
 
     go2CurrentStar() {
@@ -92,19 +93,25 @@ class ModelTradeA
     }
 
     #calcGoods()
-    {   if(this.#star === null) return;
+    {  
+        const tech = this.#star.tech;
+
+        // Три уровня станции:
+        this.levelStation = tech < 5 ? 0 : tech < 10 ? 1 : 2;
+        const L  = this.levelStation + 1;
+        const LP = this.levelStation * 0.1;
 
         const rng = this.#rng; // Math.random
 
         this.goods = [];
 
-        const count = 8; // сколько товаров показать на станции
+        const count = L * 4; // сколько товаров показать на станции
         const N     = GoodsBase.length;
 
         const cntItemMany = 3;
         const cntItemFew  = 3;
 
-        console.log("🔥 this.#star.idEconomy", this.#star.idEconomy);
+        //console.log("🔥 this.#star.idEconomy", this.#star.idEconomy);
 
         for (let i = 0, cnt = 0, m = 0, f = 0; i < N && cnt < count; i++)
         {
@@ -120,13 +127,13 @@ class ModelTradeA
                 /// Хаотичный спрос ---> Нужно смотерь ...
                 if(rng() < 0.3) continue;
 
-                console.log("\n🟩 All:");
+                //console.log("\n🟩 All:");
 
                 // Копируем объект
                 const item = { ...baseItem };
 
                 const factor = rng() <  0.5 ?  -1  :   1;
-                const chance = rng() * (0.7 - 0.2) + 0.2;
+                const chance = rng() * (0.7 + LP - 0.2) + 0.2;
 
                 const diff = this.#getDiff(item, chance);
 
@@ -144,9 +151,9 @@ class ModelTradeA
 
                 //console.log(i,". baseItem.economy: ", baseItem.economy);
 
-                if(rng() < 0.2) continue;
+                if(rng() < (0.2 + LP)) continue;
 
-                console.log("\n🟩 Много:");
+                //console.log("\n🟩 Много:");
 
                 // Копируем объект
                 const item = { ...baseItem };
@@ -165,11 +172,11 @@ class ModelTradeA
 
                 if(rng() < 0.5) continue;
 
-                console.log("\n🟩 Мало:");
+                //console.log("\n🟩 Мало:");
 
                 // Копируем объект
                 const item = { ...baseItem };
-                const diff = this.#getDiff(item, 0.5);
+                const diff = this.#getDiff(item, 0.5 - LP);
 
                 item.stock -= diff.stock;
                 item.buy   += diff.buy;
@@ -207,8 +214,8 @@ class ModelTradeA
         const trueGovern = [Anarchy, Democracy, MultiGov, MultiGov];
         const isDone = trueGovern.includes(this.#star.idGovernment);
 
-        console.log("🔥 isDone", isDone);
-        console.log("🔥 this.#star.danger", this.#star.danger);
+        //console.log("🔥 isDone", isDone);
+        //console.log("🔥 this.#star.danger", this.#star.danger);
 
         if(isDone && this.#star.danger > 0.4)
         {
