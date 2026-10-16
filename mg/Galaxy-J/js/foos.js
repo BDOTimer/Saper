@@ -258,16 +258,17 @@
 })(typeof window !== 'undefined' ? window : this);
 
 
-class ED
-{   static M = 997486157;
-    static k = 9029899n; /// 9007199254740991/9029899--->997'486'157
-    static e(v){ return BigInt(v) * ED.k; };
-    static d(r){ return {v: BigInt(r) / ED.k, x: BigInt(r) % ED.k != 0n }; };
-}
+// JSON.stringify() на BigInt кидает TypeError!
 // class ED
 // {   static M = 997486157;
-//     static k = 9029899; /// 9007199254740991/9029899--->997'486'157
-//     static e(v){ return v * ED.k; };
-//     static d(r){ return {v: r / ED.k, x: r % ED.k != 0 }; };
+//     static k = 9029899n; /// 9007199254740991/9029899--->997'486'157
+//     static e(v){ return BigInt(v) * ED.k; };
+//     static d(r){ return {v: BigInt(r) / ED.k, x: BigInt(r) % ED.k != 0n }; };
 // }
+class ED
+{   static M = 997486157;
+    static k = 9029899; /// 9007199254740991/9029899--->997'486'157
+    static e(v){ return v * ED.k; };
+    static d(r){ return {v: r / ED.k, x: r % ED.k != 0 }; };
+}
 window.ED = ED;

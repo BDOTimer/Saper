@@ -27,7 +27,6 @@ class Game
 
     constructor(options = {})
     {
-
         // Universe создаётся «чистым» — реальный seed/amount могут быть
         // перезаписаны в this.load(), когда подтянем save из профиля.
         this.universe = options.universe ?? new UniverseJS.Universe(
@@ -100,7 +99,7 @@ class Game
     _restore(saveData)
     {
         if (!saveData || typeof saveData !== "object") return;
-        if (saveData.v !== Game.SAVE_FORMAT_VERSION) return;
+        if ( saveData.v !== Game.SAVE_FORMAT_VERSION ) return;
 
         const p  = saveData.pers  || {};
         const s  = saveData.ship  || {};
@@ -155,7 +154,7 @@ class Game
         // --- cargo ---
         // Восстанавливаем ДО проверки world, чтобы даже без world данные были на месте.
         const cargo = this.ship.cargo;
-        if (cargo && typeof cargo.fromJSON === 'function')
+        if   (cargo && typeof cargo.fromJSON === 'function')
         {
             // fromJSON сам сбросит #items и провалидирует через inCargo.
             // Если в сейве cargo нет — получим пустой трюм, это корректно.
@@ -172,8 +171,7 @@ class Game
     }
 
     load()
-    {
-        if (typeof ProfileStore === "undefined") return;
+    {   if (typeof ProfileStore === "undefined") return;
 
         const profile = ProfileStore.current();
         if (!profile || !profile.save) return;
@@ -194,19 +192,33 @@ class Game
 
         const profile = ProfileStore.current();
         if (profile && profile.id) {
-            ProfileStore.saveGame(profile.id, this._snapshot());
+            const snap = this._snapshot();
+            const ok   = ProfileStore.saveGame(profile.id, snap);
+            if  (!ok)
+            {   console.error(
+                    "❌ saveGame вернул false — сейв НЕ записан", snap);
+            }
         }
-        // ★ Ушло: this.universe.save() — теперь всё через ProfileStore
-
-        console.log("♦️ this.world: ", this.world);
     }
 
     // saveUp({ship: { fuel: this.ship.fuel} });
-    saveUp(option={})
+    saveUp1(option={})
     {   const profile = ProfileStore.current();
         if (profile && profile.id) {
             ProfileStore.saveGame(profile.id, option);
         }
+    }
+
+    saveUp(option = {})
+    {
+        if (typeof ProfileStore === "undefined") return false;
+
+        const profile = ProfileStore.current();
+        if (!profile || !profile.id) return false;
+
+        this.world = this.buildWorldSnapshot();   // свежая поза камеры
+        const merged = ProfileStore.deepMerge(this._snapshot(), option);
+        return ProfileStore.saveGame(profile.id, merged);
     }
 
     reset()

@@ -1217,6 +1217,8 @@ window.HUD = HUD;
         ship.shield = ship.SHIELDMAX;
         ModelTrade.go2CurrentStar();
 
+        ship.fuel = 100; // 🔴⚠️
+
         if(game.isDock)
         {
             HUD.setStatus("D", true, { pulse: false }); // зелёный

@@ -48,7 +48,7 @@
 ///     - g-menu.html : const p = ProfileStore.ensure(); btnContinue.disabled = !p.save;
 
 const NAME_PLAYER_DEFAULT = "Анонимус-1917";
-const ProfileStoreVERSION = 0.2;
+const ProfileStoreVERSION = 0.3;
 
 class ProfileStore
 {
@@ -193,6 +193,7 @@ class ProfileStore
             localStorage.setItem(this.keyProfile(profile.id), JSON.stringify(profile));
             return true;
         } catch (e) {
+            console.warn("🔴 _writeProfile упал:", e); 
             return false;
         }
     }
@@ -299,7 +300,7 @@ class ProfileStore
     static saveGame(id, saveData)
     {
         const p = this.load(id);
-        if (!p) return false;
+        if  (!p) return false;
 
         p.save = saveData || null;
         p.lastPlayed = new Date().toISOString();
@@ -471,6 +472,11 @@ class ProfileStore
         return true;
     }
 
+    /** Публичный deepMerge (нужен для Game.saveUp). */
+    static deepMerge(base, patch)
+    {   return this.#deepMerge(base, patch);
+    }
+
     /** Глубокое слияние plain-объектов. Массивы и примитивы — заменяются. */
     static #deepMerge(base, patch)
     {
@@ -482,7 +488,7 @@ class ProfileStore
             : {};
 
         for (const k of Object.keys(patch)) {
-            out[k] = deepMerge(out[k], patch[k]);
+            out[k] = ProfileStore.#deepMerge(out[k], patch[k]);
         }
         return out;
     }
