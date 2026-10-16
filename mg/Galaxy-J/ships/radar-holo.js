@@ -236,8 +236,11 @@ class RadarHolo
             // Зажимаем внутрь сферы
         //  if (rel.length() > this.#size) rel.setLength(this.#size);
 
-            // Отбрасываем
-            if (rel.length() > this.#size) continue;
+    // Отбрасываем
+    if (rel.length() > this.#range) continue;
+
+    rel.applyQuaternion(this.#shipQuat.clone().invert());
+    rel.multiplyScalar(this.#size / this.#range);
 
             // Ось Y радара (THREE) = ось Z в плоскости XZ плоскости радара
             // Проще: раскладываем rel по (x, y, z) как есть.

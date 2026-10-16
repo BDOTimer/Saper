@@ -181,6 +181,7 @@ const kit = SND.createSoundKit({
 
     fail1    : { src: "snd/fail-3.mp3"     ,  volume: Vol, pool: 1 },
     fail2    : { src: "snd/fail-4.mp3"     ,  volume: Vol, pool: 1 },
+    boom1    : { src: "snd/boom1.mp3"      ,  volume: Vol, pool: 3 },
 });
 
 // SNDS.fail1.play();

@@ -164,3 +164,149 @@ class EnemyA
 }
 
 window.EnemyA = EnemyA;
+
+class ExplosionEffect
+{
+  constructor(scene) {
+    this.scene = scene;
+    this.particles = [];
+    this.lights = [];
+  }
+
+  /**
+   * Создать взрыв в точке position (THREE.Vector3)
+   */
+  spawn(position) {
+    SNDS.boom1.play();
+    
+    // --- Вспышка света ---
+    const light = new THREE.PointLight(0xffaa33, 50, 100);
+    light.position.copy(position);
+    this.scene.add(light);
+    this.lights.push(light);
+
+    // Постепенно уменьшаем интенсивность и удаляем свет
+    setTimeout(() => {
+      const fadeOut = setInterval(() => {
+        light.intensity *= 0.9;
+        if (light.intensity < 0.1) {
+          this.scene.remove(light);
+          clearInterval(fadeOut);
+        }
+      }, 30);
+    }, 10);
+
+    // --- Осколки (частицы) ---
+    const count = 80; // количество осколков
+    for (let i = 0; i < count; i++) {
+      // Цвет: от жёлтого до оранжевого
+      const hue = THREE.MathUtils.randFloat(0.08, 0.13); // HSL hue
+      const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color().setHSL(hue, 1, 0.7),
+        transparent: true,
+        opacity: 1,
+      });
+
+      const size = THREE.MathUtils.randFloat(0.5, 1.6);
+      const geometry = new THREE.SphereGeometry(size, 6, 6); // низкополигональная сфера
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+
+      // Направление разлёта
+      const dir = new THREE.Vector3(
+        THREE.MathUtils.randFloat(-1, 1),
+        THREE.MathUtils.randFloat(-1, 1),
+        THREE.MathUtils.randFloat(-1, 1)
+      ).normalize();
+
+      // Скорость: разные осколки летят с разной скоростью
+      const speed = THREE.MathUtils.randFloat(5, 30);
+      const velocity = dir.multiplyScalar(speed);
+
+      // Вращение
+      const spin = new THREE.Vector3(
+        THREE.MathUtils.randFloat(-3, 3),
+        THREE.MathUtils.randFloat(-3, 3),
+        THREE.MathUtils.randFloat(-3, 3)
+      );
+
+      // Время жизни
+      const lifetime = THREE.MathUtils.randFloat(1200, 2200); // мс
+      const startTime = performance.now();
+
+      this.scene.add(mesh);
+      this.particles.push({
+        mesh,
+        velocity,
+        spin,
+        lifetime,
+        startTime,
+      });
+    }
+  }
+
+  /**
+   * Вызывать каждый кадр (в цикле анимации)
+   */
+  update(delta) {
+    const now = performance.now();
+
+    // Обновляем частицы
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      const elapsed = now - p.startTime;
+      const t = elapsed / p.lifetime; // 0..1
+
+      // Движение
+      p.mesh.position.addScaledVector(p.velocity, delta);
+
+      // Гравитация (лёгкое притяжение вниз, чтобы осколки падали)
+      p.velocity.y -= 0.4 * delta;
+
+      // Трение (чтобы не улетали слишком далеко)
+      p.velocity.multiplyScalar(0.97);
+
+      // Вращение
+      p.mesh.rotation.x += p.spin.x * delta;
+      p.mesh.rotation.y += p.spin.y * delta;
+      p.mesh.rotation.z += p.spin.z * delta;
+
+      // Затухание прозрачности
+      if (t >= 1) {
+        // Частица умерла
+        this.scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        p.mesh.material.dispose();
+        this.particles.splice(i, 1);
+      } else {
+        const alpha = 1 - t;
+        p.mesh.material.opacity = Math.max(0, alpha);
+      }
+    }
+
+    // Если частиц нет — можно считать, что взрыв закончился
+    if (this.particles.length === 0 && this.lights.length === 0) {
+      // Здесь можно вызвать callback «взрыв завершён», если нужно
+    }
+  }
+
+  /**
+   * Полная очистка (вызывать при уничтожении класса или перезагрузке сцены)
+   */
+  dispose() {
+    for (const p of this.particles) {
+      this.scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+    }
+    this.particles = [];
+
+    for (const light of this.lights) {
+      this.scene.remove(light);
+    }
+    this.lights = [];
+  }
+}
+
+window.ExplosionEffect = ExplosionEffect;
