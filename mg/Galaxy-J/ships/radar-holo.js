@@ -184,7 +184,18 @@ class RadarHolo
     {
         const seen = new Set();
 
-        for (const c of contacts) {
+        const invQuat = this.#shipQuat.clone().invert();
+        const       R = this.#range;
+
+        for (const c of contacts) 
+        {   
+            const dist = c.pos.distanceTo(this.#shipPos);
+            
+            const isShown = this.#contactMeshes.has(c.id); // точка уже на радаре?
+            const limit   = isShown ? R * 1.05 : R * 0.95;
+
+            if (dist > limit) continue;
+            
             seen.add(c.id);
 
             let mesh = this.#contactMeshes.get(c.id);
@@ -227,20 +238,10 @@ class RadarHolo
             // Позиция относительно корабля
             const rel = c.pos.clone().sub(this.#shipPos);
 
-            // ★ Компенсируем поворот корабля: радар всегда «смотрит вперёд»
-            rel.applyQuaternion(this.#shipQuat.clone().invert());
-
-            // Масштабируем в координаты сферы радара
-            rel.multiplyScalar(this.#size / this.#range);
-
+            rel.applyQuaternion(invQuat);
+            rel.multiplyScalar(this.#size / R);
             // Зажимаем внутрь сферы
-        //  if (rel.length() > this.#size) rel.setLength(this.#size);
-
-    // Отбрасываем
-    if (rel.length() > this.#range) continue;
-
-    rel.applyQuaternion(this.#shipQuat.clone().invert());
-    rel.multiplyScalar(this.#size / this.#range);
+            if (rel.length() > this.#size) rel.setLength(this.#size);
 
             // Ось Y радара (THREE) = ось Z в плоскости XZ плоскости радара
             // Проще: раскладываем rel по (x, y, z) как есть.
