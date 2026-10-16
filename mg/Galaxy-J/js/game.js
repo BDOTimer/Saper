@@ -184,6 +184,8 @@ class Game
 
     save()
     {
+        this.world = this.buildWorldSnapshot();
+
         if (typeof ProfileStore === "undefined")
         {   console.assert(ProfileStore === null, 
                 `🔴 typeof ProfileStore === "undefined"`);
@@ -195,6 +197,8 @@ class Game
             ProfileStore.saveGame(profile.id, this._snapshot());
         }
         // ★ Ушло: this.universe.save() — теперь всё через ProfileStore
+
+        console.log("♦️ this.world: ", this.world);
     }
 
     // saveUp({ship: { fuel: this.ship.fuel} });
@@ -306,7 +310,7 @@ class Game
     }
 
     static randomQuat() {
-        const u1  = Math.random(), u2 = Math.random(), u3 = Math.random();
+        const  u1 = Math.random(), u2 = Math.random(), u3 = Math.random();
         const sq1 = Math.sqrt(1 - u1), sq2 = Math.sqrt(u1);
         return new THREE.Quaternion(
             sq1 * Math.sin(2 * Math.PI * u2),

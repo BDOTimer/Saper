@@ -31,9 +31,9 @@ class Pers
         console.assert(u != null);
 
         // --- Метрики игрока ---
-        this.credits   = options.credits   ?? 1000;
-        this.kills     = options.kills     ?? 0;
-        this.sector    = options.sector    ?? { x: 0, y: 0 };
+        this.credits = options.credits ?? 1000;
+        this.kills   = options.kills   ?? 0;
+        this.sector  = options.sector  ?? { x: 0, y: 0 };
 
         // --- Навигация (приватные) ---
         this.#indexGalaxy = options.indexGalaxy ?? 0;

@@ -541,7 +541,7 @@ window.HUD = HUD;
     // Модель Галактической Экономики 🪙🪙🪙
     window.ModelTrade = new ModelTradeA();
 
-    window.MusFon1.start('calm');
+    //window.MusFon1.start('calm');
     window.MusFon1.setVolume(Settings.volume);
     
     ////////////////////////////////////////////////////////////////////////////
@@ -571,11 +571,11 @@ window.HUD = HUD;
         const dx = pos.x - origin.x;
         const dy = pos.y - origin.y;
         const dz = pos.z - origin.z;
-        if (dx > halfSize) pos.x -= halfSize * 2;
+        if (dx >  halfSize) pos.x -= halfSize * 2;
         if (dx < -halfSize) pos.x += halfSize * 2;
-        if (dy > halfSize) pos.y -= halfSize * 2;
+        if (dy >  halfSize) pos.y -= halfSize * 2;
         if (dy < -halfSize) pos.y += halfSize * 2;
-        if (dz > halfSize) pos.z -= halfSize * 2;
+        if (dz >  halfSize) pos.z -= halfSize * 2;
         if (dz < -halfSize) pos.z += halfSize * 2;
     }
 
@@ -616,7 +616,6 @@ window.HUD = HUD;
         {   ship.fuel = 100; // 🔴⚠️
         }
       
-        game.world = game.buildWorldSnapshot();
         game.save();
 
         HUD.setStatus("S", true, { pulse: true }); 
@@ -1095,13 +1094,13 @@ window.HUD = HUD;
     function completeHyperJump()
     { const targetIdx = game.hyper.targetIdx;
       const star = GALAXY.getStar(targetIdx);
-      if  (!star) {
-        game.hyper.active = false;
-        
-        HYPERFX.stop(); // Остановка Гиперпрыжка.
-        
-        elHyper.style.display = "none";
-        return;
+      if  (!star)
+      {   game.hyper.active = false;
+          
+          HYPERFX.stop(); // Остановка Гиперпрыжка.
+          
+          elHyper.style.display = "none";
+          return;
       }
       // Списываем топливо
       ship.fuel = Math.max(0, ship.fuel - HYPERFX.fuelCost);
@@ -1170,7 +1169,7 @@ window.HUD = HUD;
         `(-${game.hyper.fuelCost} fuel)`,
       );
 
-      // kit.sounds.hjump.stop(); // ★ звук прибытия
+      // SNDS.hjump.stop(); // ★ звук прибытия
 
       // Завершаем
       game.hyper.active     = false;
@@ -1179,7 +1178,7 @@ window.HUD = HUD;
 
       saveGame();
 
-      console.assert(game.pers.seedStar === star.seed);
+    //console.assert(game.pers.seedStar === star.seed);
     }
 
     function updateHyper(dt) {
@@ -1212,7 +1211,8 @@ window.HUD = HUD;
     function StartGame()
     {
         // ...
-        EnemyA.doAmount(1, 2);
+        //EnemyA.doAmount(1, 2);
+        EnemyA.doAmount(51, 52);
         pers.dead  = false;
         ship.shield = ship.SHIELDMAX;
         ModelTrade.go2CurrentStar();

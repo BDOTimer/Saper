@@ -48,7 +48,7 @@
 ///     - g-menu.html : const p = ProfileStore.ensure(); btnContinue.disabled = !p.save;
 
 const NAME_PLAYER_DEFAULT = "Анонимус-1917";
-const ProfileStoreVERSION = 0.1;
+const ProfileStoreVERSION = 0.2;
 
 class ProfileStore
 {
@@ -56,6 +56,15 @@ class ProfileStore
     static KEY_LIST    = "galaxy.profiles";
     static KEY_CURRENT = "galaxy.currentProfile";
     static KEY_VERSION = "galaxy.version";
+
+    // ========================================================= +
+    //  НАСТРОЙКИ ПРОФИЛЯ (settings)
+    // =========================================================
+    static SETTINGS_DEFAULTS = {
+        isSpawnEnemies:      true,
+        isTestDockToStation: false,
+        volume:              0.5
+    };
 
     static {
         // При загрузке скрипта гарантируем, что профиль есть
@@ -242,7 +251,7 @@ class ProfileStore
                 score: 0,
                 rank:  "HARMLESS"
             },
-            settings: { ...this.SETTINGS_DEFAULTS }
+            settings: { ...(this.SETTINGS_DEFAULTS || {}) }
         };
 
         // 1. сам профиль
@@ -434,17 +443,6 @@ class ProfileStore
 
         console.groupEnd();
     }
-
-    // ========================================================= +
-    //  НАСТРОЙКИ ПРОФИЛЯ (settings)
-    // =========================================================
-
-    /** Значения по умолчанию для настроек. */
-    static SETTINGS_DEFAULTS = {
-        isSpawnEnemies:      true,
-        isTestDockToStation: false,
-        volume:              0.5
-    };
 
     /** Прочитать настройки профиля (с мержем дефолтов). */
     static getSettings(id)
