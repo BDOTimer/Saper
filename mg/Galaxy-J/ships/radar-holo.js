@@ -42,7 +42,7 @@ class RadarHolo
 
         this.#renderer = renderer;
 
-        this.#range    = opts.range    ?? 2000;
+        this.#range    = opts.range    ?? 500;
         this.#size     = opts.size     ?? 220;   // радиус сферы в world units HUD-сцены
         this.#flattenY = opts.flattenY ?? 0.5;   // ★ 1 = сфера, 0.5 = сплюснута вдвое
 
@@ -234,7 +234,10 @@ class RadarHolo
             rel.multiplyScalar(this.#size / this.#range);
 
             // Зажимаем внутрь сферы
-            if (rel.length() > this.#size) rel.setLength(this.#size);
+        //  if (rel.length() > this.#size) rel.setLength(this.#size);
+
+            // Отбрасываем
+            if (rel.length() > this.#size) continue;
 
             // Ось Y радара (THREE) = ось Z в плоскости XZ плоскости радара
             // Проще: раскладываем rel по (x, y, z) как есть.

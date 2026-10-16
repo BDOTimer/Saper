@@ -19,21 +19,20 @@ class EnemyA
 
     static spawn(camera)
     {
+        if (this.amount === 0)                  return null;
         if (!Settings.isSpawnEnemies)           return null;
-        if (!this.amount)                       return null; // 0 или undefined
         if (this.list.length >= this.MAX_ALIVE) return null; // одновременно
-        if (Math.random() > this.RATE)          return null;
+        if (Math.random() >  this.RATE)         return null;
         if (this.amount > 0) this.amount--;                  // ← после проверок, ∞ не трогаем
 
-        const cam  = camera ?? this.camera;
-        const c    = cam ? cam.position : { x: 0, y: 0, z: 0 };
+        const p    = camera ? camera.position : { x: 0, y: 0, z: 0 };
         const ang  = Math.random() * Math.PI * 2;
-        const dist = 400 + Math.random() * 600;
+        const dist = Math.random() * 600  +  400;
 
         const e = new EnemyA(new THREE.Vector3(
-            c.x + Math.cos(ang) * dist,
-            c.y + (Math.random() - 0.5) * 200,
-            c.z + Math.sin(ang) * dist,
+            p.x +  Math.cos(ang) * dist,
+            p.y + (Math.random() - 0.5) * 200,
+            p.z +  Math.sin(ang) * dist,
         ));
         this.list.push(e);
         return e;
@@ -69,6 +68,8 @@ class EnemyA
     constructor(position)
     {
         if (!EnemyA.scene) throw new Error('EnemyA.init(scene, camera) не вызван');
+
+        this.amount = 0;
 
         this.mesh = EnemyA.buildMesh();
         this.mesh.position.copy(position);
