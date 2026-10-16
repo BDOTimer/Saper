@@ -64,7 +64,7 @@ class MusFon1
         this.library = {};
 
         /* --------------------------- СОСТОЯНИЕ МАШИНЫ ------------------------------ */
-        this.state        = 'silent'; // silent | switching | playing | gap
+        this.state        = 'playing'; // silent | switching | playing | gap
         this.type         = null;     // звучащий сейчас тип музыки
         this.lastSignal   = 0;        // Date.now() последнего сигнала (для игры)
         this._lastUrl     = null;
