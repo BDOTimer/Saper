@@ -83,6 +83,38 @@ class MusFon1
         /* ---------- ДВА АУДИО-КАНАЛА (пара нужна для кроссфейда) ------------------- */
         this._a = this._mkAudio();
         this._b = this._mkAudio();
+
+        this.init();
+    }
+
+    init()
+    {   this.
+        addTracks('calm', [
+            'snd/fon/calm/c01.mp3',   // мирный дрейф среди звёзд
+            'snd/fon/calm/c02.mp3',
+            'snd/fon/calm/c03.mp3',
+            'snd/fon/calm/c04.mp3'
+        ])
+        .addTracks('dock', [
+            'snd/fon/dock/d01.mp3',
+            'snd/fon/dock/d02.mp3',
+            'snd/fon/dock/d03.mp3',
+        ])
+        .addTracks('tense', [
+            'snd/fon/tense/d01.mp3',  // астероидное поле
+            'snd/fon/tense/t02.mp3',  // враг на радаре
+            'snd/fon/tense/t03.mp3',
+        ])
+        .addTracks('epic', [
+            'snd/fon/epic/e01.mp3',   // бой с боссом
+            'snd/fon/epic/e02.mp3',
+            'snd/fon/epic/e03.mp3',
+            'snd/fon/epic/e04.mp3',
+        ])
+        .addTracks('mystic', [
+            'music/nebula.mp3'        // загадочная туманность
+        ]);
+        //.start('calm');
     }
 
     /* ══════════════════════════════════════════════════════════════════════
