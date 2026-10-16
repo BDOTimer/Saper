@@ -1143,7 +1143,8 @@ window.HUD = HUD;
           camera.quaternion.set(0, 0, 0, 1);
       }
       else
-      {   camera.position.set(0, 0, 17000);
+      {   const v = FO.math.getRandomPointOnSphere(17000);
+          camera.position.set(v.x, v.y, v.z);
           //camera.lookAt(0,0,0);
           Game.randomQuatCamera(camera);
       }

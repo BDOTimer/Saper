@@ -64,7 +64,24 @@
          */
         clamp(value, min, max) {
             return Math.min(Math.max(value, min), max);
-        }
+        },
+
+        getRandomPointOnSphere(R) {
+            // Генерируем два случайных числа в диапазоне [0, 1)
+            const u = Math.random();
+            const v = Math.random();
+
+            // Преобразуем в сферические координаты с равномерным распределением
+            const theta = 2 * Math.PI * u;     // азимут (0..2π)
+            const phi = Math.acos(1 - 2 * v);  // полярный угол (0..π)
+
+            // Переводим в декартовы координаты
+            return {
+                x : R * Math.sin(phi) * Math.cos(theta),
+                y : R * Math.sin(phi) * Math.sin(theta),
+                z : R * Math.cos(phi)
+            };
+        },
     };
 
     //=========================================================================|
