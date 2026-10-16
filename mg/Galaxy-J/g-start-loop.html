@@ -1492,8 +1492,8 @@ function updateRadar(dt) {
         });
     }
 
-    radar.setContacts(contacts);
     radar.update(dt, camera.position, camera.quaternion);
+    radar.setContacts(contacts);
 }
 
 // ------------------------------------------------------------------
