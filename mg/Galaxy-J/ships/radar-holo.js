@@ -189,12 +189,9 @@ class RadarHolo
 
         for (const c of contacts) 
         {   
-            const dist = c.pos.distanceTo(this.#shipPos);
-            
+            const dist    = c.pos.distanceTo(this.#shipPos);
             const isShown = this.#contactMeshes.has(c.id); // точка уже на радаре?
-            const limit   = isShown ? R * 1.05 : R * 0.95;
-
-            if (dist > limit) continue;
+            if (dist > (isShown ? R * 1.05 : R * 0.95)) continue;
             
             seen.add(c.id);
 
