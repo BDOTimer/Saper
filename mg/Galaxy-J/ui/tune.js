@@ -300,6 +300,9 @@
     let _listEl     = null;
     let _volumeIn   = null;
     let _volumeVal  = null;
+    let _volMusIn   = null;  // для 2 слайдера
+    let _volMusVal  = null;  // для 2 слайдера
+    let _dirty      = false; // ← были ли реальные изменения громкости
     let _onChanged  = null;
 
     // ---------------------------------------------------------
@@ -361,6 +364,9 @@
         _volumeIn  = null;
         _volumeVal = null;
 
+        _volMusIn  = null;   // ← добавили
+        _volMusVal = null;   // ← добавили
+
         if (_onChanged) {
             window.removeEventListener("profile-changed", _onChanged);
             _onChanged = null;
@@ -373,12 +379,18 @@
 
         document.removeEventListener("keydown", onKeyDown, true);
 
-        music.setVolumeL();
+        // применяем громкости к аудио-движку
+        if (_dirty && window.music) {
+            try { music.setVolumeL(); } catch (_) {}
+            try { music.setVolumeM(); } catch (_) {}   // ← добавили
+        }
+
+        _dirty = false; // ← сброс на будущее открытие
     }
 
-    function onKeyDown(e) {
-        if (e.key === "Escape") {
-            e.preventDefault();
+    function onKeyDown(e)
+    {   if (e.key === "Escape")
+        {   e.preventDefault ();
             e.stopPropagation();
             close();
         }
@@ -387,32 +399,32 @@
     // ---------------------------------------------------------
     //  Озвучка
     // ---------------------------------------------------------
-    function playClick() {
-        if (typeof window.playClick === "function") {
-            try { window.playClick(); } catch (_) { /* ignore */ }
+    function playClick()
+    {   if (typeof window.playClick === "function")
+        {   try { window.playClick(); } catch (_) { /* ignore */ }
         }
     }
 
     // ---------------------------------------------------------
     //  Хелперы значений
     // ---------------------------------------------------------
-    function clampVolume(v) {
-        v = Number(v);
-        if (isNaN(v)) return 0;
+    function clampVolume(v)
+    {   v = Number(v);
+        if (isNaN (v)) return 0;
         return Math.max(0, Math.min(1, v));
     }
 
     // хранилище 0..1  →  UI 0..100  (целое)
-    function toUi(v) {
-        v = Number(v);
-        if (isNaN(v)) v = 0;
+    function toUi (v)
+    {   v = Number(v);
+        if (isNaN (v)) v = 0;
         v = Math.max(0, Math.min(1, v));
         return Math.round(v * 100);
     }
 
     // UI 0..100 (или строка из input.value)  →  хранилище 0..1
-    function toStore(v) {
-        v = parseInt(v, 10);
+    function toStore( v)
+    {   v = parseInt( v, 10);
         if (isNaN(v)) v = 0;
         v = Math.max(0, Math.min(100, v));
         return v / 100;
@@ -421,8 +433,8 @@
     // ---------------------------------------------------------
     //  Строки
     // ---------------------------------------------------------
-    function buildCheckRow(label, field) {
-        const row = document.createElement("li");
+    function buildCheckRow(label, field)
+    {   const row = document.createElement("li");
         row.className = "tune-menu__row";
 
         const text = document.createElement("span");
@@ -447,13 +459,14 @@
         return row;
     }
 
-    function buildVolumeRow() {
+    function buildSliderRow(label, field, opts = {}) {
+        // opts: { getIn, getVal, setIn, setVal } — куда положить ссылки на DOM
         const row = document.createElement("li");
         row.className = "tune-menu__row";
 
         const text = document.createElement("span");
         text.className = "tune-menu__label";
-        text.textContent = "ГРОМКОСТЬ ЗВУКА";
+        text.textContent = label;
         row.appendChild(text);
 
         const wrap = document.createElement("div");
@@ -465,7 +478,7 @@
         range.min = "0";
         range.max = "100";
         range.step = "1";
-        range.value = String(toUi(readSettings().volume));
+        range.value = String(toUi(readSettings()[field]));
 
         const val = document.createElement("span");
         val.className = "tune-menu__val";
@@ -476,8 +489,10 @@
             val.textContent = String(range.value);
         });
         range.addEventListener("change", () => {
-            // в UI 0..100 → в хранилище 0..1
-            writeSettings({ volume: toStore(range.value) });
+            const patch = {};
+            patch[field] = toStore(range.value);
+            writeSettings(patch);
+            _dirty = true; // ← помечаем, что громкость реально менялась
             playClick();
         });
 
@@ -485,8 +500,8 @@
         wrap.appendChild(val);
         row.appendChild(wrap);
 
-        _volumeIn  = range;
-        _volumeVal = val;
+        if (typeof opts.setIn  === "function") opts.setIn(range);
+        if (typeof opts.setVal === "function") opts.setVal(val);
         return row;
     }
 
@@ -508,11 +523,16 @@
             el.checked = !!s[field];
         });
 
-        // слайдер
-        if (_volumeIn && _volumeVal) {
-            const v = toUi(s.volume);   // 0..1 → 0..100
-            _volumeIn.value  = String(v);
+        // слайдеры
+        if (_volumeIn && _volumeVal)
+        {   const v = toUi(s.volume);
+            _volumeIn.value = String(v);
             _volumeVal.textContent = String(v);
+        }
+        if (_volMusIn && _volMusVal)
+        {   const v = toUi(s.volMus);
+            _volMusIn.value = String(v);
+            _volMusVal.textContent = String(v);
         }
     }
 
@@ -528,6 +548,8 @@
             syncFromProfile();
             return;
         }
+
+        _dirty = false; // ← только при создании нового окна
 
         if (!hasStore()) {
             console.warn("[tune] ProfileStore.getSettings/updateSettings не найдены — " +
@@ -566,7 +588,14 @@
 
         list.appendChild(buildCheckRow("ВРАГИ",                 "isSpawnEnemies"));
         list.appendChild(buildCheckRow("ТЕСТ ДОКА К СТАНЦИИ",   "isTestDockToStation"));
-        list.appendChild(buildVolumeRow());
+
+        list.appendChild(buildSliderRow("ГРОМКОСТЬ ЗВУКА",    "volume",
+            { setIn : v => { _volumeIn  = v; }, 
+              setVal: v => { _volumeVal = v; } }));
+
+        list.appendChild(buildSliderRow("ГРОМКОСТЬ МУЗЫКИ",   "volMus",
+            { setIn : v => { _volMusIn  = v; },
+              setVal: v => { _volMusVal = v; } }));
 
         // --- футер ---
         const footer = document.createElement("div");

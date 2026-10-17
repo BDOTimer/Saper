@@ -50,7 +50,7 @@
 const NAME_PLAYER_DEFAULT = "Анонимус-1917";
 const ProfileStoreVERSION = 0.3;
 
-class ProfileStore
+class ProfileStore 
 {
     // ---------- Ключи localStorage ----------
     static KEY_LIST    = "galaxy.profiles";
@@ -63,13 +63,15 @@ class ProfileStore
     static SETTINGS_DEFAULTS = {
         isSpawnEnemies:      true,
         isTestDockToStation: false,
-        volume:              0.5
+        volume:              0.5  ,  // 0..1
+        volMus:              0.3     // +
     };
 
     static {
         // При загрузке скрипта гарантируем, что профиль есть
-        this.ValidateVersion();   // ← миграция/очистка по версии
-        this.ensure();
+        this.ValidateVersion();  // ← миграция/очистка по версии
+        this.ensure();           // ← гарантируем активный профиль
+        this.MigrateSettings();  // ← дописать новые поля в settings
     }
 
     /** Гарантировать, что активный профиль существует. */
@@ -546,6 +548,49 @@ class ProfileStore
         }
 
         return needWipe;
+    }
+
+    /** Дописать в settings всех профилей недостающие ключи из SETTINGS_DEFAULTS. */
+    static MigrateSettings()
+    {
+        const ids      = this.list();
+        const defaults = this.SETTINGS_DEFAULTS || {};
+        let   touched  = 0;
+
+        for (const id of ids)
+        {
+            const p = this.load(id);
+            if (!p) continue;
+
+            const cur = (p.settings && typeof p.settings === "object") 
+                      ?  p.settings : {};
+                      
+            let changed = false;
+
+            for (const key of Object.keys(defaults)) {
+                if (!(key in cur)) {
+                    cur[key] = defaults[key];
+                    changed = true;
+                }
+            }
+
+            // на случай если settings вообще не было
+            if (!p.settings) changed = true;
+
+            if (!changed) continue;
+
+            p.settings = Object.assign({}, defaults, cur);
+            if (this._writeProfile(p)) touched++;
+        }
+
+        if (touched > 0) {
+            // eslint-disable-next-line no-console
+            console.log(`⚙️ MigrateSettings: обновлено профилей — ${touched}`);
+            // уведомим UI, что активный профиль мог измениться
+            const cur = this.current();
+            if (cur) this._emit(cur.id, cur);
+        }
+        return touched;
     }
 }
 

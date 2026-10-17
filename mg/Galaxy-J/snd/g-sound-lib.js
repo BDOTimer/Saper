@@ -184,10 +184,8 @@ const kit = SND.createSoundKit({
     boom1    : { src: "snd/boom1.mp3"      ,  volume: Vol, pool: 3 },
 });
 
-// SNDS.fail1.play();
-
 kit.autoUnlock();
-window.SNDS = kit.sounds;
+window.SNDS = kit.sounds; // SNDS.boom1.play();
 
 function playMusOnStart()
 {   window.removeEventListener("click", playMusOnStart);

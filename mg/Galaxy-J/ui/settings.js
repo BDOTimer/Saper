@@ -1,18 +1,20 @@
-/// settings.js
+/// settings.js ---> [ profile-store.js ]
 /// Единый объект настроек в памяти. Источник правды для игрового кода.
 /// Синхронизируется с текущим профилем ProfileStore.
 
 (function () {
     "use strict";
 
-    const DEFAULTS = {
-        isSpawnEnemies:      true,
-        isTestDockToStation: false,
-        volume:              0.5        // 0..1
-    };
+    if (typeof ProfileStore === "undefined")
+    {   throw new Error("[settings] ProfileStore не загружен ...");
+    }
 
-    // Текущее состояние в памяти
-    const state = Object.assign({}, DEFAULTS);
+    const DEFAULTS = ProfileStore.SETTINGS_DEFAULTS;
+
+    // console.log("👓 DEFAULTS.volume: ", DEFAULTS.volume);
+
+    // Поверхностная копия
+    const state = { ...DEFAULTS };
 
     // Флаг: идёт ли наша собственная запись (чтобы не ловить свой же profile-changed)
     let _saving = false;
@@ -59,6 +61,9 @@
 
         get volume()               { return state.volume; },
         set volume(v)              { state.volume = clampVolume(v); save(); },
+
+        get volMus()               { return state.volMus; },
+        set volMus(v)              { state.volMus = clampVolume(v); save(); },
 
         // служебное
         loadFromProfile,
