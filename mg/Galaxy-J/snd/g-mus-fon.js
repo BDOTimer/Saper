@@ -216,13 +216,26 @@ class MusFon1
     /** Снять мгновенную паузу. */
     resume()
     {
-        if (this._act && this.state === 'playing')
-        {
-            const p = this._act.play();
-            if (p && p.catch) p.catch(() => {});
+        if (!this._act) return this;
+
+        // Если канал уже играет — ничего не делаем
+        if (!this._act.paused) return this;
+
+        const p = this._act.play();
+        if (p && p.catch) {
+            p.catch(err => {
+                if (err.name !== 'NotAllowedError') throw err;
+                // Если браузер заблокировал автовоспроизведение,
+                // ждём первый жест игрока — логика уже есть в _bindGesture()
+                if (!this._wantPlay) {
+                    this._wantPlay = { el: this._act };
+                    this._bindGesture();
+                }
+            });
         }
         return this;
     }
+
 
     /** Что играет прямо сейчас. */
     info() { return { state: this.state, type: this.type, url: this._lastUrl }; }
