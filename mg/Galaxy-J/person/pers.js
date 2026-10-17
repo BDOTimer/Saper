@@ -64,7 +64,7 @@ class Pers
         {   const v = FO.math.getRandomPointOnSphere(17000);
             GAME.camera.position.set(v.x, v.y, v.z);
             //camera.lookAt(0,0,0);
-            GAME.randomQuatCamera(camera);
+            Game.randomQuatCamera(GAME.camera);
         }
     }
 

@@ -768,13 +768,12 @@ static GOVERNMENTS = [
         this.#state.fuelR = Infinity;
 
         const ship = (typeof GAME !== "undefined" && GAME.ship) ? GAME.ship : null;
-        if ( !ship || !ship.TUNING)
-        {   console.error("⛔");
-            return;
-        }
+        if ( !ship || !ship.TUNING){ console.error("⛔"); return; }
 
-        const fuel        = ship.fuel;                     // текущее топливо
-        const fuelCost1LY = ship.TUNING.fuel_hyper;        // расход на 1 св.год
+        const fuel        = ship.fuel;              // текущее топливо
+        const fuelCost1LY = ship.TUNING.fuel_hyper; // расход на 1 св.год
+
+        console.log("🔍 ship.fuel", ship.fuel);   /// 100
 
         if(fuelCost1LY === -1) return;
 
@@ -782,7 +781,7 @@ static GOVERNMENTS = [
 
         // текущая звезда игрока — центр круга
         const ps = this.getCurrentStar();
-        if (!ps) return;
+        if ( !ps){ console.error("⛔"); return; }
 
         // сколько световых лет можем пролететь
         const maxLY = fuel / fuelCost1LY;
