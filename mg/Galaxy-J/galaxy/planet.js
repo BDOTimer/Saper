@@ -42,23 +42,22 @@ function computeParams1(star, planetIndex, opts = {})
     const seed = (starSeed ^ Math.imul(planetIndex + 1, 0x9e3779b1) ^ Math.imul(extraSeed + 1, 0x85ebca6b)) >>> 0;
     const rng = mulberry32(seed >>> 0);
 
-    console.log("👓👓👓---------------------:");
-    console.log("👓 planetIndex: ", planetIndex);
-    console.log("👓 seed       : ", seed);
-    console.log("👓 extraSeed  : ", extraSeed);
+    // console.log("👓👓👓---------------------:");
+    // console.log("👓 seed       : ", seed);
+    // console.log("👓 extraSeed  : ", extraSeed);
 
     const tech = Math.max(1, Math.min(15, star.tech | 0));
     const danger = typeof star.danger === "number" ? star.danger : 0;
 
     let klass;
-    switch (star.economy) {
-      case "Industrial": klass = "rocky-dark"; break;
-      case "Mining":     klass = "rocky";      break;
-      case "Agricultural": klass = "green";    break;
-      case "Refinery":   klass = "brown";      break;
-      case "High-Tech":  klass = "blue";       break;
-      case "Tourism":    klass = "vivid";      break;
-      default:           klass = "rocky";
+    switch (star.economy)
+    {   case "Industrial"  : klass = "rocky-dark"; break;
+        case "Mining"      : klass = "rocky"     ; break;
+        case "Agricultural": klass = "green"     ; break;
+        case "Refinery"    : klass = "brown"     ; break;
+        case "High-Tech"   : klass = "blue"      ; break;
+        case "Tourism"     : klass = "vivid"     ; break;
+        default            : klass = "rocky";
     }
 
     const pop       = Math.max(0, star.population || 0);
@@ -159,11 +158,6 @@ function computeParams1(star, planetIndex, opts = {})
     ) >>> 0;
 
     const rng = mulberry32(seed >>> 0);
-
-    console.log("👓👓👓---------------------:");
-    console.log("👓 planetIndex: ", planetIndex);
-    console.log("👓 seed       : ", seed);
-    console.log("👓 extraSeed  : ", extraSeed);
 
     const tech   = Math.max(1, Math.min(15, star.tech | 0));
     const danger = typeof star.danger === "number" ? star.danger : 0;
@@ -348,8 +342,6 @@ function computeParams1(star, planetIndex, opts = {})
     const pop       = Math.max(0, star.population || 0);
     const popFactor = Math.min(1, Math.log10(pop + 1) / 10);
     const radius    = 50 + popFactor * 170 + rng() * 200;
-
-    console.log("👓 radius  : ", radius);
 
     // ---------------------------------------------------------------
     //  Атмосфера

@@ -53,6 +53,21 @@ class Pers
     get seedGalaxy()  { return this.#seedGalaxy; }
     get seedStar()    { return this.#seedStar; }
 
+    // --- Позиция после Гипер-прыжка ---
+    setPositionJump()
+    {
+        if(Settings.isTestDockToStation)
+        {   GAME.camera.position  .set(0, 0, 1000);
+            GAME.camera.quaternion.set(0, 0, 0, 1);
+        }
+        else
+        {   const v = FO.math.getRandomPointOnSphere(17000);
+            GAME.camera.position.set(v.x, v.y, v.z);
+            //camera.lookAt(0,0,0);
+            GAME.randomQuatCamera(camera);
+        }
+    }
+
     getScore()
     {
         return this.kills;

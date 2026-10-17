@@ -768,7 +768,10 @@ static GOVERNMENTS = [
         this.#state.fuelR = Infinity;
 
         const ship = (typeof GAME !== "undefined" && GAME.ship) ? GAME.ship : null;
-        if (!ship || !ship.TUNING) return;
+        if ( !ship || !ship.TUNING)
+        {   console.error("⛔");
+            return;
+        }
 
         const fuel        = ship.fuel;                     // текущее топливо
         const fuelCost1LY = ship.TUNING.fuel_hyper;        // расход на 1 св.год

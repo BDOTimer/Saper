@@ -765,6 +765,30 @@ window.HUD = HUD;
                 seed        : star.seed
             });
 
+            // =========================================================
+            // Рандомная ориентация планеты (кватернион)
+            // =========================================================
+            const q = new THREE.Quaternion();
+            // Случайный поворот: генерируем вектор направления и делаем lookAt
+            const dir = new THREE.Vector3(
+              rng() * 2 - 1,
+              rng() * 2 - 1,
+              rng() * 2 - 1
+            ).normalize();
+
+            // Чтобы ось вращения была случайной, но без вырождения
+            const up   = new THREE.Vector3(0, 1, 0);
+            const axis = new THREE.Vector3().crossVectors(dir, up).normalize();
+            if (axis.length() < 0.1) {
+              // Если почти коллинеарны, возьмём другую ось
+              p.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+            } else {
+              const angle = rng() * Math.PI * 2;
+              q.setFromAxisAngle(axis, angle);
+              p.mesh.quaternion.copy(q);
+            }
+            // =========================================================
+
             p.mesh.position.copy(pos);
             scene.add(p.mesh);
             planets.push(p);
@@ -1135,19 +1159,10 @@ window.HUD = HUD;
       GALAXY.setPlayerStar(targetIdx);
 
       // ★ Синхронизируем курсор вселенной
-      GAME.pers.indexStar = targetIdx;
+      pers.indexStar = targetIdx;
 
       // Сброс сцены
-      if(Settings.isTestDockToStation)
-      {   camera.position  .set(0, 0, 0);
-          camera.quaternion.set(0, 0, 0, 1);
-      }
-      else
-      {   const v = FO.math.getRandomPointOnSphere(17000);
-          camera.position.set(v.x, v.y, v.z);
-          //camera.lookAt(0,0,0);
-          Game.randomQuatCamera(camera);
-      }
+      pers.setPositionJump();
 
       ship.speed = 0;
       ship.angVel.pitch = ship.angVel.yaw = ship.angVel.roll = 0;
@@ -1205,26 +1220,39 @@ window.HUD = HUD;
       s.population,
     );
 
+    function resetCommon()
+    {
+        if(Settings.isTestDockToStation)
+        {   ship.fuel  = 100;
+            pers.setPositionJump();
+        }
+        window.MusFon1.signal('calm');
+
+        EnemyA.clear();
+        EnemyA.doAmount(1, 2);
+      //EnemyA.doAmount(51, 52);
+
+        pers.dead   = false;
+        
+    }
+
     // ----------------------------------------
     // Вход в игру.
     // ----------------------------------------
     function StartGame()
-    {
-        window.MusFon1.start('calm');
+    {        resetCommon();
+
         window.MusFon1.setVolume(Settings.volMus);
 
         // Стартовая система
         buildSystemFromStar(pers.dataStar);
 
-        // ...
-        EnemyA.doAmount(1, 2);
-      //EnemyA.doAmount(51, 52);
-        pers.dead  = false;
         ship.shield = ship.SHIELDMAX;
         ModelTrade.go2CurrentStar();
-
-        ship.fuel  = 100; // 🔴⚠️
+        
         ship.speed = 0;
+
+        pers.set
 
         if(game.isDock)
         {
@@ -1240,20 +1268,15 @@ window.HUD = HUD;
     StartGame();
 
     function resetGame()
-    {   game.reset();
-
-        window.MusFon1.signal('calm');
+    {        resetCommon();
+      
+        game.reset();
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
         ship.angVel.pitch = ship.angVel.yaw = ship.angVel.roll = 0;
 
-        EnemyA.clear();
-
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
-
-        //camera.position  .set(0, 0, 0);
-        //camera.quaternion.set(0, 0, 0, 1);
 
         reseedDustAndMeteors();
         setDeathReason  (null);
