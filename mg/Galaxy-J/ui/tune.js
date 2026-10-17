@@ -1,4 +1,4 @@
-/// tune.js
+/// tune.js ---> [ profile-store.js ]
 /// Модалка настроек для g-menu.html.
 /// Хранит настройки ВНУТРИ АКТИВНОГО ПРОФИЛЯ через ProfileStore.
 /// ---
@@ -24,6 +24,18 @@
 /// Поведение:
 ///     - изменение чекбокса/слайдера → сразу ProfileStore.updateSettings(...).
 ///     - Esc / клик по фону / "ЗАКРЫТЬ" / "ОК" → close().
+
+const TUNE_SHOW_TEST =
+{   ISSPAWNENEMY: true,
+    ISTESTDOCK  : true,
+};
+
+const TUNE_SHOW_GAME =
+{   ISSPAWNENEMY: false,
+    ISTESTDOCK  : false,
+}
+
+const TUNE_SHOW = {...TUNE_SHOW_TEST};
 
 (function () {
     "use strict";
@@ -485,8 +497,22 @@
         val.textContent = range.value;
 
         // мгновенно в UI, но в хранилище — не на каждый пиксель
-        range.addEventListener("input", () => {
+        range.addEventListener("input", () =>
+        {
             val.textContent = String(range.value);
+
+            const normalized = range.value * 0.01; // 0..1
+
+            if (field === "volume") {
+                if (window.music) { 
+                    try { playClickSetVolume?.(normalized); } catch (_) {}
+                    playClick?.();
+                    if (window.Settings) window.Settings.volume = normalized;
+                }
+            } else if (field === "volMus") {
+                try { window.music?.setVolume(normalized); } catch (_) {}
+                if (window.Settings) window.Settings.volMus = normalized;
+            }
         });
         range.addEventListener("change", () => {
             const patch = {};

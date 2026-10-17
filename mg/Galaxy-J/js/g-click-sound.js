@@ -25,8 +25,21 @@
     }
   }
 
+  /* Установить громкость всех кликов. */
+  function setVolume(v)
+  {
+      v = Number(v);
+      if (isNaN(v)) v = 0;
+      v = Math.max(0, Math.min(1, v));
+
+      for (const a of pool) {
+          try { a.volume = v; } catch (_) { /* ignore */ }
+      }
+  }
+
   // ЭКСПОРТ наружу:
   window.playClick = playClick;
+  window.playClickSetVolume = setVolume; 
 
   // Делегирование: реагируем на клики по любым .menu-btn
   document.addEventListener('pointerdown', e =>

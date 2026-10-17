@@ -260,8 +260,8 @@
       import * as THREE from "three";
       window.THREE = THREE;
 
-      import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-      import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+      import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
+      import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
       
       HELP.init();
@@ -282,7 +282,7 @@
 
         // сетка-«мишень», чтобы оценить, где края
         ctx.strokeStyle = '#33ff88';
-        ctx.lineWidth = 2;
+        ctx.lineWidth   = 2;
 
         // рамка по краям (если виден бордюр — рамка не у края)
         ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
