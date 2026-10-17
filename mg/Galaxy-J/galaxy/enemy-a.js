@@ -19,11 +19,11 @@ class EnemyA
 
     static spawn(camera)
     {
-        if (this.amount === 0)                  return null;
+        if (EnemyA.amount === 0)                return null;
         if (!Settings.isSpawnEnemies)           return null;
         if (this.list.length >= this.MAX_ALIVE) return null; // одновременно
         if (Math.random() >  this.RATE)         return null;
-        if (this.amount > 0) this.amount--;                  // ← после проверок, ∞ не трогаем
+        if (EnemyA.amount > 0) EnemyA.amount--;  // ← после проверок, ∞ не трогаем
 
         const p    = camera ? camera.position : { x: 0, y: 0, z: 0 };
         const ang  = Math.random() * Math.PI * 2;
@@ -69,8 +69,6 @@ class EnemyA
     {
         if (!EnemyA.scene) throw new Error('EnemyA.init(scene, camera) не вызван');
 
-        this.amount = 0;
-
         this.mesh = EnemyA.buildMesh();
         this.mesh.position.copy(position);
 
@@ -92,7 +90,7 @@ class EnemyA
     static buildMesh()
     {
         if (!EnemyA._assets) {          // создаём один раз на всех
-            EnemyA._assets = {
+             EnemyA._assets = {
                 geoBody: new THREE.OctahedronGeometry(8, 0),
                 geoRing: new THREE.TorusGeometry(10, 1, 8, 24),
                 matBody: new THREE.MeshStandardMaterial({ color: 0xaa3333, metalness: 0.7, roughness: 0.5 }),
@@ -133,17 +131,17 @@ class EnemyA
         this.mesh.userData.owner = null;
     }
 
-    // this.amount =  0; // врагов нет
-    // this.amount = -1; // врагов ꝏ
+    // EnemyA.amount =  0; // врагов нет
+    // EnemyA.amount = -1; // врагов ꝏ
     static doAmount(min, max)
-    {   this.amount = Math.floor(Math.random() * (max - min)) + min;
+    {   EnemyA.amount = Math.floor(Math.random() * (max - min)) + min;
     }
 
     static start(star)
     {      EnemyA.clear();
-           this.amount = Math.round(EnemyA.MAXBASE * star.danger);
+           EnemyA.amount = Math.round(EnemyA.MAXBASE * star.danger);
 
-           console.log("💀 EnemyA.amount: ", this.amount);
+           console.log("💀 EnemyA.amount: ", EnemyA.amount);
     }
 
 

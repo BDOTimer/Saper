@@ -80,7 +80,6 @@ class Ship
 
         if(!Settings.isSpawnEnemies)
         {   this.TUNING.fuel_rate  = 0;
-            this.TUNING.fuel_hyper = 0;
         }
 
         // Загрузка профиля (пока заглушка)

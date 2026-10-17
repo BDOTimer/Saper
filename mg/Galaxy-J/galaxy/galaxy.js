@@ -773,10 +773,7 @@ static GOVERNMENTS = [
         const fuel        = ship.fuel;              // текущее топливо
         const fuelCost1LY = ship.TUNING.fuel_hyper; // расход на 1 св.год
 
-        console.log("🔍 ship.fuel", ship.fuel);   /// 100
-
-        if(fuelCost1LY === -1) return;
-
+        if (  fuelCost1LY === -1) return;
         if (!(fuelCost1LY > 0) || !(fuel >= 0)) return;
 
         // текущая звезда игрока — центр круга
