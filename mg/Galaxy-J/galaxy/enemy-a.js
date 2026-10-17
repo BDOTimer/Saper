@@ -177,13 +177,13 @@ class ExplosionEffect
    * Создать взрыв в точке position (THREE.Vector3)
    */
   spawn(position) {
-    SNDS.boom1.play();
+    SNDS?.boom1?.play?.();
     
     // --- Вспышка света ---
     const light = new THREE.PointLight(0xffaa33, 50, 100);
     light.position.copy(position);
     this.scene.add(light);
-    this.lights.push(light);
+    this.lights.push({ light, life: 0, ttl: 1.5 });
 
     // Постепенно уменьшаем интенсивность и удаляем свет
     setTimeout(() => {
@@ -250,44 +250,38 @@ class ExplosionEffect
    * Вызывать каждый кадр (в цикле анимации)
    */
   update(delta) {
-    const now = performance.now();
+    // --- свет ---
+    for (let i = this.lights.length - 1; i >= 0; i--) {
+      const l = this.lights[i];
+      l.life += delta;
+      l.light.intensity = 50 * Math.max(0, 1 - l.life / l.ttl);
+      if (l.life >= l.ttl) {
+        this.scene.remove(l.light);
+        this.lights.splice(i, 1);          // ← утечка закрыта
+      }
+    }
 
-    // Обновляем частицы
+    // --- частицы ---
+    const now = performance.now();
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      const elapsed = now - p.startTime;
-      const t = elapsed / p.lifetime; // 0..1
+      const t = (now - p.startTime) / p.lifetime;
 
-      // Движение
-      p.mesh.position.addScaledVector(p.velocity, delta);
-
-      // Гравитация (лёгкое притяжение вниз, чтобы осколки падали)
-      p.velocity.y -= 0.4 * delta;
-
-      // Трение (чтобы не улетали слишком далеко)
-      p.velocity.multiplyScalar(0.97);
-
-      // Вращение
-      p.mesh.rotation.x += p.spin.x * delta;
-      p.mesh.rotation.y += p.spin.y * delta;
-      p.mesh.rotation.z += p.spin.z * delta;
-
-      // Затухание прозрачности
-      if (t >= 1) {
-        // Частица умерла
+      if (t >= 1) {                        // ← сначала проверка смерти
         this.scene.remove(p.mesh);
         p.mesh.geometry.dispose();
         p.mesh.material.dispose();
         this.particles.splice(i, 1);
-      } else {
-        const alpha = 1 - t;
-        p.mesh.material.opacity = Math.max(0, alpha);
+        continue;
       }
-    }
 
-    // Если частиц нет — можно считать, что взрыв закончился
-    if (this.particles.length === 0 && this.lights.length === 0) {
-      // Здесь можно вызвать callback «взрыв завершён», если нужно
+      p.mesh.position.addScaledVector(p.velocity, delta);
+      p.velocity.y -= 0.4 * delta;
+      p.velocity.multiplyScalar(Math.pow(0.97, delta * 60)); // ← FPS-независимо
+      p.mesh.rotation.x += p.spin.x * delta;
+      p.mesh.rotation.y += p.spin.y * delta;
+      p.mesh.rotation.z += p.spin.z * delta;
+      p.mesh.material.opacity = 1 - t;
     }
   }
 
