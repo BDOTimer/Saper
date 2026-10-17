@@ -541,9 +541,6 @@ window.HUD = HUD;
     // Модель Галактической Экономики 🪙🪙🪙
     window.ModelTrade = new ModelTradeA();
 
-    window.MusFon1.start('calm');
-    window.MusFon1.setVolume(Settings.volMus);
-
     const explosionSystem = new ExplosionEffect(scene);
     
     ////////////////////////////////////////////////////////////////////////////
@@ -992,15 +989,15 @@ window.HUD = HUD;
 
       // Гиперпрыжок — работает и с открытой картой, и в полёте
       if (e.code === "KeyJ") {
-        tryHyperJump();
-        e.preventDefault();
+        tryHyperJump      ();
+        e.preventDefault  ();
         return;
       }
 
       // Карта галактики
       if (e.code === "KeyM") {
-        GALAXY.toggle();
-        e.preventDefault();
+        GALAXY.toggle     ();
+        e.preventDefault  ();
         return;
       }
 
@@ -1204,15 +1201,18 @@ window.HUD = HUD;
       s.economy,
       s.population,
     );
-      
-    // Стартовая система
-    buildSystemFromStar(pers.dataStar);
 
     // ----------------------------------------
     // Вход в игру.
     // ----------------------------------------
     function StartGame()
     {
+        window.MusFon1.start('calm');
+        window.MusFon1.setVolume(Settings.volMus);
+
+        // Стартовая система
+        buildSystemFromStar(pers.dataStar);
+
         // ...
         EnemyA.doAmount(1, 2);
       //EnemyA.doAmount(51, 52);
@@ -1220,7 +1220,8 @@ window.HUD = HUD;
         ship.shield = ship.SHIELDMAX;
         ModelTrade.go2CurrentStar();
 
-        ship.fuel = 100; // 🔴⚠️
+        ship.fuel  = 100; // 🔴⚠️
+        ship.speed = 0;
 
         if(game.isDock)
         {
@@ -1230,11 +1231,15 @@ window.HUD = HUD;
             const star = GALAXY.getCurrentStar();
             ship.tradeOn(star, pers.credits);
         }
+
+        checkDeath();
     };
     StartGame();
 
     function resetGame()
     {   game.reset();
+
+        window.MusFon1.signal('calm');
 
         // Сброс на «докручивание» после респавна / гиперпрыжка,
         ship.angVel.pitch = ship.angVel.yaw = ship.angVel.roll = 0;
@@ -1244,11 +1249,13 @@ window.HUD = HUD;
         for (const l of lasers) scene.remove(l);
         lasers.length = 0;
 
-        camera.position  .set(0, 0, 0);
-        camera.quaternion.set(0, 0, 0, 1);
+        //camera.position  .set(0, 0, 0);
+        //camera.quaternion.set(0, 0, 0, 1);
 
         reseedDustAndMeteors();
-        setDeathReason  (null);  
+        setDeathReason  (null);
+
+        checkDeath();
 
         document.getElementById("gameover").style.display = "none";
     }
@@ -1388,7 +1395,9 @@ window.HUD = HUD;
     //  Смерть героя.                 |
     // -------------------------------:
     function killPlayer(reason = null, sound = SNDS.death)
-    {   sound.play();
+    {   
+        sound?.play();
+        
         ship.shield = 0;
         pers.dead  = true;
 
@@ -1713,7 +1722,9 @@ else
             const dangerLevel = p.getDangerLevel(playerWorldPos);
             
             if(dangerLevel > 0.99)
-            {   killPlayer("СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ", SNDS.startG);
+            {   killPlayer("СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ");
+                window.MusFon1.stop  (0);
+                window.MusFon1.signal('death');
             }
             else if(dangerLevel > 0.1)
             {
@@ -1730,7 +1741,9 @@ else
             const starDanger = currentStarHandle.getDangerLevel(playerWorldPos);
 
             if (starDanger > 0.99)
-            {   killPlayer("ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ", SNDS.startG);
+            {   killPlayer("ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ");
+                window.MusFon1.stop  (0);
+                window.MusFon1.signal('death');
             }
             else if (starDanger > 0.1)
             {
@@ -1997,6 +2010,54 @@ function commitHeroRecord()
         score: score,
         date:  new Date().toISOString().slice(0, 10),
     });
+}
+
+// -------------------------------|
+//  Безопасная точка спавна.      |
+// -------------------------------:
+function checkDeath()
+{
+    elGameover.style.display = pers.dead ? "flex" : "none";
+
+    // ---------------------------------------------------------
+    //  Выходим из опасной зоны (планеты + звезда) прямо сейчас,
+    //  двигая камеру случайными шагами, пока коллизии не уйдут.
+    // ---------------------------------------------------------
+    const step     =  5;  // размер шага
+    const maxSteps = 500;  // предохранитель
+    const probe    = new THREE.Vector3();
+
+    // Случайное направление движения
+    const dir = {
+        x: Math.random() * 2 - 1,
+        y: Math.random() * 2 - 1,
+        z: Math.random() * 2 - 1
+    };
+
+    for (let i = 0; i < maxSteps; i++) {
+        let worst = 0;
+
+        // Звезда
+        if (currentStarHandle && currentStarHandle.getDangerLevel) {
+            worst = Math.max(worst, currentStarHandle.getDangerLevel(camera.position));
+        }
+
+        // Планеты
+        for (const p of planets) {
+            if (p.getDangerLevel) {
+                worst = Math.max(worst, p.getDangerLevel(camera.position));
+            }
+        }
+
+        // Двигаемся в случайном направлении на step
+        probe.set( dir.x, dir.y, dir.z ).normalize().multiplyScalar(step);
+        camera.position.add(probe);
+
+        // Всё чисто — выходим
+        if (worst < 0.1) break;
+    }
+
+    camera.updateMatrixWorld();
 }
 
 </script>

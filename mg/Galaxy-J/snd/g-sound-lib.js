@@ -159,7 +159,7 @@
 })(window);
 
 // ============================================================
-//  Звук
+//  Звук ---> тут только короткие звуки!
 // ============================================================
 const Vol = Settings.volume;
 const kit = SND.createSoundKit({
@@ -176,7 +176,7 @@ const kit = SND.createSoundKit({
     winclose2: { src: "snd/winclose-3.mp3" , volume: Vol, pool: 1 },
 
     bassDrop1: { src: "snd/bass_drop_01.mp3", volume: Vol, pool: 1 },
-    startG   : { src: "snd/mus/start-g-1.mp3",volume: Vol, pool: 1 },
+  //startG   : { src: "snd/mus/start-g-1.mp3",volume: Vol, pool: 1 },
     death2   : { src: "snd/ship-death-1.mp3", volume: Vol, pool: 1 },
 
     fail1    : { src: "snd/fail-3.mp3"     ,  volume: Vol, pool: 1 },

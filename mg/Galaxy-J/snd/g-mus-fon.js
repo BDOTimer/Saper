@@ -51,15 +51,6 @@ class MusFon1
             debug    : false     // служебные логи в консоль
         };
 
-        /* --------------- ПСЕВДОНИМЫ ТИПОВ (можно сигналить по-русски) ------------- */
-        this.aliases = {
-            'спокойная' : 'calm',  'спокойно' : 'calm',  'мир'        : 'calm',
-            'тревожная' : 'tense', 'тревога'  : 'tense', 'опасность'  : 'tense',
-            'эпическая': 'epic',  'эпичная'  : 'epic',  'эпик'       : 'epic',
-            'битва'     : 'epic',  'босс'     : 'epic',
-            'загадочная': 'mystic', 'тайна'   : 'mystic', 'туманность': 'mystic'
-        };
-
         /* ------------------------ БИБЛИОТЕКА: тип → [url] ------------------------- */
         this.library = {};
 
@@ -111,6 +102,9 @@ class MusFon1
             'snd/fon/epic/e03.mp3',
             'snd/fon/epic/e04.mp3',
         ])
+        .addTracks('death', [
+            "snd/mus/start-g-1.mp3"   // экран гибели
+        ])
         .addTracks('mystic', [
             'music/nebula.mp3'        // загадочная туманность
         ]);
@@ -128,7 +122,6 @@ class MusFon1
      */
     signal(type)
     {
-        type = this._alias(type);
         this.lastSignal = Date.now();
 
         const list = this.library[type];
@@ -193,7 +186,6 @@ class MusFon1
     /** Добавить треки к типу: addTracks('epic', [url1, url2]). */
     addTracks(type, urls)
     {
-        type = this._alias(type);
         const add = Array.isArray(urls) ? urls.slice() : [urls];
         this.library[type] = (this.library[type] || []).concat(add);
         this._log('+"' + type + '": ' + add.length + ' трек(ов)');
@@ -203,7 +195,6 @@ class MusFon1
     /** Полностью заменить список треков типа. */
     setTracks(type, urls)
     {
-        type = this._alias(type);
         this.library[type] = Array.isArray(urls) ? urls.slice() : [urls];
         return this;
     }
@@ -439,14 +430,6 @@ class MusFon1
     _stopGap()
     {
         if (this._timer) { clearTimeout(this._timer); this._timer = null; }
-    }
-
-    /** Русские/заглавные псевдонимы типа → канонический ключ. */
-    _alias(type)
-    {
-        if (typeof type !== 'string') return type;
-        const t = type.trim().toLowerCase();
-        return this.aliases[t] || t;
     }
 
     /** Обход autoplay-блокировки: ждём первый жест игрока. */
