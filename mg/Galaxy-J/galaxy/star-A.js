@@ -33,11 +33,11 @@ const StarA = (() => {
     const baseHue = typeof star.hue === "number" ? star.hue : (star.id * 0.137) % 1;
 
     let klass;
-    if (baseHue < 0.15) klass = "red-dwarf";
+         if (baseHue < 0.15) klass = "red-dwarf";
     else if (baseHue < 0.35) klass = "orange";
     else if (baseHue < 0.65) klass = "yellow";
     else if (baseHue < 0.85) klass = "white-blue";
-    else klass = "blue-giant";
+    else                     klass = "blue-giant";
 
     const tech = Math.max(1, Math.min(15, star.tech | 0));
     const danger = typeof star.danger === "number" ? star.danger : 0;
@@ -57,16 +57,19 @@ const StarA = (() => {
 
     const coreHue = baseHue;
     const coreSat = klass === "white-blue" || klass === "blue-giant" ? 0.9 : 0.8;
-    const coreLum = klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
+    //const coreLum = klass === "blue-giant" ? 0.85 : klass === "red-dwarf" ? 0.55 : 0.7;
+    const coreLum = 0.47;
 
-    const coronaHue = (coreHue + 0.05) % 1; // Слегка смещаем оттенок для гало
-    const coronaSat = coreSat * 0.8;
-    const coronaLum = Math.min(0.95, coreLum + 0.1);
+    const my1 = 0.50; /// гуд: 0.50(красноватый) --- 0.71(желтоватый)
+
+    const coronaHue = (coreHue + my1) % 1; // Слегка смещаем оттенок для гало
+    const coronaSat = coreSat * 0.9;
+    const coronaLum = Math.min(0.9, coreLum + 0.1);
 
     const lightColor = new THREE.Color().setHSL(coreHue, coreSat, coreLum);
     const lightIntensity = 1.2 + tech * 0.05 + danger * 0.5;
     //const lightIntensity = 0;
-    const lightDistance = radius * 20;
+    const lightDistance = radius * 200;
 
     return {
       seed, klass, radius, baseHue, coreHue, coreSat, coreLum,
