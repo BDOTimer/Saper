@@ -60,6 +60,8 @@ class AudioManager
 
         this._initialized = true;
         this._isPlaying   = false;
+
+        this.vol = this.audio.volume;
     }
 
     init()
@@ -88,10 +90,14 @@ class AudioManager
     {   this.audio.play().catch(() => {});
         this._isPlaying = true;
     }
+
     pause     () { this.audio.pause(); this._isPlaying = false;}
-    setVolume(v) { this.audio.volume = Math.max(0, Math.min(1, v)); }
-    setVolumeL() { this.audio.volume = 0.1; }
-    setVolumeM() { this.audio.volume = 0.2; }
+    setVolume(v) {
+        this.audio.volume = Math.max(0, Math.min(1, v)); 
+        this.vol = this.audio.volume;
+    }
+    setVolumeL() { this.audio.volume = this.vol; }
+    setVolumeM() { this.audio.volume = Math.min(1, this.vol * 2); }
 
     /**
      * Меняет мелодию на лету.
