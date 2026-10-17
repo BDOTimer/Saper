@@ -555,6 +555,16 @@ btnFs.addEventListener("click", function () {
 
     // добавить запись после окончания партии:
     // HeroesList.add({ name: "ВЫ", score: 15200, rank: "COMPETENT" });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          // Уходим со вкладки: ставим на паузу всё, что играет
+          music.pause();
+        } else {
+          // Возвращаемся: продолжаем с того же места
+          music.play();
+        }
+    });
     
     </script>
   </body>

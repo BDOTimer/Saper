@@ -91,7 +91,7 @@ class AudioManager
         this._isPlaying = true;
     }
 
-    pause     () { this.audio.pause(); this._isPlaying = false;}
+    pause     () { this.audio.pause (); this._isPlaying = false;}
     setVolume(v) {
         this.audio.volume = Math.max(0, Math.min(1, v)); 
         this.vol = this.audio.volume;
