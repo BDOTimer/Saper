@@ -27,7 +27,8 @@ const PLANET = (() => {
   // ---------------------------------------------------------------
   //  Параметры планеты
   // ---------------------------------------------------------------
-function computeParams(star, opts = {}) {
+function computeParams1(star, planetIndex, opts = {})
+{
     if (!star) throw new Error("PLANET.computeParams: star is required");
 
     // Базовый сид от звезды
@@ -35,13 +36,16 @@ function computeParams(star, opts = {}) {
       ((star.id | 0) * 2246822519) ^
       strHash((star.name || "") + "|" + (star.economy || ""));
 
-    // Индекс планеты в системе (или явный seed из opts) — чтобы текстуры
-    // у разных планет одной звезды не совпадали
-    const planetIndex = (opts.planetIndex | 0) || 0;
-    const extraSeed   = (opts.seed | 0) || 0;
+  //const extraSeed = (opts.seed | 0) || planetIndex;
+    const extraSeed = planetIndex;
 
     const seed = (starSeed ^ Math.imul(planetIndex + 1, 0x9e3779b1) ^ Math.imul(extraSeed + 1, 0x85ebca6b)) >>> 0;
     const rng = mulberry32(seed >>> 0);
+
+    console.log("👓👓👓---------------------:");
+    console.log("👓 planetIndex: ", planetIndex);
+    console.log("👓 seed       : ", seed);
+    console.log("👓 extraSeed  : ", extraSeed);
 
     const tech = Math.max(1, Math.min(15, star.tech | 0));
     const danger = typeof star.danger === "number" ? star.danger : 0;
@@ -57,9 +61,9 @@ function computeParams(star, opts = {}) {
       default:           klass = "rocky";
     }
 
-    const pop = Math.max(0, star.population || 0);
+    const pop       = Math.max(0, star.population || 0);
     const popFactor = Math.min(1, Math.log10(pop + 1) / 10);
-    const radius = 180 + popFactor * 120 + rng() * 60;
+    const radius    = 50 + popFactor * 170 + rng() * 200;
 
     // --- Палитра (Вода, Суша, Горы/Высоты) ---
     let colorWater, colorLand, colorHigh;
@@ -136,6 +140,284 @@ function computeParams(star, opts = {}) {
     };
   }
 
+  function computeParams2(star, planetIndex, opts = {}) {
+    if (!star) throw new Error("PLANET.computeParams: star is required");
+
+    // ---------------------------------------------------------------
+    //  Сид
+    // ---------------------------------------------------------------
+    const starSeed =
+      ((star.id | 0) * 2246822519) ^
+      strHash((star.name || "") + "|" + (star.economy || ""));
+
+    const extraSeed = planetIndex;
+
+    const seed = (
+      starSeed ^
+      Math.imul(planetIndex + 1, 0x9e3779b1) ^
+      Math.imul(extraSeed + 1, 0x85ebca6b)
+    ) >>> 0;
+
+    const rng = mulberry32(seed >>> 0);
+
+    console.log("👓👓👓---------------------:");
+    console.log("👓 planetIndex: ", planetIndex);
+    console.log("👓 seed       : ", seed);
+    console.log("👓 extraSeed  : ", extraSeed);
+
+    const tech   = Math.max(1, Math.min(15, star.tech | 0));
+    const danger = typeof star.danger === "number" ? star.danger : 0;
+
+    // ---------------------------------------------------------------
+    //  Класс планеты (по экономике звезды)
+    // ---------------------------------------------------------------
+    let klass;
+    switch (star.economy) {
+      case "Industrial":   klass = "rocky-dark"; break;
+      case "Mining":       klass = "rocky";      break;
+      case "Agricultural": klass = "green";      break;
+      case "Refinery":     klass = "brown";      break;
+      case "High-Tech":    klass = "blue";       break;
+      case "Tourism":      klass = "vivid";      break;
+      default:             klass = "rocky";
+    }
+
+    // ---------------------------------------------------------------
+    //  Уникальные модификаторы цвета для этой планеты
+    //  (одинаковые для всех трёх слоёв — вода/суша/горы)
+    // ---------------------------------------------------------------
+    // hueShift: сдвиг по цветовому кругу, ±0.09 (~±32°)
+    const hueShift   = (rng() - 0.5) * 0.18;
+    // satBoost: множитель насыщенности 0.7..1.3
+    const satBoost   = 0.7 + rng() * 0.6;
+    // lightBoost: множитель яркости 0.75..1.25
+    const lightBoost = 0.75 + rng() * 0.5;
+    // контраст между водой и сушей 0.8..1.2
+    const contrast   = 0.8 + rng() * 0.4;
+
+    // Вспомогательная функция: HSL → сдвиг → обратно
+    const tint = (color) => {
+      const hsl = { h: 0, s: 0, l: 0 };
+      color.getHSL(hsl);
+      hsl.h = (hsl.h + hueShift + 1) % 1;
+      hsl.s = Math.min(1, hsl.s * satBoost);
+      hsl.l = Math.min(1, Math.max(0.02, hsl.l * lightBoost));
+      return new THREE.Color().setHSL(hsl.h, hsl.s, hsl.l);
+    };
+
+    // Утилита: случайное значение вокруг центра с заданным разбросом,
+    // зажатое в [lo, hi]
+    const vary = (center, spread, lo = 0, hi = 1) => {
+      const v = center + (rng() - 0.5) * 2 * spread;
+      return Math.min(hi, Math.max(lo, v));
+    };
+
+    // ---------------------------------------------------------------
+    //  Палитра (Вода, Суша, Горы)
+    //  Сначала выбираем «центры» по классу, потом разбрасываем rng,
+    //  потом применяем tint() для уникальности на планету.
+    // ---------------------------------------------------------------
+    let colorWater, colorLand, colorHigh;
+
+    if (klass === "green") {
+      // Землеподобная: синяя вода, зелёная суша, бурые/жёлтые горы
+      colorWater = new THREE.Color().setHSL(
+        vary(0.58, 0.06, 0.50, 0.66),
+        vary(0.70, 0.15, 0.40, 1.00),
+        vary(0.20, 0.08, 0.10, 0.35),
+      );
+      colorLand = new THREE.Color().setHSL(
+        vary(0.28, 0.08, 0.15, 0.42),
+        vary(0.60, 0.20, 0.30, 1.00),
+        vary(0.35, 0.10, 0.20, 0.55),
+      );
+      colorHigh = new THREE.Color().setHSL(
+        vary(0.10, 0.05, 0.04, 0.18),
+        vary(0.40, 0.15, 0.15, 0.70),
+        vary(0.45, 0.10, 0.30, 0.65),
+      );
+    } else if (klass === "blue") {
+      // Высокотехнологичная: бирюзовая вода, сталь/лёд на суше
+      colorWater = new THREE.Color().setHSL(
+        vary(0.58, 0.08, 0.48, 0.68),
+        vary(0.80, 0.15, 0.45, 1.00),
+        vary(0.15, 0.08, 0.08, 0.30),
+      );
+      colorLand = new THREE.Color().setHSL(
+        vary(0.55, 0.08, 0.45, 0.65),
+        vary(0.60, 0.20, 0.30, 1.00),
+        vary(0.42, 0.10, 0.25, 0.60),
+      );
+      colorHigh = new THREE.Color().setHSL(
+        vary(0.00, 0.05, 0.90, 1.00),
+        vary(0.10, 0.10, 0.00, 0.30),
+        vary(0.80, 0.10, 0.65, 0.95),
+      );
+    } else if (klass === "brown") {
+      // Пустынная / ржавая
+      colorWater = new THREE.Color().setHSL(
+        vary(0.06, 0.05, 0.00, 0.15),
+        vary(0.60, 0.15, 0.35, 0.90),
+        vary(0.15, 0.07, 0.08, 0.28),
+      );
+      colorLand = new THREE.Color().setHSL(
+        vary(0.08, 0.06, 0.02, 0.18),
+        vary(0.70, 0.15, 0.40, 1.00),
+        vary(0.32, 0.10, 0.20, 0.50),
+      );
+      colorHigh = new THREE.Color().setHSL(
+        vary(0.12, 0.06, 0.05, 0.22),
+        vary(0.50, 0.15, 0.25, 0.80),
+        vary(0.52, 0.12, 0.35, 0.70),
+      );
+    } else if (klass === "vivid") {
+      // Туризм: яркие «психоделические» миры
+      const h = rng();
+      colorWater = new THREE.Color().setHSL(
+        (h + 0.00) % 1,
+        vary(0.85, 0.10, 0.60, 1.00),
+        vary(0.20, 0.08, 0.10, 0.35),
+      );
+      colorLand = new THREE.Color().setHSL(
+        (h + 0.33) % 1,
+        vary(0.85, 0.10, 0.60, 1.00),
+        vary(0.42, 0.10, 0.25, 0.60),
+      );
+      colorHigh = new THREE.Color().setHSL(
+        (h + 0.66) % 1,
+        vary(0.85, 0.10, 0.60, 1.00),
+        vary(0.62, 0.10, 0.45, 0.80),
+      );
+    } else if (klass === "rocky-dark") {
+      // Промышленная: тёмная, кровавая
+      colorWater = new THREE.Color().setHSL(
+        vary(0.00, 0.04, 0.00, 0.08),
+        vary(0.80, 0.15, 0.50, 1.00),
+        vary(0.10, 0.05, 0.04, 0.20),
+      );
+      colorLand = new THREE.Color().setHSL(
+        vary(0.05, 0.05, 0.00, 0.12),
+        vary(0.30, 0.15, 0.10, 0.55),
+        vary(0.15, 0.07, 0.08, 0.28),
+      );
+      colorHigh = new THREE.Color().setHSL(
+        vary(0.08, 0.05, 0.02, 0.15),
+        vary(0.40, 0.15, 0.20, 0.65),
+        vary(0.30, 0.10, 0.18, 0.45),
+      );
+    } else {
+      // rocky (по умолчанию): серо-каменная
+      colorWater = new THREE.Color().setHSL(
+        vary(0.60, 0.10, 0.45, 0.72),
+        vary(0.30, 0.15, 0.10, 0.55),
+        vary(0.15, 0.07, 0.08, 0.28),
+      );
+      colorLand = new THREE.Color().setHSL(
+        vary(0.08, 0.06, 0.02, 0.18),
+        vary(0.20, 0.15, 0.05, 0.45),
+        vary(0.32, 0.10, 0.20, 0.50),
+      );
+      colorHigh = new THREE.Color().setHSL(
+        vary(0.10, 0.05, 0.04, 0.18),
+        vary(0.10, 0.10, 0.00, 0.30),
+        vary(0.52, 0.12, 0.35, 0.70),
+      );
+    }
+
+    // Применяем уникальный tint (hueShift / satBoost / lightBoost)
+    colorWater = tint(colorWater);
+    colorLand  = tint(colorLand);
+    colorHigh  = tint(colorHigh);
+
+    // Небольшой контрастный «разброс» между водой и сушей
+    // (чтобы у одних планет вода была темнее суши, у других — наоборот)
+    {
+      const wl = { h: 0, s: 0, l: 0 };
+      const ll = { h: 0, s: 0, l: 0 };
+      colorWater.getHSL(wl);
+      colorLand.getHSL(ll);
+      wl.l = Math.min(1, Math.max(0.02, wl.l * (2 - contrast)));
+      ll.l = Math.min(1, Math.max(0.02, ll.l * contrast));
+      colorWater.setHSL(wl.h, wl.s, wl.l);
+      colorLand.setHSL(ll.h,  ll.s, ll.l);
+    }
+
+    // ---------------------------------------------------------------
+    //  Размер планеты
+    // ---------------------------------------------------------------
+    const pop       = Math.max(0, star.population || 0);
+    const popFactor = Math.min(1, Math.log10(pop + 1) / 10);
+    const radius    = 50 + popFactor * 170 + rng() * 200;
+
+    console.log("👓 radius  : ", radius);
+
+    // ---------------------------------------------------------------
+    //  Атмосфера
+    // ---------------------------------------------------------------
+    const hasAtmosphere = klass !== "rocky-dark" && rng() > 0.25;
+
+    // Оттенок атмосферы зависит от класса + случайный сдвиг,
+    // но НЕ совпадает с цветом воды (иначе сливается)
+    let atmoHue;
+    if (klass === "green") atmoHue = 0.55 + (rng() - 0.5) * 0.06;
+    else if (klass === "blue") atmoHue = 0.58 + (rng() - 0.5) * 0.06;
+    else if (klass === "brown") atmoHue = 0.08 + (rng() - 0.5) * 0.08;
+    else if (klass === "vivid") atmoHue = rng();
+    else atmoHue = 0.55 + (rng() - 0.5) * 0.2;
+
+    const atmosphereColor = new THREE.Color().setHSL(
+      (atmoHue + 1) % 1,
+      0.5 + rng() * 0.4,
+      0.55 + rng() * 0.2,
+    );
+    const atmosphereScale     = 1.04 + rng() * 0.04;
+    const atmosphereIntensity = hasAtmosphere ? 0.4 + tech * 0.03 : 0;
+
+    // ---------------------------------------------------------------
+    //  Кольца
+    // ---------------------------------------------------------------
+    const hasRings  = rng() > 0.78 && radius > 200;
+    const ringInner = radius * 1.6 + rng() * 20;
+    const ringOuter = ringInner + 40 + rng() * 80;
+
+    // Цвет кольца: смесь суши и гор, но со своим hue-сдвигом
+    const ringHSL = { h: 0, s: 0, l: 0 };
+    colorLand.getHSL(ringHSL);
+    const ringColor = new THREE.Color().setHSL(
+      (ringHSL.h + 0.5 + (rng() - 0.5) * 0.3 + 1) % 1,
+      0.3 + rng() * 0.4,
+      0.5 + rng() * 0.3,
+    );
+    const ringTilt = (rng() - 0.5) * 0.6;
+
+    // ---------------------------------------------------------------
+    //  Прочие параметры
+    // ---------------------------------------------------------------
+    const spinSpeed         = 0.02 + rng() * 0.06;
+    const dangerRangeFactor = 2 + rng() * 2;
+    const noiseSeed         = (seed >>> 0) % 10000;
+
+    // Уникальный сид для текстуры
+    const texSeed = (
+      (seed ^ Math.imul(planetIndex + 1, 0x27d4eb2d)) >>> 0
+    ) % 1_000_000;
+
+    const textureSize = Math.max(
+      64,
+      Math.min(2048, (opts.textureSize | 0) || 512),
+    );
+
+    return {
+      seed, klass, radius,
+      colorWater, colorLand, colorHigh,
+      // 🔽 новые поля — для уникальности цвета
+      hueShift, satBoost, lightBoost, contrast,
+      hasAtmosphere, atmosphereColor, atmosphereScale, atmosphereIntensity,
+      hasRings, ringInner, ringOuter, ringColor, ringTilt,
+      spinSpeed, noiseSeed, texSeed, textureSize, dangerRangeFactor,
+    };
+  }
+
   // ===============================================================
   //  Одноразовая генерация карты высот 512x512 (CanvasTexture)
   // ===============================================================
@@ -144,8 +426,9 @@ function computeParams(star, opts = {}) {
 
     // Быстрый детерминированный value-noise
     const hash2 = (x, y, s) => {
-      let h = x * 374761393 + y * 668265263 + s * 1442695040;
-      h = (h ^ (h >>> 13)) * 1274126177;
+      let h = (x | 0) ^ Math.imul(y | 0, 0x27d4eb2d) ^ Math.imul(s | 0, 0x165667b1);
+      h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+      h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
       h = h ^ (h >>> 16);
       return (h >>> 0) / 4294967296;
     };
@@ -506,11 +789,19 @@ function computeParams(star, opts = {}) {
       return computeParams(star);
     },
 
-    generate(star, opts = {}) {
-      const params = computeParams(star, opts);
+    generate(star, id, opts = {})
+    {
+      let params = null;
+
+      switch(id)
+      {
+        case  0: params = computeParams1(star, id, opts);
+        case  1: params = computeParams2(star, id, opts);
+        default: params = computeParams2(star, id, opts);
+      }
 
       // Направление на звезду для освещения
-      let lightDir = new THREE.Vector3(1, 0.5, 0.7).normalize();
+      let lightDir   = new THREE.Vector3(1, 0.5, 0.7).normalize();
       let lightColor = new THREE.Color(1, 1, 1);
 
       if (opts.starPosition && opts.position) {

@@ -728,36 +728,41 @@ window.HUD = HUD;
         // sun.setPosition(0, 2000, 8000);
         // sun.setVisible(false);
 
+        const SP = { x: 0, y: 0, z:0 }; // z = -3000
+
         // Светило — висит далеко впереди
         currentStarHandle = StarA.generate(star);
-        const starPos = new THREE.Vector3(0, 0, -3000);
-        currentStarHandle.mesh.position.copy(starPos);
+        const starPos = new THREE.Vector3(SP.x, SP.y, SP.z);
+        currentStarHandle.mesh  .position.copy(starPos);
         currentStarHandle.corona.position.copy(starPos);
-        currentStarHandle.light.position.copy(starPos);
+        currentStarHandle.light .position.copy(starPos);
         scene.add(currentStarHandle.mesh);
         scene.add(currentStarHandle.corona);
         scene.add(currentStarHandle.light);
 
-        sunLight.position.set(0, 0, -3000);
+        sunLight.position.set(SP.x, SP.y, SP.z);
 
         // Планеты: число зависит от tech
-        const n = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
+        const n   = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
+        const rng = UniverseJS.utils.mulberry32(star.seed);
         
-        for (let i = 0; i < n; i++) {
-            const rng = UniverseJS.utils.mulberry32(star.seed);
+        for (let i = 0; i < n; i++)
+        {
             const dist = 800 + i * 900 + rng() * 400;
             const ang  = rng() * Math.PI * 2;
+            // Чтобы не лежали строго в одной плоскости
+            const height = (rng() - 0.5) * 300;
             const pos = new THREE.Vector3(
                 Math.cos(ang) * dist,
-                (rng() - 0.5) * 400,
-                Math.sin(ang) * dist - 1500,
+                height,
+                Math.sin(ang) * dist
             );
 
-            const p = PLANET.generate(star, {
-                planetIndex:        i, // ★ уникализирует текстуру между планетами
-                position:         pos, // ★ (по желанию) для направления света
+            const p = PLANET.generate(star, i, {
+                position    :     pos, // ★ (по желанию) для направления света
                 starPosition: starPos, // ★ если хочешь, чтобы свет шёл от звезды
-                textureSize:      512, // ★ опционально; можно 256 для экономии
+                textureSize :     512, // ★ опционально; можно 256 для экономии
+                seed        : star.seed
             });
 
             p.mesh.position.copy(pos);
@@ -766,8 +771,6 @@ window.HUD = HUD;
         }
 
         currentStationHandle = new Station(star);
-        
-
         scene.add(currentStationHandle.group);
     }
     
@@ -2018,7 +2021,7 @@ function commitHeroRecord()
 function checkDeath()
 {
     elGameover.style.display = pers.dead ? "flex" : "none";
-    
+
     // ---------------------------------------------------------
     //  Выходим из опасной зоны (планеты + звезда) прямо сейчас,
     //  двигая камеру случайными шагами, пока коллизии не уйдут.
