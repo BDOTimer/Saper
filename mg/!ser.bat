@@ -19,7 +19,7 @@ if errorlevel 1 (
 )
 
 REM Открыть браузер через 1 секунду (сервер успеет подняться)
-start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/Galaxy-J/g-start-loop.html"
+start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/Galaxy-J/g-menu.html"
 
 REM Запустить сервер (Ctrl+C — остановить)
 python -m http.server 8000

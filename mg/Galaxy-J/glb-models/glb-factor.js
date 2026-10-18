@@ -22,25 +22,24 @@ class ModelFactory
     {   ModelFactory.loader = new GLTFLoader();
     }
 
-    static paths = [
-                       "./glb-models/shuttle-g1.glb",
-                       "./glb-models/station-g1.glb"
-                   ];
-    // static MODELS = {
-    //     SHUTTLE: { id: 0, path: "./glb-models/shuttle-g1.glb", poolSize: 30 },
-    //     STATION: { id: 1, path: "./glb-models/station-g1.glb",  poolSize: 10 },
-    // };
+    static MODELS = [
+{ id: 0, path: "./glb-models/shuttle-g1.glb",  poolSize: 30, scale: 0.5 },
+{ id: 1, path: "./glb-models/station-g1.glb",  poolSize:  2, scale: 100 },
+    ];
 
     /**
      * Прелоад моделей (вызывать явно при старте игры, не в static {})
      */
+    /** Прелоад всех моделей из MODELS */
     static async preloadAll()
-    {   const promises = this.paths.map((path, id) =>
-                                        this.loadGLB(path).catch(err =>
-        {   console.error(`Ошибка прелоада модели $ {path}:`, err);
-            return null; // чтобы не ломать весь прелоад
-        })
-                                       );
+    {
+        const promises = this.MODELS.map(m =>
+            this.loadGLB(m.path).catch(err =>
+            {
+                console.error(`Ошибка прелоада модели ${m.path}:`, err);
+                return null;
+            })
+        );
         await Promise.all(promises);
     }
 
@@ -76,26 +75,37 @@ class ModelFactory
 
     static async createShip(path, scale = 1)
     {
-        const gltf = await this.loadGLB(path);
-        const model = SkeletonUtils.clone(gltf.scene); // см. п.8
-        model.scale.setScalar(scale);                  // сначала масштаб
+        const gltf  = await this.loadGLB(path);
+        const model = SkeletonUtils.clone(gltf.scene);
+
+        // Явный сброс трансформаций, чтобы бокс считался корректно
+        model.position.set  (0, 0, 0);
+        model.rotation.set  (0, 0, 0);
+        model.scale.setScalar (scale);
         model.updateMatrixWorld(true);
+
+        // Центрируем: помещаем геометрический центр в origin wrapper'а
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center);                    // смещаем ВНУТРЕННИЙ объект
+        model.position.sub(center);
+
         const wrapper = new THREE.Group();
-        wrapper.add(model);                            // наружу отдаём wrapper
+        wrapper.add(model);
         wrapper.userData.animations = gltf.animations;
+
         return { model: wrapper, animations: gltf.animations };
     }
 
-    static async getModel(id, scale = 1)
+    static async getModel(id, scale = -1)
     {
-        if (id < 0 || id >= this.paths.length)
+        if (id < 0 || id >= this.MODELS.length)
         {
             throw new Error(`Неверный id модели: ${id}`);
         }
-        const { model } = await this.createShip(this.paths[id], scale);
+
+        const SCL = scale === -1 ? this.MODELS[id].scale : scale;
+
+        const { model } = await this.createShip(this.MODELS[id].path, SCL);
         return model;
     }
 }
@@ -107,6 +117,9 @@ class UnitsManager
 {   static scene = null;
     static pools = new Map(); // id → { pool: [], max: number }
     static activeUnits = new Map(); // unitId → { model, mixer, etc }
+
+    static SHUTTLE = 0;
+    static STATION = 1;
 
     static unitCounter = 0;
 
@@ -132,7 +145,7 @@ class UnitsManager
     /**
      * Получить юнит из пула или создать новый
      */
-    static async borrowUnit(id, scale = 1)
+    static async borrowUnit(id, scale = -1)
     {
         const poolData = UnitsManager.pools.get(id);
         if (!poolData)
@@ -275,22 +288,23 @@ window.GLB.UnitsManager = UnitsManager;
 window.GLB.init = async function(scene)
 {   UnitsManager.init  (scene);
     await ModelFactory.preloadAll();
-    UnitsManager.createPool(0, 30); // shuttle
-    UnitsManager.createPool(1, 10); // station
+    // Создаём пулы строго по MODELS
+    for (const m of ModelFactory.MODELS)
+        UnitsManager.createPool(m.id, m.poolSize);
 }
 
 // Спавн врага: возвращаем объект врага, чтобы управлять им
-window.GLB.spawnEnemy = async function(position)
-{   const { unitId, model, mixer } = await UnitsManager.borrowUnit(0); // id 0 = shuttle
+window.GLB.spawnEnemy = async function(id, position)
+{   const { unitId, model, mixer } = await UnitsManager.borrowUnit(id);
     UnitsManager.add2Scene(unitId, position);
 
     // Создаём объект врага и сохраняем unitId/mixer внутри него
     const enemy =
     {   unitId,
-        model,
-        mixer,
+        model ,
+        mixer ,
         alive: true,
-        hp: 100,
+        hp   : 100,
         // сюда можно добавить логику врага: update(dt), hit(dmg) и т.п.
     };
 
@@ -316,11 +330,11 @@ window.GLB.changeSector = function()
 }
 
 // Где-то в точке входа (main.js, index.js и т.д.)
-window.GLB.test_1 = async function(scene, pos) 
+window.GLB.test_1 = async function(scene, pos)
 {   
     await GLB.init(scene);
 
-    console.log('cache size:', GLB.ModelFactory._cache.size);
+    console.log('🔍 GLB cache size:', GLB.ModelFactory._cache.size);
 
     for (const [path, val] of GLB.ModelFactory._cache) {
         console.log(path, val instanceof Promise ? 'PROMISE (ещё грузится)' : 'GLTF OK', val);
@@ -330,18 +344,12 @@ window.GLB.test_1 = async function(scene, pos)
     // const enemy1 = await GLB.spawnEnemy(new THREE.Vector3(pos.x, pos.y+50, pos.z));
     // const enemy2 = await GLB.spawnEnemy(new THREE.Vector3(pos.x, pos.y, pos.z+50));
 
-    const enemy1 = await GLB.spawnEnemy(new THREE.Vector3(0, 100, 1000));
-    const enemy2 = await GLB.spawnEnemy(new THREE.Vector3(0, 0, 1000));
+    const enemy1 = await GLB.spawnEnemy(UnitsManager.SHUTTLE, new THREE.Vector3(0, 100, 1000));
+    const enemy2 = await GLB.spawnEnemy(UnitsManager.STATION, new THREE.Vector3(0,   0, 1000));
 
     // Когда враг умер
     //GLB.onEnemyDeath(enemy1);
 
-    return {enemy1, enemy2};
+    return [enemy1, enemy2];
 }
 
-// <!-- 1. Сначала THREE.js -->
-// <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-// <script src="https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"></script>
-
-// <!-- 2. Потом твои классы (где определены ModelFactory и UnitsManager) -->
-// <script src="./glb-models/glb-factor.js"></script> 
