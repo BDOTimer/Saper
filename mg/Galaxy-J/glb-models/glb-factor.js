@@ -25,6 +25,7 @@ class ModelFactory
     static MODELS = [
 { id: 0, path: "./glb-models/shuttle-g1.glb",  poolSize: 30, scale: 0.5 },
 { id: 1, path: "./glb-models/station-g1.glb",  poolSize:  2, scale: 100 },
+{ id: w2, path: "./glb-models/ss-1.glb"      ,  poolSize:  2, scale: 100 },
     ];
 
     /**
@@ -120,6 +121,7 @@ class UnitsManager
 
     static SHUTTLE = 0;
     static STATION = 1;
+    static SS1     = 2;
 
     static unitCounter = 0;
 
@@ -344,12 +346,13 @@ window.GLB.test_1 = async function(scene, pos)
     // const enemy1 = await GLB.spawnEnemy(new THREE.Vector3(pos.x, pos.y+50, pos.z));
     // const enemy2 = await GLB.spawnEnemy(new THREE.Vector3(pos.x, pos.y, pos.z+50));
 
-    const enemy1 = await GLB.spawnEnemy(UnitsManager.SHUTTLE, new THREE.Vector3(0, 100, 1000));
-    const enemy2 = await GLB.spawnEnemy(UnitsManager.STATION, new THREE.Vector3(0,   0, 1000));
+    const enemy1  = await GLB.spawnEnemy(UnitsManager.SHUTTLE, new THREE.Vector3(0, 100, 1000));
+    const station = await GLB.spawnEnemy(UnitsManager.STATION, new THREE.Vector3(0,   0, 1000));
+    const ss1     = await GLB.spawnEnemy(UnitsManager.SS1    , new THREE.Vector3(0, 400, 1000));
 
     // Когда враг умер
     //GLB.onEnemyDeath(enemy1);
 
-    return [enemy1, enemy2];
+    return [enemy1, station, ss1];
 }
 
