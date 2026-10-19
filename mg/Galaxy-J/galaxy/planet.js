@@ -944,6 +944,13 @@ class PlanetsManager
             this.#scene.add(p.mesh);
             this.#planets.push(p);
         }
+
+        // Гарантируем корректный boundingSphere для всех планет
+        for (const p of this.planets)
+        {   if (p.mesh.geometry && !p.mesh.geometry.boundingSphere)
+            {   p.mesh.geometry.computeBoundingSphere();
+            }
+        }
     }
 
     ///----------------------------------------------------
@@ -972,7 +979,7 @@ class PlanetsManager
             if (dangerLevel > 0.99)
             {
                 killed = true;
-                reason = "СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ";
+                reason = { text: "СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ", scarf: 100 };
                 break;
             }
             else if (dangerLevel > 0.1)
@@ -1039,17 +1046,10 @@ class PlanetsManager
             return;
         }
 
-        // Гарантируем корректный boundingSphere для всех планет
-        for (const p of arr) {
-            if (p.mesh.geometry && !p.mesh.geometry.boundingSphere) {
-                p.mesh.geometry.computeBoundingSphere();
-            }
-        }
-
         console.group(`[PlanetsManager] планет: ${arr.length}`);
         console.table(
             arr.map((p, i) => ({
-                "#":         i,
+              //"#":         i,
                 pos:      `(${p.mesh.position.x.toFixed(0)},` + 
                           ` ${p.mesh.position.y.toFixed(0)},` + 
                           ` ${p.mesh.position.z.toFixed(0)})`,

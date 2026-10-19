@@ -129,8 +129,6 @@ class Station
     // ---------------------------------------------------------------
     constructor(star, planetsManager, options = {})
     {
-        //planetsManager.debug(); // 🔶
-
         // --- Параметры / геометрия ---
         this.params = Station.getParams(star);
         this.group  = this._buildGroup(this.params);
@@ -577,10 +575,16 @@ class Station
         // 5) (опционально) развернуть станцию "лицом" к планете
         //    — чтобы шлюз смотрел внутрь системы
         this.group.lookAt(planetPos);
+        this.group.rotateY(Math.PI);
 
+        const pos = this.group.position;
+        planetsManager.debug(); // 🔶
         console.log(
             `[Station] planet R=${R.toFixed(1)}, ` +
-            `station dist=${dist.toFixed(1)} от центра`
+            `station dist=${dist.toFixed(1)} от центра, ` +
+            `pos:{ (${pos.x.toFixed(0)}, ` + 
+                   `${pos.y.toFixed(0)}, ` + 
+                   `${pos.z.toFixed(0)}) }`
         );
     }
 }

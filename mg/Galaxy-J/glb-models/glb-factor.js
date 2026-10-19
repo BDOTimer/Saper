@@ -60,7 +60,8 @@ class ModelFactory
                 resolve(gltf);
             },
             xhr =>
-            {   console.log(`$ {path}: $ {(xhr.loaded / xhr.total * 100).toFixed(1)}%`);
+            {   
+    //console.log(`$ {path}: $ {(xhr.loaded / xhr.total * 100).toFixed(1)}%`);
             },
             err =>
             {   this._cache.delete(path); // при ошибке убираем из кэша
@@ -338,9 +339,9 @@ window.GLB.test_1 = async function(scene, pos)
 
     console.log('🔍 GLB cache size:', GLB.ModelFactory._cache.size);
 
-    for (const [path, val] of GLB.ModelFactory._cache) {
-        console.log(path, val instanceof Promise ? 'PROMISE (ещё грузится)' : 'GLTF OK', val);
-    }
+    // for (const [path, val] of GLB.ModelFactory._cache) {
+    //     console.log(path, val instanceof Promise ? 'PROMISE (ещё грузится)' : 'GLTF OK', val);
+    // }
 
     // Пример спавна
     // const enemy1 = await GLB.spawnEnemy(new THREE.Vector3(pos.x, pos.y+50, pos.z));

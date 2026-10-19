@@ -217,7 +217,10 @@
     GAME OVER
 
     <div id="deathBanner">
-      <span id="deathReason">ПРИЧИНА СМЕРТИ НЕИЗВЕСТНА</span>
+      <div class="death-banner__flash">
+        <div id="deathReason">ПРИЧИНА СМЕРТИ НЕИЗВЕСТНА</div>
+        <div id="deathScarf">Штраф: ... 3</div>
+      </div>
     </div>
 
     <small>нажми ENTER чтобы начать заново</small>
@@ -389,6 +392,7 @@
     const elDamage    = $("damage-flash");
     const elGameover  = $("gameover");
     const elDeathReason = $("deathReason");
+    const elDeathScarf  = $("deathScarf");
 
     const elCompassNeedle = $("compass-needle");
     const elHdg           = $("hdg");
@@ -403,14 +407,23 @@
  * Установить текст причины смерти на экране GAME OVER.
  * @param {string} [text] — если не передать, ставится дефолт.
  */
-function setDeathReason(text) {
-    const msg = (text && String(text).trim()) || "ПРИЧИНА СМЕРТИ НЕИЗВЕСТНА";
-    elDeathReason.textContent = msg;
+const DEFAULT_DEATH_SCARF = 3;
+function setDeathReason(reason) {
+    const text  = (reason?.text ?? "").trim() || "ПРИЧИНА СМЕРТИ НЕИЗВЕСТНА";
+    const scarf = reason?.scarf ?? DEFAULT_DEATH_SCARF;
+    
+    elDeathReason.textContent = `${text}`;
+    elDeathScarf .textContent = `Штраф: ${scarf}`;
 
-    // перезапуск анимации вспышки
+    // перезапуск анимации вспышки — на баннере, а не на одной строке,
+    // чтобы вспыхивала вся плашка целиком
+    const banner = elDeathReason.parentElement; // #deathBanner
     elDeathReason.classList.remove("is-updated");
     void elDeathReason.offsetWidth;
     elDeathReason.classList.add("is-updated");
+
+    /// Штраф за смерть ...
+    pers.credits -= scarf;
 }
 
 /**
@@ -1416,10 +1429,8 @@ window.HUD = HUD;
         ship.shield = 0;
         pers.dead  = true;
 
-        setDeathReason(reason); 
+        setDeathReason(reason);
         elGameover.style.display = "flex";
-
-        /// TODO: тут добавить штрафы за смерть ...
 
         GALAXY.close();
 
@@ -1718,7 +1729,7 @@ else
             SHAKE.trigger(power);
 
             if (ship.shield <= 0) {
-                killPlayer("СТОЛКНОВЕНИЕ С МЕТЕОРИТОМ");
+                killPlayer({text: "СТОЛКНОВЕНИЕ С МЕТЕОРИТОМ", scarf: 10 });
             }
           }
         }
@@ -1746,8 +1757,7 @@ else
             const starDanger = currentStarHandle.getDangerLevel(playerWorldPos);
 
             if (starDanger > 0.99)
-            {   killPlayer("ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ");
-                window.MusFon1.stop  (0);
+            {   killPlayer({text: "ПРИТЯНУТ ГРАВИТАЦИЕЙ ЗВЕЗДЫ", scarf: 300 });
                 window.MusFon1.signal('death');
             }
             else if (starDanger > 0.1)
@@ -1789,7 +1799,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
           {
             // авария
             game.isDock = false;
-            killPlayer("ЖЁСТКАЯ ПОСАДКА НА СТАНЦИЮ");
+            killPlayer({ text: "ЖЁСТКАЯ ПОСАДКА НА СТАНЦИЮ", scarf: 20 });
           }
           else if (status === 1) {
             // успешная посадка — например, пополнить топливо/щит,
@@ -1899,7 +1909,7 @@ const gateIn = new THREE.Vector3(0,0,1); // внутрь станции
               ship.shield -= 10 * dt;
               flashDamage(0.4);
               if (ship.shield <= 0) {
-                killPlayer("УНИЧТОЖЕН ВРАЖЕСКИМ ОГНЁМ");
+                killPlayer({ text: "УНИЧТОЖЕН ВРАЖЕСКИМ ОГНЁМ", scarf: 10 });
               }
             }
           }

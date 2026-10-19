@@ -1252,8 +1252,9 @@ padding: 0 !important;
   min-width: 360px;
   max-width: 80vw;
   text-align: center;
+  letter-spacing: 3px;
+  text-indent: 3px;              /* компенсация трекинга последнего символа */
 
-  /* ВСЕ слои в одном background: сверху блик, под ним — тёмно-красный градиент */
   background:
     /* верхний блик (полупрозрачный) */
     linear-gradient(180deg,
@@ -1284,17 +1285,16 @@ padding: 0 !important;
 
   font-family: "Orbitron", "Share Tech Mono", monospace;
   font-weight: 700;
-  letter-spacing: 3px;
   text-transform: uppercase;
 
   animation: deathBannerIn 0.45s cubic-bezier(0.18, 0.9, 0.3, 1.2) both;
 }
 
 #deathBanner #deathReason {
-  display: inline-block;
+  display: block;                /* было inline-block */
   font-size: 18px;
   line-height: 1.3;
-  color: #ffffff;                                 /* белый текст */
+  color: #fff;
   text-shadow:
     0 0 4px rgba(255, 255, 255, 0.9),
     0 0 14px rgba(255, 90, 90, 0.85),
@@ -1303,9 +1303,27 @@ padding: 0 !important;
   transition: filter 0.2s ease;
 }
 
-/* вспышка при смене текста */
-#deathBanner #deathReason.is-updated {
-  animation: deathReasonFlash 0.55s ease-out;
+#deathBanner #deathScarf {
+  text-transform: none;
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: none;          /* «Штраф», а не «ШТРАФ» */
+  color: #ffb3b3;
+  opacity: 0.9;
+  text-shadow:
+    0 0 3px rgba(255, 180, 180, 0.9),
+    0 0 8px rgba(255, 80, 80, 0.6);
+}
+
+/* вспышка — на обёртке, чтобы не конфликтовать с deathBannerIn */
+#deathBanner.is-updated .death-banner__flash {
+  animation: deathBannerFlash 0.55s ease-out;
+}
+@keyframes deathBannerFlash {
+  0%   { filter: brightness(2.4); }
+  100% { filter: none; }
 }
 
 @keyframes deathBannerIn {
@@ -1313,17 +1331,13 @@ padding: 0 !important;
   to   { opacity: 1; transform: none; filter: none; }
 }
 
-@keyframes deathReasonFlash {
-  0%   { filter: brightness(2.4); }
-  100% { filter: none; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  #deathBanner { animation: none; }
-  #deathBanner #deathReason.is-updated { animation: none; }
+  #deathBanner,
+  #deathBanner .death-banner__flash { animation: none !important; }
 }
 
 @media (max-width: 840px) {
   #deathBanner { min-width: 240px; padding: 10px 22px; }
   #deathBanner #deathReason { font-size: 14px; letter-spacing: 2px; }
 }
+
