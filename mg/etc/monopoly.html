@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a14">
+    <title>Монополия — Классика</title>
+    <link rel="icon" type="image/png" href="../res/favicon-64.png" sizes="64x64">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a14;
+            color: #e8f6ff;
+            font-family: 'Courier New', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button {
+            font-family: inherit;
+            cursor: pointer;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        :root {
+            --bg: #0a0a14;
+            --cy: #00ffff;
+            --line: rgba(0, 255, 255, .35);
+        }
+
+        /* ---------- Кнопки ---------- */
+        .neon {
+            background: rgba(0,255,255,.12);
+            border: 2px solid var(--cy);
+            color: var(--cy);
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-weight: bold;
+            font-size: clamp(13px, 3.6vw, 17px);
+            box-shadow: 0 0 14px rgba(0,255,255,.35), inset 0 0 10px rgba(0,255,255,.08);
+            text-shadow: 0 0 8px rgba(0,255,255,.8);
+        }
+        .neon:active { transform: scale(.94); background: rgba(0,255,255,.4); color: #001317; }
+        .neon.big { animation: pulse 1.6s infinite; }
+        .neon.dis { opacity: .35; pointer-events: none; }
+
+        .ghost {
+            background: rgba(0,255,255,.04);
+            border: 1.5px solid rgba(0,255,255,.4);
+            color: #8fd8e8;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-weight: bold;
+            font-size: clamp(12px, 3.2vw, 15px);
+        }
+        .ghost:active { background: rgba(0,255,255,.25); color: #001317; }
+
+        .danger {
+            border: 2px solid #ff5e5e;
+            color: #ff7a7a;
+            background: rgba(255,60,60,.1);
+            box-shadow: 0 0 12px rgba(255,60,60,.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-weight: bold;
+            font-size: clamp(12px, 3.2vw, 15px);
+        }
+        .danger:active { transform: scale(.94); background: rgba(255,60,60,.35); color: #1a0000; }
+
+        .mini {
+            background: rgba(0,255,255,.08);
+            border: 1.5px solid rgba(0,255,255,.5);
+            color: var(--cy);
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: clamp(11px, 2.8vw, 13px);
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(0,255,255,.2);
+        }
+        .mini:active { background: rgba(0,255,255,.35); color: #001317; }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(0,255,255,.3), inset 0 0 10px rgba(0,255,255,.08); }
+            50%      { box-shadow: 0 0 28px rgba(0,255,255,.8), inset 0 0 12px rgba(0,255,255,.15); }
+        }
+
+        /* ---------- Игровой экран ---------- */
+        #game { display: flex; flex-direction: column; height: 100%; }
+
+        #topbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            padding-top: calc(6px + env(safe-area-inset-top));
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--line);
+            background: rgba(0,0,0,.4);
+            z-index: 5;
+        }
+        #chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 9px;
+            border: 1.5px solid var(--pc);
+            border-radius: 20px;
+            background: rgba(0,0,0,.45);
+            font-size: clamp(10px, 2.6vw, 13px);
+            cursor: pointer;
+            color: #d9f6ff;
+            transition: transform .15s;
+        }
+        .chip .dot {
+            width: 9px; height: 9px; border-radius: 50%;
+            background: var(--pc);
+            box-shadow: 0 0 7px var(--pc);
+            flex: none;
+        }
+        .chip .cmoney { color: #eaffff; font-weight: bold; }
+        .chip .cmarks { font-size: 11px; }
+        .chip.active { background: rgba(255,255,255,.1); animation: chipGlow 1.4s infinite; }
+        .chip.dead { opacity: .3; text-decoration: line-through; }
+        @keyframes chipGlow {
+            0%, 100% { box-shadow: 0 0 6px var(--pc); }
+            50%      { box-shadow: 0 0 18px var(--pc); }
+        }
+
+        #boardWrap {
+            flex: 1;
+            display: grid;
+            place-items: center;
+            padding: 5px;
+            min-height: 0;
+            position: relative;
+        }
+        canvas#board {
+            border: 2px solid var(--cy);
+            border-radius: 6px;
+            box-shadow: 0 0 30px rgba(0,255,255,.35);
+            background: #070712;
+            touch-action: manipulation;
+        }
+
+        #bottombar {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+            border-top: 1px solid var(--line);
+            background: rgba(0,0,0,.4);
+            z-index: 5;
+        }
+        #ticker {
+            min-height: 15px;
+            font-size: clamp(10px, 2.8vw, 13px);
+            color: #8fd8e8;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 0 6px rgba(0,224,255,.5);
+        }
+        #actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        #actions .ghost { padding: 12px 14px; }
+
+        /* ---------- Тост ---------- */
+        #toast {
+            position: fixed;
+            left: 50%;
+            bottom: 118px;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(0,10,18,.92);
+            border: 1.5px solid var(--cy);
+            color: #cffcff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: clamp(11px, 3vw, 14px);
+            box-shadow: 0 0 16px rgba(0,255,255,.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: .25s;
+            z-index: 60;
+            max-width: 92vw;
+            text-align: center;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ---------- Модальные окна ---------- */
+        #modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(2,4,12,.82);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 70;
+            padding: 14px;
+        }
+        #modal.open { display: flex; }
+        #modalBox {
+            background: #0b0b1e;
+            border: 2px solid var(--cy);
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0,255,255,.45);
+            max-width: 460px;
+            width: 100%;
+            max-height: 86vh;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        #modalBox h2 {
+            color: var(--cy);
+            text-shadow: 0 0 10px rgba(0,255,255,.8);
+            font-size: clamp(16px, 4.5vw, 21px);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        #modalBox h3 {
+            color: var(--cy);
+            font-size: clamp(13px, 3.6vw, 15px);
+            margin: 10px 0 4px;
+        }
+        #modalBox p { font-size: clamp(12px, 3.1vw, 14px); line-height: 1.5; }
+
+        .deed-head {
+            padding: 10px 8px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            color: #04121a;
+            font-weight: bold;
+            font-size: clamp(14px, 4vw, 18px);
+        }
+        .deed-head small { display: block; font-size: 11px; font-weight: normal; letter-spacing: 2px; }
+        table.deed { width: 100%; border-collapse: collapse; font-size: clamp(11px, 3vw, 14px); margin: 6px 0 12px; }
+        table.deed td { padding: 3px 6px; border-bottom: 1px dashed rgba(0,255,255,.18); color: #c9e9f2; }
+        table.deed td:last-child { text-align: right; color: #bffcff; font-weight: bold; }
+        .mbtns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+        .dim { color: #7b93a8; font-size: 12px; text-align: center; }
+        .ok { color: #7dffb0; }
+        .bad { color: #ff7a7a; }
+
+        .prow {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 4px;
+            border-bottom: 1px solid rgba(0,255,255,.12);
+            font-size: clamp(11px, 2.9vw, 13px);
+        }
+        .prow .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; box-shadow: 0 0 5px rgba(255,255,255,.3); }
+        .prow .pn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .prow .pn small { color: #7fa8b8; }
+        .pbtns { display: flex; gap: 4px; flex: none; flex-wrap: wrap; }
+        .pbtns button {
+            padding: 4px 7px;
+            font-size: 11px;
+            border-radius: 6px;
+            border: 1.5px solid var(--cy);
+            background: rgba(0,255,255,.08);
+            color: var(--cy);
+            font-weight: bold;
+        }
+        .pbtns button:active { background: rgba(0,255,255,.4); color: #001317; }
+        .pbtns button.dis { opacity: .28; pointer-events: none; }
+        .pbtns button.sell { border-color: #ffd23f; color: #ffd23f; background: rgba(255,210,63,.07); }
+        .pbtns button.mort { border-color: #ff9f43; color: #ff9f43; background: rgba(255,159,67,.07); }
+
+        /* ---------- Журнал ---------- */
+        #logPanel {
+            position: fixed;
+            top: 0; right: -330px;
+            width: min(330px, 88vw);
+            height: 100%;
+            background: rgba(4,8,20,.97);
+            border-left: 2px solid var(--cy);
+            box-shadow: -8px 0 30px rgba(0,255,255,.15);
+            z-index: 65;
+            transition: right .25s;
+            display: flex;
+            flex-direction: column;
+            padding-top: env(safe-area-inset-top);
+        }
+        #logPanel.open { right: 0; }
+        #logPanel h3 {
+            color: var(--cy);
+            text-align: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--line);
+            text-shadow: 0 0 8px rgba(0,255,255,.7);
+        }
+        #logList { flex: 1; overflow-y: auto; padding: 8px 10px; font-size: 12px; line-height: 1.5; }
+        #logList div { padding: 3px 0; border-bottom: 1px dotted rgba(0,255,255,.1); color: #c9e9f2; }
+
+        /* ---------- Экран настройки ---------- */
+        #setup {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+            background: radial-gradient(1200px 800px at 50% -10%, rgba(0,255,255,.09), transparent), var(--bg);
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .setup-panel {
+            background: rgba(8,10,26,.92);
+            border: 2px solid var(--cy);
+            border-radius: 14px;
+            box-shadow: 0 0 40px rgba(0,255,255,.3);
+            padding: 22px 18px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+        }
+        .logo {
+            font-size: clamp(30px, 9vw, 46px);
+            letter-spacing: 5px;
+            color: var(--cy);
+            text-shadow: 0 0 18px rgba(0,255,255,.9), 0 0 60px rgba(0,255,255,.5);
+            margin-bottom: 2px;
+        }
+        .sub { color: #7fa8b8; font-size: 12px; margin-bottom: 16px; letter-spacing: 2px; }
+        .count-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; font-size: 15px; }
+        .cntbtn {
+            width: 38px; height: 38px;
+            border-radius: 8px;
+            border: 2px solid var(--cy);
+            background: rgba(0,255,255,.1);
+            color: var(--cy);
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(0,255,255,.25);
+        }
+        .cntbtn:active { transform: scale(.88); }
+        #plist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .pset {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,.35);
+            border: 1.5px solid rgba(0,255,255,.3);
+            border-radius: 10px;
+            padding: 7px 9px;
+        }
+        .pset .pdot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: 0 0 8px currentColor; background: currentColor; }
+        .pset input {
+            flex: 1;
+            min-width: 0;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #eaffff;
+            font-family: inherit;
+            font-size: 14px;
+            border-bottom: 1px dashed rgba(0,255,255,.25);
+            padding: 2px 0;
+        }
+        .tgl {
+            border: 1.5px solid var(--cy);
+            border-radius: 8px;
+            padding: 5px 0;
+            font-size: 11px;
+            font-weight: bold;
+            background: rgba(0,255,255,.12);
+            color: var(--cy);
+            min-width: 84px;
+        }
+        .tgl.bot { border-color: #ffd23f; color: #ffd23f; background: rgba(255,210,63,.1); }
+        .setup-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+        /* ---------- Победа ---------- */
+        #winScreen {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.94);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 80;
+            text-align: center;
+            padding: 20px;
+        }
+        #winScreen h2 {
+            font-size: clamp(24px, 7vw, 36px);
+            color: var(--cy);
+            text-shadow: 0 0 20px rgba(0,255,255,.9);
+            margin-bottom: 8px;
+        }
+        #winScreen .wsub { color: #9fdcff; margin-bottom: 26px; font-size: clamp(13px, 3.6vw, 16px); }
+
+        .rules p, .rules li { font-size: 12.5px; color: #c9e9f2; line-height: 1.55; }
+        .rules ul { padding-left: 18px; margin: 4px 0; }
+        .scrollbox { max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+
+        .back-btn {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top));
+            left: 10px;
+            padding: 7px 14px;
+            font-size: clamp(12px, 3vw, 15px);
+            background: rgba(0,255,255,.1);
+            color: var(--cy);
+            border: 2px solid var(--cy);
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(0,255,255,.35);
+            text-decoration: none;
+            font-weight: bold;
+            z-index: 30;
+            font-family: 'Courier New', monospace;
+        }
+        .back-btn:active { background: rgba(0,255,255,.4); color: #000; }
+
+        body.hide-cursor, body.hide-cursor * { cursor: none !important; }
+
+        /* на узких экранах освобождаем место под кнопку «← Меню» */
+        #topbar { padding-left: 124px; }
+    </style>
+</head>
+<body>
+
+<a href="../../index.html" class="back-btn">← Меню</a>
+
+<!-- ==================== ЭКРАН НАСТРОЙКИ ==================== -->
+<div id="setup">
+    <div class="setup-panel">
+        <div class="logo">МОНОПОЛИЯ</div>
+        <div class="sub">КЛАССИКА · 2–6 ИГРОКОВ</div>
+        <div class="count-row">
+            <span>Игроков:</span>
+            <button class="cntbtn" id="cntMinus">−</button>
+            <span id="cntVal" style="font-size:22px;font-weight:bold;color:var(--cy);min-width:26px">4</span>
+            <button class="cntbtn" id="cntPlus">+</button>
+        </div>
+        <div id="plist"></div>
+        <div class="setup-btns">
+            <button class="neon big" id="btnStart">НАЧАТЬ ИГРУ</button>
+            <button class="ghost" id="btnRules0">ПРАВИЛА</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== ИГРА ==================== -->
+<div id="game" style="display:none">
+    <div id="topbar">
+        <button class="mini" id="btnRestart" title="Новая игра">⟲</button>
+        <div id="chips"></div>
+        <button class="mini" id="btnLog">Журнал</button>
+        <button class="mini" id="btnRules">Правила</button>
+        <button class="mini" id="btnSnd">🔊</button>
+    </div>
+    <div id="boardWrap"><canvas id="board"></canvas></div>
+    <div id="bottombar">
+        <div id="ticker"></div>
+        <div id="actions"></div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="modal"><div id="modalBox"></div></div>
+
+<div id="logPanel">
+    <h3>ЖУРНАЛ ИГРЫ</h3>
+    <div id="logList"></div>
+</div>
+
+<div id="winScreen">
+    <h2 id="winnerText"></h2>
+    <div class="wsub" id="winnerSub"></div>
+    <button class="neon big" onclick="location.reload()">ИГРАТЬ СНОВА</button>
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+//  УТИЛИТЫ
+// ============================================================
+const $ = s => document.querySelector(s);
+const FAST = /[?&]fast=1/.test(location.search); // ускоренный режим для отладки
+const sleep = ms => new Promise(r => setTimeout(r, FAST ? ms * 0.12 : ms));
+const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const fmt = n => Math.round(n).toLocaleString('ru-RU');
+
+// ============================================================
+//  ЗВУК (WebAudio-синтез, без внешних файлов)
+// ============================================================
+const Snd = {
+    ctx: null,
+    on: localStorage.getItem('mono_snd') !== '0',
+    unlock() {
+        if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    },
+    tone(f, dur, type = 'square', vol = .14, delay = 0, slide = 0) {
+        if (!this.ctx || !this.on) return;
+        try {
+            const t = this.ctx.currentTime + delay;
+            const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+            o.type = type;
+            o.frequency.setValueAtTime(Math.max(30, f), t);
+            if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + dur);
+            g.gain.setValueAtTime(vol, t);
+            g.gain.exponentialRampToValueAtTime(.001, t + dur);
+            o.connect(g); g.connect(this.ctx.destination);
+            o.start(t); o.stop(t + dur + .03);
+        } catch (e) {}
+    },
+    dice()   { for (let i = 0; i < 6; i++) this.tone(ri(400, 900), .04, 'square', .07, i * .07); },
+    step()   { this.tone(520, .045, 'square', .05); },
+    go()     { this.tone(784, .09, 'square', .14); this.tone(1175, .13, 'square', .14, .09); },
+    buy()    { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, .09, 'square', .11, i * .07)); },
+    pay()    { this.tone(300, .18, 'sawtooth', .12, 0, -140); this.tone(200, .22, 'sawtooth', .09, .12, -80); },
+    card()   { this.tone(880, .07, 'triangle', .15); this.tone(1320, .1, 'triangle', .12, .07); },
+    jail()   { [392, 311, 233].forEach((f, i) => this.tone(f, .2, 'sawtooth', .13, i * .15)); },
+    build()  { this.tone(660, .06, 'square', .11); this.tone(990, .09, 'square', .09, .06); },
+    click()  { this.tone(1040, .045, 'square', .07); },
+    dub()    { this.tone(988, .08, 'square', .13); this.tone(1319, .12, 'square', .13, .08); },
+    win()    { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone(f, .17, 'square', .13, i * .12)); },
+    bankr()  { [440, 349, 262, 196].forEach((f, i) => this.tone(f, .22, 'sawtooth', .12, i * .16)); },
+};
+['pointerdown', 'keydown', 'touchstart'].forEach(e =>
+    document.addEventListener(e, () => Snd.unlock(), { passive: true }));
+
+// Скрытие курсора через 3 секунды бездействия
+let cursorTimer = null;
+function hideCursor() { document.body.classList.add('hide-cursor'); }
+function showCursor() {
+    document.body.classList.remove('hide-cursor');
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(hideCursor, 3000);
+}
+['mousemove', 'mousedown', 'pointerdown', 'touchstart', 'keydown', 'wheel']
+    .forEach(evt => document.addEventListener(evt, showCursor, { passive: true }));
+hideCursor();
+
+// ============================================================
+//  ДАННЫЕ ПОЛЯ (классическая Монополия, московская локализация)
+// ============================================================
+const GROUP_COLORS = {
+    brown: '#b07840', lightblue: '#7fd4ff', pink: '#ff6ec7', orange: '#ffa64d',
+    red: '#ff5555', yellow: '#ffe066', green: '#5dff8f', darkblue: '#6f8dff',
+};
+const GROUP_NAMES = {
+    brown: 'КОРИЧНЕВАЯ ГРУППА', lightblue: 'ГОЛУБАЯ ГРУППА', pink: 'РОЗОВАЯ ГРУППА',
+    orange: 'ОРАНЖЕВАЯ ГРУППА', red: 'КРАСНАЯ ГРУППА', yellow: 'ЖЁЛТАЯ ГРУППА',
+    green: 'ЗЕЛЁНАЯ ГРУППА', darkblue: 'СИНЯЯ ГРУППА',
+};
+const GROUP = {
+    brown: [1, 3], lightblue: [6, 8, 9], pink: [11, 13, 14], orange: [16, 18, 19],
+    red: [21, 23, 24], yellow: [26, 27, 29], green: [31, 32, 34], darkblue: [37, 39],
+};
+const RAILS = [5, 15, 25, 35];
+const UTILS = [12, 28];
+const JAIL_POS = 10;
+
+const CELLS = [
+    { t: 'go',      n: 'Вперёд',                    b: 'ВПЕРЁД' },
+    { t: 'street',  n: 'Житная улица',              b: 'Житная ул.',       g: 'brown',     price: 60,  rent: [2, 10, 30, 90, 160, 250],      hc: 50 },
+    { t: 'chest',   n: 'Общественная казна',        b: 'КАЗНА' },
+    { t: 'street',  n: 'Нагатинская улица',         b: 'Нагатинская ул.',  g: 'brown',     price: 60,  rent: [4, 20, 60, 180, 320, 450],     hc: 50 },
+    { t: 'tax',     n: 'Подоходный налог',          b: 'НАЛОГ 200',        price: 200 },
+    { t: 'rail',    n: 'Рижский вокзал',            b: 'Рижский вокз.',    price: 200 },
+    { t: 'street',  n: 'Варшавское шоссе',          b: 'Варшавское ш.',    g: 'lightblue', price: 100, rent: [6, 30, 90, 270, 400, 550],     hc: 50 },
+    { t: 'chance',  n: 'Шанс',                      b: 'ШАНС' },
+    { t: 'street',  n: 'Улица Огарёва',             b: 'ул. Огарёва',      g: 'lightblue', price: 100, rent: [6, 30, 90, 270, 400, 550],     hc: 50 },
+    { t: 'street',  n: '1-я Парковая улица',        b: '1-я Парковая',     g: 'lightblue', price: 120, rent: [8, 40, 100, 300, 450, 600],    hc: 50 },
+    { t: 'jail',    n: 'Тюрьма',                    b: 'ТЮРЬМА' },
+    { t: 'street',  n: 'Полянка',                   b: 'Полянка',          g: 'pink',      price: 140, rent: [10, 50, 150, 450, 625, 750],   hc: 100 },
+    { t: 'util',    n: 'Электростанция',            b: 'ЭЛЕКТРОСТАНЦИЯ',   price: 150 },
+    { t: 'street',  n: 'Сретенка',                  b: 'Сретенка',         g: 'pink',      price: 140, rent: [10, 50, 150, 450, 625, 750],   hc: 100 },
+    { t: 'street',  n: 'Разгуляй',                  b: 'Разгуляй',         g: 'pink',      price: 160, rent: [12, 60, 180, 500, 700, 900],   hc: 100 },
+    { t: 'rail',    n: 'Казанский вокзал',          b: 'Казанский вокз.',  price: 200 },
+    { t: 'street',  n: 'Рязанский проспект',        b: 'Рязанский просп.', g: 'orange',    price: 180, rent: [14, 70, 200, 550, 750, 950],   hc: 100 },
+    { t: 'chest',   n: 'Общественная казна',        b: 'КАЗНА' },
+    { t: 'street',  n: 'Улица Вавилова',            b: 'ул. Вавилова',     g: 'orange',    price: 180, rent: [14, 70, 200, 550, 750, 950],   hc: 100 },
+    { t: 'street',  n: 'Рузовская улица',           b: 'Рузовская ул.',    g: 'orange',    price: 200, rent: [16, 80, 220, 600, 800, 1000],  hc: 100 },
+    { t: 'free',    n: 'Бесплатная парковка',       b: 'ПАРКОВКА' },
+    { t: 'street',  n: 'Китай-город',               b: 'Китай-город',      g: 'red',       price: 220, rent: [18, 90, 250, 700, 875, 1050],  hc: 150 },
+    { t: 'chance',  n: 'Шанс',                      b: 'ШАНС' },
+    { t: 'street',  n: 'Тверская улица',            b: 'Тверская ул.',     g: 'red',       price: 220, rent: [18, 90, 250, 700, 875, 1050],  hc: 150 },
+    { t: 'street',  n: 'Пушкинская улица',          b: 'Пушкинская ул.',   g: 'red',       price: 240, rent: [20, 100, 300, 750, 925, 1100], hc: 150 },
+    { t: 'rail',    n: 'Ленинградский вокзал',      b: 'Ленингр. вокз.',   price: 200 },
+    { t: 'street',  n: 'Смоленская площадь',        b: 'Смоленская пл.',   g: 'yellow',    price: 260, rent: [22, 110, 330, 800, 975, 1150], hc: 150 },
+    { t: 'street',  n: 'Кузнецкий мост',            b: 'Кузнецкий мост',   g: 'yellow',    price: 260, rent: [22, 110, 330, 800, 975, 1150], hc: 150 },
+    { t: 'util',    n: 'Водопроводная станция',     b: 'ВОДОКАНАЛ',        price: 150 },
+    { t: 'street',  n: 'Лубянская площадь',         b: 'Лубянская пл.',    g: 'yellow',    price: 280, rent: [24, 120, 360, 850, 1025, 1200],hc: 150 },
+    { t: 'gotojail',n: 'Отправляйтесь в тюрьму',    b: 'В ТЮРЬМУ' },
+    { t: 'street',  n: 'Арбат',                     b: 'Арбат',            g: 'green',     price: 300, rent: [26, 130, 390, 900, 1100, 1275],hc: 200 },
+    { t: 'street',  n: 'Кутузовский проспект',      b: 'Кутузовский просп.',g: 'green',    price: 300, rent: [26, 130, 390, 900, 1100, 1275],hc: 200 },
+    { t: 'chest',   n: 'Общественная казна',        b: 'КАЗНА' },
+    { t: 'street',  n: 'Малая Бронная улица',       b: 'Малая Бронная',    g: 'green',     price: 320, rent: [28, 150, 450, 1000, 1200, 1400],hc: 200 },
+    { t: 'rail',    n: 'Белорусский вокзал',        b: 'Белорусский вокз.',price: 200 },
+    { t: 'chance',  n: 'Шанс',                      b: 'ШАНС' },
+    { t: 'street',  n: 'Гоголевский бульвар',       b: 'Гоголевский бул.', g: 'darkblue',  price: 350, rent: [35, 175, 500, 1100, 1300, 1500],hc: 200 },
+    { t: 'lux',     n: 'Налог на роскошь',          b: 'РОСКОШЬ 100',      price: 100 },
+    { t: 'street',  n: '1-я Тверская-Ямская улица', b: '1-я Тверск.-Ямская',g: 'darkblue', price: 400, rent: [50, 200, 600, 1400, 1700, 2000],hc: 200 },
+];
+
+const PLAYER_COLORS = ['#00ffff', '#ff5ec4', '#ffd23f', '#5dff6a', '#ff9f43', '#b08bff'];
+
+// ============================================================
+//  КАРТОЧКИ «ШАНС» И «ОБЩЕСТВЕННАЯ КАЗНА»
+// ============================================================
+function nearestOf(pos, arr) {
+    let best = null, bd = 99;
+    for (const a of arr) {
+        const d = (a - pos + 40) % 40;
+        if (d !== 0 && d < bd) { bd = d; best = a; }
+    }
+    return best === null ? arr[0] : best;
+}
+const cardRepairs = (fh, fH) => async p => {
+    let tot = 0;
+    for (let i = 0; i < 40; i++) if (G.owner[i] === p.id) {
+        const h = G.houses[i];
+        tot += h === 5 ? fH : h * fh;
+    }
+    if (tot > 0) await payDebt(p, tot, null, `ремонт зданий (${fh}/${fH})`);
+    else log(`${p.name}: зданий нет — ремонт не требуется`);
+};
+const cardPayEach = n => async p => {
+    const others = G.players.filter(q => q.alive && q !== p);
+    if (!others.length) return;
+    const tot = n * others.length;
+    const ok = await payDebt(p, tot, null, `платёж по ${n} каждому игроку`);
+    if (ok) { others.forEach(o => { o.money += n; floatOn(o.pos, `+${n}`, '#7dffb0'); }); updateHUD(); }
+};
+const cardGetEach = n => async p => {
+    const others = G.players.filter(q => q.alive && q !== p);
+    others.forEach(o => {
+        const v = Math.min(o.money, n);
+        o.money -= v; p.money += v;
+        floatOn(o.pos, `-${v}`, '#ff7a7a');
+    });
+    gain(p, 0, `сбор по ${n} с каждого игрока`);
+};
+
+const CHANCE_SRC = [
+    { t: 'Отправляйтесь на клетку «Вперёд». Получите 200.', f: async p => { await advanceTo(p, 0); await resolveCell(p, {}); } },
+    { t: 'Отправляйтесь на Пушкинскую улицу. Если проходите «Вперёд» — получите 200.', f: async p => { await advanceTo(p, 24); await resolveCell(p, {}); } },
+    { t: 'Отправляйтесь на Полянку.', f: async p => { await advanceTo(p, 11); await resolveCell(p, {}); } },
+    { t: 'Отправляйтесь на Рижский вокзал.', f: async p => { await advanceTo(p, 5); await resolveCell(p, {}); } },
+    { t: 'Отправляйтесь на ближайший вокзал и заплатите владельцу двойную арендную плату. Если вокзал свободен — можно купить.', f: async p => {
+        const target = nearestOf(p.pos, RAILS);
+        await advanceTo(p, target);
+        await resolveCell(p, { rentMult: 2 });
+    } },
+    { t: 'Отправляйтесь на ближайшее коммунальное предприятие. Если оно занято, заплатите владельцу 10-кратную сумму броска. Если свободно — можно купить.', f: async p => {
+        const target = nearestOf(p.pos, UTILS);
+        await advanceTo(p, target);
+        const o = G.owner[target];
+        if (o === -1) await resolveCell(p, {});
+        else if (o !== p.id && !G.mortgaged[target]) {
+            const [a, b] = await rollAnim();
+            await payDebt(p, (a + b) * 10, G.players[o], '10× бросок (карточка)');
+        } else await resolveCell(p, {});
+    } },
+    { t: 'Банк выплачивает вам дивиденды в размере 50.', f: async p => gain(p, 50, 'дивиденды банка') },
+    { t: 'Освободитесь из тюрьмы бесплатно. Сохраните эту карточку до необходимости.', jf: true },
+    { t: 'Отправляйтесь в тюрьму! Проходя «Вперёд», сумму не получаете.', f: async p => sendToJail(p) },
+    { t: 'Произведите капитальный ремонт вашего имущества: 25 за каждый дом, 100 за каждый отель.', f: cardRepairs(25, 100) },
+    { t: 'Штраф за превышение скорости: заплатите 15.', f: async p => payDebt(p, 15, null, 'штраф за скорость') },
+    { t: 'Отправляйтесь на 1-ю Тверскую-Ямскую улицу.', f: async p => { await advanceTo(p, 39); await resolveCell(p, {}); } },
+    { t: 'Отойдите назад на 3 клетки.', f: async p => { await moveSteps(p, 3, -1); await resolveCell(p, {}); } },
+    { t: 'Вас избрали председателем совета директоров: заплатите каждому игроку по 50.', f: cardPayEach(50) },
+    { t: 'Строительный кредит погашен: получите 150.', f: async p => gain(p, 150, 'строительный кредит') },
+    { t: 'Вы победили в конкурсе кроссвордов: получите 100.', f: async p => gain(p, 100, 'приз за кроссворд') },
+];
+
+const CHEST_SRC = [
+    { t: 'Отправляйтесь на клетку «Вперёд». Получите 200.', f: async p => { await advanceTo(p, 0); await resolveCell(p, {}); } },
+    { t: 'Ошибка банка в вашу пользу: получите 200.', f: async p => gain(p, 200, 'ошибка банка') },
+    { t: 'Оплата услуг врача: заплатите 50.', f: async p => payDebt(p, 50, null, 'услуги врача') },
+    { t: 'От продажи акций вы получаете 50.', f: async p => gain(p, 50, 'продажа акций') },
+    { t: 'Освободитесь из тюрьмы бесплатно. Сохраните эту карточку до необходимости.', jf: true },
+    { t: 'Отправляйтесь в тюрьму! Проходя «Вперёд», сумму не получаете.', f: async p => sendToJail(p) },
+    { t: 'Ночь в опере: получите по 50 с каждого игрока.', f: cardGetEach(50) },
+    { t: 'Праздничный фонд погашен: получите 100.', f: async p => gain(p, 100, 'праздничный фонд') },
+    { t: 'Возврат подоходного налога: получите 20.', f: async p => gain(p, 20, 'возврат налога') },
+    { t: 'У вас день рождения: получите по 10 с каждого игрока.', f: cardGetEach(10) },
+    { t: 'Выплата по страховке жизни: получите 100.', f: async p => gain(p, 100, 'страховка') },
+    { t: 'Оплата лечения в больнице: заплатите 100.', f: async p => payDebt(p, 100, null, 'больница') },
+    { t: 'Оплата школьных сборов: заплатите 50.', f: async p => payDebt(p, 50, null, 'школьные сборы') },
+    { t: 'Гонорар за консультацию: получите 25.', f: async p => gain(p, 25, 'консультация') },
+    { t: 'Произведён ремонт улиц: заплатите 40 за каждый дом и 115 за каждый отель.', f: cardRepairs(40, 115) },
+    { t: 'Вы заняли второе место в конкурсе красоты: получите 10.', f: async p => gain(p, 10, 'конкурс красоты') },
+];
+
+function mkDecks() {
+    const shuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = ri(0, i); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const mk = (src, deckName) => shuf(src.slice().map(c => ({ ...c, _deck: deckName })));
+    return { chance: mk(CHANCE_SRC, 'chance'), chest: mk(CHEST_SRC, 'chest') };
+}
+
+// ============================================================
+//  СОСТОЯНИЕ ИГРЫ
+// ============================================================
+const G = {
+    players: [],
+    owner: Array(40).fill(-1),
+    houses: Array(40).fill(0),   // 0-4 дома, 5 = отель
+    mortgaged: Array(40).fill(false),
+    turn: 0,
+    round: 1,
+    doubles: 0,
+    dice: [1, 1],
+    rolling: false,
+    bankHouses: 32,
+    bankHotels: 12,
+    decks: null,
+    centerMsg: null,
+    cur: null,          // текущий игрок (объект)
+    canManage: false,
+    started: false,
+};
+
+// ============================================================
+//  ХОЛСТ И ГЕОМЕТРИЯ
+// ============================================================
+const canvas = $('#board');
+const ctx = canvas.getContext('2d');
+let S = 600, CORNER = 96, CW = 45, DPR = 1;
+const boardCv = document.createElement('canvas');
+const bctx = boardCv.getContext('2d');
+const anims = [];
+const floats = [];
+
+function edgeOf(i) { return i < 10 ? 'bottom' : i < 20 ? 'left' : i < 30 ? 'top' : 'right'; }
+
+function cellRect(i) {
+    if (i === 0)  return { x: S - CORNER, y: S - CORNER, w: CORNER, h: CORNER };
+    if (i === 10) return { x: 0, y: S - CORNER, w: CORNER, h: CORNER };
+    if (i === 20) return { x: 0, y: 0, w: CORNER, h: CORNER };
+    if (i === 30) return { x: S - CORNER, y: 0, w: CORNER, h: CORNER };
+    const k = i % 10; // 1..9
+    if (i < 10) return { x: S - CORNER - CW * k, y: S - CORNER, w: CW, h: CORNER };
+    if (i < 20) return { x: 0, y: S - CORNER - CW * k, w: CORNER, h: CW };
+    if (i < 30) return { x: CORNER + CW * (k - 1), y: 0, w: CW, h: CORNER };
+    return { x: S - CORNER, y: CORNER + CW * (k - 1), w: CORNER, h: CW };
+}
+
+const SLOT = [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1.7]];
+
+function slotOf(p) {
+    const r = cellRect(p.pos);
+    const mates = G.players.filter(q => q.alive && q.pos === p.pos && q.inJail === p.inJail);
+    const k = Math.max(0, mates.indexOf(p));
+    if (p.pos === JAIL_POS) {
+        if (p.inJail) return { x: r.x + r.w * 0.58 + (k - (mates.length - 1) / 2) * r.w * 0.17, y: r.y + r.h * 0.45 };
+        return { x: r.x + r.w * 0.32 + (k - (mates.length - 1) / 2) * r.w * 0.16, y: r.y + r.h * 0.76 };
+    }
+    const u = Math.min(r.w, r.h) * 0.26;
+    const [sx, sy] = SLOT[Math.min(k, SLOT.length - 1)];
+    return { x: r.x + r.w / 2 + sx * u, y: r.y + r.h / 2 + sy * u };
+}
+
+function wrapText(g, text, maxW, fontPx) {
+    g.font = `${fontPx}px 'Courier New', monospace`;
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (g.measureText(test).width <= maxW || !line) line = test;
+        else { lines.push(line); line = w; }
+    }
+    if (line) lines.push(line);
+    return lines;
+}
+
+function layout() {
+    if (!G.started) return;
+    const topH = $('#topbar').offsetHeight, botH = $('#bottombar').offsetHeight;
+    const availW = Math.min(window.innerWidth - 10, 760);
+    const availH = window.innerHeight - topH - botH - 14;
+    S = Math.max(300, Math.min(availW, availH));
+    CORNER = Math.round(S * 0.155);
+    CW = (S - 2 * CORNER) / 9;
+    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.round(S * DPR); canvas.height = Math.round(S * DPR);
+    canvas.style.width = S + 'px'; canvas.style.height = S + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    boardCv.width = canvas.width; boardCv.height = canvas.height;
+    bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawStatic();
+    G.players.forEach(p => { if (!anims.some(a => a.p === p)) { const c = slotOf(p); p.vx = c.x; p.vy = c.y; } });
+}
+
+window.addEventListener('resize', () => { clearTimeout(layout._t); layout._t = setTimeout(layout, 120); });
+
+// ============================================================
+//  СТАТИЧЕСКАЯ ОТРИСОВКА ДОСКИ
+// ============================================================
+function drawStatic() {
+    const g = bctx;
+    g.clearRect(0, 0, S, S);
+    g.fillStyle = '#070712';
+    g.fillRect(0, 0, S, S);
+
+    // центр: лого
+    g.save();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const cC = CORNER + (S - 2 * CORNER) / 2;
+    g.font = `bold ${Math.round(S * 0.052)}px 'Courier New', monospace`;
+    g.shadowColor = '#0ff'; g.shadowBlur = S * 0.03;
+    g.fillStyle = '#0ff';
+    g.fillText('МОНОПОЛИЯ', cC, CORNER + (S - 2 * CORNER) * 0.14);
+    g.shadowBlur = 0;
+    g.fillStyle = 'rgba(0,229,255,.45)';
+    g.font = `${Math.round(S * 0.02)}px 'Courier New', monospace`;
+    g.fillText('К Л А С С И К А', cC, CORNER + (S - 2 * CORNER) * 0.14 + S * 0.045);
+    g.restore();
+
+    for (let i = 0; i < 40; i++) drawCellStatic(g, i);
+}
+
+function drawCellStatic(g, i) {
+    const c = CELLS[i], r = cellRect(i), e = edgeOf(i);
+    const pad = Math.max(1, S * 0.0025);
+    g.fillStyle = '#0b0b1c';
+    g.fillRect(r.x, r.y, r.w, r.h);
+    g.strokeStyle = 'rgba(0,255,255,.35)';
+    g.lineWidth = Math.max(1, S * 0.0022);
+    g.strokeRect(r.x + pad / 2, r.y + pad / 2, r.w - pad, r.h - pad);
+
+    if (c.t === 'street') {
+        const band = Math.max(6, r.w * 0.19);
+        g.fillStyle = GROUP_COLORS[c.g];
+        g.shadowColor = GROUP_COLORS[c.g]; g.shadowBlur = 5;
+        if (e === 'bottom') g.fillRect(r.x + 2, r.y + 2, r.w - 4, band);
+        if (e === 'top')    g.fillRect(r.x + 2, r.y + r.h - band - 2, r.w - 4, band);
+        if (e === 'left')   g.fillRect(r.x + r.w - band - 2, r.y + 2, band, r.h - 4);
+        if (e === 'right')  g.fillRect(r.x + 2, r.y + 2, band, r.h - 4);
+        g.shadowBlur = 0;
+    }
+
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const vert = (e === 'left' || e === 'right');
+
+    if (c.t === 'go') {
+        g.fillStyle = '#0ff'; g.shadowColor = '#0ff'; g.shadowBlur = 8;
+        g.font = `bold ${Math.round(CORNER * 0.13)}px 'Courier New', monospace`;
+        g.fillText('ВПЕРЁД', r.x + r.w / 2, r.y + r.h * 0.3);
+        // стрелка влево (направление движения)
+        g.beginPath();
+        const ax = r.x + r.w * 0.22, ay = r.y + r.h * 0.55, aw = r.w * 0.5;
+        g.moveTo(ax, ay); g.lineTo(ax + aw * 0.35, ay - aw * 0.22); g.lineTo(ax + aw * 0.35, ay - aw * 0.08);
+        g.lineTo(ax + aw, ay - aw * 0.08); g.lineTo(ax + aw, ay + aw * 0.08);
+        g.lineTo(ax + aw * 0.35, ay + aw * 0.08); g.lineTo(ax + aw * 0.35, ay + aw * 0.22);
+        g.closePath(); g.fill();
+        g.font = `bold ${Math.round(CORNER * 0.12)}px 'Courier New', monospace`;
+        g.fillText('+200', r.x + r.w / 2, r.y + r.h * 0.84);
+        g.shadowBlur = 0;
+        return;
+    }
+    if (c.t === 'jail') {
+        // решётка
+        g.strokeStyle = 'rgba(0,255,255,.8)'; g.lineWidth = Math.max(1.5, S * 0.004);
+        const bx = r.x + r.w * 0.18, by = r.y + r.h * 0.14, bw = r.w * 0.64, bh = r.h * 0.44;
+        g.strokeRect(bx, by, bw, bh);
+        for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(bx + bw * k / 4, by); g.lineTo(bx + bw * k / 4, by + bh); g.stroke(); }
+        g.fillStyle = '#0ff'; g.font = `bold ${Math.round(CORNER * 0.125)}px 'Courier New', monospace`;
+        g.fillText('ТЮРЬМА', r.x + r.w / 2, r.y + r.h * 0.72);
+        g.font = `${Math.round(CORNER * 0.085)}px 'Courier New', monospace`;
+        g.fillStyle = 'rgba(0,255,255,.6)';
+        g.fillText('просто визит', r.x + r.w / 2, r.y + r.h * 0.88);
+        return;
+    }
+    if (c.t === 'free') {
+        g.fillStyle = '#0ff'; g.shadowColor = '#0ff'; g.shadowBlur = 6;
+        g.strokeStyle = '#0ff'; g.lineWidth = Math.max(1.5, S * 0.004);
+        g.beginPath(); g.arc(r.x + r.w / 2, r.y + r.h * 0.32, CORNER * 0.16, 0, Math.PI * 2); g.stroke();
+        g.font = `bold ${Math.round(CORNER * 0.11)}px 'Courier New', monospace`;
+        g.fillText('БЕСПЛАТНАЯ', r.x + r.w / 2, r.y + r.h * 0.62);
+        g.fillText('ПАРКОВКА', r.x + r.w / 2, r.y + r.h * 0.78);
+        g.shadowBlur = 0;
+        return;
+    }
+    if (c.t === 'gotojail') {
+        g.fillStyle = '#ff7a7a'; g.shadowColor = '#ff5e5e'; g.shadowBlur = 8;
+        g.font = `bold ${Math.round(CORNER * 0.115)}px 'Courier New', monospace`;
+        g.fillText('В ТЮРЬМУ', r.x + r.w / 2, r.y + r.h * 0.4);
+        g.font = `${Math.round(CORNER * 0.09)}px 'Courier New', monospace`;
+        g.fillText('ОТПРАВЛЯЙТЕСЬ', r.x + r.w / 2, r.y + r.h * 0.66);
+        g.fillText('СРАЗУ ЖЕ', r.x + r.w / 2, r.y + r.h * 0.8);
+        g.shadowBlur = 0;
+        return;
+    }
+
+    let fontPx = vert ? Math.max(8, Math.min(CW * 0.24, CORNER * 0.14))
+                      : Math.max(7, Math.min(CW * 0.24, S * 0.017));
+    let name = c.b;
+    let maxW = vert ? CW * 0.62 : r.w - 6;
+    let lines = wrapText(g, name, maxW, fontPx);
+    if (lines.length > 3) { fontPx = Math.round(fontPx * 0.85); lines = wrapText(g, name, maxW, fontPx); }
+
+    const priceTxt = c.price ? fmt(c.price) : '';
+    g.fillStyle = c.t === 'chance' ? '#ffa64d' : c.t === 'chest' ? '#7fd4ff' : c.t === 'tax' || c.t === 'lux' ? '#ff9f43' : '#d9f6ff';
+    if (c.t === 'chance' || c.t === 'chest') g.shadowColor = g.fillStyle, g.shadowBlur = 4;
+
+    const band = c.t === 'street' ? Math.max(6, r.w * 0.19) : 0;
+
+    if (vert) {
+        g.save();
+        g.translate(r.x + r.w / 2, r.y + r.h / 2);
+        if (e === 'left') g.rotate(-Math.PI / 2); else g.rotate(Math.PI / 2);
+        const avail = r.h - 8;
+        let totalH = lines.length * fontPx * 1.12 + (priceTxt ? fontPx * 1.15 : 0);
+        const scale = totalH > avail ? avail / totalH : 1;
+        const fs = fontPx * (scale < 1 ? scale * 0.95 : 1);
+        g.font = `bold ${fs}px 'Courier New', monospace`;
+        let y = -(totalH * scale) / 2 + fs / 2;
+        for (const ln of lines) { g.fillText(ln, 0, y); y += fs * 1.12; }
+        if (priceTxt) { g.fillStyle = 'rgba(255,255,255,.75)'; g.fillText('₽' + priceTxt, 0, y + fs * 0.1); }
+        g.restore();
+    } else {
+        const topPad = e === 'bottom' ? band + 4 : 6;
+        const avail = r.h - topPad - (priceTxt ? fontPx * 1.2 : 6);
+        let fs = fontPx;
+        let totalH = lines.length * fs * 1.1 + (priceTxt ? fs * 1.2 : 0);
+        if (totalH > avail) { fs = Math.max(6.5, fs * (avail / totalH) * 0.95); lines = wrapText(g, name, maxW, fs); totalH = lines.length * fs * 1.1 + (priceTxt ? fs * 1.2 : 0); }
+        g.font = `bold ${fs}px 'Courier New', monospace`;
+        let y = e === 'bottom' ? topPad + fs * 0.55 : r.h - 6 - (priceTxt ? fs * 1.2 : 0) - (lines.length - 1) * fs * 1.1 - fs * 0.5;
+        for (const ln of lines) { g.fillText(ln, r.x + r.w / 2, r.y + y); y += fs * 1.1; }
+        if (priceTxt) {
+            g.fillStyle = 'rgba(255,255,255,.75)';
+            g.font = `${fs}px 'Courier New', monospace`;
+            g.fillText('₽' + priceTxt, r.x + r.w / 2, e === 'bottom' ? r.y + r.h - fs * 0.75 : r.y + fs * 0.7);
+        }
+    }
+    g.shadowBlur = 0;
+}
+
+// ============================================================
+//  ДИНАМИЧЕСКАЯ ОТРИСОВКА (каждый кадр)
+// ============================================================
+function hexA(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function render() {
+    if (!G.started) return;
+    ctx.clearRect(0, 0, S, S);
+    ctx.drawImage(boardCv, 0, 0, S, S);
+
+    // подсветка владельцев
+    for (let i = 0; i < 40; i++) {
+        const o = G.owner[i];
+        if (o < 0) continue;
+        const r = cellRect(i);
+        const col = G.players[o].color;
+        ctx.fillStyle = hexA(col, G.mortgaged[i] ? .04 : .12);
+        ctx.fillRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
+        ctx.strokeStyle = hexA(col, G.mortgaged[i] ? .4 : .95);
+        ctx.lineWidth = Math.max(1.2, S * 0.004);
+        ctx.shadowColor = col; ctx.shadowBlur = G.mortgaged[i] ? 0 : 5;
+        ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
+        ctx.shadowBlur = 0;
+        if (G.mortgaged[i]) {
+            ctx.strokeStyle = 'rgba(255,80,80,.65)';
+            ctx.lineWidth = Math.max(1, S * 0.003);
+            for (let k = -r.h; k < r.w; k += Math.max(6, S * 0.02)) {
+                ctx.beginPath(); ctx.moveTo(r.x + k, r.y + r.h); ctx.lineTo(r.x + k + r.h, r.y); ctx.stroke();
+            }
+        }
+    }
+
+    // пульс текущей клетки
+    if (G.cur && G.cur.alive) {
+        const r = cellRect(G.cur.pos);
+        const t = (performance.now() / 700) % 1;
+        ctx.strokeStyle = hexA(G.cur.color, .35 + .5 * Math.abs(Math.sin(performance.now() / 300)));
+        ctx.lineWidth = Math.max(1.5, S * 0.005);
+        ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+    }
+
+    // дома и отели
+    for (let i = 0; i < 40; i++) {
+        const h = G.houses[i];
+        if (!h) continue;
+        drawHouses(i, h);
+    }
+
+    // фишки
+    for (const p of G.players) { if (p.alive) drawToken(p); }
+
+    // кубики
+    drawDice();
+
+    // сообщение в центре (карточка)
+    if (G.centerMsg) drawCenterMsg();
+
+    // подпись хода
+    if (G.cur) {
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `bold ${Math.round(S * 0.028)}px 'Courier New', monospace`;
+        ctx.fillStyle = G.cur.color;
+        ctx.shadowColor = G.cur.color; ctx.shadowBlur = 8;
+        ctx.fillText('ХОД: ' + G.cur.name.toUpperCase(), S / 2, S - CORNER * 0.55);
+        ctx.shadowBlur = 0;
+        ctx.font = `${Math.round(S * 0.02)}px 'Courier New', monospace`;
+        ctx.fillStyle = 'rgba(0,229,255,.5)';
+        ctx.fillText('РАУНД ' + G.round, S / 2, S - CORNER * 0.55 + S * 0.032);
+    }
+
+    // всплывающие числа
+    const now = performance.now();
+    for (let i = floats.length - 1; i >= 0; i--) {
+        const f = floats[i];
+        const t = (now - f.t0) / f.dur;
+        if (t >= 1) { floats.splice(i, 1); continue; }
+        ctx.globalAlpha = 1 - t;
+        ctx.font = `bold ${Math.round(S * 0.03)}px 'Courier New', monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = f.color;
+        ctx.shadowColor = f.color; ctx.shadowBlur = 8;
+        ctx.fillText(f.txt, f.x, f.y - t * S * 0.06);
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+}
+
+function drawHouses(i, h) {
+    const c = CELLS[i], r = cellRect(i), e = edgeOf(i);
+    const band = Math.max(6, r.w * 0.19);
+    const bs = Math.max(4, S * 0.013);
+    const col = h === 5 ? '#ff5e5e' : '#5dff6f';
+    ctx.fillStyle = col;
+    ctx.shadowColor = col; ctx.shadowBlur = 5;
+    const n = h === 5 ? 1 : h;
+    const span = e === 'bottom' || e === 'top' ? r.w : r.h;
+    const startX = (e === 'bottom' || e === 'top') ? r.x + (r.w - (h === 5 ? span * 0.6 : n * bs * 1.35)) / 2 : 0;
+    const startY = (e === 'left' || e === 'right') ? r.y + (r.h - (h === 5 ? span * 0.6 : n * bs * 1.35)) / 2 : 0;
+    for (let k = 0; k < n; k++) {
+        let x, y, w = bs, hh = bs;
+        if (h === 5) { w = (e === 'bottom' || e === 'top') ? span * 0.6 : bs; hh = (e === 'left' || e === 'right') ? span * 0.6 : bs; }
+        if (e === 'bottom') { x = h === 5 ? startX : startX + k * bs * 1.35; y = r.y + 2 + (band - bs) / 2; }
+        if (e === 'top')    { x = h === 5 ? startX : startX + k * bs * 1.35; y = r.y + r.h - band + (band - bs) / 2; }
+        if (e === 'left')   { x = r.x + r.w - band + (band - bs) / 2; y = h === 5 ? startY : startY + k * bs * 1.35; }
+        if (e === 'right')  { x = r.x + 2 + (band - bs) / 2; y = h === 5 ? startY : startY + k * bs * 1.35; }
+        ctx.fillRect(x, y, w, hh);
+    }
+    ctx.shadowBlur = 0;
+}
+
+function drawToken(p) {
+    const x = p.vx, y = p.vy;
+    const rad = Math.max(5, S * 0.017);
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = '#04040c';
+    ctx.fill();
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = Math.max(1.6, S * 0.0045);
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = p.color;
+    ctx.font = `bold ${Math.round(rad * 1.15)}px 'Courier New', monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.name[0].toUpperCase(), x, y + rad * 0.06);
+}
+
+function dieFace(g, x, y, sz, val, rolling) {
+    const j = rolling ? ri(-2, 2) : 0;
+    g.save();
+    g.translate(x + j, y + j);
+    g.fillStyle = 'rgba(0,20,30,.9)';
+    g.strokeStyle = '#0ff';
+    g.shadowColor = '#0ff'; g.shadowBlur = rolling ? 14 : 8;
+    g.lineWidth = Math.max(1.5, S * 0.004);
+    const rr = sz * 0.22;
+    g.beginPath();
+    g.moveTo(-sz / 2 + rr, -sz / 2);
+    g.arcTo(sz / 2, -sz / 2, sz / 2, sz / 2, rr);
+    g.arcTo(sz / 2, sz / 2, -sz / 2, sz / 2, rr);
+    g.arcTo(-sz / 2, sz / 2, -sz / 2, -sz / 2, rr);
+    g.arcTo(-sz / 2, -sz / 2, sz / 2, -sz / 2, rr);
+    g.closePath(); g.fill(); g.stroke();
+    g.shadowBlur = 0;
+    g.fillStyle = '#cffcff';
+    const pd = sz * 0.16;
+    const P = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [0, 0], [1, -1], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] };
+    for (const [px, py] of P[val]) {
+        g.beginPath(); g.arc(px * sz * 0.26, py * sz * 0.26, pd / 2, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+}
+
+function drawDice() {
+    const sz = S * 0.075;
+    const cx = S / 2, cy = CORNER + (S - 2 * CORNER) * 0.5;
+    dieFace(ctx, cx - sz * 0.62, cy, sz, G.dice[0], G.rolling);
+    dieFace(ctx, cx + sz * 0.62, cy, sz, G.dice[1], G.rolling);
+    if (G.dice[0] === G.dice[1] && !G.rolling) {
+        ctx.font = `bold ${Math.round(S * 0.024)}px 'Courier New', monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffd23f'; ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 8;
+        ctx.fillText('ДУБЛЬ!', cx, cy + sz * 0.75);
+        ctx.shadowBlur = 0;
+    }
+}
+
+function drawCenterMsg() {
+    const m = G.centerMsg;
+    const boxW = (S - 2 * CORNER) * 0.92;
+    const cx = S / 2, top = S * 0.565;
+    const fs = Math.max(9, Math.min(S * 0.024, boxW / 22));
+    const lines = wrapText(ctx, m.text, boxW - 20, fs);
+    const boxH = lines.length * fs * 1.3 + fs * 1.6;
+    ctx.fillStyle = 'rgba(3,8,18,.88)';
+    ctx.strokeStyle = m.color;
+    ctx.shadowColor = m.color; ctx.shadowBlur = 12;
+    ctx.lineWidth = Math.max(1.5, S * 0.004);
+    ctx.beginPath();
+    const rr = 8;
+    ctx.moveTo(cx - boxW / 2 + rr, top);
+    ctx.arcTo(cx + boxW / 2, top, cx + boxW / 2, top + boxH, rr);
+    ctx.arcTo(cx + boxW / 2, top + boxH, cx - boxW / 2, top + boxH, rr);
+    ctx.arcTo(cx - boxW / 2, top + boxH, cx - boxW / 2, top, rr);
+    ctx.arcTo(cx - boxW / 2, top, cx + boxW / 2, top, rr);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = m.color;
+    ctx.font = `bold ${fs}px 'Courier New', monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let y = top + fs * 0.85;
+    for (const ln of lines) { ctx.fillText(ln, cx, y); y += fs * 1.3; }
+}
+
+function floatOn(idx, txt, color) {
+    const r = cellRect(idx);
+    floats.push({ x: r.x + r.w / 2, y: r.y + r.h / 2, txt, color, t0: performance.now(), dur: 1300 });
+}
+function floatAt(x, y, txt, color) {
+    floats.push({ x, y, txt, color, t0: performance.now(), dur: 1300 });
+}
+
+function showCard(text, color, ms = 2600) {
+    G.centerMsg = { text, color };
+    return new Promise(res => {
+        let done = false;
+        const finish = () => {
+            if (done) return; done = true;
+            G.centerMsg = null;
+            canvas.removeEventListener('pointerdown', finish);
+            clearTimeout(t);
+            res();
+        };
+        const t = setTimeout(finish, FAST ? ms * 0.3 : ms);
+        canvas.addEventListener('pointerdown', finish);
+    });
+}
+
+// игровой цикл
+function loop() {
+    const now = performance.now();
+    for (let i = anims.length - 1; i >= 0; i--) {
+        const a = anims[i];
+        let t = (now - a.t0) / a.dur;
+        if (t >= 1) {
+            a.p.vx = a.tx; a.p.vy = a.ty;
+            anims.splice(i, 1);
+            a.res();
+        } else {
+            const k = Math.sin(Math.PI * t);
+            a.p.vx = a.fx + (a.tx - a.fx) * t;
+            a.p.vy = a.fy + (a.ty - a.fy) * t - (a.arc || S * 0.035) * k;
+        }
+    }
+    render();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ============================================================
+//  ИНТЕРФЕЙС: журнал, тосты, модалки, панель действий
+// ============================================================
+function log(msg, color) {
+    const el = document.createElement('div');
+    el.textContent = msg;
+    if (color) el.style.color = color;
+    $('#logList').prepend(el);
+    while ($('#logList').children.length > 80) $('#logList').lastChild.remove();
+    $('#ticker').textContent = msg;
+}
+let toastT = null;
+function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+let actionResolve = null;
+let actionDeathPoll = null;
+function setActions(list) {
+    const bar = $('#actions');
+    bar.innerHTML = '';
+    for (const a of list) {
+        const b = document.createElement('button');
+        b.className = a.cls || 'neon' + (a.big ? ' big' : '');
+        if (a.cls === 'neon' && a.big) b.classList.add('big');
+        if (a.dis) b.classList.add('dis');
+        b.textContent = a.label;
+        b.addEventListener('click', () => pressAction(a.id));
+        bar.appendChild(b);
+    }
+}
+function clearActions() { $('#actions').innerHTML = ''; }
+function pressAction(id) {
+    Snd.click();
+    if (id === 'manage') { openManage(G.cur); return; }
+    if (!actionResolve) return;
+    const r = actionResolve; actionResolve = null;
+    clearTimeout(actionDeathPoll);
+    clearActions();
+    r(id);
+}
+function waitAction(list) {
+    return new Promise(res => {
+        actionResolve = res;
+        setActions(list);
+        // защита: если текущий игрок выбыл (банкротство), не ждем клика вечно
+        clearTimeout(actionDeathPoll);
+        const poll = () => {
+            actionDeathPoll = setTimeout(() => {
+                if (!actionResolve) return;
+                if (G.cur && !G.cur.alive) {
+                    const r = actionResolve; actionResolve = null;
+                    clearActions();
+                    r('dead');
+                    return;
+                }
+                poll();
+            }, 400);
+        };
+        poll();
+    });
+}
+
+let modalOnClose = null;
+function showModal(html) {
+    $('#modalBox').innerHTML = html;
+    $('#modal').classList.add('open');
+}
+function closeModal() {
+    $('#modal').classList.remove('open');
+    $('#modalBox').innerHTML = '';
+}
+function modalOpen() { return $('#modal').classList.contains('open'); }
+
+// ============================================================
+//  ВЛАДЕНИЕ / АРЕНДА / ОПЕРАЦИИ С ДОМАМИ
+// ============================================================
+function countOwned(pid, type) {
+    let n = 0;
+    for (let i = 0; i < 40; i++) if (G.owner[i] === pid && CELLS[i].t === type) n++;
+    return n;
+}
+function ownsGroup(pid, g) { return GROUP[g].every(i => G.owner[i] === pid); }
+function groupOfIdx(i) { const c = CELLS[i]; return c.g ? GROUP[c.g] : [i]; }
+function completesGroup(pid, i) {
+    const c = CELLS[i];
+    if (!c.g) return false;
+    return GROUP[c.g].every(x => x === i || G.owner[x] === pid);
+}
+function playersProps(pid) {
+    const r = [];
+    for (let i = 0; i < 40; i++) if (G.owner[i] === pid) r.push(i);
+    return r;
+}
+
+function calcRent(idx, ctx = {}) {
+    const c = CELLS[idx], o = G.owner[idx];
+    if (o < 0 || G.mortgaged[idx]) return 0;
+    if (c.t === 'street') {
+        const h = G.houses[idx];
+        if (h > 0) return c.rent[h];
+        return ownsGroup(o, c.g) ? c.rent[0] * 2 : c.rent[0];
+    }
+    if (c.t === 'rail') {
+        const n = countOwned(o, 'rail');
+        const base = [0, 25, 50, 100, 200][Math.max(1, n)] || 200;
+        return base * (ctx.rentMult || 1);
+    }
+    if (c.t === 'util') {
+        const n = countOwned(o, 'util');
+        const ds = ctx.diceSum || 7;
+        return ds * (n === 2 ? 10 : 4);
+    }
+    return 0;
+}
+
+function canBuildOn(idx) {
+    const c = CELLS[idx];
+    if (c.t !== 'street' || G.owner[idx] < 0) return { ok: false, why: '' };
+    const cells = GROUP[c.g];
+    if (!ownsGroup(G.owner[idx], c.g)) return { ok: false, why: 'Нужна вся цветовая группа' };
+    if (cells.some(i => G.mortgaged[i])) return { ok: false, why: 'Сначала выкупите залог в группе' };
+    const minH = Math.min(...cells.map(i => G.houses[i]));
+    if (G.houses[idx] > minH) return { ok: false, why: 'Стройте равномерно' };
+    if (G.houses[idx] >= 5) return { ok: false, why: 'Отель уже построен' };
+    if (G.houses[idx] === 4 && G.bankHotels < 1) return { ok: false, why: 'В банке нет отелей' };
+    if (G.bankHouses < 1) return { ok: false, why: 'В банке нет домов' };
+    return { ok: true };
+}
+function buildHouse(p, idx, silent) {
+    const c = CELLS[idx];
+    p.money -= c.hc;
+    if (G.houses[idx] === 4) { G.bankHotels--; G.bankHouses += 4; G.houses[idx] = 5; }
+    else { G.bankHouses--; G.houses[idx]++; }
+    Snd.build();
+    if (!silent) log(`${p.name} строит: ${c.b} — ${G.houses[idx] === 5 ? 'ОТЕЛЬ!' : 'дом ' + G.houses[idx]}`);
+    updateHUD();
+}
+function canSellHouse(idx) {
+    const c = CELLS[idx];
+    if (c.t !== 'street' || G.owner[idx] < 0 || G.houses[idx] <= 0) return { ok: false, why: '' };
+    const cells = GROUP[c.g];
+    const maxH = Math.max(...cells.map(i => G.houses[i]));
+    if (G.houses[idx] < maxH) return { ok: false, why: 'Продавайте равномерно' };
+    if (G.houses[idx] === 5 && G.bankHouses < 4) return { ok: false, why: 'В банке нет 4 домов' };
+    return { ok: true };
+}
+function sellHouse(p, idx) {
+    const c = CELLS[idx];
+    if (G.houses[idx] === 5) { G.bankHotels++; G.bankHouses -= 4; G.houses[idx] = 4; }
+    else { G.bankHouses++; G.houses[idx]--; }
+    p.money += c.hc / 2;
+    Snd.pay();
+    log(`${p.name} продаёт дом: ${c.b} (+${fmt(c.hc / 2)})`);
+    floatOn(idx, `+${fmt(c.hc / 2)}`, '#ffd23f');
+    updateHUD();
+}
+function canMortgage(idx) {
+    const c = CELLS[idx];
+    if (G.owner[idx] < 0 || G.mortgaged[idx]) return { ok: false, why: '' };
+    if (c.t === 'street' && GROUP[c.g].some(i => G.houses[i] > 0)) return { ok: false, why: 'Сначала продайте дома' };
+    return { ok: true };
+}
+function mortgageProp(p, idx) {
+    const c = CELLS[idx];
+    G.mortgaged[idx] = true;
+    p.money += Math.floor(c.price / 2);
+    Snd.pay();
+    log(`${p.name} закладывает ${c.b} (+${fmt(c.price / 2)})`);
+    floatOn(idx, `+${fmt(c.price / 2)}`, '#ff9f43');
+    updateHUD();
+}
+function unmortgageCost(idx) { return Math.ceil(CELLS[idx].price * 0.55); }
+function canUnmortgage(p, idx) {
+    if (!G.mortgaged[idx] || G.owner[idx] !== p.id) return { ok: false, why: '' };
+    if (p.money < unmortgageCost(idx)) return { ok: false, why: 'Не хватает денег' };
+    return { ok: true };
+}
+function unmortgageProp(p, idx) {
+    const cost = unmortgageCost(idx);
+    p.money -= cost;
+    G.mortgaged[idx] = false;
+    Snd.buy();
+    log(`${p.name} выкупает из залога ${CELLS[idx].b} (−${fmt(cost)})`);
+    updateHUD();
+}
+
+// ============================================================
+//  ДЕНЬГИ
+// ============================================================
+function gain(p, amount, reason) {
+    if (amount > 0) p.money += amount;
+    Snd.go();
+    log(`${p.name} получает ${fmt(amount)} — ${reason}`, '#7dffb0');
+    floatOn(p.pos, `+${fmt(amount)}`, '#7dffb0');
+    updateHUD();
+}
+
+async function payDebt(p, amount, creditor, reason) {
+    if (amount <= 0) return true;
+    if (p.money < amount) {
+        if (p.isBot) {
+            botRaiseFunds(p, amount);
+            await sleep(500);
+        } else {
+            const ok = await debtModal(p, amount, creditor ? creditor.name : 'Банк', reason);
+            if (!ok) { await bankrupt(p, creditor); return false; }
+        }
+        if (p.money < amount) { await bankrupt(p, creditor); return false; }
+    }
+    p.money -= amount;
+    if (creditor) creditor.money += amount;
+    Snd.pay();
+    log(`${p.name} платит ${fmt(amount)} — ${reason}${creditor ? ' → ' + creditor.name : ''}`, '#ff9f9f');
+    floatOn(p.pos, `−${fmt(amount)}`, '#ff7a7a');
+    updateHUD();
+    return true;
+}
+
+async function bankrupt(p, creditor) {
+    Snd.bankr();
+    // продажа всех зданий банку за полцены
+    let refund = 0;
+    for (let i = 0; i < 40; i++) {
+        if (G.owner[i] !== p.id) continue;
+        const h = G.houses[i];
+        if (h > 0) {
+            refund += (h === 5 ? 5 : h) * CELLS[i].hc / 2;
+            if (h === 5) G.bankHotels++; else G.bankHouses += h;
+            G.houses[i] = 0;
+        }
+    }
+    p.money += refund;
+    log(`💸 ${p.name} ОБЪЯВЛЕН БАНКРОТОМ!`, '#ff5e5e');
+    toast(`${p.name} — банкрот!`);
+    if (creditor) {
+        creditor.money += p.money;
+        for (let i = 0; i < 40; i++) if (G.owner[i] === p.id) G.owner[i] = creditor.id;
+        creditor.jailCards.push(...p.jailCards);
+        log(`Всё имущество переходит к ${creditor.name}`, '#ffd23f');
+    } else {
+        for (let i = 0; i < 40; i++) if (G.owner[i] === p.id) { G.owner[i] = -1; G.mortgaged[i] = false; }
+        p.jailCards.forEach(cd => G.decks[cd._deck].push(cd));
+        log('Имущество возвращается банку', '#ffd23f');
+    }
+    p.jailCards = [];
+    p.money = 0;
+    p.alive = false;
+    updateHUD();
+    await sleep(1200);
+}
+
+// ============================================================
+//  ВЕРХНЯЯ ПАНЕЛЬ ИГРОКОВ
+// ============================================================
+function updateHUD() {
+    const box = $('#chips');
+    box.innerHTML = '';
+    for (const p of G.players) {
+        const d = document.createElement('div');
+        d.className = 'chip' + (p === G.cur ? ' active' : '') + (p.alive ? '' : ' dead');
+        d.style.setProperty('--pc', p.color);
+        d.innerHTML = `<span class="dot"></span><span>${p.name}</span><span class="cmoney">$${fmt(p.money)}</span>` +
+            `<span class="cmarks">${p.inJail ? '🔒' : ''}${p.jailCards.length ? '🎟' + p.jailCards.length : ''}</span>`;
+        d.addEventListener('click', () => chipInfoModal(p.id));
+        box.appendChild(d);
+    }
+}
+
+function chipInfoModal(pid) {
+    const p = G.players[pid];
+    const rows = playersProps(pid).map(i => {
+        const c = CELLS[i];
+        const col = c.g ? GROUP_COLORS[c.g] : '#7fd4ff';
+        const st = G.mortgaged[i] ? ' · ЗАЛОГ' : G.houses[i] ? (G.houses[i] === 5 ? ' · ОТЕЛЬ' : ` · домов ${G.houses[i]}`) : '';
+        return `<div class="prow"><span class="swatch" style="background:${col}"></span><span class="pn">${c.n}<small>${st}</small></span></div>`;
+    }).join('');
+    showModal(`<h2 style="color:${p.color}">${p.name}</h2>
+        <p class="dim">Капитал: $${fmt(p.money)} · ${p.inJail ? 'в тюрьме 🔒' : 'на свободе'} · карточки выхода: ${p.jailCards.length}</p>
+        <div style="margin-top:8px">${rows || '<p class="dim">Собственности нет</p>'}</div>
+        <div class="mbtns"><button class="neon" onclick="closeModal()">ЗАКРЫТЬ</button></div>`);
+}
+
+// ============================================================
+//  ВЕРНУТЬ СЕРТИФИКАТ ВЛАДЕНИЯ
+// ============================================================
+function deedHTML(idx) {
+    const c = CELLS[idx];
+    const col = c.g ? GROUP_COLORS[c.g] : '#7fd4ff';
+    let body = '';
+    if (c.t === 'street') {
+        body = `<tr><td>Базовая аренда</td><td>${fmt(c.rent[0])}</td></tr>
+        <tr><td>Аренда при монополии</td><td>${fmt(c.rent[0] * 2)}</td></tr>
+        <tr><td>С 1 домом</td><td>${fmt(c.rent[1])}</td></tr>
+        <tr><td>С 2 домами</td><td>${fmt(c.rent[2])}</td></tr>
+        <tr><td>С 3 домами</td><td>${fmt(c.rent[3])}</td></tr>
+        <tr><td>С 4 домами</td><td>${fmt(c.rent[4])}</td></tr>
+        <tr><td>С отелем</td><td>${fmt(c.rent[5])}</td></tr>
+        <tr><td>Стоимость дома/отеля</td><td>${fmt(c.hc)}</td></tr>
+        <tr><td>Залог</td><td>${fmt(c.price / 2)}</td></tr>`;
+    } else if (c.t === 'rail') {
+        body = `<tr><td>1 вокзал</td><td>25</td></tr>
+        <tr><td>2 вокзала</td><td>50</td></tr>
+        <tr><td>3 вокзала</td><td>100</td></tr>
+        <tr><td>4 вокзала</td><td>200</td></tr>
+        <tr><td>Залог</td><td>100</td></tr>`;
+    } else if (c.t === 'util') {
+        body = `<tr><td>1 предприятие</td><td>4 × бросок кубиков</td></tr>
+        <tr><td>2 предприятия</td><td>10 × бросок кубиков</td></tr>
+        <tr><td>Залог</td><td>75</td></tr>`;
+    }
+    const sub = c.g ? GROUP_NAMES[c.g] : c.t === 'rail' ? 'ЖЕЛЕЗНАЯ ДОРОГА' : 'КОММУНАЛЬНОЕ ПРЕДПРИЯТИЕ';
+    return `<div class="deed-head" style="background:${col}">${c.n}<small>${sub}</small></div>
+        <table class="deed">${body}</table>`;
+}
+
+// ============================================================
+//  ПОКУПКА / АУКЦИОН
+// ============================================================
+function askBuyModal(p, idx) {
+    return new Promise(res => {
+        const c = CELLS[idx];
+        const canBuy = p.money >= c.price;
+        showModal(`${deedHTML(idx)}
+        <p class="dim">Ваши деньги: $${fmt(p.money)}</p>
+        <div class="mbtns">
+            <button class="neon ${canBuy ? '' : 'dis'}" id="mBuy">КУПИТЬ за $${fmt(c.price)}</button>
+            <button class="ghost" id="mAuc">НА АУКЦИОН</button>
+        </div>`);
+        $('#mBuy').onclick = () => { closeModal(); res('buy'); };
+        $('#mAuc').onclick = () => { closeModal(); res('auction'); };
+    });
+}
+
+async function offerPurchase(p, idx) {
+    const c = CELLS[idx];
+    let want = false;
+    if (p.isBot) {
+        await sleep(650);
+        want = botWantsBuy(p, idx);
+    } else {
+        want = (await askBuyModal(p, idx)) === 'buy';
+    }
+    if (want && p.money >= c.price) {
+        p.money -= c.price;
+        G.owner[idx] = p.id;
+        Snd.buy();
+        toast(`${p.name}: ${c.b} за $${fmt(c.price)}`);
+        log(`${p.name} покупает ${c.n} за $${fmt(c.price)}`, p.color);
+        floatOn(idx, `−${fmt(c.price)}`, p.color);
+        updateHUD();
+    } else {
+        if (p.isBot) log(`${p.name} отказывается от покупки`, p.color);
+        await runAuction(idx);
+    }
+}
+
+function botBidStep(p, idx, bid) {
+    const c = CELLS[idx];
+    let max = Math.min(c.price * 1.25, p.money - 80);
+    if (completesGroup(p.id, idx)) max = Math.min(c.price * 1.7, p.money - 30);
+    else if (c.g && GROUP[c.g].some(i => G.owner[i] === p.id)) max = Math.min(c.price * 1.45, p.money - 60);
+    if (c.t === 'util') max = Math.min(max, c.price * 1.0);
+    const next = bid + 10;
+    if (next > max) return null;
+    return (Math.random() < 0.25 && bid + 50 <= max) ? 50 : 10;
+}
+
+function humanAuctionBid(p, idx, bid, leader) {
+    return new Promise(res => {
+        const c = CELLS[idx];
+        const mk = inc => {
+            const need = bid + inc;
+            return `<button class="neon ${p.money >= need ? '' : 'dis'}" data-inc="${inc}">+${inc}</button>`;
+        };
+        showModal(`<h2>АУКЦИОН</h2>${deedHTML(idx)}
+        <p>Текущая ставка: <b style="color:#0ff">$${fmt(bid)}</b> ${leader ? '— ' + leader.name : '<span class="dim">(ставок нет)</span>'}</p>
+        <p class="dim">Ваши деньги: $${fmt(p.money)}</p>
+        <div class="mbtns">
+            ${mk(10)}${mk(50)}${mk(100)}
+            <button class="danger" id="mPass">ПАС</button>
+        </div>`);
+        $('#modalBox').querySelectorAll('[data-inc]').forEach(b => {
+            b.onclick = () => { Snd.click(); closeModal(); res(parseInt(b.dataset.inc, 10)); };
+        });
+        $('#mPass').onclick = () => { closeModal(); res(null); };
+    });
+}
+
+async function runAuction(idx) {
+    const c = CELLS[idx];
+    toast(`АУКЦИОН: ${c.b}`);
+    log(` 🔨 Аукцион: ${c.n} (цена в магазине $${fmt(c.price)})`, '#ffd23f');
+    const parts = G.players.filter(x => x.alive).map(x => ({ p: x, out: false }));
+    let bid = 0, leader = null, i = 0, safety = 0;
+    while (safety++ < 300) {
+        const remain = parts.filter(x => !x.out);
+        if (remain.length === 0) break;
+        if (leader && remain.length === 1 && remain[0].p === leader) break;
+        const part = remain[i++ % remain.length];
+        if (part.p === leader) continue;
+        let inc = null;
+        if (part.p.isBot) { await sleep(600); inc = botBidStep(part.p, idx, bid); }
+        else inc = await humanAuctionBid(part.p, idx, bid, leader);
+        if (inc == null) { part.out = true; log(`${part.p.name} выходит из торгов`, part.p.color); }
+        else {
+            bid += inc; leader = part.p;
+            Snd.click();
+            log(`${part.p.name}: ставка $${fmt(bid)}`, part.p.color);
+            toast(`${part.p.name}: $${fmt(bid)}`);
+        }
+    }
+    if (leader) {
+        leader.money -= bid;
+        G.owner[idx] = leader.id;
+        Snd.buy();
+        log(` 🔨 ${leader.name} выигрывает аукцион: ${c.n} за $${fmt(bid)}`, leader.color);
+        toast(`${leader.name} выигрывает лот за $${fmt(bid)}`);
+        floatOn(idx, `−${fmt(bid)}`, leader.color);
+    } else {
+        log(' 🔨 Лот не продан — никто не сделал ставку');
+        toast('Лот не продан');
+    }
+    updateHUD();
+}
+
+// ============================================================
+//  МОДАЛКА ДОЛГА (ликвидация имущества)
+// ============================================================
+function propRowHTML(p, idx, ctx) {
+    const c = CELLS[idx];
+    const col = c.g ? GROUP_COLORS[c.g] : '#7fd4ff';
+    const h = G.houses[idx];
+    const hLbl = h === 5 ? ' · ОТЕЛЬ' : h ? ` · 🏠×${h}` : '';
+    const mLbl = G.mortgaged[idx] ? ' · ЗАЛОГ' : '';
+    let btns = '';
+    if (c.t === 'street') {
+        const cb = canBuildOn(idx), cs = canSellHouse(idx);
+        btns += `<button class="${cb.ok ? '' : 'dis'}" data-act="build" data-i="${idx}" title="${cb.why || 'Построить дом (' + fmt(c.hc) + ')'}">+</button>`;
+        btns += `<button class="sell ${cs.ok ? '' : 'dis'}" data-act="sell" data-i="${idx}" title="${cs.why || 'Продать дом (+' + fmt(c.hc / 2) + ')'}">−</button>`;
+    }
+    const cm = canMortgage(idx);
+    if (!G.mortgaged[idx]) btns += `<button class="mort ${cm.ok ? '' : 'dis'}" data-act="mort" data-i="${idx}" title="${cm.why || 'Заложить (+' + fmt(c.price / 2) + ')'}">ЗАЛОГ</button>`;
+    else {
+        const cu = canUnmortgage(p, idx);
+        btns += `<button class="${cu.ok ? '' : 'dis'}" data-act="unmort" data-i="${idx}" title="${cu.why || 'Выкупить за ' + fmt(unmortgageCost(idx))}">ВЫКУП</button>`;
+    }
+    return `<div class="prow"><span class="swatch" style="background:${col}"></span>
+        <span class="pn">${c.b}<small>${hLbl}${mLbl}</small></span>
+        <span class="pbtns">${btns}</span></div>`;
+}
+
+function bindPropRows(box, p, rerender) {
+    box.querySelectorAll('[data-act]').forEach(b => {
+        b.addEventListener('click', () => {
+            const idx = parseInt(b.dataset.i, 10);
+            const act = b.dataset.act;
+            if (act === 'build' && canBuildOn(idx).ok) buildHouse(p, idx);
+            else if (act === 'sell' && canSellHouse(idx).ok) sellHouse(p, idx);
+            else if (act === 'mort' && canMortgage(idx).ok) mortgageProp(p, idx);
+            else if (act === 'unmort' && canUnmortgage(p, idx).ok) unmortgageProp(p, idx);
+            rerender();
+        });
+    });
+}
+
+function debtModal(p, amount, credName, reason) {
+    return new Promise(res => {
+        const render = () => {
+            const rows = playersProps(p.id).map(i => propRowHTML(p, i, 'debt')).join('');
+            showModal(`<h2>ДОЛГ: $${fmt(amount)}</h2>
+            <p>${reason} — получатель: <b>${credName}</b></p>
+            <p>Ваши деньги: <b class="${p.money >= amount ? 'ok' : 'bad'}">$${fmt(p.money)}</b>
+            <span class="dim">· банк: ${G.bankHouses}🏠 / ${G.bankHotels}🏨</span></p>
+            <div style="margin-top:6px">${rows || '<p class="dim">Собственности нет — продавать нечего</p>'}</div>
+            <p class="dim">Продавайте дома (−) и закладывайте собственность, чтобы собрать сумму.</p>
+            <div class="mbtns">
+                <button class="neon ${p.money >= amount ? '' : 'dis'}" id="mPay">ОПЛАТИТЬ ДОЛГ</button>
+                <button class="danger" id="mBr">БАНКРОТСТВО</button>
+            </div>`);
+            bindPropRows($('#modalBox'), p, render);
+            $('#mPay').onclick = () => { closeModal(); res(true); };
+            $('#mBr').onclick = () => { closeModal(); res(false); };
+        };
+        render();
+    });
+}
+
+function openManage(p) {
+    const render = () => {
+        const rows = playersProps(p.id).map(i => propRowHTML(p, i, 'manage')).join('');
+        showModal(`<h2>УПРАВЛЕНИЕ</h2>
+        <p class="dim">Ваши деньги: <b style="color:#7dffb0">$${fmt(p.money)}</b> · банк: ${G.bankHouses}🏠 / ${G.bankHotels}🏨 · дом $50–200</p>
+        <div style="margin-top:6px">${rows || '<p class="dim">Собственности нет</p>'}</div>
+        <p class="dim">+ построить дом · − продать дом за полцены · равномерная застройка группы</p>
+        <div class="mbtns"><button class="neon" id="mClose">ЗАКРЫТЬ</button></div>`);
+        bindPropRows($('#modalBox'), p, render);
+        $('#mClose').onclick = closeModal;
+    };
+    render();
+}
+
+// ============================================================
+//  ДВИЖЕНИЕ ФИШЕК
+// ============================================================
+function hop(p, dur = 150, arc) {
+    return new Promise(res => {
+        const t = slotOf(p); // p.pos уже установлен
+        anims.push({ p, fx: p.vx, fy: p.vy, tx: t.x, ty: t.y, t0: performance.now(), dur: FAST ? dur * 0.4 : dur, res, arc });
+    });
+}
+
+async function moveSteps(p, steps, dir = 1) {
+    for (let s = 0; s < steps; s++) {
+        p.pos = (p.pos + dir + 40) % 40;
+        if (dir > 0 && p.pos === 0) {
+            p.money += 200;
+            Snd.go();
+            log(`${p.name} проходит «Вперёд» +$200`, '#7dffb0');
+            floatOn(0, '+200', '#7dffb0');
+            updateHUD();
+        }
+        Snd.step();
+        await hop(p, 150);
+    }
+}
+
+async function advanceTo(p, target) {
+    const steps = (target - p.pos + 40) % 40;
+    if (steps > 0) await moveSteps(p, steps, 1);
+}
+
+async function sendToJail(p) {
+    Snd.jail();
+    toast(`${p.name} отправляется в тюрьму!`);
+    log(`${p.name} отправляется в тюрьму!`, '#ff7a7a');
+    p.pos = JAIL_POS;
+    await hop(p, 650, S * 0.12);
+    p.inJail = true;
+    p.jailTurns = 0;
+    G.doubles = 0;
+    updateHUD();
+    await sleep(350);
+}
+
+async function rollAnim() {
+    G.rolling = true;
+    Snd.dice();
+    const t0 = performance.now();
+    const DUR = FAST ? 250 : 750;
+    while (performance.now() - t0 < DUR) {
+        G.dice = [ri(1, 6), ri(1, 6)];
+        await sleep(70);
+    }
+    const a = ri(1, 6), b = ri(1, 6);
+    G.dice = [a, b];
+    G.rolling = false;
+    await sleep(400);
+    return [a, b];
+}
+
+// ============================================================
+//  КАРТОЧКИ
+// ============================================================
+async function drawCard(p, deckName) {
+    const deck = G.decks[deckName];
+    const card = deck.shift();
+    Snd.card();
+    await showCard(card.t, deckName === 'chance' ? '#ffa64d' : '#7fd4ff', 2700);
+    log(` 🎴 ${deckName === 'chance' ? 'ШАНС' : 'КАЗНА'}: ${card.t}`);
+    if (card.jf) {
+        p.jailCards.push(card);
+        toast(`${p.name} получает карточку выхода из тюрьмы`);
+        updateHUD();
+        return;
+    }
+    deck.push(card);
+    await card.f(p);
+}
+
+// ============================================================
+//  РАЗРЕШЕНИЕ КЛЕТКИ
+// ============================================================
+async function resolveCell(p, ctx = {}) {
+    if (!p.alive) return;
+    const c = CELLS[p.pos];
+    switch (c.t) {
+        case 'street': case 'rail': case 'util': {
+            const o = G.owner[p.pos];
+            if (o === -1) {
+                await offerPurchase(p, p.pos);
+            } else if (o !== p.id && !G.mortgaged[p.pos]) {
+                const rent = calcRent(p.pos, ctx);
+                if (rent > 0) {
+                    toast(`${p.name} → аренда $${fmt(rent)} → ${G.players[o].name}`);
+                    await payDebt(p, rent, G.players[o], `аренда: ${c.b}`);
+                }
+            } else if (o !== p.id && G.mortgaged[p.pos]) {
+                log(`${c.b} в залоге — аренда не взимается`);
+            }
+            break;
+        }
+        case 'tax': case 'lux':
+            toast(`${c.n}: −$${fmt(c.price)}`);
+            await payDebt(p, c.price, null, c.n.toLowerCase());
+            break;
+        case 'gotojail':
+            await sendToJail(p);
+            break;
+        case 'chance':
+            await drawCard(p, 'chance');
+            break;
+        case 'chest':
+            await drawCard(p, 'chest');
+            break;
+        case 'free':
+            log(`${p.name} отдыхает на бесплатной парковке`, p.color);
+            break;
+        case 'go':
+            log(`${p.name} точно на клетке «Вперёд»`, p.color);
+            break;
+        case 'jail':
+            log(`${p.name} просто заходит в тюрьму`, p.color);
+            break;
+    }
+}
+
+async function moveAndResolve(p, steps) {
+    await moveSteps(p, steps, 1);
+    await sleep(200);
+    await resolveCell(p, { diceSum: steps });
+}
+
+// ============================================================
+//  ТЮРЬМА
+// ============================================================
+function botJailChoice(p) {
+    if (p.jailCards.length) return 'card';
+    const hasMono = Object.keys(GROUP).some(g => ownsGroup(p.id, g));
+    if (p.money >= 250 && (hasMono || countOwned(p.id, 'rail') >= 2)) return 'pay';
+    if (p.jailTurns >= 1 && p.money >= 150) return 'pay';
+    return 'roll';
+}
+
+async function jailPhase(p) {
+    while (true) {
+        let choice;
+        if (p.isBot) { await sleep(750); choice = botJailChoice(p); }
+        else {
+            choice = await waitAction([
+                { id: 'roll', label: 'БРОСИТЬ (ДУБЛЬ = ВЫХОД)', big: true },
+                { id: 'pay', label: 'ЗАПЛАТИТЬ 50', dis: p.money < 50 },
+                { id: 'card', label: 'КАРТА ВЫХОДА', dis: !p.jailCards.length },
+                { id: 'manage', label: 'УПРАВЛЕНИЕ', cls: 'ghost' },
+            ]);
+        }
+        if (choice === 'dead' || !p.alive) return 'done';
+        if (choice === 'card' && p.jailCards.length) {
+            const cd = p.jailCards.pop();
+            G.decks[cd._deck].push(cd);
+            p.inJail = false; p.jailTurns = 0;
+            Snd.click();
+            toast(`${p.name} выходит по карточке!`);
+            log(`${p.name} использует карточку «Освободитесь из тюрьмы»`, p.color);
+            updateHUD();
+            return 'normal';
+        }
+        if (choice === 'pay' && p.money >= 50) {
+            p.money -= 50;
+            Snd.pay();
+            log(`${p.name} платит $50 и выходит из тюрьмы`, p.color);
+            floatOn(p.pos, '−50', '#ff7a7a');
+            p.inJail = false; p.jailTurns = 0;
+            updateHUD();
+            return 'normal';
+        }
+        if (choice === 'roll') {
+            const [a, b] = await rollAnim();
+            if (a === b) {
+                p.inJail = false; p.jailTurns = 0;
+                toast('Дубль! Выход из тюрьмы');
+                log(`${p.name} выбрасывает дубль и выходит из тюрьмы`, p.color);
+                updateHUD();
+                await moveAndResolve(p, a + b);
+                return 'done';
+            }
+            p.jailTurns++;
+            if (p.jailTurns >= 3) {
+                log('Третья попытка не удалась: штраф $50');
+                const ok = await payDebt(p, 50, null, 'штраф за 3-ю неудачную попытку');
+                if (!ok || !p.alive) return 'done';
+                p.inJail = false; p.jailTurns = 0;
+                updateHUD();
+                await moveAndResolve(p, a + b);
+                return 'done';
+            }
+            toast('Не дубль — остаётесь в тюрьме');
+            log(`${p.name} не выбросил дубль (${p.jailTurns}/3 попытки)`, p.color);
+            return 'stay';
+        }
+    }
+}
+
+// ============================================================
+//  БОТЫ
+// ============================================================
+function botWantsBuy(p, idx) {
+    const c = CELLS[idx];
+    if (p.money < c.price) return false;
+    if (completesGroup(p.id, idx)) return true;
+    if (c.t === 'util') return p.money - c.price >= 250;
+    return p.money - c.price >= 100;
+}
+
+function botBuild(p) {
+    let built = 0;
+    for (const g of Object.keys(GROUP)) {
+        if (!ownsGroup(p.id, g)) continue;
+        const cells = GROUP[g];
+        if (cells.some(i => G.mortgaged[i])) continue;
+        let guard = 0;
+        while (built < 3 && guard++ < 8) {
+            const minH = Math.min(...cells.map(i => G.houses[i]));
+            if (minH >= 5) break;
+            const target = cells.find(i => G.houses[i] === minH);
+            if (!canBuildOn(target).ok) break;
+            if (p.money < CELLS[target].hc + 150) break;
+            buildHouse(p, target, true);
+            log(`🏗 ${p.name} строит: ${CELLS[target].b} — ${G.houses[target] === 5 ? 'ОТЕЛЬ!' : 'дом ' + G.houses[target]}`, p.color);
+            built++;
+        }
+    }
+}
+
+function botRaiseFunds(p, debt) {
+    let guard = 0;
+    while (p.money < debt && guard++ < 80) {
+        const withHouses = playersProps(p.id).filter(i => canSellHouse(i).ok);
+        if (withHouses.length) { sellHouse(p, withHouses[0]); continue; }
+        // сначала закладываем дешёвое и не-монопольное, монополии — в последнюю очередь
+        const score = i => (CELLS[i].g && ownsGroup(p.id, CELLS[i].g) ? 10000 : 0) + CELLS[i].price;
+        const mort = playersProps(p.id).filter(i => canMortgage(i).ok).sort((a, b) => score(a) - score(b));
+        if (mort.length) { mortgageProp(p, mort[0]); continue; }
+        break;
+    }
+}
+
+// ============================================================
+//  ХОД ИГРОКА
+// ============================================================
+function aliveCount() { return G.players.filter(p => p.alive).length; }
+
+async function rollTurn(p) {
+    if (p.isBot) {
+        await sleep(700);
+        return rollAnim();
+    }
+    const id = await waitAction([
+        { id: 'roll', label: 'БРОСИТЬ КУБИКИ', big: true },
+        { id: 'manage', label: 'УПРАВЛЕНИЕ', cls: 'ghost' },
+    ]);
+    if (id === 'dead' || !p.alive) return null;
+    return rollAnim();
+}
+
+async function playTurn(p) {
+    G.cur = p;
+    G.doubles = 0;
+    G.canManage = true;
+    updateHUD();
+    log(`— Ход: ${p.name} —`, p.color);
+    if (p.isBot) { await sleep(450); botBuild(p); }
+    else await sleep(150);
+
+    let proceed = true;
+    while (proceed) {
+        proceed = false;
+
+        if (p.inJail) {
+            const r = await jailPhase(p);
+            if (r !== 'normal') { G.canManage = false; return; }
+            // вышел, заплатив/по карточке → обычный бросок ниже
+        }
+
+        let again = true;
+        while (again) {
+            again = false;
+            const rolled = await rollTurn(p);
+            if (!rolled) { G.canManage = false; return; }
+            const [d1, d2] = rolled;
+            log(`${p.name} выбрасывает ${d1} + ${d2}${d1 === d2 ? ' — ДУБЛЬ!' : ''}`, p.color);
+            if (d1 === d2) G.doubles++;
+            if (G.doubles >= 3) {
+                toast('ТРИ ДУБЛЯ ПОДРЯД — В ТЮРЬМУ!');
+                await sendToJail(p);
+                G.canManage = false;
+                return;
+            }
+            await moveAndResolve(p, d1 + d2);
+            if (!p.alive || p.inJail) { G.canManage = false; return; }
+            if (d1 === d2) {
+                again = true;
+                Snd.dub();
+                toast('Дубль — ещё один ход!');
+                if (p.isBot) botBuild(p);
+                else {
+                    // возможность построить перед следующим броском
+                    if (playersProps(p.id).some(i => canBuildOn(i).ok)) {
+                        await waitAction([
+                            { id: 'roll', label: 'БРОСИТЬ СНОВА', big: true },
+                            { id: 'manage', label: 'УПРАВЛЕНИЕ', cls: 'ghost' },
+                        ]);
+                    }
+                }
+                await sleep(400);
+            }
+        }
+    }
+    G.canManage = false;
+}
+
+function nextAlive(from) {
+    let i = from;
+    for (let k = 0; k < G.players.length; k++) {
+        i = (i + 1) % G.players.length;
+        if (G.players[i].alive) return i;
+    }
+    return from;
+}
+
+async function runGame() {
+    while (aliveCount() > 1) {
+        const p = G.players[G.turn];
+        if (!p.alive) { G.turn = nextAlive(G.turn); continue; }
+        try {
+            await playTurn(p);
+        } catch (e) {
+            console.error('Ошибка хода:', e);
+            await sleep(300);
+        }
+        if (aliveCount() <= 1) break;
+        const nx = nextAlive(G.turn);
+        if (nx <= G.turn) G.round++;
+        G.turn = nx;
+        await sleep(350);
+    }
+    const w = G.players.find(x => x.alive);
+    if (w) {
+        Snd.win();
+        $('#winnerText').textContent = `ПОБЕДИТЕЛЬ: ${w.name.toUpperCase()}!`;
+        $('#winnerSub').textContent = `Капитал: $${fmt(w.money)} · раундов: ${G.round}`;
+        $('#winScreen').style.display = 'flex';
+        log(`🏆 ${w.name} побеждает в игре!`, w.color);
+    }
+}
+
+// ============================================================
+//  ЭКРАН НАСТРОЙКИ
+// ============================================================
+let setupCount = 4;
+const setupTypes = ['human', 'bot', 'bot', 'bot', 'bot', 'bot'];
+const defaultNames = ['Игрок', 'Бот 1', 'Бот 2', 'Бот 3', 'Бот 4', 'Бот 5'];
+
+function renderSetup() {
+    $('#cntVal').textContent = setupCount;
+    const box = $('#plist');
+    box.innerHTML = '';
+    for (let i = 0; i < setupCount; i++) {
+        const row = document.createElement('div');
+        row.className = 'pset';
+        row.style.color = PLAYER_COLORS[i];
+        const isBot = setupTypes[i] === 'bot';
+        row.innerHTML = `<span class="pdot"></span>
+            <input maxlength="12" value="${defaultNames[i]}" data-i="${i}">
+            <button class="tgl ${isBot ? 'bot' : ''}" data-i="${i}">${isBot ? 'БОТ' : 'ЧЕЛОВЕК'}</button>`;
+        row.querySelector('input').addEventListener('input', e => { defaultNames[i] = e.target.value; });
+        row.querySelector('.tgl').addEventListener('click', e => {
+            Snd.click();
+            setupTypes[i] = setupTypes[i] === 'bot' ? 'human' : 'bot';
+            renderSetup();
+        });
+        box.appendChild(row);
+    }
+}
+$('#cntMinus').addEventListener('click', () => { Snd.click(); setupCount = Math.max(2, setupCount - 1); renderSetup(); });
+$('#cntPlus').addEventListener('click', () => { Snd.click(); setupCount = Math.min(6, setupCount + 1); renderSetup(); });
+
+$('#btnStart').addEventListener('click', () => {
+    Snd.buy();
+    G.players = [];
+    for (let i = 0; i < setupCount; i++) {
+        G.players.push({
+            id: i,
+            name: (defaultNames[i] || `Игрок ${i + 1}`).trim() || `Игрок ${i + 1}`,
+            color: PLAYER_COLORS[i],
+            isBot: setupTypes[i] === 'bot',
+            money: 1500,
+            pos: 0,
+            vx: 0, vy: 0,
+            inJail: false,
+            jailTurns: 0,
+            jailCards: [],
+            alive: true,
+        });
+    }
+    G.owner = Array(40).fill(-1);
+    G.houses = Array(40).fill(0);
+    G.mortgaged = Array(40).fill(false);
+    G.decks = mkDecks();
+    G.turn = 0; G.round = 1; G.doubles = 0; G.dice = [1, 1];
+    G.started = true;
+    G.cur = G.players[0];
+    G.players.forEach(p => { p.vx = slotOf(p).x; p.vy = slotOf(p).y; });
+    $('#setup').style.display = 'none';
+    $('#game').style.display = 'flex';
+    layout();
+    updateHUD();
+    log('Игра началась! Стартовый капитал каждого — $1500', '#0ff');
+    toast('Игра началась!');
+    runGame();
+});
+
+// ============================================================
+//  ПРАВИЛА / КНОПКИ
+// ============================================================
+const RULES_HTML = `<div class="rules scrollbox">
+<h3>Цель игры</h3>
+<p>Разорить всех соперников и остаться единственным не обанкротившимся игроком.</p>
+<h3>Подготовка</h3>
+<ul><li>Игроки: от 2 до 6.</li><li>Стартовый капитал: $1500 каждому.</li><li>В банке 32 дома и 12 отелей.</li></ul>
+<h3>Ход игры</h3>
+<ul><li>Бросайте 2 кубика и двигайтесь по часовой стрелке.</li>
+<li>Дубль — ещё один ход. Три дубля подряд — тюрьма.</li>
+<li>Проходя или останавливаясь на клетке «Вперёд», получайте $200.</li></ul>
+<h3>Недвижимость</h3>
+<ul><li>Свободный участок можно купить по цене на поле или выставить на аукцион.</li>
+<li>Монополия (вся цветовая группа) удваивает базовую аренду и позволяет строить.</li>
+<li>Максимум 4 дома на участке, затем отель.</li>
+<li>Попал на чужое — плати аренду (заложенное аренду не собирает).</li>
+<li>Залог: банк даёт половину цены (дома продаются банку за полцены). Выкуп — половина цены +10%.</li></ul>
+<h3>Тюрьма</h3>
+<ul><li>Попасть можно: клетка «В тюрьму», карточка, три дубля.</li>
+<li>Выход: заплатить $50 до броска, карточка «Освободитесь из тюрьмы», либо дубль за 3 попытки. После третьей неудачи — $50 и ход.</li>
+<li>Из тюрьмы можно собирать аренду, строить и закладывать.</li></ul>
+<h3>Банкротство</h3>
+<p>Если денег на долг нет даже после залога и продажи домов — вы банкрот и выбываете. Имущество переходит к кредитору (или банку).</p>
+</div>`;
+
+function rulesModal() {
+    showModal(`<h2>ПРАВИЛА</h2>${RULES_HTML}
+    <div class="mbtns"><button class="neon" id="mRl">ЗАКРЫТЬ</button></div>`);
+    $('#mRl').onclick = closeModal;
+}
+$('#btnRules').addEventListener('click', () => { Snd.click(); rulesModal(); });
+$('#btnRules0').addEventListener('click', () => { Snd.click(); rulesModal(); });
+
+$('#btnLog').addEventListener('click', () => { Snd.click(); $('#logPanel').classList.toggle('open'); });
+
+$('#btnSnd').addEventListener('click', () => {
+    Snd.on = !Snd.on;
+    localStorage.setItem('mono_snd', Snd.on ? '1' : '0');
+    $('#btnSnd').textContent = Snd.on ? '🔊' : '🔇';
+    if (Snd.on) Snd.click();
+});
+$('#btnSnd').textContent = Snd.on ? '🔊' : '🔇';
+
+$('#btnRestart').addEventListener('click', () => {
+    showModal(`<h2>НОВАЯ ИГРА?</h2><p class="dim">Текущая партия будет завершена.</p>
+    <div class="mbtns">
+        <button class="danger" id="mYes">ДА, ЗАНОВО</button>
+        <button class="neon" id="mNo">ОТМЕНА</button>
+    </div>`);
+    $('#mYes').onclick = () => location.reload();
+    $('#mNo').onclick = closeModal;
+});
+
+// клавиатура: пробел — бросок
+window.addEventListener('keydown', e => {
+    if (e.code === 'Space' && actionResolve && !modalOpen()) {
+        const btn = $('#actions').querySelector('.big');
+        if (btn) btn.click();
+    }
+});
+
+renderSetup();
+
+</script>
+</body>
+</html>
