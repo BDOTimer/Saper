@@ -865,3 +865,24 @@ function computeParams1(star, planetIndex, opts = {})
     },
   };
 })();
+
+
+///----------------------------------------------------------------------------|
+/// Все планеты в текущей Звёздной системе.
+///   <--- galaxy.js
+///----------------------------------------------------------------------------:
+class PlanetsManager
+{
+    #planets = []; // массив хэндлов PLANET.generate(...)
+
+     get planets(){ return this.#planets; }
+
+    constructor(star)
+    {
+       
+    }
+
+
+}
+
+window.planetsManager = new PlanetsManager(GALAXY.getCurrentStar());

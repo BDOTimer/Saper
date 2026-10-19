@@ -25,7 +25,7 @@ class ModelFactory
     static MODELS = [
 { id: 0, path: "./glb-models/shuttle-g1.glb",  poolSize: 30, scale: 0.5 },
 { id: 1, path: "./glb-models/station-g1.glb",  poolSize:  2, scale: 100 },
-{ id: w2, path: "./glb-models/ss-1.glb"      ,  poolSize:  2, scale: 100 },
+{ id: 2, path: "./glb-models/ss-1.glb"      ,  poolSize:  2, scale: 100 },
     ];
 
     /**

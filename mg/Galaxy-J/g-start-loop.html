@@ -730,7 +730,8 @@ window.HUD = HUD;
     //  Система текущей звезды: светило + планеты
     //  Использует StarA и PLANET из ./galaxy/star.js и ./galaxy/planet.js
     // ------------------------------------------------------------------------:
-    const planets = []; // массив хэндлов PLANET.generate(...)
+    // массив хэндлов PLANET.generate(...)
+    const planets = window.planetsManager.planets;
     let currentStarHandle    = null;
     let currentStationHandle = null;
 
