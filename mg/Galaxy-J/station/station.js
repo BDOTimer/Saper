@@ -181,11 +181,16 @@ class Station
         const group = new THREE.Group();
         const PI2 = Math.PI / 2;
 
+        const matTex = this.#getTextureTor(); /// map: matTex.ringTex,
+
         // ---- Ядро ----
         const coreMat = new THREE.MeshStandardMaterial({
-            color: params.hullColor,
+            map: matTex.ringTex,
+            color: 0x000030,                     // очень тёмный синий базовый
             metalness: 0.85,
             roughness: 0.35,
+            emissive: 0x222244,                  // тёмно-синий emissive
+            emissiveIntensity: 0.2,              // множитель (по умолчанию 1)
         });
         const core = new THREE.Mesh(
             new THREE.IcosahedronGeometry(params.coreRadius, 1),
@@ -193,12 +198,14 @@ class Station
         );
         group.add(core);
 
-        // ---- Внешнее кольцо ----
-        const ringMat = new THREE.MeshStandardMaterial({
-            color: params.hullColor.clone().offsetHSL(0, 0, 0.1),
-            metalness: 0.9,
-            roughness: 0.3,
-        });
+        // ---- Внешнее кольцо ---- 
+        const ringMat = matTex.ringMat;
+        //              new THREE.MeshStandardMaterial({
+        //     color: params.hullColor.clone().offsetHSL(0, 0, 0.1),
+        //     metalness: 0.9,
+        //     roughness: 0.3,
+        // });
+
         const ring = new THREE.Mesh(
             new THREE.TorusGeometry(params.ringRadius, params.ringTube, 12, 48),
             ringMat,
@@ -208,6 +215,7 @@ class Station
 
         // ---- Спицы ----
         const spokeMat = new THREE.MeshStandardMaterial({
+            map: matTex.ringTex,
             color: params.accentColor,
             metalness: 0.7,
             roughness: 0.4,
@@ -586,6 +594,34 @@ class Station
                    `${pos.y.toFixed(0)}, ` + 
                    `${pos.z.toFixed(0)}) }`
         );
+    }
+
+    #getTextureTor()
+    {
+        const ringTex = new THREE.TextureLoader().load("./res/tor-1.jpg");
+
+        // Оборачивание — повторяем по кругу
+        ringTex.wrapS = THREE.RepeatWrapping;
+        ringTex.wrapT = THREE.RepeatWrapping;
+
+        // Сколько раз текстура уложится вдоль кольца и поперёк трубы
+        ringTex.repeat.set(12, 2);
+
+        // Цветовой режим (если текстура цветная)
+        ringTex.colorSpace = THREE.SRGBColorSpace;
+
+        // Анизотропия — чтобы под углом не мылилось
+        //ringTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+        const ringMat = new THREE.MeshStandardMaterial({
+            map: ringTex,
+            metalness: 0.9,
+            roughness: 0.3,
+            color: 0xffffff,            // белый, чтобы не тонировать текстуру
+            // color: params.hullColor, // если хотите подкрасить
+        });
+
+        return { ringMat, ringTex };
     }
 }
 
