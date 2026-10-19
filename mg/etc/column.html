@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Columns — неоновые камни</title>
+    <link rel="icon" type="image/png" href="res/favicon-64.png" sizes="64x64">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a14;
+            font-family: 'Courier New', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            padding: 70px 10px 30px;
+            touch-action: none;
+        }
+
+        .hud {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: clamp(12px, 3.4vw, 17px);
+            text-shadow: 0 0 10px #0ff;
+            white-space: nowrap;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 96vw;
+        }
+
+        .hud .val { color: #0ff; text-shadow: 0 0 10px #0ff; }
+
+        .status {
+            position: absolute;
+            top: 48px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0ff;
+            font-size: clamp(11px, 3vw, 16px);
+            letter-spacing: 1.5px;
+            text-shadow: 0 0 12px #0ff;
+            white-space: nowrap;
+            z-index: 20;
+            pointer-events: none;
+            max-width: 96vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ===== Игровое поле ===== */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(13, 1fr);
+            gap: 2px;
+            width: min(70vw, 55vh, 420px);
+            aspect-ratio: 7 / 13;
+            padding: clamp(4px, 1.2vw, 8px);
+            background: rgba(0, 255, 255, 0.04);
+            border: 2px solid #0ff;
+            border-radius: 12px;
+            box-shadow:
+                0 0 30px rgba(0, 255, 255, 0.4),
+                inset 0 0 30px rgba(0, 255, 255, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cell {
+            border-radius: 6px;
+            background: rgba(0, 255, 255, 0.04);
+            border: 1px solid rgba(0, 255, 255, 0.12);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0;
+        }
+
+        .cell .jewel {
+            width: 82%;
+            height: 82%;
+            border-radius: 8px;
+            transition: transform 0.12s ease, box-shadow 0.15s ease;
+            box-shadow: inset 0 0 12px rgba(255,255,255,0.15), 0 0 8px currentColor;
+        }
+
+        /* цвета камней */
+        .j0 { color: #0ff; background: #0ff; }
+        .j1 { color: #f0f; background: #f0f; }
+        .j2 { color: #fc0; background: #fc0; }
+        .j3 { color: #0f0; background: #0f0; }
+        .j4 { color: #f44; background: #f44; }
+        .j5 { color: #08f; background: #08f; }
+        .j6 { color: #fff; background: #fff; }
+
+        .jewel.magic {
+            animation: magicPulse 0.7s ease-in-out infinite;
+        }
+        @keyframes magicPulse {
+            0%, 100% { box-shadow: inset 0 0 12px #fff, 0 0 10px #fff; transform: scale(1); }
+            50%      { box-shadow: inset 0 0 18px #fff, 0 0 22px #fff; transform: scale(1.08); }
+        }
+
+        .jewel.flash {
+            animation: flashAnim 0.18s ease-in-out 2;
+        }
+        @keyframes flashAnim {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.2; transform: scale(1.25); }
+        }
+
+        /* Падающая колонна */
+        .falling-col {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: none;
+        }
+        .falling-col .jewel {
+            width: 100%;
+            border-radius: 6px;
+        }
+
+        .corner-btn {
+            position: absolute;
+            top: 10px;
+            padding: 7px 14px;
+            font-family: inherit;
+            font-size: clamp(12px, 3vw, 15px);
+            background: rgba(0, 255, 255, 0.15);
+            color: #0ff;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+            text-decoration: none;
+            z-index: 25;
+            user-select: none;
+            -webkit-user-select: none;
+            line-height: 1;
+            transition: all 0.15s ease;
+        }
+        .corner-btn:active { background: rgba(0, 255, 255, 0.4); color: #000; }
+        .back-btn { left: 10px; }
+        .fs-btn   { right: 10px; display: inline-flex; align-items: center; gap: 6px; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: clamp(14px, 3vh, 24px);
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 96vw;
+        }
+
+        .btn {
+            padding: clamp(10px, 2.5vh, 14px) clamp(14px, 3.6vw, 22px);
+            font-family: inherit;
+            font-size: clamp(12px, 3.2vw, 16px);
+            letter-spacing: 2px;
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+            transition: all 0.15s ease;
+        }
+        .btn:active { transform: scale(0.96); box-shadow: 0 0 30px rgba(0, 255, 255, 0.9); }
+        .btn.secondary {
+            background: transparent;
+            color: #0ff;
+            border: 2px solid #0ff;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+        }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+        .mobile-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .mobile-controls .btn {
+            min-width: 54px;
+            font-size: 20px;
+            letter-spacing: 0;
+            padding: 10px 0;
+        }
+
+        .result-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 30;
+            text-align: center;
+            padding: 20px;
+            gap: 18px;
+        }
+        .result-screen h2 {
+            color: #0ff;
+            font-size: clamp(22px, 7vw, 34px);
+            text-shadow: 0 0 20px #0ff;
+            letter-spacing: 3px;
+        }
+        .result-screen p {
+            color: #fff;
+            font-size: clamp(14px, 4vw, 18px);
+            text-shadow: 0 0 10px #0ff;
+        }
+        .result-screen button {
+            padding: 14px 30px;
+            font-family: inherit;
+            font-size: clamp(15px, 4vw, 19px);
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+<a href="../../index.html" class="corner-btn back-btn">← Меню</a>
+<button type="button" class="corner-btn fs-btn" id="btnFullscreen">
+    <span id="fsIcon">⛶</span>
+</button>
+
+<div class="game-wrapper">
+    <div class="hud">
+        <span>Счёт: <span class="val" id="score">0</span></span>
+        <span>Уровень: <span class="val" id="level">1</span></span>
+        <span>Линии: <span class="val" id="lines">0</span></span>
+    </div>
+    <div class="status" id="status">Стрелки ← →, ↑ — смена, ↓ — ускорить</div>
+
+    <div class="board" id="board"></div>
+
+    <div class="mobile-controls">
+        <button class="btn secondary" id="btnLeft">◀</button>
+        <button class="btn secondary" id="btnCycle">↻</button>
+        <button class="btn secondary" id="btnRight">▶</button>
+        <button class="btn secondary" id="btnDown">▼</button>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="newGame">НОВАЯ ИГРА</button>
+    </div>
+
+    <div class="result-screen" id="resultScreen">
+        <h2>ИГРА ОКОНЧЕНА</h2>
+        <p id="resultStats"></p>
+        <button onclick="newGame()">Играть снова</button>
+    </div>
+</div>
+
+<script>
+// ============================================================
+//                    ЗВУК НАЖАТИЙ
+// ============================================================
+    const CLICK_SRC = 'res/dzin-1.mp3';
+    const CLICK_POOL_SIZE = 4;
+    const clickPool = [];
+    let clickPoolIdx = 0;
+    let audioUnlocked = false;
+
+    function initClickSound() {
+        for (let i = 0; i < CLICK_POOL_SIZE; i++) {
+            const a = new Audio(CLICK_SRC);
+            a.preload = 'auto';
+            a.volume = 0.3;
+            clickPool.push(a);
+        }
+    }
+    function playClick() {
+        if (!audioUnlocked) return;
+        const a = clickPool[clickPoolIdx];
+        clickPoolIdx = (clickPoolIdx + 1) % CLICK_POOL_SIZE;
+        try { a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+    }
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        audioUnlocked = true;
+        const a = new Audio(CLICK_SRC);
+        a.volume = 0;
+        const p = a.play(); if (p && p.catch) p.catch(() => {});
+        setTimeout(() => { try { a.pause(); } catch (e) {} }, 50);
+    }
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+    initClickSound();
+
+    // ============================================================
+    //                       КОНСТАНТЫ
+    // ============================================================
+    const COLS = 7;
+    const ROWS = 13;
+    const FALL_COL = 3;          // длина падающей колонны
+    const NUM_COLORS = 5;        // сколько цветов использовать
+    const MAGIC_CHANCE = 0.08;   // шанс магического камня
+
+    const DEFAULT_STATUS = 'Стрелки: ← →, ↑ : смена, ↓ : ускорить';
+
+    const COLORS = [
+        { cls: 'j0' }, { cls: 'j1' }, { cls: 'j2' }, { cls: 'j3' }, { cls: 'j4' },
+        { cls: 'j5' }, { cls: 'j6' }
+    ];
+
+    // скорость падения по уровням (мс на клетку)
+    function dropInterval(level) {
+        return Math.max(90, 700 - (level - 1) * 55);
+    }
+    function linesForLevel(level) {
+        return 10; // каждые 10 линий — новый уровень
+    }
+
+    // ============================================================
+    //                       DOM
+    // ============================================================
+    const boardEl     = document.getElementById('board');
+    const scoreEl     = document.getElementById('score');
+    const levelEl     = document.getElementById('level');
+    const linesEl     = document.getElementById('lines');
+    const statusEl    = document.getElementById('status');
+    const resultScr   = document.getElementById('resultScreen');
+    const resultStats = document.getElementById('resultStats');
+
+    // ============================================================
+    //                       СОСТОЯНИЕ
+    // ============================================================
+    // grid[r][c] = null или { color: 0..N, magic: bool }
+    let grid = [];
+    let cells = [];              // DOM-ячейки
+    let score = 0;
+    let lines = 0;
+    let level = 1;
+
+    let falling = null;          // { col, colors: [c0, c1, c2] (сверху вниз), magicIdx }
+    let fallTimer = null;
+    let gameOver = false;
+    let paused = false;          // на время анимации/обработки
+    let animLock = false;
+
+    // ============================================================
+    //                       ПОЛЕ
+    // ============================================================
+    function buildBoard() {
+        boardEl.innerHTML = '';
+        cells = [];
+        for (let r = 0; r < ROWS; r++) {
+            const row = [];
+            for (let c = 0; c < COLS; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                boardEl.appendChild(cell);
+                row.push(cell);
+            }
+            cells.push(row);
+        }
+    }
+
+    function makeJewelEl(color, magic) {
+        const j = document.createElement('div');
+        j.className = 'jewel ' + COLORS[color].cls + (magic ? ' magic' : '');
+        return j;
+    }
+
+    function renderGrid() {
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const cell = cells[r][c];
+                cell.innerHTML = '';
+                const g = grid[r][c];
+                if (g) {
+                    cell.appendChild(makeJewelEl(g.color, g.magic));
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    //                  ПАДАЮЩАЯ КОЛОННА (визуал)
+    // ============================================================
+    let fallingEl = null;
+
+    function createFallingEl() {
+        if (fallingEl) fallingEl.remove();
+        fallingEl = document.createElement('div');
+        fallingEl.className = 'falling-col';
+        boardEl.appendChild(fallingEl);
+        updateFallingEl();
+    }
+
+    function updateFallingEl() {
+        if (!fallingEl || !falling) return;
+        fallingEl.innerHTML = '';
+        const cellW = cells[0][0].getBoundingClientRect().width + 2; // gap
+        const cellH = cells[0][0].getBoundingClientRect().height + 2;
+        // Позиция: колонка falling.col, верх на row = falling.row (виртуальная)
+        const rect = boardEl.getBoundingClientRect();
+        const cell0 = cells[0][falling.col].getBoundingClientRect();
+        const top = cell0.top - rect.top + (falling.row * cellH);
+        fallingEl.style.left = (cell0.left - rect.left) + 'px';
+        fallingEl.style.top = top + 'px';
+        fallingEl.style.width = cellW + 'px';
+        fallingEl.style.height = (cellH * FALL_COL) + 'px';
+        for (let i = 0; i < FALL_COL; i++) {
+            const j = makeJewelEl(falling.colors[i], falling.magicIdx === i);
+            j.style.width = '100%';
+            j.style.height = (cellH - 4) + 'px';
+            fallingEl.appendChild(j);
+        }
+    }
+
+    function removeFallingEl() {
+        if (fallingEl) { fallingEl.remove(); fallingEl = null; }
+    }
+
+    // ============================================================
+    //                  СПАВН И УПРАВЛЕНИЕ
+    // ============================================================
+    function spawnFalling() {
+        if (gameOver) return;
+        // верхние 3 строки должны быть свободны
+        for (let r = 0; r < FALL_COL; r++) {
+            if (grid[r][FALL_COL]) {
+                endGame();
+                return;
+            }
+        }
+        const colors = [];
+        for (let i = 0; i < FALL_COL; i++) {
+            colors.push(Math.floor(Math.random() * NUM_COLORS));
+        }
+        let magicIdx = -1;
+        if (Math.random() < MAGIC_CHANCE) {
+            magicIdx = Math.floor(Math.random() * FALL_COL);
+        }
+        falling = {
+            col: Math.floor(COLS / 2),
+            row: 0,             // виртуальная верхняя позиция (0 = верх поля)
+            colors,
+            magicIdx
+        };
+        createFallingEl();
+        scheduleFall();
+    }
+
+    function scheduleFall() {
+        clearTimeout(fallTimer);
+        if (!falling || gameOver || paused) return;
+        fallTimer = setTimeout(() => {
+            if (!falling || gameOver || paused) return;
+            stepDown();
+        }, dropInterval(level));
+    }
+
+    function stepDown() {
+        if (!falling) return;
+        // проверяем, можно ли сдвинуть вниз
+        const nextRow = falling.row + 1;
+        // колонна занимает виртуальные строки nextRow .. nextRow+FALL_COL-1
+        const bottomRow = nextRow + FALL_COL - 1;
+        if (bottomRow >= ROWS) {
+            land();
+            return;
+        }
+        // проверяем, свободна ли нижняя клетка
+        if (grid[bottomRow][falling.col]) {
+            land();
+            return;
+        }
+        falling.row = nextRow;
+        updateFallingEl();
+        scheduleFall();
+    }
+
+    function hardDrop() {
+        if (!falling || gameOver || paused) return;
+        clearTimeout(fallTimer);
+        while (true) {
+            const nextRow = falling.row + 1;
+            const bottomRow = nextRow + FALL_COL - 1;
+            if (bottomRow >= ROWS || grid[bottomRow][falling.col]) break;
+            falling.row = nextRow;
+        }
+        updateFallingEl();
+        land();
+    }
+
+    function moveFalling(dc) {
+        if (!falling || gameOver || paused || animLock) return;
+        const nc = falling.col + dc;
+        if (nc < 0 || nc >= COLS) return;
+        // проверим, что в целевой колонке нет камней на виртуальных строках
+        for (let r = 0; r < FALL_COL; r++) {
+            const gr = falling.row + r;
+            if (gr >= 0 && gr < ROWS && grid[gr][nc]) return;
+        }
+        falling.col = nc;
+        updateFallingEl();
+        playClick();
+    }
+
+    function cycleFalling() {
+        if (!falling || gameOver || paused || animLock) return;
+        // сдвиг вниз: [a,b,c] -> [c,a,b]
+        const last = falling.colors.pop();
+        falling.colors.unshift(last);
+        // magicIdx тоже сдвигается
+        if (falling.magicIdx >= 0) {
+            falling.magicIdx = (falling.magicIdx + 1) % FALL_COL;
+        }
+        updateFallingEl();
+        playClick();
+    }
+
+    // ============================================================
+    //                  ПРИЗЕМЛЕНИЕ И ЛИНИИ
+    // ============================================================
+    function land() {
+        if (!falling) return;
+        removeFallingEl();
+        const col = falling.col;
+
+        // Определяем, куда встаёт каждый камень
+        // Верх колонны = falling.row, занимает строки falling.row .. falling.row+FALL_COL-1
+        // Находим для каждого камня (сверху вниз) первую свободную клетку снизу
+        // На самом деле все 3 камня падают в колонку: верхний камень встаёт выше,
+        // нижний — ниже. Ищем базовую строку (низ колонны).
+        let baseRow = ROWS - 1;
+        // Найдём самый низ, где ещё можно разместить
+        for (let r = ROWS - 1; r >= 0; r--) {
+            if (!grid[r][col]) { baseRow = r; break; }
+        }
+        // Камни займут строки baseRow, baseRow-1, baseRow-2 (снизу вверх)
+        // falling.colors[0] — верхний, [1] — средний, [2] — нижний
+        const positions = [];
+        for (let i = 0; i < FALL_COL; i++) {
+            const r = baseRow - (FALL_COL - 1 - i);
+            if (r < 0) {
+                // не помещается — game over
+                endGame();
+                return;
+            }
+            positions.push({ r, c: col, color: falling.colors[i], magic: falling.magicIdx === i });
+        }
+
+        // магия: если есть магический камень, уничтожаем все камни того цвета,
+        // с которым он соприкоснулся снизу (или на поле — по ТЗ: «того цвета,
+        // с которым соприкоснулся снизу»). Если снизу пусто — ничего не делает.
+        let magicColorToClear = -1;
+        for (let i = 0; i < positions.length; i++) {
+            const p = positions[i];
+            if (p.magic) {
+                // смотрим, что под ним (в момент приземления)
+                // Сначала разместим остальные, потом проверим
+                // Найдём первый камень ниже p.r в этой колонке
+                // (учитывая только те, что уже стоят или встанут)
+                // Проще: сначала размещаем все, потом смотрим
+                // Запомним индекс
+                p._isMagic = true;
+            }
+        }
+
+        // Размещаем камни
+        for (const p of positions) {
+            grid[p.r][p.c] = { color: p.color, magic: p.magic };
+        }
+
+        // Магия: ищем под магическим камнем первый непустой — его цвет уничтожаем
+        for (let i = 0; i < positions.length; i++) {
+            const p = positions[i];
+            if (!p.magic) continue;
+            // ищем ниже
+            for (let r = p.r + 1; r < ROWS; r++) {
+                if (grid[r][p.c]) {
+                    magicColorToClear = grid[r][p.c].color;
+                    break;
+                }
+            }
+            break; // максимум один магический за колонну
+        }
+
+        falling = null;
+        renderGrid();
+
+        if (magicColorToClear >= 0) {
+            // вспышка и удаление всех камней этого цвета
+            flashAndClearColor(magicColorToClear);
+        } else {
+            processMatches();
+        }
+    }
+
+    function flashAndClearColor(color) {
+        animLock = true;
+        paused = true;
+        const toClear = [];
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const g = grid[r][c];
+                if (g && g.color === color) {
+                    toClear.push({ r, c });
+                    const j = cells[r][c].querySelector('.jewel');
+                    if (j) j.classList.add('flash');
+                }
+            }
+        }
+        setTimeout(() => {
+            for (const { r, c } of toClear) grid[r][c] = null;
+            renderGrid();
+            applyGravity();
+            // после гравитации — обычная проверка
+            processMatches();
+        }, 380);
+    }
+
+    // ============================================================
+    //                  ГРАВИТАЦИЯ
+    // ============================================================
+    function applyGravity() {
+        for (let c = 0; c < COLS; c++) {
+            let write = ROWS - 1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (grid[r][c]) {
+                    if (write !== r) {
+                        grid[write][c] = grid[r][c];
+                        grid[r][c] = null;
+                    }
+                    write--;
+                }
+            }
+        }
+        renderGrid();
+    }
+
+    // ============================================================
+    //                  ПОИСК СОВПАДЕНИЙ
+    // ============================================================
+    // Возвращает Set индексов "r,c" всех камней в линиях >=3
+    function findMatches() {
+        const matched = new Set();
+
+        // горизонтали
+        for (let r = 0; r < ROWS; r++) {
+            let runStart = 0;
+            for (let c = 1; c <= COLS; c++) {
+                const same = c < COLS && grid[r][c] && grid[r][runStart] &&
+                             grid[r][c].color === grid[r][runStart].color &&
+                             !(grid[r][c].magic || grid[r][runStart].magic);
+                if (!same) {
+                    const len = c - runStart;
+                    if (len >= 3 && grid[r][runStart] && !grid[r][runStart].magic) {
+                        for (let k = runStart; k < c; k++) matched.add(r + ',' + k);
+                    }
+                    runStart = c;
+                }
+            }
+        }
+
+        // вертикали
+        for (let c = 0; c < COLS; c++) {
+            let runStart = 0;
+            for (let r = 1; r <= ROWS; r++) {
+                const same = r < ROWS && grid[r][c] && grid[runStart][c] &&
+                             grid[r][c].color === grid[runStart][c].color &&
+                             !(grid[r][c].magic || grid[runStart][c].magic);
+                if (!same) {
+                    const len = r - runStart;
+                    if (len >= 3 && grid[runStart][c] && !grid[runStart][c].magic) {
+                        for (let k = runStart; k < r; k++) matched.add(k + ',' + c);
+                    }
+                    runStart = r;
+                }
+            }
+        }
+
+        // диагонали ↘
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (!grid[r][c] || grid[r][c].magic) continue;
+                const col = grid[r][c].color;
+                let len = 1;
+                while (r + len < ROWS && c + len < COLS &&
+                       grid[r + len][c + len] && !grid[r + len][c + len].magic &&
+                       grid[r + len][c + len].color === col) len++;
+                if (len >= 3) {
+                    for (let k = 0; k < len; k++) matched.add((r + k) + ',' + (c + k));
+                }
+            }
+        }
+
+        // диагонали ↙
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (!grid[r][c] || grid[r][c].magic) continue;
+                const col = grid[r][c].color;
+                let len = 1;
+                while (r - len >= 0 && c + len < COLS &&
+                       grid[r - len][c + len] && !grid[r - len][c + len].magic &&
+                       grid[r - len][c + len].color === col) len++;
+                if (len >= 3) {
+                    for (let k = 0; k < len; k++) matched.add((r - k) + ',' + (c + k));
+                }
+            }
+        }
+
+        return matched;
+    }
+
+    function processMatches(chain) {
+        chain = chain || 0;
+        const matched = findMatches();
+        if (matched.size === 0) {
+            // всё устоялось — спавним новую колонну
+            animLock = false;
+            paused = false;
+            checkLevelUp();
+            spawnFalling();
+            return;
+        }
+
+        animLock = true;
+        paused = true;
+
+        // подсветка
+        for (const key of matched) {
+            const [r, c] = key.split(',').map(Number);
+            const j = cells[r][c].querySelector('.jewel');
+            if (j) j.classList.add('flash');
+        }
+
+        // очки
+        const base = matched.size * 10 * Math.pow(2, chain);
+        score += base;
+        lines += Math.floor(matched.size / 3);
+        scoreEl.textContent = score;
+        linesEl.textContent = lines;
+
+        setTimeout(() => {
+            for (const key of matched) {
+                const [r, c] = key.split(',').map(Number);
+                grid[r][c] = null;
+            }
+            renderGrid();
+            applyGravity();
+            // каскад
+            setTimeout(() => processMatches(chain + 1), 120);
+        }, 260);
+    }
+
+    // ============================================================
+    //                  УРОВНИ И КОНЕЦ
+    // ============================================================
+    function checkLevelUp() {
+        const newLevel = Math.floor(lines / linesForLevel(1)) + 1;
+        if (newLevel > level) {
+            level = Math.min(newLevel, 15);
+            levelEl.textContent = level;
+            showStatus('Уровень ' + level + '!', 1500);
+        }
+    }
+
+    function endGame() {
+        gameOver = true;
+        clearTimeout(fallTimer);
+        removeFallingEl();
+        resultStats.textContent = `Счёт: ${score} · Линий: ${lines} · Уровень: ${level}`;
+        resultScr.style.display = 'flex';
+    }
+
+    // ============================================================
+    //                  НОВАЯ ИГРА
+    // ============================================================
+    function newGame() {
+        clearTimeout(fallTimer);
+        removeFallingEl();
+        gameOver = false;
+        paused = false;
+        animLock = false;
+        falling = null;
+        grid = [];
+        for (let r = 0; r < ROWS; r++) {
+            grid.push(new Array(COLS).fill(null));
+        }
+        score = 0;
+        lines = 0;
+        level = 1;
+        scoreEl.textContent = '0';
+        linesEl.textContent = '0';
+        levelEl.textContent = '1';
+        resultScr.style.display = 'none';
+        renderGrid();
+        showStatus(DEFAULT_STATUS, 0);
+        spawnFalling();
+    }
+
+    // ============================================================
+    //                  СТАТУС
+    // ============================================================
+    let statusResetTimer = null;
+    function showStatus(text, autoResetMs) {
+        statusEl.textContent = text;
+        if (statusResetTimer) clearTimeout(statusResetTimer);
+        if (autoResetMs > 0) {
+            statusResetTimer = setTimeout(() => {
+                if (!gameOver) statusEl.textContent = DEFAULT_STATUS;
+            }, autoResetMs);
+        }
+    }
+
+    // ============================================================
+    //                  УПРАВЛЕНИЕ
+    // ============================================================
+    function onKey(e) {
+        if (gameOver) return;
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); moveFalling(-1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); moveFalling(1); }
+        if (e.key === 'ArrowUp')    { e.preventDefault(); cycleFalling(); }
+        if (e.key === 'ArrowDown')  { e.preventDefault(); hardDrop(); }
+    }
+    document.addEventListener('keydown', onKey);
+
+    // кнопки для мобильных
+    const btnLeft  = document.getElementById('btnLeft');
+    const btnRight = document.getElementById('btnRight');
+    const btnCycle = document.getElementById('btnCycle');
+    const btnDown  = document.getElementById('btnDown');
+
+    btnLeft.addEventListener('click', () => moveFalling(-1));
+    btnRight.addEventListener('click', () => moveFalling(1));
+    btnCycle.addEventListener('click', cycleFalling);
+    btnDown.addEventListener('click', hardDrop);
+
+    // свайпы (минимально)
+    let touchStartX = null, touchStartY = null;
+    boardEl.addEventListener('touchstart', e => {
+        const t = e.touches[0];
+        touchStartX = t.clientX; touchStartY = t.clientY;
+    }, { passive: true });
+    boardEl.addEventListener('touchend', e => {
+        if (touchStartX === null) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 30) moveFalling(1);
+            else if (dx < -30) moveFalling(-1);
+        } else {
+            if (dy > 50) hardDrop();
+            else if (dy < -50) cycleFalling();
+        }
+        touchStartX = null; touchStartY = null;
+    }, { passive: true });
+
+    // ============================================================
+    //                  ПОЛНЫЙ ЭКРАН
+    // ============================================================
+    const fsBtn   = document.getElementById('btnFullscreen');
+    const fsIcon  = document.getElementById('fsIcon');
+    const fsTarget = document.documentElement;
+
+    function isFullscreen() {
+        return document.fullscreenElement ||
+               document.webkitFullscreenElement ||
+               document.msFullscreenElement;
+    }
+    function updateFsIcon() {
+        fsIcon.textContent = isFullscreen() ? '⤡' : '⛶';
+    }
+    function toggleFullscreen() {
+        if (!isFullscreen()) {
+            const req = fsTarget.requestFullscreen ||
+                        fsTarget.webkitRequestFullscreen ||
+                        fsTarget.msRequestFullscreen;
+            if (req) {
+                const p = req.call(fsTarget);
+                if (p && p.catch) p.catch(() => {});
+            }
+        } else {
+            const exit = document.exitFullscreen ||
+                         document.webkitExitFullscreen ||
+                         document.msExitFullscreen;
+            if (exit) {
+                const p = exit.call(document);
+                if (p && p.catch) p.catch(() => {});
+            }
+        }
+    }
+    fsBtn.addEventListener('click', toggleFullscreen);
+    fsBtn.addEventListener('pointerdown', e => e.stopPropagation());
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
+        .forEach(evt => document.addEventListener(evt, updateFsIcon));
+
+    (function autoFullscreenFromMenu() {
+        const KEY = 'arcade_fullscreen_pref';
+        let pref = '0';
+        try { pref = localStorage.getItem(KEY) || '0'; } catch (e) {}
+        if (pref !== '1') return;
+        function tryFs() {
+            if (isFullscreen()) return;
+            const req = fsTarget.requestFullscreen ||
+                        fsTarget.webkitRequestFullscreen ||
+                        fsTarget.msRequestFullscreen;
+            if (req) {
+                const p = req.call(fsTarget);
+                if (p && p.catch) p.catch(() => {});
+            }
+        }
+        const once = () => {
+            tryFs();
+            document.removeEventListener('pointerdown', once);
+            document.removeEventListener('keydown', once);
+        };
+        document.addEventListener('pointerdown', once, { once: true });
+        document.addEventListener('keydown', once, { once: true });
+        tryFs();
+    })();
+
+    // ============================================================
+    //                  КНОПКА НОВАЯ ИГРА
+    // ============================================================
+    document.getElementById('newGame').addEventListener('click', newGame);
+
+    // ============================================================
+    //                  ОБНОВЛЕНИЕ ПРИ РЕСАЙЗЕ
+    // ============================================================
+    // При изменении размера окна нужно пересчитать позицию падающей колонны
+    window.addEventListener('resize', () => {
+        if (falling) updateFallingEl();
+    });
+
+    // ============================================================
+    //                  ПАУЗА ПРИ УХОДЕ С ВКЛАДКИ
+    // ============================================================
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            clearTimeout(fallTimer);
+        } else if (falling && !gameOver && !animLock) {
+            scheduleFall();
+        }
+    });
+
+    // ============================================================
+    //                  СТАРТ
+    // ============================================================
+    buildBoard();
+    newGame();
+    updateFsIcon();
+</script>
+</body>
+</html>
