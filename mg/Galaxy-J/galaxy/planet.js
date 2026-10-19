@@ -873,16 +873,256 @@ function computeParams1(star, planetIndex, opts = {})
 ///----------------------------------------------------------------------------:
 class PlanetsManager
 {
-    #planets = []; // массив хэндлов PLANET.generate(...)
+    #planets = [];    // массив хэндлов PLANET.generate(...)
+    #scene   = null;  // ссылка на сцену THREE
+    #starPos = null;  // позиция текущей звезды (THREE.Vector3)
 
-     get planets(){ return this.#planets; }
+    get planets(){ return this.#planets; }
 
-    constructor(star)
+    constructor(scene)
     {
-       
+        this.#scene = scene;
     }
 
+    ///----------------------------------------------------
+    /// Создание всех планет для заданной звезды.
+    ///----------------------------------------------------
+    initStar(star, starPos)
+    {
+        if (!star || !starPos) return;
 
+        this.#starPos = starPos;
+
+        // Планеты: число зависит от tech
+        const n   = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
+        const rng = UniverseJS.utils.mulberry32(star.seed);
+
+        for (let i = 0; i < n; i++)
+        {
+            const dist = 800 + i * 900 + rng() * 400;
+            const ang  = rng() * Math.PI * 2;
+            // Чтобы не лежали строго в одной плоскости
+            const height = (rng() - 0.5) * 300;
+            const pos = new THREE.Vector3(
+                Math.cos(ang) * dist,
+                height,
+                Math.sin(ang) * dist
+            );
+
+            const p = PLANET.generate(star, i, {
+                position    :     pos, // ★ (по желанию) для направления света
+                starPosition: starPos, // ★ если хочешь, чтобы свет шёл от звезды
+                textureSize :     512, // ★ опционально; можно 256 для экономии
+                seed        : star.seed
+            });
+
+            // =========================================================
+            // Рандомная ориентация планеты (кватернион)
+            // =========================================================
+            const q = new THREE.Quaternion();
+            // Случайный поворот: генерируем вектор направления и делаем lookAt
+            const dir = new THREE.Vector3(
+              rng() * 2 - 1,
+              rng() * 2 - 1,
+              rng() * 2 - 1
+            ).normalize();
+
+            // Чтобы ось вращения была случайной, но без вырождения
+            const up   = new THREE.Vector3(0, 1, 0);
+            const axis = new THREE.Vector3().crossVectors(dir, up).normalize();
+            if (axis.length() < 0.1) {
+              // Если почти коллинеарны, возьмём другую ось
+              p.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+            } else {
+              const angle = rng() * Math.PI * 2;
+              q.setFromAxisAngle(axis, angle);
+              p.mesh.quaternion.copy(q);
+            }
+            // =========================================================
+
+            p.mesh.position.copy(pos);
+            this.#scene.add(p.mesh);
+            this.#planets.push(p);
+        }
+    }
+
+    ///----------------------------------------------------
+    /// Обновление всех планет (вызывать каждый кадр).
+    ///----------------------------------------------------
+    update(dt)
+    {
+        for (const p of this.#planets) p.update(dt);
+    }
+
+    ///----------------------------------------------------
+    /// Проверка столкновения с планетами.
+    ///   Возвращает { killed, danger, reason } — убит ли игрок и уровень
+    ///   опасности (для щита / вспышки урона).
+    ///----------------------------------------------------
+    checkCollision(playerWorldPos, dt)
+    {
+        let killed = false;
+        let reason = null;
+        let maxDanger = 0;
+
+        for (const p of this.#planets)
+        {
+            const dangerLevel = p.getDangerLevel(playerWorldPos);
+
+            if (dangerLevel > 0.99)
+            {
+                killed = true;
+                reason = "СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ";
+                break;
+            }
+            else if (dangerLevel > 0.1)
+            {
+                maxDanger = Math.max(maxDanger, dangerLevel);
+            }
+        }
+
+        return { killed, reason, danger: maxDanger };
+    }
+
+    ///----------------------------------------------------
+    /// Контакты для радара.
+    ///----------------------------------------------------
+    getRadarContacts()
+    {
+        const contacts = [];
+        for (let i = 0; i < this.#planets.length; i++) {
+            contacts.push({
+                id:   "pl_" + i,
+                pos:  this.#planets[i].mesh.position,
+                kind: "planet",
+            });
+        }
+        return contacts;
+    }
+
+    ///----------------------------------------------------
+    /// Очистка всех планет со сцены и освобождение ресурсов.
+    ///----------------------------------------------------
+    clear()
+    {
+        for (const p of this.#planets)
+        {
+            this.#scene.remove(p.mesh);
+            if (p.atmosphere) this.#scene.remove(p.atmosphere);
+            if (p.rings)      this.#scene.remove(p.rings);
+            PLANET.dispose(p);
+        }
+        this.#planets.length = 0;
+        this.#starPos = null;
+    }
+
+    getMaxDanger(pos)
+    {
+        let worst = 0;
+        for (const p of this.#planets) {
+            if (p.getDangerLevel) {
+                worst = Math.max(worst, p.getDangerLevel(pos));
+            }
+        }
+        return worst;
+    }
+
+    ///----------------------------------------------------
+    /// Отладочная информация о планетах текущей системы.
+    ///----------------------------------------------------
+    debug()
+    {
+        const arr = this.#planets;
+
+        if (!arr.length) {
+            console.log("[PlanetsManager] планет нет");
+            return;
+        }
+
+        // Гарантируем корректный boundingSphere для всех планет
+        for (const p of arr) {
+            if (p.mesh.geometry && !p.mesh.geometry.boundingSphere) {
+                p.mesh.geometry.computeBoundingSphere();
+            }
+        }
+
+        console.group(`[PlanetsManager] планет: ${arr.length}`);
+        console.table(
+            arr.map((p, i) => ({
+                "#":         i,
+                pos:      `(${p.mesh.position.x.toFixed(0)},` + 
+                          ` ${p.mesh.position.y.toFixed(0)},` + 
+                          ` ${p.mesh.position.z.toFixed(0)})`,
+                radius:     Math.round(this.radiusOf(p) * 10) / 10,
+                distToStar: this.#starPos
+                          ? p.mesh.position.distanceTo(this.#starPos).toFixed(0)
+                          : "—",
+                visible:    p.mesh.visible,
+                hasAtmo:  !!p.atmosphere,
+                hasRings: !!p.rings,
+                rotY:      (p.mesh.rotation.y * 180 / Math.PI).toFixed(1) + "°",
+                scale:      p.mesh.scale.x.toFixed(2),
+            }))
+        );
+
+        // Сводка по опасности от текущей позиции камеры (если есть scene/camera)
+        console.log("starPos:", this.#starPos
+            ? `(${this.#starPos.x.toFixed(0)},` + 
+              ` ${this.#starPos.y.toFixed(0)},` + 
+              ` ${this.#starPos.z.toFixed(0)})`
+            : "—");
+
+        console.groupEnd();
+    }
+
+    /// Радиус планеты в мировых координатах (с учётом scale).
+    radiusOf = (p) =>
+    {   // 1) если хэндл сам хранит радиус — берём его
+        if (typeof p.radius === "number") return p.radius * p.mesh.scale.x;
+
+        // 2) если есть boundingSphere у геометрии
+        const bs = p.mesh.geometry && p.mesh.geometry.boundingSphere;
+        if (bs) return bs.radius * p.mesh.scale.x;
+
+        // 3) fallback — через Box3
+        const box = new THREE.Box3().setFromObject(p.mesh);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        return Math.max(size.x, size.y, size.z) * 0.5;
+    };
+
+    getPosition(p)
+    {
+        const planet = this.#resolve(p);
+        if (!planet) return null;
+
+        return planet.mesh.position;
+    }
+
+    /// Внутренний резолвер: id → объект, объект → объект.
+    #resolve(p)
+    {
+        // null / undefined
+        if (p == null) return null;
+
+        // число или строка → id
+        if (typeof p === "number" || typeof p === "string") {
+            const id = Number(p);
+            if (!Number.isInteger(id) || id < 0 || id >= this.#planets.length)
+            {   console.warn(`[PlanetsManager] planet id=${p} не найден`);
+                return null;
+            }
+            return this.#planets[id];
+        }
+
+        // объект — проверяем, что это похоже на хэндл планеты
+        if (typeof p === "object" && p.mesh) {
+            return p;
+        }
+
+        console.warn("[PlanetsManager] некорректный аргумент:", p);
+        return null;
+    }
 }
 
-window.planetsManager = new PlanetsManager(GALAXY.getCurrentStar());
+window.PlanetsManager = PlanetsManager;

@@ -540,32 +540,13 @@ window.HUD = HUD;
     // ----------------------------------------------------
     const TEST = await window.GLB.test_1(scene, game.camera.position);
 
-    // function loadScript(src)
-    // {   return new Promise((resolve, reject) => {
-    //         const s   = document.createElement("script");
-    //         s.src     = src;
-    //         s.onload  = resolve;
-    //         s.onerror = reject;
-    //         document.body.appendChild(s);
-    //     });
-    // }
-
-    // window.addEventListener("three-ready", async () => {
-    //     console.log("🔥:1");
-    //     await loadScript("./glb-models/glb-factor.js");
-    //     console.log("🔥:2");
-    //     const TEST = await window.GLB.test_1(scene, GAME.camera.position);
-
-    //     console.log("🔥:3");
-    // }, { once: true });
-
     // ----------------------------------------------------
     //  Радар
     // ----------------------------------------------------
     const radar = new RadarHolo( renderer, { range: 600, size: 220 } );
 
     // ----------------------------------------------------
-    /// Галактика.
+    // Галактика.
     // ----------------------------------------------------
     const seedGalaxy = GAME.pers.seedGalaxy;
     window.   GALAXY = new Galaxy( seedGalaxy);
@@ -575,20 +556,37 @@ window.HUD = HUD;
     pers.dataStar = GALAXY.getCurrentStar();
     updateSectorFromStar(pers.dataStar);
 
+    // ----------------------------------------------------
+    // Планеты.
+    // ----------------------------------------------------
+    const planetsManager  = new PlanetsManager(scene);
+    window.planetsManager = planetsManager;
+
+    // ----------------------------------------------------
+    // HUD.
+    // ----------------------------------------------------
     HUD.setSystem(GALAXY.getCurrentStar().name);
     
-    HELP .init();
+    // ----------------------------------------------------
+    // Модель Галактической Экономики 🪙🪙🪙
+    // ----------------------------------------------------
     TRADE.init();
     TRADE.setOnCreditsChanged((credits) => {
         pers.credits = credits;
         elCredits.textContent = credits;
     });
-
-    // Модель Галактической Экономики 🪙🪙🪙
     window.ModelTrade = new ModelTradeA();
 
+    // ----------------------------------------------------
+    // Взрыв.
+    // ----------------------------------------------------
     const explosionSystem = new ExplosionEffect(scene);
-    
+
+    // ----------------------------------------------------
+    // F1::HELP.
+    // ----------------------------------------------------
+    HELP.init();
+
     ////////////////////////////////////////////////////////////////////////////
 
     // ============================================================
@@ -736,13 +734,8 @@ window.HUD = HUD;
     let currentStationHandle = null;
 
     function clearSystem()
-    {   for (const p of planets) {
-          scene.remove(p.mesh);
-          if (p.atmosphere) scene.remove(p.atmosphere);
-          if (p.rings) scene.remove(p.rings);
-          PLANET.dispose(p);
-        }
-        planets.length = 0;
+    {   
+        planetsManager.clear();
 
         if (currentStarHandle) {
           scene.remove(currentStarHandle.mesh);
@@ -775,11 +768,12 @@ window.HUD = HUD;
         // sun.setPosition(0, 2000, 8000);
         // sun.setVisible(false);
 
-        const SP = { x: 0, y: 0, z:0 }; // z = -3000
+        const SP = { x: 0, y: 0, z:0 };
+        const starPos = new THREE.Vector3(SP.x, SP.y, SP.z);
+        sunLight.position.set(SP.x, SP.y, SP.z);
 
         // Светило — висит далеко впереди
         currentStarHandle = StarA.generate(star);
-        const starPos = new THREE.Vector3(SP.x, SP.y, SP.z);
         currentStarHandle.mesh  .position.copy(starPos);
         currentStarHandle.corona.position.copy(starPos);
         currentStarHandle.light .position.copy(starPos);
@@ -787,61 +781,10 @@ window.HUD = HUD;
         scene.add(currentStarHandle.corona);
         scene.add(currentStarHandle.light);
 
-        sunLight.position.set(SP.x, SP.y, SP.z);
-
         // Планеты: число зависит от tech
-        const n   = Math.min(5, 1 + Math.floor((star.tech || 1) / 4));
-        const rng = UniverseJS.utils.mulberry32(star.seed);
-        
-        for (let i = 0; i < n; i++)
-        {
-            const dist = 800 + i * 900 + rng() * 400;
-            const ang  = rng() * Math.PI * 2;
-            // Чтобы не лежали строго в одной плоскости
-            const height = (rng() - 0.5) * 300;
-            const pos = new THREE.Vector3(
-                Math.cos(ang) * dist,
-                height,
-                Math.sin(ang) * dist
-            );
+        planetsManager.initStar(star, starPos);
 
-            const p = PLANET.generate(star, i, {
-                position    :     pos, // ★ (по желанию) для направления света
-                starPosition: starPos, // ★ если хочешь, чтобы свет шёл от звезды
-                textureSize :     512, // ★ опционально; можно 256 для экономии
-                seed        : star.seed
-            });
-
-            // =========================================================
-            // Рандомная ориентация планеты (кватернион)
-            // =========================================================
-            const q = new THREE.Quaternion();
-            // Случайный поворот: генерируем вектор направления и делаем lookAt
-            const dir = new THREE.Vector3(
-              rng() * 2 - 1,
-              rng() * 2 - 1,
-              rng() * 2 - 1
-            ).normalize();
-
-            // Чтобы ось вращения была случайной, но без вырождения
-            const up   = new THREE.Vector3(0, 1, 0);
-            const axis = new THREE.Vector3().crossVectors(dir, up).normalize();
-            if (axis.length() < 0.1) {
-              // Если почти коллинеарны, возьмём другую ось
-              p.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-            } else {
-              const angle = rng() * Math.PI * 2;
-              q.setFromAxisAngle(axis, angle);
-              p.mesh.quaternion.copy(q);
-            }
-            // =========================================================
-
-            p.mesh.position.copy(pos);
-            scene.add(p.mesh);
-            planets.push(p);
-        }
-
-        currentStationHandle = new Station(star);
+        currentStationHandle = new Station(star, planetsManager);
         scene.add(currentStationHandle.group);
     }
     
@@ -1556,13 +1499,7 @@ function updateRadar(dt) {
     }
 
     // Планеты
-    for (let i = 0; i < planets.length; i++) {
-        contacts.push({
-            id:   "pl_" + i,
-            pos:  planets[i].mesh.position,
-            kind: "planet",
-        });
-    }
+    contacts.push(...planetsManager.getRadarContacts());
 
     // Звезда
     if (currentStarHandle && currentStarHandle.mesh) {
@@ -1594,7 +1531,7 @@ function animate()
     // Светило и планеты текущей системы
     currentStarHandle.update(dt, time);
     
-    for (const p of planets) p.update(dt);
+    planetsManager.update(dt);
 
     GALAXY.update(dt);
     updateHyper(dt);
@@ -1789,20 +1726,16 @@ else
         ///-----------------------------------|
         /// Проверка столкновения с Планетами.|
         ///-----------------------------------:
-        for (const p of planets)
+        const plCol = planetsManager.checkCollision(playerWorldPos, dt);
+        if  ( plCol.killed)
         {
-            const dangerLevel = p.getDangerLevel(playerWorldPos);
-            
-            if(dangerLevel > 0.99)
-            {   killPlayer("СГОРЕЛ В АТМОСФЕРЕ ПЛАНЕТЫ");
-                window.MusFon1.stop  (0);
-                window.MusFon1.signal('death');
-            }
-            else if(dangerLevel > 0.1)
-            {
-                ship.shield -= 0.001 * dt;
-                flashDamage(0.6 * dangerLevel);
-            }
+            killPlayer(plCol.reason);
+            window.MusFon1.stop(0);
+            window.MusFon1.signal('death');
+        } else if (plCol.danger > 0)
+        {
+            ship.shield -= 0.001 * dt;
+            flashDamage(0.6 * plCol.danger);
         }
         
         ///-----------------------------------|
@@ -2115,11 +2048,7 @@ function checkDeath()
         }
 
         // Планеты
-        for (const p of planets) {
-            if (p.getDangerLevel) {
-                worst = Math.max(worst, p.getDangerLevel(camera.position));
-            }
-        }
+        worst = Math.max(worst, planetsManager.getMaxDanger(camera.position));
 
         // Двигаемся в случайном направлении на step
         probe.set( dir.x, dir.y, dir.z ).normalize().multiplyScalar(step);

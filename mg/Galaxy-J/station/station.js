@@ -127,8 +127,10 @@ class Station
     // ---------------------------------------------------------------
     //  Экземпляр
     // ---------------------------------------------------------------
-    constructor(star, options = {})
+    constructor(star, planetsManager, options = {})
     {
+        //planetsManager.debug(); // 🔶
+
         // --- Параметры / геометрия ---
         this.params = Station.getParams(star);
         this.group  = this._buildGroup(this.params);
@@ -158,7 +160,9 @@ class Station
             {
                 const rot = UniverseJS.utils.RandVec3Rot(GAME.pers.seedStar);
                 this.setRotation({ rotation: rot });
-                this.group.position.set(0, 0, -600);
+
+                this.#setPosition(planetsManager);
+
             //  console.log(rot);
             }
         }
@@ -530,6 +534,54 @@ class Station
                 obj.material.dispose?.();
             }
         });
+    }
+
+    #setPosition(planetsManager)
+    {
+        const p = planetsManager.planets[0];
+        if (!p) {
+            console.warn("[Station] нет планет — ставлю станцию в дефолт");
+            this.group.position.set(0, 0, -600);
+            return;
+        }
+
+        // 1) позиция и радиус планеты
+        const planetPos = p.mesh.position;               // THREE.Vector3
+        const R         = planetsManager.radiusOf(p);    // число
+
+        // 2) случайное равномерное направление на сфере
+        //    (метод Марсальи — без "полюсных сгущений")
+        const u = Math.random();
+        const v = Math.random();
+        const theta = 2 * Math.PI * u;                   // азимут
+        const phi   = Math.acos(2 * v - 1);              // полярный угол
+
+        const dir = new THREE.Vector3(
+            Math.sin(phi) * Math.cos(theta),
+            Math.cos(phi),
+            Math.sin(phi) * Math.sin(theta)
+        );
+
+        // 3) расстояние от центра планеты
+        const MARGIN = R * 1.5;      // минимум — 1.5 радиуса над поверхностью
+        const SPREAD = R * 2.0;      // разброс — ещё 2 радиуса
+        const dist   = R + MARGIN + Math.random() * SPREAD;
+
+        // 4) финальная позиция
+        const stationPos = new THREE.Vector3()
+            .copy(planetPos)
+            .addScaledVector(dir, dist);
+
+        this.group.position.copy(stationPos);
+
+        // 5) (опционально) развернуть станцию "лицом" к планете
+        //    — чтобы шлюз смотрел внутрь системы
+        this.group.lookAt(planetPos);
+
+        console.log(
+            `[Station] planet R=${R.toFixed(1)}, ` +
+            `station dist=${dist.toFixed(1)} от центра`
+        );
     }
 }
 
