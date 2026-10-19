@@ -611,7 +611,7 @@ class Station
         ringTex.colorSpace = THREE.SRGBColorSpace;
 
         // Анизотропия — чтобы под углом не мылилось
-        //ringTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        ringTex.anisotropy = GAME.renderer.capabilities.getMaxAnisotropy();
 
         const ringMat = new THREE.MeshStandardMaterial({
             map: ringTex,
