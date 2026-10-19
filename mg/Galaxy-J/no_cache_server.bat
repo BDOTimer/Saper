@@ -40,7 +40,7 @@ REM Создаём временный сервер с запретом кэши�
 )
 
 REM Открыть браузер через 1 секунду (сервер успеет подняться)
-start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/Galaxy-J/g-menu.html"
+start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/g-menu.html"
 
 REM Запустить сервер без кэша (Ctrl+C — остановить)
 python "%~dp0_no_cache_server.py"

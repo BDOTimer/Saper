@@ -417,10 +417,10 @@ function setDeathReason(reason) {
 
     // перезапуск анимации вспышки — на баннере, а не на одной строке,
     // чтобы вспыхивала вся плашка целиком
-    const banner = elDeathReason.parentElement; // #deathBanner
-    elDeathReason.classList.remove("is-updated");
-    void elDeathReason.offsetWidth;
-    elDeathReason.classList.add("is-updated");
+    const banner = elDeathReason.closest('#deathBanner');
+    banner.classList.remove("is-updated");
+    void banner.offsetWidth;
+    banner.classList.add("is-updated");
 
     /// Штраф за смерть ...
     pers.credits -= scarf;
@@ -1263,6 +1263,8 @@ window.HUD = HUD;
 
             const star = GALAXY.getCurrentStar();
             ship.tradeOn(star, pers.credits);
+
+            pers.credits = 999;
         }
 
         checkDeath();
