@@ -12,7 +12,24 @@
 
 <script src="radio-overlay.js"></script>
 <script>
-  initRadioOverlay();
+
+    document.addEventListener('click', function startRadio() {
+        //RadioOverlay.play();
+        document.removeEventListener('click', startRadio);
+    }, { once: true });
+
+    setTimeout(() => {
+        // здесь ваша "лямбда" — функция
+        console.log('прошло 5 секунды');
+        RadioOverlay.play();
+        RadioOverlay.setVolume(10);
+    }, 3000);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const a = RadioOverlay.getAudioElement().addEventListener;
+        a('play',  () => console.log('PLAY'));
+        a('pause', () => console.log('PAUSE'));
+    });
 </script>
 
 </body>
