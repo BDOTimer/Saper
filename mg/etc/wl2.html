@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Warlords II — MVP</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14;
+    font-family: system-ui, sans-serif; color: #e6edf3; user-select: none; }
+  #app { position: fixed; inset: 0; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+
+  #topbar {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(20,26,34,.85); padding: 8px 12px; border-radius: 10px;
+    border: 1px solid #2a3441; backdrop-filter: blur(6px);
+  }
+  #topbar .turn { font-weight: 600; min-width: 160px; text-align: center; }
+  button {
+    background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  button:hover:not(:disabled) { background: #2a3a4d; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: #2e7d4f; border-color: #3fa86a; }
+  button.primary:hover:not(:disabled) { background: #369a5f; }
+
+  #panel {
+    position: absolute; bottom: 12px; left: 12px; min-width: 240px;
+    background: rgba(20,26,34,.9); padding: 12px; border-radius: 10px;
+    border: 1px solid #2a3441; font-size: 13px; line-height: 1.5;
+  }
+  #panel h3 { margin: 0 0 6px; font-size: 14px; }
+  #panel .hp { color: #7fd47f; }
+  #panel .muted { color: #8899a6; }
+
+  #log {
+    position: absolute; bottom: 12px; right: 12px; width: 280px; max-height: 220px;
+    overflow: auto; background: rgba(20,26,34,.9); padding: 10px;
+    border-radius: 10px; border: 1px solid #2a3441; font-size: 12px;
+  }
+  #log div { margin-bottom: 4px; color: #b8c4cf; }
+  #log div.hl { color: #ffd166; }
+
+  #overlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.7); font-size: 28px; font-weight: 700;
+  }
+  #overlay button { font-size: 16px; margin-top: 20px; }
+  #overlay .box { text-align: center; background: #141a22; padding: 32px 40px;
+    border-radius: 14px; border: 1px solid #2a3441; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <div id="topbar">
+    <button id="btnNew">Новая партия</button>
+    <div class="turn" id="turnLabel">Ход игрока</div>
+    <button id="btnEnd" class="primary">Завершить ход</button>
+
+    <button id="btnTiltUp"   title="Наклонить камеру выше (Q)">Наклон ↑</button>
+    <button id="btnTiltDown" title="Наклонить камеру ниже (E)">Наклон ↓</button>
+    <button id="btnCamReset" title="Сбросить камеру (R)">Сброс вида</button>
+  </div>
+  <div id="panel"><h3>Юнит</h3><div class="muted">Кликни по отряду или городу</div></div>
+  <div id="log"></div>
+  <div id="overlay"><div class="box"><div id="overlayText"></div><button id="btnRestart">Играть снова</button></div></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   ДЕТЕРМИНИРОВАННЫЙ RNG (mulberry32)
+   ========================================================= */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* =========================================================
+   КОНСТАНТЫ
+   ========================================================= */
+const MAP_W = 15;
+const MAP_H = 15;
+const TILE = 2;            // размер клетки в юнитах сцены
+const TERRAIN = {
+  PLAIN: { id: 'plain', name: 'Равнина', color: 0x6d8f4e, moveCost: 1, defBonus: 0 },
+  FOREST:{ id: 'forest',name: 'Лес',     color: 0x2f5a35, moveCost: 2, defBonus: 0.2 },
+  MOUNT: { id: 'mount', name: 'Гора',    color: 0x777078, moveCost: 3, defBonus: 0.35 },
+};
+const FACTION = {
+  PLAYER: { id: 'player', name: 'Игрок',  color: 0x2e8bff },
+  AI:     { id: 'ai',     name: 'ИИ',     color: 0xd64545 },
+  NEUTRAL:{ id: 'neutral',name: 'Нейтрал',color: 0x9aa4ad },
+};
+const UNIT_STATS = {
+  hp: 10, attack: 4, move: 3, attackRange: 1,
+};
+const SEED = 1337;
+
+/* =========================================================
+   AUDIO MANAGER (WebAudio, без внешних файлов)
+   ========================================================= */
+class AudioManager {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+  }
+  _ensure() {
+    if (!this.ctx) {
+      try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch { this.enabled = false; }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  }
+  _blip({ freq = 440, dur = 0.08, type = 'sine', gain = 0.12, slideTo = null } = {}) {
+    if (!this.enabled) return;
+    this._ensure();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(t); osc.stop(t + dur);
+  }
+  step()   { this._blip({ freq: 220, dur: 0.06, type: 'triangle', gain: 0.06 }); }
+  select() { this._blip({ freq: 660, dur: 0.05, type: 'sine', gain: 0.05 }); }
+  attack() { this._blip({ freq: 180, dur: 0.12, type: 'square', gain: 0.09, slideTo: 60 }); }
+  capture(){ this._blip({ freq: 523, dur: 0.1, type: 'sine', gain: 0.08, slideTo: 1046 }); }
+  win()    { this._blip({ freq: 523, dur: 0.2, type: 'sine', gain: 0.1, slideTo: 1046 }); }
+}
+
+/* =========================================================
+   BOARD — сетка, генерация, валидация
+   ========================================================= */
+class Board {
+  constructor(seed = SEED) {
+    this.w = MAP_W;
+    this.h = MAP_H;
+    this.seed = seed;
+    this.rng = mulberry32(seed);
+    this.tiles = []; // [{x,y,terrain}]
+    this._generate();
+  }
+  _generate() {
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        const r = this.rng();
+        let terrain = TERRAIN.PLAIN;
+        if (r > 0.82) terrain = TERRAIN.MOUNT;
+        else if (r > 0.62) terrain = TERRAIN.FOREST;
+        this.tiles.push({ x, y, terrain });
+      }
+    }
+  }
+  tileAt(x, y) {
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return null;
+    return this.tiles[y * this.w + x];
+  }
+  inBounds(x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h; }
+  // манхэттен-дистанция в клетках
+  dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+  // клетки в радиусе (для поиска пути и атаки)
+  neighbors(x, y) {
+    return [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]
+      .filter(([nx,ny]) => this.inBounds(nx,ny))
+      .map(([nx,ny]) => this.tileAt(nx,ny));
+  }
+}
+
+/* =========================================================
+   UNIT
+   ========================================================= */
+class Unit {
+  constructor({ id, owner, x, y, stats = UNIT_STATS }) {
+    this.id = id;
+    this.owner = owner; // FACTION
+    this.x = x; this.y = y;
+    this.maxHp = stats.hp;
+    this.hp = stats.hp;
+    this.attack = stats.attack;
+    this.move = stats.move;
+    this.attackRange = stats.attackRange;
+    this.hasMoved = false;
+    this.hasAttacked = false;
+  }
+  get alive() { return this.hp > 0; }
+  resetTurn() { this.hasMoved = false; this.hasAttacked = false; }
+}
+
+/* =========================================================
+   CITY
+   ========================================================= */
+class City {
+  constructor({ id, owner, x, y }) {
+    this.id = id;
+    this.owner = owner; // FACTION
+    this.x = x; this.y = y;
+    this.name = `Город ${id}`;
+  }
+}
+
+/* =========================================================
+   GAME — главный контроллер
+   ========================================================= */
+class Game {
+  constructor() {
+    this.audio = new AudioManager();
+    this.board = new Board(SEED);
+    this.units = [];
+    this.cities = [];
+    this.unitId = 0;
+    this.cityId = 0;
+    this.current = FACTION.PLAYER;
+    this.selected = null;
+    this.gameOver = false;
+    this.turnCount = 1;
+    this._setupMap();
+    this._logListeners = [];
+  }
+
+_setupMap() {
+  const b = this.board;
+
+  // Стартовые города по углам
+  const starts = [
+    { x: 1, y: 1, owner: FACTION.PLAYER },
+    { x: b.w - 2, y: b.h - 2, owner: FACTION.AI },
+  ];
+  for (const s of starts) {
+    const city = new City({ id: ++this.cityId, owner: s.owner, x: s.x, y: s.y });
+    this.cities.push(city);
+    const ux = s.x + 1 < b.w ? s.x + 1 : s.x - 1;
+    this._spawnUnit(s.owner, ux, s.y);
+  }
+
+  // Нейтральные города — детерминированно по сетке, не ближе 3 клеток к другим городам
+  const neutralSpots = [
+    { x: 7, y: 2 },
+    { x: 2, y: 7 },
+    { x: 12, y: 7 },
+    { x: 7, y: 12 },
+    { x: 7, y: 7 }, // центр
+  ];
+  for (const spot of neutralSpots) {
+    const tooClose = this.cities.some(c => b.dist(c, spot) < 3);
+    if (tooClose) continue;
+    this.cities.push(new City({
+      id: ++this.cityId,
+      owner: FACTION.NEUTRAL,
+      x: spot.x, y: spot.y,
+    }));
+  }
+
+  // Пара нейтральных патрулей
+  this._spawnUnit(FACTION.NEUTRAL, 7, 4);
+  this._spawnUnit(FACTION.NEUTRAL, 7, 10);
+}
+
+  _spawnUnit(owner, x, y) {
+    const u = new Unit({ id: ++this.unitId, owner, x, y });
+    this.units.push(u);
+    return u;
+  }
+
+  unitAt(x, y) {
+    return this.units.find(u => u.alive && u.x === x && u.y === y);
+  }
+  cityAt(x, y) {
+    return this.cities.find(c => c.x === x && c.y === y);
+  }
+  unitsOf(owner) {
+    return this.units.filter(u => u.alive && u.owner.id === owner.id);
+  }
+  citiesOf(owner) {
+    return this.cities.filter(c => c.owner.id === owner.id);
+  }
+
+  /* ---------- ХОД ИГРОКА ---------- */
+
+  selectAt(x, y) {
+    if (this.gameOver) return;
+    const u = this.unitAt(x, y);
+    if (u && u.owner.id === this.current.id) {
+      this.selected = u;
+      this.audio.select();
+      this._emitSelect();
+      return;
+    }
+    // клик по клетке — попытка действия выбранным юнитом
+    if (this.selected) this._tryAction(this.selected, x, y);
+  }
+
+  _tryAction(unit, tx, ty) {
+    if (unit.owner.id !== this.current.id) return;
+    const b = this.board;
+    const target = this.unitAt(tx, ty);
+    const d = b.dist({x:unit.x,y:unit.y}, {x:tx,y:ty});
+
+    // Атака
+    if (target && target.owner.id !== unit.owner.id) {
+      if (unit.hasAttacked) { this.log('Юнит уже атаковал в этот ход'); return; }
+      if (d > unit.attackRange) { this.log('Цель вне радиуса атаки'); return; }
+      this._resolveCombat(unit, target);
+      return;
+    }
+
+    // Движение
+    if (unit.hasMoved) { this.log('Юнит уже ходил в этот ход'); return; }
+    if (target && target.owner.id === unit.owner.id) { this.log('Клетка занята союзником'); return; }
+    if (d === 0) return;
+
+    const path = this._findPath(unit, tx, ty);
+    if (!path) { this.log('Путь недоступен'); return; }
+    const cost = path.reduce((s, t) => s + t.terrain.moveCost, 0);
+    if (cost > unit.move) { this.log('Слишком далеко (нужно ' + cost + ' очков, есть ' + unit.move + ')'); return; }
+
+    unit.x = tx; unit.y = ty;
+    unit.hasMoved = true;
+    this.audio.step();
+
+    // Захват города
+    const city = this.cityAt(tx, ty);
+    if (city && city.owner.id !== unit.owner.id) {
+      this._tryCapture(unit, city);
+    }
+    // авто-атака после движения если враг рядом? — оставим на усмотрение игрока
+    this._emitSelect();
+  }
+
+  // Простой BFS по стоимости (Dijkstra-lite для сетки)
+  _findPath(unit, tx, ty) {
+    const b = this.board;
+    const start = { x: unit.x, y: unit.y };
+    const goal = { x: tx, y: ty };
+    if (!b.inBounds(tx, ty)) return null;
+    if (this.unitAt(tx, ty)) return null;
+
+    const key = (x, y) => x + ',' + y;
+    const open = [{ x: start.x, y: start.y, g: 0, prev: null }];
+    const best = new Map([[key(start.x, start.y), 0]]);
+    const visited = new Map();
+    let found = null;
+
+    while (open.length) {
+      open.sort((a, b2) => a.g - b2.g);
+      const cur = open.shift();
+      const k = key(cur.x, cur.y);
+      if (visited.has(k)) continue;
+      visited.set(k, cur);
+      if (cur.x === goal.x && cur.y === goal.y) { found = cur; break; }
+      if (cur.g > unit.move) continue;
+
+      for (const nb of b.neighbors(cur.x, cur.y)) {
+        const nk = key(nb.x, nb.y);
+        if (visited.has(nk)) continue;
+        if (this.unitAt(nb.x, nb.y)) continue; // непроходимо
+        const ng = cur.g + nb.terrain.moveCost;
+        if (ng > unit.move) continue;
+        if (!best.has(nk) || ng < best.get(nk)) {
+          best.set(nk, ng);
+          open.push({ x: nb.x, y: nb.y, g: ng, prev: cur });
+        }
+      }
+    }
+    if (!found) return null;
+
+    // реконструкция
+    const path = [];
+    let node = found;
+    while (node.prev) { path.unshift(b.tileAt(node.x, node.y)); node = node.prev; }
+    return path;
+  }
+
+  _resolveCombat(attacker, defender) {
+    const b = this.board;
+    const atkTile = b.tileAt(attacker.x, attacker.y);
+    const defTile = b.tileAt(defender.x, defender.y);
+    const rng = mulberry32((attacker.id * 73856093) ^ (defender.id * 19349663) ^ this.turnCount);
+
+    const atkBonus = 1 - (defTile.terrain.defBonus);
+    const roll = 0.7 + rng() * 0.6; // 0.7..1.3
+    let dmg = Math.max(1, Math.round(attacker.attack * atkBonus * roll));
+    defender.hp -= dmg;
+    attacker.hasAttacked = true;
+    this.audio.attack();
+    this.log(`${attacker.owner.name} наносит ${dmg} урона ${defender.owner.name}`, true);
+
+    if (defender.hp <= 0) {
+      defender.hp = 0;
+      this.log(`${defender.owner.name} отряд уничтожен`, true);
+      // захват города, если стоял на нём
+      const city = this.cityAt(defender.x, defender.y);
+      if (city && city.owner.id !== attacker.owner.id) this._tryCapture(attacker, city);
+      this._checkVictory();
+    }
+    this._emitSelect();
+  }
+
+  _tryCapture(unit, city) {
+    // город захватывается, если рядом (в радиусе 1) нет вражеских отрядов
+    const enemies = this.units.filter(u =>
+      u.alive && u.owner.id !== unit.owner.id &&
+      this.board.dist(u, city) <= 1
+    );
+    if (enemies.length) { this.log('Город защищён врагом рядом'); return; }
+    city.owner = unit.owner;
+    this.audio.capture();
+    this.log(`${unit.owner.name} захватывает ${city.name}`, true);
+    this._checkVictory();
+  }
+
+  endTurn() {
+    if (this.gameOver) return;
+    this.units.forEach(u => u.resetTurn());
+    this.selected = null;
+
+    if (this.current.id === 'player') {
+      this.current = FACTION.AI;
+      this._emitSelect();
+      this.log('Ход ИИ...');
+      setTimeout(() => this._aiTurn(), 400);
+    } else {
+      this.current = FACTION.PLAYER;
+      this.turnCount++;
+      this._emitSelect();
+      this.log(`Ход игрока #${this.turnCount}`);
+    }
+  }
+
+  _aiTurn() {
+    if (this.gameOver) return;
+    const b = this.board;
+    const aiUnits = this.unitsOf(FACTION.AI);
+    const targets = this.cities.filter(c => c.owner.id !== 'ai');
+    if (!targets.length) { this.endTurn(); return; }
+
+for (const u of aiUnits) {
+  if (!u.alive) continue;
+
+  // 1) Атакуем ближайшего врага в радиусе (включая нейтралов)
+  const enemyInRange = this.units.find(e =>
+    e.alive && e.owner.id !== 'ai' && b.dist(u, e) <= u.attackRange);
+  if (enemyInRange && u.hp / u.maxHp > 0.3) {
+    this._resolveCombat(u, enemyInRange);
+    continue;
+  }
+
+  // 2) Идём к ближайшему НЕ своему городу
+  const target = targets.reduce((best, c) =>
+    (!best || b.dist(u, c) < b.dist(u, best)) ? c : best, null);
+  if (target) {
+    const path = this._findPathTo(u, target);
+    const dest = path && path[0];
+    if (dest) { u.x = dest.x; u.y = dest.y; u.hasMoved = true; }
+
+    // если встал на город — захватить (если рядом нет врагов)
+    const here = this.cityAt(u.x, u.y);
+    if (here && here.owner.id !== 'ai') this._tryCapture(u, here);
+  }
+}
+
+    // Восстановление в городах
+    for (const c of this.citiesOf(FACTION.AI)) {
+      for (const u of aiUnits) {
+        if (u.alive && b.dist(u, c) <= 1 && u.hp < u.maxHp) {
+          u.hp = Math.min(u.maxHp, u.hp + 2);
+        }
+      }
+    }
+
+    this._checkVictory();
+    this.endTurn();
+  }
+
+  _findPathTo(unit, city) {
+    const b = this.board;
+    if (b.dist(unit, city) <= 1) return null; // уже рядом
+    // BFS к городу, но без учета стоимости (ИИ простой)
+    const start = { x: unit.x, y: unit.y };
+    const goal = { x: city.x, y: city.y };
+    const key = (x, y) => x + ',' + y;
+    const q = [{ x: start.x, y: start.y, path: [] }];
+    const seen = new Set([key(start.x, start.y)]);
+    while (q.length) {
+      const cur = q.shift();
+      for (const nb of b.neighbors(cur.x, cur.y)) {
+        const k = key(nb.x, nb.y);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const newPath = [...cur.path, nb];
+        if (nb.x === goal.x && nb.y === goal.y) return newPath;
+        if (newPath.length >= unit.move) continue; // не глубже дальности хода
+        if (this.unitAt(nb.x, nb.y)) continue;
+        q.push({ x: nb.x, y: nb.y, path: newPath });
+      }
+    }
+    // Если не дошли — идём в сторону цели любым первым шагом
+    const dirX = Math.sign(goal.x - start.x);
+    const dirY = Math.sign(goal.y - start.y);
+    const candidates = [
+      { x: start.x + dirX, y: start.y },
+      { x: start.x, y: start.y + dirY },
+    ];
+    for (const c of candidates) {
+      if (b.inBounds(c.x, c.y) && !this.unitAt(c.x, c.y)) {
+        return [b.tileAt(c.x, c.y)];
+      }
+    }
+    return null;
+  }
+
+_checkVictory() {
+  // Победа: у врага не осталось стартовых городов (нейтральные не считаем)
+  const aiOriginal = this.cities.filter(c => c.owner.id === 'ai');
+  const playerOriginal = this.cities.filter(c => c.owner.id === 'player');
+  if (aiOriginal.length === 0 && !this._allCitiesTaken()) {
+    this._finish('Победа! ИИ потерял все города.');
+  }
+  if (playerOriginal.length === 0) {
+    this._finish('Поражение. Все ваши города захвачены.');
+  }
+}
+
+  _finish(msg) {
+    this.gameOver = true;
+    this.audio.win();
+    this._onGameOver?.(msg);
+  }
+
+  /* ---------- ПОДПИСКИ UI ---------- */
+
+  onSelect(cb) { this._onSelect = cb; }
+  onGameOver(cb) { this._onGameOver = cb; }
+  onLog(cb) { this._logListeners.push(cb); }
+  _emitSelect() { this._onSelect?.(this.selected); }
+  log(msg, hl = false) {
+    this._logListeners.forEach(cb => cb(msg, hl));
+  }
+
+  /* ---------- СЕРИАЛИЗАЦИЯ ---------- */
+
+  save() {
+    const data = {
+      seed: this.board.seed,
+      turnCount: this.turnCount,
+      current: this.current.id,
+      cities: this.cities.map(c => ({ id: c.id, owner: c.owner.id, x: c.x, y: c.y })),
+      units: this.units.filter(u => u.alive).map(u => ({
+        id: u.id, owner: u.owner.id, x: u.x, y: u.y,
+        hp: u.hp, maxHp: u.maxHp, attack: u.attack, move: u.move,
+      })),
+      gameOver: this.gameOver,
+    };
+    localStorage.setItem('warlords_mvp', JSON.stringify(data));
+  }
+
+  static load() {
+    const raw = localStorage.getItem('warlords_mvp');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+}
+
+/* =========================================================
+   RENDERER — Three.js
+   ========================================================= */
+class Renderer {
+
+  constructor(game, container) {
+  this.game = game;
+  this.container = container;
+  this.scene = new THREE.Scene();
+  this.scene.background = new THREE.Color(0x0b0f14);
+
+  // 1) Камера
+  this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+  this.camera.position.set(15, 22, 22);
+
+  // 2) Рендерер
+  this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+  this.renderer.setSize(window.innerWidth, window.innerHeight);
+  this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  this.renderer.shadowMap.enabled = true;
+  container.appendChild(this.renderer.domElement);
+
+  // 3) OrbitControls — СНАЧАЛА создаём
+  this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+
+  // 4) И только теперь настраиваем
+  this.controls.enableRotate = true;
+  this.controls.rotateSpeed = 0.8;
+  this.controls.enableDamping = true;
+  this.controls.dampingFactor = 0.08;
+
+  this.controls.minPolarAngle = THREE.MathUtils.degToRad(20);
+  this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75);
+
+  this.controls.enablePan = true;
+  this.controls.screenSpacePanning = false;
+  this.controls.panSpeed = 1.0;
+  this.controls.enableZoom = true;
+  this.controls.zoomSpeed = 1.0;
+  this.controls.minDistance = 8;
+  this.controls.maxDistance = 50;
+
+  this.controls.target.set(0, 0, 0);
+
+  this.controls.mouseButtons = {
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.PAN,
+  };
+  this.controls.touches = {
+    ONE: THREE.TOUCH.ROTATE,
+    TWO: THREE.TOUCH.DOLLY_PAN,
+  };
+
+  // 5) Свет и сцена
+  this._buildLights();
+  this._buildBoard();
+  this._buildEntities();
+
+  // 6) Ввод
+  this.raycaster = new THREE.Raycaster();
+  this.mouse = new THREE.Vector2();
+  this._bindEvents();
+
+  // 7) Цикл
+  this._animate = this._animate.bind(this);
+  requestAnimationFrame(this._animate);
+}
+
+  // Изменяет угол наклона камеры на deltaDeg градусов (относительно горизонта)
+  tiltCamera(deltaDeg) {
+    const offset = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+
+    // polar: 0 — сверху, PI/2 — на горизонте. Меняем polar.
+    spherical.phi = THREE.MathUtils.clamp(
+      spherical.phi + THREE.MathUtils.degToRad(deltaDeg),
+      this.controls.minPolarAngle,
+      this.controls.maxPolarAngle
+    );
+
+    const newPos = new THREE.Vector3().setFromSpherical(spherical).add(this.controls.target);
+    this.camera.position.copy(newPos);
+    this.controls.update();
+  }
+
+  // Возврат к «дефолтному» обзорному виду
+  resetCamera() {
+    this.controls.target.set(0, 0, 0);
+    this.camera.position.set(15, 22, 22);
+    this.controls.update();
+  }
+
+  _bindEvents() {
+    const dom = this.renderer.domElement;
+    dom.addEventListener('pointermove', (e) => this._onPointerMove(e));
+    dom.addEventListener('pointerdown', (e) => this._onPointerDown(e));
+    dom.addEventListener('pointerup',   (e) => this._onPointerUp(e));
+    dom.addEventListener('pointercancel', () => { this._dragStart = null; });
+    // Не даём браузеру открывать контекстное меню на ПКМ (панорамирование)
+    dom.addEventListener('contextmenu', (e) => e.preventDefault());
+    window.addEventListener('resize', () => this._onResize());
+  }
+
+  _buildLights() {
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(20, 30, 10);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    const s = 25;
+    Object.assign(dir.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 100 });
+    this.scene.add(dir);
+  }
+
+  _buildBoard() {
+    const b = this.game.board;
+    const geo = new THREE.BoxGeometry(TILE * 0.9, 0.4, TILE * 0.9);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
+    const count = b.w * b.h;
+    const inst = new THREE.InstancedMesh(geo, mat, count);
+    inst.receiveShadow = true;
+    inst.castShadow = false;
+    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+    b.tiles.forEach((t, i) => {
+      dummy.position.set(this._worldX(t.x), 0, this._worldZ(t.y));
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+      color.setHex(t.terrain.color);
+      inst.setColorAt(i, color);
+    });
+    inst.instanceColor.needsUpdate = true;
+    this.scene.add(inst);
+    this.tileMesh = inst;
+
+    // подсветка выбранной клетки
+    const ringGeo = new THREE.RingGeometry(TILE * 0.42, TILE * 0.48, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    this.selRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x2e8bff, transparent: true, opacity: 0.9 }));
+    this.selRing.position.y = 0.25;
+    this.selRing.visible = false;
+    this.scene.add(this.selRing);
+
+    const hoverGeo = new THREE.RingGeometry(TILE * 0.44, TILE * 0.5, 32);
+    hoverGeo.rotateX(-Math.PI / 2);
+    this.hoverRing = new THREE.Mesh(hoverGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }));
+    this.hoverRing.position.y = 0.24;
+    this.hoverRing.visible = false;
+    this.scene.add(this.hoverRing);
+  }
+
+  _worldX(x) { return (x - (this.game.board.w - 1) / 2) * TILE; }
+  _worldZ(y) { return (y - (this.game.board.h - 1) / 2) * TILE; }
+
+  _buildEntities() {
+    // группы юнитов и городов
+    this.unitGroup = new THREE.Group();
+    this.cityGroup = new THREE.Group();
+    this.scene.add(this.unitGroup, this.cityGroup);
+
+    this._syncUnits();
+    this._syncCities();
+  }
+
+  _syncUnits() {
+    while (this.unitGroup.children.length) {
+      const c = this.unitGroup.children.pop();
+      c.geometry?.dispose(); c.material?.dispose();
+    }
+    for (const u of this.game.units) {
+      if (!u.alive) continue;
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.45, 0.5, 1.2, 8),
+        new THREE.MeshStandardMaterial({ color: u.owner.color, roughness: 0.7 })
+      );
+      body.position.y = 0.9;
+      body.castShadow = true;
+      g.add(body);
+
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 })
+      );
+      head.position.y = 1.65;
+      head.castShadow = true;
+      g.add(head);
+
+      // HP-бар
+      const barBg = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.1, 0.12),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6 })
+      );
+      barBg.rotation.x = -Math.PI / 2;
+      barBg.position.y = 0.06;
+      g.add(barBg);
+
+      const hpRatio = Math.max(0, u.hp / u.maxHp);
+      const barFg = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.1 * hpRatio, 0.1),
+        new THREE.MeshBasicMaterial({ color: hpRatio > 0.5 ? 0x6fe06f : hpRatio > 0.25 ? 0xf0c040 : 0xe05050 })
+      );
+      barFg.rotation.x = -Math.PI / 2;
+      barFg.position.set(-0.55 + 1.1 * hpRatio / 2, 0.07, 0);
+      g.add(barFg);
+
+      g.position.set(this._worldX(u.x), 0, this._worldZ(u.y));
+      g.userData = { type: 'unit', unit: u };
+      this.unitGroup.add(g);
+    }
+  }
+
+_syncCities() {
+  while (this.cityGroup.children.length) {
+    const c = this.cityGroup.children.pop();
+    c.traverse?.(o => { o.geometry?.dispose(); o.material?.dispose(); });
+  }
+
+  for (const city of this.game.cities) {
+    const g = new THREE.Group();
+    const isNeutral = city.owner.id === 'neutral';
+    const ownerColor = city.owner.color;
+
+    // Платформа-основание (визуальная «подложка» цвета владельца)
+    const platform = new THREE.Mesh(
+      new THREE.CylinderGeometry(TILE * 0.55, TILE * 0.6, 0.15, 24),
+      new THREE.MeshStandardMaterial({
+        color: ownerColor, emissive: ownerColor, emissiveIntensity: isNeutral ? 0.15 : 0.4,
+        roughness: 0.6,
+      })
+    );
+    platform.position.y = 0.08;
+    platform.receiveShadow = true;
+    g.add(platform);
+
+    // Светящееся кольцо — хорошо видно издалека чей город
+    const ringGeo = new THREE.RingGeometry(TILE * 0.62, TILE * 0.72, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      color: ownerColor, transparent: true, opacity: isNeutral ? 0.35 : 0.8,
+    }));
+    ring.position.y = 0.16;
+    g.add(ring);
+
+    // Основание здания
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(TILE * 0.6, 1.0, TILE * 0.6),
+      new THREE.MeshStandardMaterial({ color: isNeutral ? 0xb9b9b9 : 0xe6dbb8, roughness: 0.85 })
+    );
+    base.position.y = 0.7;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    g.add(base);
+
+    // Крыша — цвет владельца
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(TILE * 0.5, 0.9, 4),
+      new THREE.MeshStandardMaterial({ color: ownerColor, roughness: 0.55 })
+    );
+    roof.position.y = 1.65;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    g.add(roof);
+
+    // Флаг
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.03, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
+    pole.position.set(0.28, 1.9, 0);
+    g.add(pole);
+
+    const flag = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.55, 0.32),
+      new THREE.MeshBasicMaterial({ color: ownerColor, side: THREE.DoubleSide })
+    );
+    flag.position.set(0.55, 2.3, 0);
+    g.add(flag);
+
+    // У нейтральных — вопросительный «флажок» из двух полос, чтобы визуально отличать
+    if (isNeutral) {
+      const band = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.55, 0.12),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+      );
+      band.position.set(0.55, 2.23, 0.001);
+      g.add(band);
+    }
+
+    // Подпись-билборд HP-стиля: имя города + владелец через цвет уже виден
+    // (Текст реализуем через canvas-текстуру — маленький спрайт над городом)
+    const label = this._makeCityLabel(city);
+    label.position.y = 3.2;
+    g.add(label);
+
+    g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
+    g.userData = { type: 'city', city };
+    this.cityGroup.add(g);
+  }
+}
+
+_makeCityLabel(city) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(10,14,18,0.75)';
+  ctx.fillRect(0, 0, 256, 64);
+  ctx.strokeStyle = '#' + city.owner.color.toString(16).padStart(6, '0');
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, 252, 60);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 26px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const ownerName = city.owner.id === 'neutral' ? 'Нейтрал' : city.owner.name;
+  ctx.fillText(`${city.name} · ${ownerName}`, 128, 34);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(3.2, 0.8, 1);
+  return sprite;
+}
+
+  // Полная перерисовка сущностей после хода/боя
+  sync() {
+    this._syncUnits();
+    this._syncCities();
+    this._updateSelectionRing();
+  }
+
+  _updateSelectionRing() {
+    const sel = this.game.selected;
+    if (!sel || !sel.alive) { this.selRing.visible = false; return; }
+    this.selRing.position.x = this._worldX(sel.x);
+    this.selRing.position.z = this._worldZ(sel.y);
+    this.selRing.visible = true;
+  }
+
+  /* ---------- ВВОД ---------- */
+
+  _bindEvents() {
+    const dom = this.renderer.domElement;
+    dom.addEventListener('pointermove', (e) => this._onPointerMove(e));
+    dom.addEventListener('pointerdown', (e) => this._onPointerDown(e));
+    window.addEventListener('resize', () => this._onResize());
+  }
+
+  _updateMouse(e) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  }
+
+  _pickTile() {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const hits = this.raycaster.intersectObject(this.tileMesh);
+    if (!hits.length) return null;
+    const idx = hits[0].instanceId;
+    return this.game.board.tiles[idx];
+  }
+
+  _onPointerMove(e) {
+    this._updateMouse(e);
+    const tile = this._pickTile();
+    if (tile) {
+      this.hoverRing.visible = true;
+      this.hoverRing.position.x = this._worldX(tile.x);
+      this.hoverRing.position.z = this._worldZ(tile.y);
+      this.renderer.domElement.style.cursor = 'pointer';
+    } else {
+      this.hoverRing.visible = false;
+      this.renderer.domElement.style.cursor = 'default';
+    }
+  }
+
+  _onPointerDown(e) {
+    // Не реагируем на правую кнопку (панорамирование)
+    if (e.button !== 0) return;
+    this._updateMouse(e);
+    const tile = this._pickTile();
+    if (!tile) return;
+    if (this.game.gameOver) return;
+    if (this.game.current.id !== 'player') return;
+    this.game.selectAt(tile.x, tile.y);
+
+     this._dragStart = { x: e.clientX, y: e.clientY, button: e.button, t: performance.now() };
+  }
+
+  _onPointerUp(e) {
+    if (!this._dragStart) return;
+    const dx = e.clientX - this._dragStart.x;
+    const dy = e.clientY - this._dragStart.y;
+    const dist = Math.hypot(dx, dy);
+    const dt = performance.now() - this._dragStart.t;
+    const wasClick = dist < 6 && dt < 400 && this._dragStart.button === 0;
+    this._dragStart = null;
+
+    if (!wasClick) return;                     // это был драг — не выбираем
+    if (this.game.gameOver) return;
+    if (this.game.current.id !== 'player') return;
+
+    this._updateMouse(e);
+    const tile = this._pickTile();
+    if (!tile) return;
+    this.game.selectAt(tile.x, tile.y);
+  }
+
+  _onResize() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  _animate() {
+    requestAnimationFrame(this._animate);
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+/* =========================================================
+   UI CONTROLLER
+   ========================================================= */
+class UI {
+  constructor(game, renderer) {
+    this.game = game;
+    this.renderer = renderer;
+
+    this.turnLabel = document.getElementById('turnLabel');
+    this.panel = document.getElementById('panel');
+    this.logBox = document.getElementById('log');
+    this.overlay = document.getElementById('overlay');
+    this.overlayText = document.getElementById('overlayText');
+    this.btnEnd = document.getElementById('btnEnd');
+
+    document.getElementById('btnNew').addEventListener('click', () => this._newGame());
+    document.getElementById('btnTiltUp')  .addEventListener('click', () => this.renderer.tiltCamera(-8));
+    document.getElementById('btnTiltDown').addEventListener('click', () => this.renderer.tiltCamera(+8));
+    document.getElementById('btnCamReset').addEventListener('click', () => this.renderer.resetCamera());
+
+    document.getElementById('btnRestart').addEventListener('click', () => this._newGame());
+    this.btnEnd.addEventListener('click', () => this._endTurn());
+
+    game.onSelect(() => { this.renderer.sync(); this.updatePanel(); this.updateTurn(); });
+    game.onGameOver((msg) => this._showGameOver(msg));
+    game.onLog((msg, hl) => this._addLog(msg, hl));
+
+    this.updatePanel();
+    this.updateTurn();
+    this._addLog('Партия начата. Seed: ' + game.board.seed);
+  }
+
+  _endTurn() {
+    if (this.game.gameOver) return;
+    if (this.game.current.id !== 'player') return;
+    this.game.endTurn();
+    this.updateTurn();
+  }
+
+  _newGame() {
+    localStorage.removeItem('warlords_mvp');
+    window.location.reload();
+  }
+
+  updateTurn() {
+    const g = this.game;
+    if (g.gameOver) return;
+    const isPlayer = g.current.id === 'player';
+    this.turnLabel.textContent = isPlayer
+      ? `Ход игрока #${g.turnCount}`
+      : 'Ход ИИ...';
+    this.btnEnd.disabled = !isPlayer || g.gameOver;
+  }
+
+  updatePanel() {
+    const sel = this.game.selected;
+    if (!sel || !sel.alive) {
+      // Показываем статус городов
+      const p = this.game.citiesOf(FACTION.PLAYER).length;
+      const a = this.game.citiesOf(FACTION.AI).length;
+      this.panel.innerHTML =
+        `<h3>Статус</h3>
+         <div>Города игрока: <b>${p}</b></div>
+         <div>Города ИИ: <b>${a}</b></div>
+         <div class="muted" style="margin-top:6px">Кликни по отряду или клетке</div>`;
+      return;
+    }
+    const u = sel;
+    const canMove = !u.hasMoved ? 'да' : 'нет';
+    const canAttack = !u.hasAttacked ? 'да' : 'нет';
+    const owner = u.owner.name;
+    this.panel.innerHTML =
+      `<h3>Отряд — ${owner}</h3>
+       <div>HP: <span class="hp">${u.hp}/${u.maxHp}</span></div>
+       <div>Атака: ${u.attack}</div>
+       <div>Ход: ${u.move}</div>
+       <div>Движение: <b>${canMove}</b></div>
+       <div>Атака: <b>${canAttack}</b></div>
+       <div class="muted" style="margin-top:6px">Кликни по клетке — идти; по врагу — атака</div>`;
+  }
+
+  _addLog(msg, hl = false) {
+    const d = document.createElement('div');
+    if (hl) d.className = 'hl';
+    d.textContent = msg;
+    this.logBox.appendChild(d);
+    this.logBox.scrollTop = this.logBox.scrollHeight;
+    while (this.logBox.children.length > 60) this.logBox.removeChild(this.logBox.firstChild);
+  }
+
+  _showGameOver(msg) {
+    this.overlayText.textContent = msg;
+    this.overlay.style.display = 'flex';
+    this.btnEnd.disabled = true;
+  }
+}
+
+/* =========================================================
+   BOOTSTRAP
+   ========================================================= */
+function boot() {
+  const game = new Game();
+  const renderer = new Renderer(game, document.getElementById('app'));
+  const ui = new UI(game, renderer);
+
+  // Автосохранение в конце каждого хода
+  const origEndTurn = game.endTurn.bind(game);
+  game.endTurn = function () {
+    origEndTurn();
+    try { game.save(); } catch (e) { /* localStorage может быть запрещён */ }
+  };
+
+  // Пробуем загрузить сохранение (простая реализация — только сброс seed)
+  const saved = Game.load();
+  if (saved) {
+    ui._addLog('Найдено сохранение (ход ' + saved.turnCount + '). Используем новую карту для чистоты.');
+    localStorage.removeItem('warlords_mvp');
+  }
+
+  // горячие клавиши
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); ui._endTurn(); }
+    if (e.code === 'Escape') { game.selected = null; renderer.sync(); ui.updatePanel(); }
+
+    if (e.code === 'KeyQ') renderer.tiltCamera(-8);
+    if (e.code === 'KeyE') renderer.tiltCamera(+8);
+    if (e.code === 'KeyR') renderer.resetCamera();
+  });
+
+  // отладочный доступ
+  window.__game = game;
+  window.__renderer = renderer;
+  window.__ui = ui;
+}
+
+boot();
+</script>
+</body>
+</html>
