@@ -1,3 +1,5 @@
+/* Файл: "neon.css" */
+
 * {
   margin: 0;
   padding: 0;
@@ -192,3 +194,64 @@ h1 {
     inset 0 0 20px rgba(0, 255, 255, 0.2);
   transform: translateY(-2px);
 }
+
+/* ===== Кнопки-стрелки в углах экрана ===== */
+.corner-btn {
+  position: absolute;
+  top: 16px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(42px, 9vw, 54px);
+  height: clamp(42px, 9vw, 54px);
+  color: #0ff;
+  font-family: inherit;
+  font-size: clamp(16px, 4vw, 22px);
+  line-height: 1;
+  text-decoration: none;
+  background: rgba(0, 255, 255, 0.08);
+  border: 2px solid #0ff;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.corner-btn--left {
+  left: 16px;
+}
+
+.corner-btn--right {
+  right: 16px;
+}
+
+.corner-btn .corner-arrow {
+  transition: transform 0.2s ease;
+}
+
+.corner-btn:hover,
+.corner-btn:active {
+  background: rgba(0, 255, 255, 0.25);
+  color: #fff;
+  box-shadow:
+    0 0 25px rgba(0, 255, 255, 0.6),
+    inset 0 0 20px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.corner-btn--left:hover .corner-arrow,
+.corner-btn--left:active .corner-arrow {
+  transform: translateX(-4px);
+}
+
+.corner-btn--right:hover .corner-arrow,
+.corner-btn--right:active .corner-arrow {
+  transform: translateX(4px);
+}
+
+.corner-btn[hidden] {
+  display: none;
+}
+
+/* ===== ... ===== */
