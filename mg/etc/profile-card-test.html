@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Профиль — Neon</title>
+  <link rel="stylesheet" href="./neon.css" />
+
+  <!-- ===== Стили для карточки профиля (в том же неоновом стиле) ===== -->
+  <style>
+    /* Обёртка, чтобы центрировать плашку */
+    .profile-stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Сама плашка */
+    .profile-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(14px, 3vh, 22px);
+      padding: clamp(22px, 5vw, 36px) clamp(22px, 6vw, 48px);
+      background: rgba(0, 255, 255, 0.06);
+      border: 2px solid #0ff;
+      border-radius: 18px;
+      box-shadow:
+        0 0 25px rgba(0, 255, 255, 0.25),
+        inset 0 0 25px rgba(0, 255, 255, 0.08);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      max-width: min(360px, 86vw);
+      width: 100%;
+      animation: cardIn 0.35s ease-out;
+    }
+
+    @keyframes cardIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Аватар */
+    .profile-avatar {
+      width: clamp(96px, 26vw, 140px);
+      height: clamp(96px, 26vw, 140px);
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #0ff;
+      box-shadow:
+        0 0 18px rgba(0, 255, 255, 0.55),
+        0 0 40px rgba(0, 255, 255, 0.25),
+        inset 0 0 18px rgba(0, 255, 255, 0.15);
+      background: #0a0a14;
+      transition: box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    .profile-avatar:hover {
+      transform: scale(1.04);
+      box-shadow:
+        0 0 28px rgba(0, 255, 255, 0.8),
+        0 0 60px rgba(0, 255, 255, 0.35),
+        inset 0 0 20px rgba(0, 255, 255, 0.25);
+    }
+
+    /* Имя / ник под аватаром */
+    .profile-name {
+      color: #0ff;
+      font-size: clamp(16px, 4.5vw, 22px);
+      letter-spacing: 2px;
+      text-align: center;
+      text-shadow:
+        0 0 8px rgba(0, 255, 255, 0.8),
+        0 0 22px rgba(0, 255, 255, 0.45);
+      margin: 0;
+      word-break: break-word;
+    }
+
+    /* Кнопка-ссылка */
+    .profile-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: clamp(9px, 2.2vh, 14px) clamp(20px, 5vw, 30px);
+      background: rgba(0, 255, 255, 0.08);
+      border: 2px solid #0ff;
+      color: #0ff;
+      font-family: inherit;
+      font-size: clamp(15px, 4vw, 19px);
+      letter-spacing: 3px;
+      text-decoration: none;
+      text-transform: uppercase;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+    }
+
+    .profile-link:hover,
+    .profile-link:active {
+      background: rgba(0, 255, 255, 0.25);
+      color: #fff;
+      box-shadow:
+        0 0 25px rgba(0, 255, 255, 0.6),
+        inset 0 0 20px rgba(0, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    /* Стрелка, которая едет при ховере */
+    .profile-link .arrow {
+      transition: transform 0.2s ease;
+    }
+
+    .profile-link:hover .arrow {
+      transform: translateX(6px);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Контейнер, куда JS вставит плашку -->
+  <div class="profile-stage" id="profile-stage"></div>
+
+  <!-- Подключаем скрипт -->
+  <script src="./profile-card.js"></script>
+
+  <!-- ===== Пример использования ===== -->
+  <script>
+    createProfileCard({
+      avatar: 'https://i.pravatar.cc/300?img=12', // замените на свой URL
+      name: 'NEON_USER',
+      href: './profile.html',                     // ссылка на ваш html
+      label: 'Профиль',
+      target: '_self',
+    });
+  </script>
+
+</body>
+</html>

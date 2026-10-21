@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ЛЕНИВЕЦ // 404</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background-color: #0a0a14;
+  font-family: "Courier New", monospace;
+}
+
+.menu-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: clamp(20px, 5vh, 40px);
+  padding: 20px;
+  position: relative;
+}
+
+/* Декоративная неоновая сетка на фоне */
+.menu-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    #000 0%,
+    transparent 75%
+  );
+}
+
+h1 {
+  color: #0ff;
+  font-size: clamp(28px, 9vw, 56px);
+  letter-spacing: clamp(3px, 1.5vw, 10px);
+  text-shadow:
+    0 0 10px #0ff,
+    0 0 30px #0ff,
+    0 0 60px rgba(0, 255, 255, 0.5);
+  text-align: center;
+  z-index: 2;
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.subtitle {
+  color: #fff;
+  opacity: 0.5;
+  font-size: clamp(11px, 3vw, 15px);
+  letter-spacing: 4px;
+  z-index: 2;
+  margin-top: -10px;
+}
+
+/* ===== Блок с информацией ===== */
+.lazy-card {
+  z-index: 2;
+  width: min(560px, 88vw);
+  padding: clamp(20px, 4vw, 32px) clamp(18px, 4vw, 30px);
+  background: rgba(0, 255, 255, 0.06);
+  border: 2px solid #0ff;
+  border-radius: 16px;
+  box-shadow:
+    0 0 20px rgba(0, 255, 255, 0.25),
+    inset 0 0 30px rgba(0, 255, 255, 0.06);
+  text-align: center;
+  animation: cardIn 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Бегущий блик по карточке */
+.lazy-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(0, 255, 255, 0.18),
+    transparent
+  );
+  transform: skewX(-20deg);
+  animation: shimmer 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0% { left: -120%; }
+  55% { left: 160%; }
+  100% { left: 160%; }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lazy-emoji {
+  font-size: clamp(48px, 14vw, 84px);
+  line-height: 1;
+  display: inline-block;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(0, 255, 255, 0.7));
+  user-select: none;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-12px) rotate(4deg); }
+}
+
+.lazy-title {
+  color: #fff;
+  font-size: clamp(16px, 4.2vw, 22px);
+  letter-spacing: 3px;
+  margin: 16px 0 12px;
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.8);
+}
+
+.lazy-text {
+  color: #9ff;
+  opacity: 0.85;
+  font-size: clamp(12px, 3.2vw, 15px);
+  line-height: 1.8;
+  letter-spacing: 1px;
+}
+
+.lazy-text .hl {
+  color: #0ff;
+  text-shadow: 0 0 10px #0ff;
+  font-weight: bold;
+}
+
+/* Мигающий курсор */
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  background: #0ff;
+  box-shadow: 0 0 10px #0ff;
+  vertical-align: text-bottom;
+  margin-left: 3px;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ===== Прогресс «сделано» ===== */
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  color: #0ff;
+  opacity: 0.8;
+  font-size: clamp(10px, 2.8vw, 12px);
+  letter-spacing: 2px;
+  margin-top: 22px;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #0ff, #00ff88);
+  box-shadow: 0 0 14px #0ff;
+  border-radius: 6px;
+  animation: fillProgress 2.4s ease-out 0.9s forwards;
+}
+
+@keyframes fillProgress {
+  0% { width: 0%; }
+  70% { width: 3%; }
+  100% { width: 3%; }
+}
+
+.progress-note {
+  margin-top: 10px;
+  color: #fff;
+  opacity: 0.4;
+  font-size: clamp(10px, 2.6vw, 12px);
+  letter-spacing: 2px;
+}
+
+/* ===== Кнопки ===== */
+.actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: rgba(0, 255, 255, 0.08);
+  border: 2px solid #0ff;
+  color: #0ff;
+  font-family: inherit;
+  font-size: clamp(13px, 3.6vw, 16px);
+  letter-spacing: 2px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn:hover,
+.btn:active {
+  background: rgba(0, 255, 255, 0.25);
+  color: #fff;
+  box-shadow:
+    0 0 25px rgba(0, 255, 255, 0.6),
+    inset 0 0 20px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* ===== Кнопка «назад» ===== */
+.back-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 3;
+  padding: 8px 16px;
+  color: #0ff;
+  font-family: inherit;
+  font-size: clamp(13px, 3.5vw, 16px);
+  letter-spacing: 2px;
+  text-decoration: none;
+  background: rgba(0, 255, 255, 0.08);
+  border: 2px solid #0ff;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover,
+.back-btn:active {
+  background: rgba(0, 255, 255, 0.25);
+  color: #fff;
+  box-shadow:
+    0 0 25px rgba(0, 255, 255, 0.6),
+    inset 0 0 20px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Декоративная картинка справа */
+.side-art {
+  position: absolute;
+  right: clamp(0px, 9vw, 60px);
+  top: 50%;
+  transform: translateY(-50%);
+  height: min(70vh, 520px);
+  width: auto;
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  filter: drop-shadow(0 0 24px rgba(0, 255, 255, 0.5));
+  z-index: 1;
+}
+
+@media (max-width: 700px) {
+  .side-art {
+    display: none;
+  }
+}
+
+.footer {
+  position: absolute;
+  bottom: 15px;
+  color: #0ff;
+  opacity: 0.35;
+  font-size: clamp(10px, 2.5vw, 12px);
+  letter-spacing: 2px;
+  z-index: 2;
+}
+
+/* Звуковая подсказка */
+.sound-hint {
+  position: absolute;
+  bottom: 42px;
+  color: #0ff;
+  opacity: 0.45;
+  font-size: clamp(9px, 2.4vw, 11px);
+  letter-spacing: 2px;
+  z-index: 2;
+  animation: pulse 3s ease-in-out infinite;
+}
+</style>
+</head>
+<body>
+<div class="menu-wrapper">
+
+  <a href="../../index.html" class="back-btn" id="backBtn">← НАЗАД</a>
+
+  <!-- Декоративный SVG-арт справа (ленивый кот) -->
+  <svg class="side-art" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <g fill="none" stroke="#0ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="100" cy="220" rx="62" ry="42"/>
+      <circle cx="100" cy="150" r="38"/>
+      <path d="M72 122 L58 84 L92 108"/>
+      <path d="M128 122 L142 84 L108 108"/>
+      <path d="M88 148 q4 6 0 12" />
+      <path d="M112 148 q-4 6 0 12" />
+      <path d="M96 164 q4 4 8 0" />
+      <path d="M50 214 q-22 6 -28 30"/>
+      <path d="M150 214 q22 6 28 30"/>
+      <path d="M84 250 q16 10 32 0"/>
+      <text x="100" y="290" text-anchor="middle" fill="#0ff" stroke="none"
+            font-family="Courier New, monospace" font-size="13" opacity="0.7">ZzZ…</text>
+    </g>
+  </svg>
+
+  <h1>ЛЕНЬ</h1>
+  <div class="subtitle">[ СТРАНИЦА В РАЗРАБОТКЕ... НАВЕРНОЕ ]</div>
+
+  <div class="lazy-card" id="lazyCard">
+    <div class="lazy-emoji">🦥</div>
+    <div class="lazy-title">ПОЛЬЗОВАТЕЛЬ СЛИШКОМ ЛЕНИВ</div>
+    <p class="lazy-text">
+      Этот человек <span class="hl">ничего не сделал</span> для данной страницы.<br>
+      Совсем. Ноль. Пустота.<br>
+      Он обещал. Он собирался. Он даже открыл редактор...<br>
+      <span class="hl">Но потом решил вздремнуть.</span><span class="cursor"></span>
+    </p>
+
+    <div class="progress-label">
+      <span>ПРОГРЕСС</span>
+      <span id="progressPercent">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill"></div>
+    </div>
+    <div class="progress-note">// работа остановлена на этапе «подумать об этом»</div>
+
+    <div class="actions">
+      <button class="btn" id="wakeBtn">⚡ РАЗБУДИТЬ</button>
+      <a href="../../index.html" class="btn">← УЙТИ</a>
+    </div>
+  </div>
+
+  <div class="sound-hint">♪ НАЖМИ ЛЮБУЮ КНОПКУ — БУДЕТ ЗВУК ♪</div>
+  <div class="footer">11.HTML // LAZY EDITION</div>
+</div>
+
+<script>
+/* ================= ЗВУК (Web Audio API, без файлов) ================= */
+let audioCtx = null;
+
+function getCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+/* Одиночный тон с мягкой огибающей */
+function playTone(freq, start, duration, type = "sine", volume = 0.15) {
+  const ctx = getCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(volume, start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(start);
+  osc.stop(start + duration + 0.05);
+}
+
+/* Звук клика — короткий «неоновый» бип */
+function playClick() {
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  playTone(880, t, 0.08, "square", 0.08);
+  playTone(1320, t + 0.05, 0.1, "sine", 0.1);
+}
+
+/* Звук «пробуждения» — восходящее арпеджио */
+function playWake() {
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+  notes.forEach((f, i) => {
+    playTone(f, t + i * 0.09, 0.25, "triangle", 0.12);
+  });
+}
+
+/* Звук при наведении — тихий тик (не спамим: только при смене) */
+let hoverLock = false;
+function playHover() {
+  if (hoverLock) return;
+  hoverLock = true;
+  const ctx = getCtx();
+  playTone(1568, ctx.currentTime, 0.05, "sine", 0.04);
+  setTimeout(() => (hoverLock = false), 120);
+}
+
+/* ================= ИНТЕРАКТИВ ================= */
+document.addEventListener("click", (e) => {
+  if (e.target.closest("a, button")) {
+    playClick();
+  }
+});
+
+document.querySelectorAll(".btn, .back-btn").forEach((el) => {
+  el.addEventListener("mouseenter", playHover);
+});
+
+/* Кнопка «разбудить» */
+const wakeBtn = document.getElementById("wakeBtn");
+let wakeCount = 0;
+
+wakeBtn.addEventListener("click", () => {
+  playWake();
+  wakeCount++;
+
+  const card = document.getElementById("lazyCard");
+  const emoji = card.querySelector(".lazy-emoji");
+  const title = card.querySelector(".lazy-title");
+  const text = card.querySelector(".lazy-text");
+
+  // тряска карточки
+  card.animate(
+    [
+      { transform: "translateX(0)" },
+      { transform: "translateX(-8px)" },
+      { transform: "translateX(8px)" },
+      { transform: "translateX(-5px)" },
+      { transform: "translateX(0)" },
+    ],
+    { duration: 380, easing: "ease-in-out" }
+  );
+
+  if (wakeCount === 1) {
+    emoji.textContent = "😴";
+    title.textContent = "ПОЛЬЗОВАТЕЛЬ ПЕРЕВЕРНУЛСЯ НА ДРУГОЙ БОК";
+    text.innerHTML =
+      'Попытка разбудить <span class="hl">провалилась</span>.<br>' +
+      'Он пробормотал что-то про «завтра» и снова уснул.<br>' +
+      '<span class="hl">Завтра</span> — это, конечно, не сегодня.<span class="cursor"></span>';
+  } else if (wakeCount === 2) {
+    emoji.textContent = "🥱";
+    title.textContent = "ОН ОТКРЫЛ ОДИН ГЛАЗ";
+    text.innerHTML =
+      'Взгляд полон <span class="hl">глубокой мудрости</span> и нуля мотивации.<br>' +
+      '«Я всё сделаю. Потом. Честно.»<br>' +
+      'Мы ему не верим.<span class="cursor"></span>';
+  } else if (wakeCount === 3) {
+    emoji.textContent = "🛌";
+    title.textContent = "ХВАТИТ. ОН УСТАЛ ОТ ТВОИХ КНОПОК";
+    text.innerHTML =
+      'Человек лёг обратно и накрылся пледом.<br>' +
+      'Страница останется <span class="hl">пустой</span>. Смирись.<br>' +
+      'Или... сделай её сам?<span class="cursor"></span>';
+    wakeBtn.textContent = "😑 ОН СПИТ";
+    wakeBtn.style.opacity = "0.5";
+    wakeBtn.disabled = true;
+    wakeBtn.style.cursor = "not-allowed";
+  }
+
+  // обновляем прогресс (шутливо)
+  const percent = document.getElementById("progressPercent");
+  const shown = Math.min(3, wakeCount);
+  percent.textContent = shown + "%";
+});
+
+/* Параллакс: лёгкий наклон карточки за курсором */
+const card = document.getElementById("lazyCard");
+let rafId = null;
+
+document.addEventListener("mousemove", (e) => {
+  if (window.innerWidth < 700) return;
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const rx = ((e.clientY - cy) / cy) * -4;
+  const ry = ((e.clientX - cx) / cx) * 4;
+
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(() => {
+    card.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+    card.style.transition = "transform 0.15s ease-out";
+  });
+});
+
+/* Автовоспроизведение: короткий звук при первом взаимодействии */
+let firstInteraction = false;
+function onFirstInteraction() {
+  if (firstInteraction) return;
+  firstInteraction = true;
+  playHover();
+}
+document.addEventListener("pointerdown", onFirstInteraction, { once: true });
+document.addEventListener("keydown", onFirstInteraction, { once: true });
+</script>
+</body>
+</html>

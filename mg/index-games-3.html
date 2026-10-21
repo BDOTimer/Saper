@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Arcade Neon — Меню</title>
+    <link rel="icon" type="image/png" href="res/favicon-64.png" sizes="64x64">
+    <link rel="stylesheet" href="./etc/neon.css" />
+</head>
+<body>
+
+<a href="../index.html" class="back-btn">← Меню</a>
+<script src="res/click-sound.js"></script>
+<div class="menu-wrapper">
+    <h1>ARCADE</h1>
+    <div class="subtitle">NEON EDITION</div>
+
+    <div class="menu-buttons">
+
+        <a href="snake.html" class="menu-btn" data-game="snake">
+            <span><span class="num">05</span>ЗМЕЙКА</span>
+            <span class="arrow">▶</span>
+        </a>
+        <a href="15in4x4.html" class="menu-btn" data-game="15in4x4">
+            <span><span class="num">04</span>ПЯТНАШКИ</span>
+            <span class="arrow">▶</span>
+        </a>
+        <a href="pong.html" class="menu-btn">
+            <span><span class="num">03</span>PONG</span>
+            <span class="arrow">▶</span>
+        </a>
+        <a href="tetris.html" class="menu-btn">
+            <span><span class="num">02</span>TETRIS</span>
+            <span class="arrow">▶</span>
+        </a>
+        <a href="tictactoe.html" class="menu-btn" data-game="tictactoe">
+            <span><span class="num">01</span>КРЕСТИКИ 4×4</span>
+            <span class="arrow">▶</span>
+        </a>
+
+        <!-- ... Скрыто ... -->
+        <a href="mg/index-games-3.html" class="menu-btn" hidden>
+          <span><span class="num">➡️</span> ... etc</span>
+          <span class="arrow">▶</span>
+        </a>
+        
+    </div>
+
+    <div class="footer">ВЫБЕРИ ИГРУ</div>
+    
+    <!-- >>> ДОБАВЛЕНО: декоративная картинка справа
+    <img src="mg/res/123.png" alt="" class="side-art">
+    -->
+</div>
+
+</body>
+</html>

@@ -16,169 +16,155 @@
     />
 
     <title>Arcade Neon — Меню</title>
+
+    <link rel="stylesheet" href="./mg/etc/neon.css" />
+
+    <!-- ===== Стили для карточек профиля (в неоновом стиле) ===== -->
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        height: 100%;
-        overflow: hidden;
-        background-color: #0a0a14;
-        font-family: "Courier New", monospace;
-      }
-
-      .menu-wrapper {
+      /* ---------- Левая панель-агрегатор ---------- */
+      .profiles-panel {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: min(260px, 34vw);
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 8px 6px;
         display: flex;
         flex-direction: column;
+        gap: 12px;
+        z-index: 3;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 255, 255, 0.35) transparent;
+      }
+
+      .profiles-panel::-webkit-scrollbar {
+        width: 6px;
+      }
+      .profiles-panel::-webkit-scrollbar-thumb {
+        background: rgba(0, 255, 255, 0.35);
+        border-radius: 4px;
+      }
+      .profiles-panel::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      /* ---------- Карточка профиля ---------- */
+      .profile-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 14px 16px;
+        background: rgba(0, 255, 255, 0.06);
+        border: 2px solid #0ff;
+        border-radius: 14px;
+        box-shadow:
+          0 0 15px rgba(0, 255, 255, 0.25),
+          inset 0 0 15px rgba(0, 255, 255, 0.08);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        width: 100%;
+        animation: cardIn 0.35s ease-out;
+      }
+
+      @keyframes cardIn {
+        from {
+          opacity: 0;
+          transform: translateX(-12px) scale(0.97);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+      }
+
+      .profile-card:hover {
+        box-shadow:
+          0 0 25px rgba(0, 255, 255, 0.5),
+          inset 0 0 18px rgba(0, 255, 255, 0.15);
+      }
+
+      /* Аватар */
+      .profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #0ff;
+        box-shadow:
+          0 0 10px rgba(0, 255, 255, 0.55),
+          inset 0 0 10px rgba(0, 255, 255, 0.15);
+        background: #0a0a14;
+        transition: box-shadow 0.25s ease, transform 0.25s ease;
+      }
+
+      .profile-avatar:hover {
+        transform: scale(1.06);
+        box-shadow:
+          0 0 18px rgba(0, 255, 255, 0.85),
+          inset 0 0 12px rgba(0, 255, 255, 0.25);
+      }
+
+      /* Имя */
+      .profile-name {
+        color: #0ff;
+        font-size: 13px;
+        letter-spacing: 1.5px;
+        text-align: center;
+        text-shadow:
+          0 0 6px rgba(0, 255, 255, 0.8),
+          0 0 16px rgba(0, 255, 255, 0.4);
+        margin: 0;
+        word-break: break-word;
+        line-height: 1.2;
+      }
+
+      /* Кнопка-ссылка */
+      .profile-link {
+        display: flex;
         align-items: center;
         justify-content: center;
+        gap: 6px;
         width: 100%;
-        height: 100%;
-        gap: clamp(20px, 5vh, 40px);
-        padding: 20px;
-        position: relative;
-      }
-
-      /* Декоративная неоновая сетка на фоне */
-      .menu-wrapper::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image:
-          linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
-        background-size: 40px 40px;
-        pointer-events: none;
-        mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
-        -webkit-mask-image: radial-gradient(
-          circle at center,
-          #000 0%,
-          transparent 75%
-        );
-      }
-
-      h1 {
-        color: #0ff;
-        font-size: clamp(28px, 9vw, 56px);
-        letter-spacing: clamp(3px, 1.5vw, 10px);
-        text-shadow:
-          0 0 10px #0ff,
-          0 0 30px #0ff,
-          0 0 60px rgba(0, 255, 255, 0.5);
-        text-align: center;
-        z-index: 2;
-        animation: pulse 2.5s ease-in-out infinite;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.75;
-        }
-      }
-
-      .subtitle {
-        color: #fff;
-        opacity: 0.5;
-        font-size: clamp(11px, 3vw, 15px);
-        letter-spacing: 4px;
-        z-index: 2;
-        margin-top: -10px;
-      }
-
-      .menu-buttons {
-        display: flex;
-        flex-direction: column;
-        gap: clamp(10px, 2vh, 16px);
-        width: min(340px, 82vw);
-        z-index: 2;
-      }
-
-      .menu-btn {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: clamp(9px, 2.2vh, 14px) clamp(20px, 5vw, 30px);
+        padding: 7px 10px;
         background: rgba(0, 255, 255, 0.08);
         border: 2px solid #0ff;
         color: #0ff;
         font-family: inherit;
-        font-size: clamp(16px, 4.5vw, 22px);
-        letter-spacing: 3px;
+        font-size: 12px;
+        letter-spacing: 2px;
         text-decoration: none;
-        border-radius: 12px;
+        text-transform: uppercase;
+        border-radius: 10px;
         cursor: pointer;
         transition: all 0.2s ease;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
       }
 
-      .menu-btn[hidden] {
-        display: none;
-      }
-
-      .menu-btn .num {
-        color: #fff;
-        opacity: 0.6;
-        font-size: 0.85em;
-        margin-right: 10px;
-      }
-
-      .menu-btn .arrow {
-        transition: transform 0.2s ease;
-      }
-
-      .menu-btn:hover,
-      .menu-btn:active {
+      .profile-link:hover,
+      .profile-link:active {
         background: rgba(0, 255, 255, 0.25);
         color: #fff;
         box-shadow:
-          0 0 25px rgba(0, 255, 255, 0.6),
-          inset 0 0 20px rgba(0, 255, 255, 0.2);
-        transform: translateY(-2px);
+          0 0 18px rgba(0, 255, 255, 0.6),
+          inset 0 0 12px rgba(0, 255, 255, 0.2);
+        transform: translateY(-1px);
       }
 
-      .menu-btn:hover .arrow {
-        transform: translateX(6px);
+      .profile-link .arrow {
+        transition: transform 0.2s ease;
       }
 
-      .footer {
-        position: absolute;
-        bottom: 15px;
-        color: #0ff;
-        opacity: 0.35;
-        font-size: clamp(10px, 2.5vw, 12px);
-        letter-spacing: 2px;
-        z-index: 2;
+      .profile-link:hover .arrow {
+        transform: translateX(4px);
       }
 
-      /* Декоративная картинка справа */
-      .side-art {
-        position: absolute;
-        right: clamp(0px, 9vw, 60px);
-        top: 50%;
-        transform: translateY(-50%);
-        height: min(70vh, 520px);
-        width: auto;
-        opacity: 0.5;
-        pointer-events: none;
-        user-select: none;
-        -webkit-user-select: none;
-        filter: drop-shadow(0 0 24px rgba(0, 255, 255, 0.5));
-        z-index: 1;
-      }
-
-      /* На узких экранах прячем, чтобы не мешала */
-      @media (max-width: 700px) {
-        .side-art {
+      /* На узких экранах панель прячем, чтобы не мешала меню */
+      @media (max-width: 900px) {
+        .profiles-panel {
           display: none;
         }
       }
@@ -187,6 +173,9 @@
 
   <body>
     <script src="mg/res/click-sound.js"></script>
+
+    <!-- ===== Левая панель-агрегатор профилей ===== -->
+    <aside class="profiles-panel" id="profiles-panel" aria-label="Профили"></aside>
 
     <div class="menu-wrapper">
       <h1>ARCADE</h1>
@@ -199,67 +188,87 @@
           data-game="elite"
           target="_blank"
         >
-          <span><span class="num">00</span>Galaxy-J[🪒]</span>
+          <span><span class="num">🚀</span>Galaxy-J[🪒]</span>
           <span class="arrow">▶</span>
         </a>
 
-        <!--
-        ... Новое ...
-        -->
+        <a href="mg/etc/bulls-cows.html" class="menu-btn" data-game="3lines">
+          <span><span class="num">13</span>БЫКИ И КОРОВЫ</span>
+          <span class="arrow">▶</span>
+        </a>
 
         <a href="mg/etc/flappy.html" class="menu-btn" data-game="3lines">
-          <span><span class="num">13</span>ФЛОПИ-БИРД</span>
+          <span><span class="num">12</span>ФЛОПИ-БИРД</span>
           <span class="arrow">▶</span>
         </a>
 
         <a href="mg/etc/lines.html" class="menu-btn" data-game="3lines">
-          <span><span class="num">12</span>LINES-98</span>
+          <span><span class="num">11</span>LINES-98</span>
           <span class="arrow">▶</span>
         </a>
 
         <a href="mg/etc/monopoly.html" class="menu-btn" data-game="3lines">
-          <span><span class="num">11</span>МОНОПОЛИЯ</span>
-          <span class="arrow">▶</span>
-        </a>
-
-        <a href="mg/etc/prostofilia.html" class="menu-btn" data-game="3lines">
-          <span><span class="num">10</span>Просто Филя</span>
-          <span class="arrow">▶</span>
-        </a>
-
-        <a href="mg/etc/chess.html" class="menu-btn" data-game="3lines">
-          <span><span class="num">09</span>ШАХМАТЫ</span>
+          <span><span class="num">10</span>МОНОПОЛИЯ</span>
           <span class="arrow">▶</span>
         </a>
 
         <a href="mg/calc.html" class="menu-btn" data-game="calc">
-          <span><span class="num">08</span>Калькулятор</span>
+          <span><span class="num">📅</span>Калькулятор</span>
           <span class="arrow">▶</span>
         </a>
 
-        <!--
-        ... Скрыто ...
-        -->
         <a
           href="mg/tictactoe.html"
           class="menu-btn"
           data-game="tictactoe"
           hidden
         >
-        <span><span class="num">08</span>КРЕСТИКИ 4×4</span>
+          <span><span class="num">08</span>КРЕСТИКИ 4×4</span>
           <span class="arrow">▶</span>
         </a>
 
         <a href="mg/index-games-2.html" class="menu-btn">
-          <span><span class="num">99</span>... etc</span>
+          <span><span class="num">🚶‍➡️</span> ... etc</span>
           <span class="arrow">▶</span>
         </a>
       </div>
 
       <div class="footer">ВЫБЕРИ ИГРУ</div>
 
-      <!-- >>> ДОБАВЛЕНО: декоративная картинка справа -->
       <img src="mg/res/123.png" alt="" class="side-art" />
     </div>
+
+    <!-- ===== Подключаем скрипт карточек ===== -->
+    <script src="./mg/etc/profile-card.js"></script>
+
+    <!-- ===== Наполняем панель 5 карточками ===== -->
+    <script>
+      createProfileList(
+        [
+          {
+            avatar: 'https://img.magnific.com/premium-psd/panda-wearing-hoodie-funny-cool-animal-character-illustration-vector-graphic_1266954-9723.jpg?semt=ais_hybrid&w=740&q=80',
+            name: 'Bondersan',
+            href: 'http://kypilkimen.ru/',
+            label: 'САЙТ',
+            target: '_blank',
+          },
+          {
+            avatar: 'https://i.pravatar.cc/300?img=13',
+            name: 'slava-rusi11',
+            href: 'mg/etc/11.html',
+            label: 'ВКЛАД В САЙТ',
+            target: '_self',
+          },
+          {
+            avatar: 'https://img.magnific.com/premium-vector/3d-rendering-cute-pug-dark-room-3d-illustration-3d-rendering-cute-pug-dark-room_912214-20048.jpg?semt=ais_hybrid&w=740&q=80',
+            name: 'MONOPOLIST',
+            href: 'mg/etc/monopoly.html',
+            label: '...',
+            target: '_self',
+          },
+        ],
+        document.getElementById('profiles-panel')
+      );
+    </script>
   </body>
 </html>

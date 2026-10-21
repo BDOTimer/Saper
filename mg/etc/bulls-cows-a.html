@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Быки и Коровы</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  .game-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 30px;
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.8s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    text-align: center;
+    color: #fff;
+    font-size: 2.2em;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
+    animation: glow 3s ease-in-out infinite alternate;
+  }
+
+  @keyframes glow {
+    from { text-shadow: 0 0 20px rgba(100, 200, 255, 0.3); }
+    to { text-shadow: 0 0 30px rgba(100, 200, 255, 0.8), 0 0 60px rgba(150, 100, 255, 0.4); }
+  }
+
+  .subtitle {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 20px;
+    font-size: 0.9em;
+  }
+
+  .rules {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85em;
+    line-height: 1.6;
+    border-left: 3px solid #e94560;
+  }
+
+  .rules b { color: #e94560; }
+
+  .input-area {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
+
+  .digit-inputs {
+    display: flex;
+    gap: 8px;
+  }
+
+  .digit-input {
+    width: 56px;
+    height: 64px;
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    outline: none;
+    transition: all 0.3s ease;
+    caret-color: #e94560;
+  }
+
+  .digit-input:focus {
+    border-color: #e94560;
+    box-shadow: 0 0 20px rgba(233, 69, 96, 0.4);
+    background: rgba(233, 69, 96, 0.1);
+    transform: scale(1.05);
+  }
+
+  .digit-input.filled {
+    border-color: #00d9ff;
+    background: rgba(0, 217, 255, 0.1);
+  }
+
+  .digit-input.error {
+    animation: shake 0.4s ease;
+    border-color: #ff4444 !important;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  .btn {
+    padding: 12px 28px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.5s, height 0.5s;
+  }
+
+  .btn:active::after {
+    width: 300px;
+    height: 300px;
+  }
+
+  .btn-check {
+    background: linear-gradient(135deg, #e94560, #c23152);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+    height: 64px;
+  }
+
+  .btn-check:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(233, 69, 96, 0.6);
+  }
+
+  .btn-check:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-new {
+    background: linear-gradient(135deg, #00d9ff, #0099cc);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(0, 217, 255, 0.4);
+    display: block;
+    margin: 0 auto;
+    padding: 14px 40px;
+    font-size: 18px;
+  }
+
+  .btn-new:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(0, 217, 255, 0.6);
+  }
+
+  .history {
+    max-height: 320px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+  }
+
+  .history::-webkit-scrollbar { width: 6px; }
+  .history::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+  .history::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+  .guess-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    animation: slideIn 0.5s ease;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .guess-row.win {
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(150, 100, 255, 0.2));
+    border-color: rgba(0, 217, 255, 0.5);
+    animation: winPulse 1s ease infinite alternate;
+  }
+
+  @keyframes winPulse {
+    from { box-shadow: 0 0 10px rgba(0, 217, 255, 0.3); }
+    to { box-shadow: 0 0 25px rgba(0, 217, 255, 0.6); }
+  }
+
+  .guess-number {
+    font-size: 24px;
+    font-weight: bold;
+    color: #fff;
+    letter-spacing: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .guess-result {
+    display: flex;
+    gap: 10px;
+  }
+
+  .badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .badge-bull {
+    background: rgba(255, 107, 53, 0.2);
+    color: #ff6b35;
+    border: 1px solid rgba(255, 107, 53, 0.4);
+  }
+
+  .badge-cow {
+    background: rgba(0, 217, 255, 0.15);
+    color: #00d9ff;
+    border: 1px solid rgba(0, 217, 255, 0.3);
+  }
+
+  .status {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 15px;
+    font-size: 0.95em;
+    min-height: 24px;
+    transition: all 0.3s;
+  }
+
+  .status.win-text {
+    color: #00d9ff;
+    font-size: 1.3em;
+    font-weight: bold;
+    animation: winPulse 1s ease infinite alternate;
+  }
+
+  .attempts {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85em;
+    margin-bottom: 10px;
+  }
+
+  .particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    border-radius: 50%;
+  }
+
+  @keyframes particleFly {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--px), var(--py)) scale(0); opacity: 0; }
+  }
+
+  .confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  @keyframes confettiFall {
+    0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  .bull-anim {
+    display: inline-block;
+    animation: bullBounce 0.6s ease;
+  }
+
+  @keyframes bullBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px) scale(1.2); }
+  }
+
+  /* ===== ВЕРХНЯЯ ПАНЕЛЬ С КНОПКАМИ ===== */
+  .top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .top-btn {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  }
+
+  .top-btn:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(0, 217, 255, 0.5);
+    box-shadow: 0 6px 20px rgba(0, 217, 255, 0.3);
+  }
+
+  .top-btn:active {
+    transform: translateY(0);
+  }
+
+  .menu-btn {
+    border-left: 3px solid #00d9ff;
+  }
+
+  .rules-btn {
+    border-right: 3px solid #e94560;
+  }
+
+  /* ===== МОДАЛЬНОЕ ОКНО ПРАВИЛ ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 30, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  .modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .modal {
+    background: linear-gradient(135deg, #1e2640 0%, #16213e 100%);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(0, 217, 255, 0.15);
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s ease;
+    position: relative;
+  }
+
+  .modal-overlay.active .modal {
+    transform: scale(1) translateY(0);
+  }
+
+  .modal::-webkit-scrollbar { width: 6px; }
+  .modal::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+  .modal::-webkit-scrollbar-thumb { background: rgba(0,217,255,0.3); border-radius: 3px; }
+
+  .modal h2 {
+    color: #00d9ff;
+    font-size: 1.6em;
+    margin-bottom: 20px;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+  }
+
+  .modal-content {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.95em;
+    line-height: 1.7;
+  }
+
+  .modal-content p {
+    margin-bottom: 14px;
+  }
+
+  .modal-content ul {
+    list-style: none;
+    margin-bottom: 16px;
+  }
+
+  .modal-content li {
+    padding: 8px 0 8px 30px;
+    position: relative;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .modal-content li::before {
+    content: '▸';
+    position: absolute;
+    left: 8px;
+    color: #e94560;
+    font-weight: bold;
+  }
+
+  .modal-content .highlight {
+    color: #ff6b35;
+    font-weight: bold;
+  }
+
+  .modal-content .highlight-blue {
+    color: #00d9ff;
+    font-weight: bold;
+  }
+
+  .example-box {
+    background: rgba(0, 217, 255, 0.08);
+    border: 1px solid rgba(0, 217, 255, 0.25);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 0.9em;
+  }
+
+  .example-box .ex-title {
+    color: #00d9ff;
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+  }
+
+  .close-btn {
+    display: block;
+    margin: 24px auto 0;
+    padding: 12px 40px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    background: linear-gradient(135deg, #e94560, #c23152);
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+    transition: all 0.3s ease;
+  }
+
+  .close-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(233, 69, 96, 0.6);
+  }
+
+  @media (max-width: 480px) {
+    .game-container { padding: 20px 15px; }
+    h1 { font-size: 1.7em; }
+    .digit-input { width: 46px; height: 54px; font-size: 22px; }
+    .guess-number { font-size: 20px; letter-spacing: 5px; }
+    .btn-check { padding: 12px 18px; font-size: 14px; }
+    .top-btn { padding: 8px 12px; font-size: 12px; }
+    .top-bar { padding: 12px; }
+    .modal { padding: 22px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== ВЕРХНЯЯ ПАНЕЛЬ ===== -->
+<div class="top-bar">
+  <a href="bulls-cows.html" class="top-btn menu-btn" title="Вернуться в меню">
+    🏠 NEON
+  </a>
+  <button class="top-btn rules-btn" onclick="openRules()" title="Правила игры">
+    📖 ПРАВИЛА
+  </button>
+</div>
+
+<div class="game-container">
+  <h1>🐂 Быки и Коровы 🐄</h1>
+  <p class="subtitle">Угадай 4-значное число</p>
+
+  <div class="rules">
+    <b>🐂 Бык</b> — цифра на своём месте<br>
+    <b>🐄 Корова</b> — цифра есть, но не на своём месте<br>
+    Цифры не повторяются. Первая может быть 0.
+  </div>
+
+  <div class="status" id="status">Введи свою догадку</div>
+  <div class="attempts" id="attempts">Попытка: 1</div>
+
+  <div class="input-area">
+    <div class="digit-inputs">
+      <input type="text" class="digit-input" id="d0" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input type="text" class="digit-input" id="d1" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input type="text" class="digit-input" id="d2" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input type="text" class="digit-input" id="d3" maxlength="1" inputmode="numeric" autocomplete="off">
+    </div>
+    <button class="btn btn-check" id="checkBtn" onclick="checkGuess()">✓</button>
+  </div>
+
+  <div class="history" id="history"></div>
+
+  <button class="btn btn-new" id="newBtn" onclick="newGame()">🔄 Новая игра</button>
+</div>
+
+<!-- ===== МОДАЛЬНОЕ ОКНО ПРАВИЛ ===== -->
+<div class="modal-overlay" id="rulesModal" onclick="closeRulesOnOverlay(event)">
+  <div class="modal">
+    <h2>📖 Правила игры</h2>
+    <div class="modal-content">
+      <p>Компьютер загадывает <span class="highlight-blue">4-значное число</span> из неповторяющихся цифр. Твоя задача — угадать его за <span class="highlight">10 попыток</span>.</p>
+
+      <ul>
+        <li><span class="highlight">🐂 Бык</span> — угадана цифра <b>и её позиция</b></li>
+        <li><span class="highlight-blue">🐄 Корова</span> — цифра угадана, но стоит <b>не на своём месте</b></li>
+      </ul>
+
+      <div class="example-box">
+        <div class="ex-title">💡 Пример</div>
+        <p>Загадано число: <b style="color:#fff">1 2 3 4</b><br>
+        Твой ход: <b style="color:#fff">1 5 3 6</b></p>
+        <p style="margin-bottom:0">Результат: <span class="highlight">🐂 2 быка</span> (1 и 3 на своих местах) и <span class="highlight-blue">🐄 0 коров</span>.</p>
+      </div>
+
+      <p><b>Важные моменты:</b></p>
+      <ul>
+        <li>Цифры в числе <b>не повторяются</b></li>
+        <li>Первая цифра может быть <b>0</b></li>
+        <li>Всего даётся <b>10 попыток</b></li>
+        <li>После каждой попытки вводи новые цифры</li>
+      </ul>
+
+      <p style="text-align:center; color:#00d9ff; font-weight:bold;">Удачи! 🍀</p>
+    </div>
+    <button class="close-btn" onclick="closeRules()">Понятно</button>
+  </div>
+</div>
+
+<script>
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, duration, type = 'sine', volume = 0.15, delay = 0) {
+  initAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const t = audioCtx.currentTime + delay;
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + duration + 0.05);
+}
+
+const Sound = {
+  type() { playTone(600 + Math.random() * 300, 0.05, 'sine', 0.06); },
+  click() {
+    playTone(800, 0.08, 'square', 0.06);
+    playTone(1200, 0.05, 'sine', 0.04, 0.05);
+  },
+  bull() {
+    playTone(220, 0.15, 'sawtooth', 0.12);
+    playTone(180, 0.2, 'sawtooth', 0.1, 0.1);
+  },
+  cow() {
+    playTone(400, 0.1, 'sine', 0.08);
+    playTone(500, 0.1, 'sine', 0.08, 0.08);
+  },
+  correct() {
+    playTone(523, 0.12, 'sine', 0.12);
+    playTone(659, 0.12, 'sine', 0.12, 0.1);
+    playTone(784, 0.2, 'sine', 0.12, 0.2);
+  },
+  win() {
+    const notes = [523, 659, 784, 1047, 1319];
+    notes.forEach((n, i) => playTone(n, 0.3, 'sine', 0.15, i * 0.12));
+    playTone(1568, 0.5, 'sine', 0.1, 0.6);
+  },
+  error() {
+    playTone(200, 0.15, 'square', 0.1);
+    playTone(150, 0.2, 'square', 0.1, 0.12);
+  },
+  gameover() {
+    playTone(400, 0.2, 'sawtooth', 0.1);
+    playTone(300, 0.3, 'sawtooth', 0.1, 0.2);
+    playTone(200, 0.5, 'sawtooth', 0.1, 0.5);
+  },
+  modalOpen() {
+    playTone(600, 0.08, 'sine', 0.08);
+    playTone(900, 0.1, 'sine', 0.08, 0.08);
+  },
+  modalClose() {
+    playTone(700, 0.08, 'sine', 0.08);
+    playTone(450, 0.1, 'sine', 0.08, 0.08);
+  }
+};
+
+// ===== МОДАЛЬНОЕ ОКНО =====
+function openRules() {
+  Sound.modalOpen();
+  document.getElementById('rulesModal').classList.add('active');
+}
+
+function closeRules() {
+  Sound.modalClose();
+  document.getElementById('rulesModal').classList.remove('active');
+}
+
+function closeRulesOnOverlay(e) {
+  if (e.target.id === 'rulesModal') closeRules();
+}
+
+// Закрытие по Esc
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeRules();
+});
+
+// ===== ИГРОВАЯ ЛОГИКА =====
+let secret = [];
+let attempts = 0;
+let gameOver = false;
+const MAX_ATTEMPTS = 10;
+const inputs = [0,1,2,3].map(i => document.getElementById('d' + i));
+
+function generateSecret() {
+  const digits = [0,1,2,3,4,5,6,7,8,9];
+  for (let i = digits.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [digits[i], digits[j]] = [digits[j], digits[i]];
+  }
+  return digits.slice(0, 4);
+}
+
+function countBullsCows(guess, target) {
+  let bulls = 0, cows = 0;
+  for (let i = 0; i < 4; i++) {
+    if (guess[i] === target[i]) bulls++;
+    else if (target.includes(guess[i])) cows++;
+  }
+  return { bulls, cows };
+}
+
+function newGame() {
+  secret = generateSecret();
+  attempts = 0;
+  gameOver = false;
+  document.getElementById('history').innerHTML = '';
+  document.getElementById('status').textContent = 'Введи свою догадку';
+  document.getElementById('status').className = 'status';
+  document.getElementById('attempts').textContent = 'Попытка: 1';
+  document.getElementById('checkBtn').disabled = false;
+  inputs.forEach(inp => {
+    inp.value = '';
+    inp.classList.remove('filled');
+    inp.disabled = false;
+  });
+  inputs[0].focus();
+  Sound.click();
+}
+
+function getGuess() {
+  return inputs.map(inp => inp.value);
+}
+
+function checkGuess() {
+  if (gameOver) return;
+  const guess = getGuess().map(Number);
+
+  if (guess.some(isNaN)) {
+    showError('Заполни все 4 цифры!');
+    return;
+  }
+  if (new Set(guess).size !== 4) {
+    showError('Цифры не должны повторяться!');
+    return;
+  }
+
+  const { bulls, cows } = countBullsCows(guess, secret);
+  attempts++;
+
+  addHistory(guess, bulls, cows);
+  playResultSound(bulls, cows);
+
+  if (bulls === 4) {
+    gameOver = true;
+    document.getElementById('status').textContent = '🎉 ПОБЕДА! Ты угадал!';
+    document.getElementById('status').className = 'status win-text';
+    document.getElementById('checkBtn').disabled = true;
+    inputs.forEach(inp => inp.disabled = true);
+    setTimeout(() => { Sound.win(); launchConfetti(); }, 300);
+    return;
+  }
+
+  if (attempts >= MAX_ATTEMPTS) {
+    gameOver = true;
+    document.getElementById('status').textContent = '😢 Попытки кончились! Загадано: ' + secret.join('');
+    document.getElementById('status').className = 'status';
+    document.getElementById('checkBtn').disabled = true;
+    inputs.forEach(inp => inp.disabled = true);
+    setTimeout(() => Sound.gameover(), 200);
+    return;
+  }
+
+  document.getElementById('attempts').textContent = `Попытка: ${attempts + 1} из ${MAX_ATTEMPTS}`;
+  inputs.forEach(inp => {
+    inp.value = '';
+    inp.classList.remove('filled');
+  });
+  inputs[0].focus();
+}
+
+function addHistory(guess, bulls, cows) {
+  const history = document.getElementById('history');
+  const row = document.createElement('div');
+  row.className = 'guess-row' + (bulls === 4 ? ' win' : '');
+  row.innerHTML = `
+    <span class="guess-number">${guess.join('')}</span>
+    <span class="guess-result">
+      <span class="badge badge-bull ${bulls > 0 ? 'bull-anim' : ''}">🐂 ${bulls}</span>
+      <span class="badge badge-cow">🐄 ${cows}</span>
+    </span>
+  `;
+  history.prepend(row);
+}
+
+function showError(msg) {
+  Sound.error();
+  document.getElementById('status').textContent = '⚠️ ' + msg;
+  document.getElementById('status').className = 'status';
+  inputs.forEach(inp => {
+    inp.classList.add('error');
+    setTimeout(() => inp.classList.remove('error'), 400);
+  });
+  const rect = document.getElementById('checkBtn').getBoundingClientRect();
+  spawnParticles(rect.left + rect.width/2, rect.top, '#ff4444', 8);
+}
+
+function playResultSound(bulls, cows) {
+  if (bulls === 0 && cows === 0) {
+    Sound.error();
+  } else {
+    if (bulls > 0) Sound.bull();
+    if (cows > 0) setTimeout(() => Sound.cow(), 150);
+    if (bulls === 4) Sound.win();
+  }
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 4 + Math.random() * 6;
+    p.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      left:${x}px; top:${y}px;
+      box-shadow: 0 0 ${size*2}px ${color};
+      --px: ${(Math.random()-0.5)*200}px;
+      --py: ${(Math.random()-0.5)*200}px;
+      animation: particleFly 0.8s ease-out forwards;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 900);
+  }
+}
+
+function launchConfetti() {
+  const colors = ['#e94560','#00d9ff','#ffd700','#ff6b35','#a855f7','#22c55e'];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.cssText = `
+      left:${Math.random()*100}vw;
+      top:-20px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius:${Math.random()>0.5?'50%':'2px'};
+      width:${6+Math.random()*8}px;
+      height:${6+Math.random()*8}px;
+      animation: confettiFall ${2+Math.random()*2}s ease-out forwards;
+      animation-delay:${Math.random()*0.5}s;
+    `;
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 5000);
+  }
+}
+
+inputs.forEach((inp, i) => {
+  inp.addEventListener('input', (e) => {
+    const val = e.target.value.replace(/\D/g, '');
+    e.target.value = val.slice(0, 1);
+    if (e.target.value) {
+      e.target.classList.add('filled');
+      Sound.type();
+      if (i < 3) inputs[i+1].focus();
+    } else {
+      e.target.classList.remove('filled');
+    }
+  });
+
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !e.target.value && i > 0) {
+      inputs[i-1].focus();
+    }
+    if (e.key === 'ArrowLeft' && i > 0) inputs[i-1].focus();
+    if (e.key === 'ArrowRight' && i < 3) inputs[i+1].focus();
+    if (e.key === 'Enter') checkGuess();
+  });
+
+  inp.addEventListener('focus', () => {
+    inp.select();
+  });
+});
+
+document.querySelector('.digit-inputs').addEventListener('click', () => {
+  const empty = inputs.find(inp => !inp.value && !inp.disabled);
+  if (empty) empty.focus();
+});
+
+newGame();
+</script>
+</body>
+</html>
