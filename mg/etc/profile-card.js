@@ -19,6 +19,7 @@ function createProfileCard(options) {
     avatar,
     name = '',
     hrefAvatar,
+    targetAvatar,
     href,
     label = 'Перейти',
     target = '_self',
@@ -40,8 +41,8 @@ function createProfileCard(options) {
       // Аватар как ссылка
       const link = document.createElement('a');
       link.href = hrefAvatar;
-      link.target = target;
-      if (target === '_blank') {
+      link.target = targetAvatar;
+      if (targetAvatar === '_blank') {
         link.rel = 'noopener noreferrer';
       }
       link.className = 'avatar-link'; // можно стилизовать отдельно
