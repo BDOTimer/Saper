@@ -1,0 +1,330 @@
+/* Файл: "neon.css" */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background-color: #0a0a14;
+  font-family: "Courier New", monospace;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ===== Фоновая неоновая сетка ===== */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(circle at center, #000 0%, transparent 75%);
+  z-index: 0;
+}
+
+/* ===== Контейнер игры ===== */
+.game-container {
+  width: 100%;
+  max-width: 820px;
+  background: rgba(10, 15, 30, 0.85);
+  border: 2px solid rgba(0, 255, 255, 0.3);
+  border-radius: 16px;
+  box-shadow:
+    0 0 30px rgba(0, 255, 255, 0.15),
+    inset 0 0 30px rgba(0, 255, 255, 0.05);
+  padding: 24px;
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+h1 {
+  text-align: center;
+  margin: 0 0 8px;
+  color: #0ff;
+  font-size: clamp(20px, 5vw, 28px);
+  letter-spacing: 4px;
+  text-shadow:
+    0 0 10px #0ff,
+    0 0 30px #0ff,
+    0 0 60px rgba(0, 255, 255, 0.5);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+.subtitle {
+  text-align: center;
+  color: #fff;
+  opacity: 0.5;
+  font-size: clamp(11px, 2.6vw, 14px);
+  letter-spacing: 2px;
+  margin: 0 0 20px;
+}
+
+.task-nav {
+  text-align: center;
+  color: #0ff;
+  opacity: 0.6;
+  font-size: 13px;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+
+/* ===== Игровое поле ===== */
+.board {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 24px 20px;
+  background: rgba(0, 10, 20, 0.5);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 12px;
+  min-height: 220px;
+  position: relative;
+  touch-action: none;
+  box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.05);
+}
+
+.symbol {
+  position: relative;
+  user-select: none;
+  display: inline-block;
+  z-index: 1;
+}
+
+/* ===== Спички ===== */
+.match-stick {
+  fill: #1a2a3a;
+  stroke: #00e5ff;
+  stroke-width: 0.025;
+  cursor: grab;
+  filter: drop-shadow(0 0 3px rgba(0, 229, 255, 0.7));
+  transition: filter 0.15s, stroke 0.15s;
+}
+
+.match-stick:active { cursor: grabbing; }
+
+.match-stick:hover {
+  stroke: #6effff;
+  filter: drop-shadow(0 0 8px rgba(110, 255, 255, 1));
+}
+
+.match-head {
+  fill: #ff2d95;
+  stroke: #ff6ec4;
+  stroke-width: 0.02;
+  filter: drop-shadow(0 0 6px rgba(255, 45, 149, 0.9));
+  pointer-events: none;
+}
+
+/* ===== Пустые слоты ===== */
+.slot-outline {
+  fill: none;
+  stroke: rgba(0, 255, 255, 0.25);
+  stroke-width: 0.06;
+  stroke-dasharray: 0.1 0.1;
+  transition: stroke 0.15s, fill 0.15s;
+  pointer-events: none;
+}
+
+.slot-outline.active {
+  stroke: #6effff;
+  stroke-dasharray: none;
+  fill: rgba(0, 229, 255, 0.15);
+  filter: drop-shadow(0 0 6px rgba(110, 255, 255, 1));
+}
+
+/* ===== Перетаскиваемая спичка ===== */
+.dragged-match {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.9));
+  transform-origin: center;
+  transition: none;
+}
+
+/* ===== Кнопки ===== */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 10px 18px;
+  border: 2px solid #0ff;
+  border-radius: 10px;
+  background: rgba(0, 255, 255, 0.08);
+  color: #0ff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:hover, button:active {
+  background: rgba(0, 255, 255, 0.25);
+  color: #fff;
+  box-shadow:
+    0 0 25px rgba(0, 255, 255, 0.6),
+    inset 0 0 20px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+button.btn-primary {
+  border-color: #ff2d95;
+  color: #ff6ec4;
+  background: rgba(255, 45, 149, 0.08);
+  box-shadow: 0 0 15px rgba(255, 45, 149, 0.3);
+}
+
+button.btn-primary:hover, button.btn-primary:active {
+  background: rgba(255, 45, 149, 0.25);
+  color: #fff;
+  box-shadow:
+    0 0 25px rgba(255, 45, 149, 0.7),
+    inset 0 0 20px rgba(255, 45, 149, 0.2);
+}
+
+/* ===== Лампочка ===== */
+.bulb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #1a1a2a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.bulb.success {
+  background: #00ff9d;
+  box-shadow:
+    0 0 15px #00ff9d,
+    0 0 30px rgba(0, 255, 157, 0.7),
+    inset 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+.bulb.error {
+  background: #ff2d95;
+  box-shadow:
+    0 0 15px #ff2d95,
+    0 0 30px rgba(255, 45, 149, 0.7),
+    inset 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+/* ===== Сообщения ===== */
+.message {
+  text-align: center;
+  font-weight: 500;
+  padding: 12px;
+  border-radius: 10px;
+  margin-top: 16px;
+  display: none;
+  letter-spacing: 1px;
+}
+
+.message.success {
+  background: rgba(0, 255, 157, 0.1);
+  color: #00ff9d;
+  border: 1px solid rgba(0, 255, 157, 0.5);
+  text-shadow: 0 0 8px rgba(0, 255, 157, 0.8);
+  display: block;
+}
+
+.message.error {
+  background: rgba(255, 45, 149, 0.1);
+  color: #ff6ec4;
+  border: 1px solid rgba(255, 45, 149, 0.5);
+  text-shadow: 0 0 8px rgba(255, 45, 149, 0.8);
+  display: block;
+}
+
+.message.info {
+  background: rgba(0, 255, 255, 0.1);
+  color: #0ff;
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
+  display: block;
+}
+
+.hint-text {
+  text-align: center;
+  font-size: 13px;
+  color: #0ff;
+  opacity: 0.6;
+  margin-top: 12px;
+  font-style: italic;
+  letter-spacing: 1px;
+}
+
+/* ===== Кнопки-стрелки в углах ===== */
+.corner-btn {
+  position: fixed;
+  top: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(42px, 9vw, 54px);
+  height: clamp(42px, 9vw, 54px);
+  color: #0ff;
+  font-family: inherit;
+  font-size: clamp(16px, 4vw, 22px);
+  line-height: 1;
+  text-decoration: none;
+  background: rgba(0, 255, 255, 0.08);
+  border: 2px solid #0ff;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+.corner-btn--left { left: 16px; }
+.corner-btn--right { right: 16px; }
+
+.corner-btn:hover, .corner-btn:active {
+  background: rgba(0, 255, 255, 0.25);
+  color: #fff;
+  box-shadow:
+    0 0 25px rgba(0, 255, 255, 0.6),
+    inset 0 0 20px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* На узких экранах прячем угловые кнопки, чтобы не мешали */
+@media (max-width: 600px) {
+  .corner-btn { display: none; }
+}

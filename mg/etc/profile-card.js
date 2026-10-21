@@ -18,6 +18,7 @@ function createProfileCard(options) {
   const {
     avatar,
     name = '',
+    hrefAvatar,
     href,
     label = 'Перейти',
     target = '_self',
@@ -33,15 +34,37 @@ function createProfileCard(options) {
   const card = document.createElement('div');
   card.className = 'profile-card';
 
-  // --- Аватар ---
+  // --- Аватар (со ссылкой или без) ---
   if (avatar) {
-    const img = document.createElement('img');
-    img.className = 'profile-avatar';
-    img.src = avatar;
-    img.alt = name || 'Аватар';
-    img.loading = 'lazy';
-    img.draggable = false;
-    card.appendChild(img);
+    if (hrefAvatar) {
+      // Аватар как ссылка
+      const link = document.createElement('a');
+      link.href = hrefAvatar;
+      link.target = target;
+      if (target === '_blank') {
+        link.rel = 'noopener noreferrer';
+      }
+      link.className = 'avatar-link'; // можно стилизовать отдельно
+
+      const img = document.createElement('img');
+      img.className = 'profile-avatar';
+      img.src = avatar;
+      img.alt = name || 'Аватар';
+      img.loading = 'lazy';
+      img.draggable = false;
+
+      link.appendChild(img);
+      card.appendChild(link);
+    } else {
+      // Просто аватар без ссылки
+      const img = document.createElement('img');
+      img.className = 'profile-avatar';
+      img.src = avatar;
+      img.alt = name || 'Аватар';
+      img.loading = 'lazy';
+      img.draggable = false;
+      card.appendChild(img);
+    }
   }
 
   // --- Имя ---

@@ -250,8 +250,8 @@ h1 {
   transform: translateX(4px);
 }
 
-.corner-btn[hidden] {
-  display: none;
-}
-
 /* ===== ... ===== */
+
+a.corner-btn[hidden] {
+  display: none !important;
+}

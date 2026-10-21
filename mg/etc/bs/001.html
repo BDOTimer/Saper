@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Спички: переложи одну палочку</title>
+<link rel="stylesheet" href="neon-bs.css">
+</head>
+<body>
+
+<div class="game-container">
+    <h1>СПИЧКИ</h1>
+    <p class="subtitle">ПЕРЕЛОЖИ ОДНУ СПИЧКУ</p>
+    <div class="task-nav" id="taskNav"></div>
+
+    <div class="board" id="board"></div>
+
+    <div class="controls">
+        <button class="btn-primary" id="checkBtn">ПРОВЕРИТЬ</button>
+        <div class="bulb" id="bulb"></div>
+        <button id="resetBtn">СБРОС</button>
+        <button id="hintBtn">ПОДСКАЗКА</button>
+    </div>
+
+    <div class="message" id="message"></div>
+    <div class="hint-text" id="hintText"></div>
+</div>
+
+<!-- Угловые стрелки для переключения задач -->
+<button class="corner-btn corner-btn--left"  id="prevBtn" aria-label="Предыдущая задача">‹</button>
+<!--
+<button class="corner-btn corner-btn--right" id="nextBtn" aria-label="Следующая задача">›</button>
+-->
+
+<script>
+/* ============================================================
+   ЗВУКИ (Web Audio API — без внешних файлов)
+   ============================================================ */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function ensureAudio() {
+    if (!audioCtx) {
+        audioCtx = new AudioCtx();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playTone(freq, duration, type = 'sine', vol = 0.15, when = 0) {
+    ensureAudio();
+    const t = audioCtx.currentTime + when;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration);
+}
+
+function sfxPick() {
+    playTone(880, 0.08, 'square', 0.1);
+    playTone(1320, 0.06, 'square', 0.08, 0.03);
+}
+
+function sfxDrop() {
+    playTone(300, 0.1, 'triangle', 0.15);
+}
+
+function sfxSuccess() {
+    playTone(523.25, 0.15, 'sine', 0.15, 0);
+    playTone(659.25, 0.15, 'sine', 0.15, 0.1);
+    playTone(783.99, 0.15, 'sine', 0.15, 0.2);
+    playTone(1046.5, 0.4, 'sine', 0.18, 0.3);
+}
+
+function sfxError() {
+    playTone(330, 0.15, 'sawtooth', 0.12, 0);
+    playTone(220, 0.25, 'sawtooth', 0.12, 0.1);
+}
+
+function sfxClick() {
+    playTone(1200, 0.04, 'sine', 0.08);
+}
+
+/* ============================================================
+   МОДЕЛЬ
+   ============================================================ */
+const PT = {
+    A: [0, 0], B: [1, 0],
+    C: [0, 1], D: [1, 1],
+    E: [0, 2], F: [1, 2],
+    G: [0, 3], H: [1, 3],
+};
+
+const SLOT_7SEG = {
+    top:      ['A', 'B'],
+    topLeft:  ['A', 'C'],
+    topRight: ['B', 'D'],
+    middle:   ['C', 'D'],
+    botLeft:  ['C', 'E'],
+    botRight: ['D', 'F'],
+    bottom:   ['E', 'F'],
+};
+
+const GLYPHS = {
+    '0': ['top', 'topLeft', 'topRight', 'botLeft', 'botRight', 'bottom'],
+    '1': ['topRight', 'botRight'],
+    '2': ['top', 'topRight', 'middle', 'botLeft', 'bottom'],
+    '3': ['top', 'topRight', 'middle', 'botRight', 'bottom'],
+    '4': ['topLeft', 'topRight', 'middle', 'botRight'],
+    '5': ['top', 'topLeft', 'middle', 'botRight', 'bottom'],
+    '6': ['top', 'topLeft', 'middle', 'botLeft', 'botRight', 'bottom'],
+    '7': ['top', 'topRight', 'botRight'],
+    '8': ['top', 'topLeft', 'topRight', 'middle', 'botLeft', 'botRight', 'bottom'],
+    '9': ['top', 'topLeft', 'topRight', 'middle', 'botRight', 'bottom'],
+};
+
+const SPECIAL_GLYPHS = {
+    '+': {
+        slots: {
+            'h': { cx: 0.5, cy: 0.5, w: 0.9, h: 0.22 },
+            'v': { cx: 0.5, cy: 0.5, w: 0.22, h: 0.9 },
+        },
+        occupied: ['h', 'v'],
+    },
+    '-': {
+        slots: { 'h': { cx: 0.5, cy: 0.5, w: 0.9, h: 0.22 } },
+        occupied: ['h'],
+    },
+    '=': {
+        slots: {
+            'h1': { cx: 0.5, cy: 0.3, w: 0.9, h: 0.22 },
+            'h2': { cx: 0.5, cy: 0.7, w: 0.9, h: 0.22 },
+        },
+        occupied: ['h1', 'h2'],
+    },
+};
+
+/* ============================================================
+   ГЕНЕРАЦИЯ ЗАДАЧ
+   ============================================================ */
+function isValidExpr(expr) {
+    return /^\d[+\-]\d=\d$/.test(expr);
+}
+
+function isCorrect(expr) {
+    if (!isValidExpr(expr)) return false;
+    const a = +expr[0], op = expr[1], b = +expr[2], c = +expr[4];
+    const left = op === '+' ? a + b : a - b;
+    return left === c;
+}
+
+function slotsOf(ch) {
+    if (GLYPHS[ch]) return new Set(GLYPHS[ch]);
+    if (SPECIAL_GLYPHS[ch]) return new Set(SPECIAL_GLYPHS[ch].occupied);
+    return new Set();
+}
+
+function buildRealTasks() {
+    const out = [];
+    const seen = new Set();
+    for (let a = 0; a <= 9; a++) {
+        for (const op of ['+', '-']) {
+            for (let b = 0; b <= 9; b++) {
+                for (let c = 0; c <= 9; c++) {
+                    const chars = [String(a), op, String(b), '=', String(c)];
+                    const expr = chars.join('');
+                    if (!isValidExpr(expr)) continue;
+                    if (isCorrect(expr)) continue;
+                    for (let i = 0; i < 5; i++) {
+                        const candidates = [...Object.keys(GLYPHS), '+', '-', '='];
+                        for (const ch of candidates) {
+                            if (ch === chars[i]) continue;
+                            const fromSet = slotsOf(chars[i]);
+                            const toSet = slotsOf(ch);
+                            const removed = [...fromSet].filter(s => !toSet.has(s));
+                            const added = [...toSet].filter(s => !fromSet.has(s));
+                            if (removed.length !== 1 || added.length !== 1) continue;
+                            const newChars = [...chars];
+                            newChars[i] = ch;
+                            const newExpr = newChars.join('');
+                            if (!isCorrect(newExpr)) continue;
+                            if (seen.has(expr)) continue;
+                            seen.add(expr);
+                            out.push({
+                                text: expr,
+                                solution: newExpr,
+                                hint: `Замени «${chars[i]}» на «${ch}» в позиции ${i+1}.`,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return out;
+}
+
+/* ============================================================
+   СОСТОЯНИЕ
+   ============================================================ */
+let TASKS_FINAL = [];
+let currentIdx = 0;
+let symbols = [];
+
+// Для рендера
+const SCALE = 56;
+const PAD = 0.25;
+const STICK_W = 0.12;
+const HEAD_LEN = 0.22;
+const HEAD_W = 0.22;
+
+/* ============================================================
+   ПОСТРОЕНИЕ
+   ============================================================ */
+function symbolType(ch) {
+    if (ch >= '0' && ch <= '9') return 'digit';
+    return 'special';
+}
+
+function buildSymbols(expr) {
+    return expr.split('').map(ch => {
+        const type = symbolType(ch);
+        if (type === 'digit') {
+            const occ = new Set(GLYPHS[ch]);
+            const slots = {};
+            Object.keys(SLOT_7SEG).forEach(name => {
+                slots[name] = occ.has(name) ? 'match' : 'empty';
+            });
+            return { type, char: ch, slots };
+        } else {
+            const def = SPECIAL_GLYPHS[ch];
+            const occ = new Set(def.occupied);
+            const slots = {};
+            Object.keys(def.slots).forEach(name => {
+                slots[name] = occ.has(name) ? 'match' : 'empty';
+            });
+            return { type, char: ch, slots };
+        }
+    });
+}
+
+/* ============================================================
+   РЕНДЕР
+   ============================================================ */
+function render() {
+    const board = document.getElementById('board');
+    board.innerHTML = '';
+    symbols.forEach((sym, i) => {
+        board.appendChild(buildSvg(sym, i));
+    });
+}
+
+function buildSvg(sym, idx) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const isDigit = sym.type === 'digit';
+    const w = 1;
+    const h = isDigit ? 3 : 1;
+    const vw = w + PAD * 2;
+    const vh = h + PAD * 2;
+
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${vw} ${vh}`);
+    svg.setAttribute('width', vw * SCALE);
+    svg.setAttribute('height', vh * SCALE);
+    svg.classList.add('symbol');
+    svg.dataset.symIdx = idx;
+
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('transform', `translate(${PAD}, ${PAD})`);
+
+    if (isDigit) {
+        Object.entries(SLOT_7SEG).forEach(([name, [p1, p2]]) => {
+            const state = sym.slots[name];
+            const [x1, y1] = PT[p1];
+            const [x2, y2] = PT[p2];
+            drawMatchStick(g, x1, y1, x2, y2, state, idx, name);
+        });
+    } else {
+        const def = SPECIAL_GLYPHS[sym.char];
+        Object.entries(def.slots).forEach(([name, geo]) => {
+            const state = sym.slots[name];
+            drawSpecialMatch(g, geo.cx, geo.cy, geo.w, geo.h, state, idx, name);
+        });
+    }
+
+    svg.appendChild(g);
+    return svg;
+}
+
+function drawMatchStick(g, x1, y1, x2, y2, state, symIdx, slotName) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len, uy = dy / len;
+
+    const sx = x1 + ux * 0.02;
+    const sy = y1 + uy * 0.02;
+    const ex = x2 - ux * 0.02;
+    const ey = y2 - uy * 0.02;
+    const L = Math.hypot(ex - sx, ey - sy);
+    const angle = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI;
+
+    const group = document.createElementNS(NS, 'g');
+    group.setAttribute('transform', `translate(${(sx + ex) / 2}, ${(sy + ey) / 2}) rotate(${angle})`);
+    group.dataset.symIdx = symIdx;
+    group.dataset.slotName = slotName;
+
+    if (state === 'match') {
+        const wood = document.createElementNS(NS, 'rect');
+        wood.setAttribute('x', -L / 2);
+        wood.setAttribute('y', -STICK_W / 2);
+        wood.setAttribute('width', L);
+        wood.setAttribute('height', STICK_W);
+        wood.setAttribute('rx', STICK_W / 2);
+        wood.setAttribute('ry', STICK_W / 2);
+        wood.setAttribute('class', 'match-stick');
+        wood.dataset.symIdx = symIdx;
+        wood.dataset.slotName = slotName;
+        wood.addEventListener('pointerdown', onDragStart);
+        group.appendChild(wood);
+
+        const head = document.createElementNS(NS, 'rect');
+        head.setAttribute('x', L / 2 - HEAD_LEN);
+        head.setAttribute('y', -HEAD_W / 2);
+        head.setAttribute('width', HEAD_LEN);
+        head.setAttribute('height', HEAD_W);
+        head.setAttribute('rx', HEAD_W / 2);
+        head.setAttribute('ry', HEAD_W / 2);
+        head.setAttribute('class', 'match-head');
+        group.appendChild(head);
+    } else {
+        const outline = document.createElementNS(NS, 'rect');
+        outline.setAttribute('x', -L / 2);
+        outline.setAttribute('y', -STICK_W / 2);
+        outline.setAttribute('width', L);
+        outline.setAttribute('height', STICK_W);
+        outline.setAttribute('rx', STICK_W / 2);
+        outline.setAttribute('ry', STICK_W / 2);
+        outline.setAttribute('class', 'slot-outline');
+        outline.dataset.symIdx = symIdx;
+        outline.dataset.slotName = slotName;
+        group.appendChild(outline);
+    }
+
+    g.appendChild(group);
+}
+
+function drawSpecialMatch(g, cx, cy, w, h, state, symIdx, slotName) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const isHorizontal = w > h;
+
+    const group = document.createElementNS(NS, 'g');
+    group.dataset.symIdx = symIdx;
+    group.dataset.slotName = slotName;
+
+    if (state === 'match') {
+        const wood = document.createElementNS(NS, 'rect');
+        wood.setAttribute('x', cx - w / 2);
+        wood.setAttribute('y', cy - h / 2);
+        wood.setAttribute('width', w);
+        wood.setAttribute('height', h);
+        wood.setAttribute('rx', Math.min(w, h) / 2);
+        wood.setAttribute('ry', Math.min(w, h) / 2);
+        wood.setAttribute('class', 'match-stick');
+        wood.dataset.symIdx = symIdx;
+        wood.dataset.slotName = slotName;
+        wood.addEventListener('pointerdown', onDragStart);
+        group.appendChild(wood);
+
+        const head = document.createElementNS(NS, 'rect');
+        if (isHorizontal) {
+            head.setAttribute('x', cx + w / 2 - HEAD_LEN);
+            head.setAttribute('y', cy - HEAD_W / 2);
+            head.setAttribute('width', HEAD_LEN);
+            head.setAttribute('height', HEAD_W);
+        } else {
+            head.setAttribute('x', cx - HEAD_W / 2);
+            head.setAttribute('y', cy + h / 2 - HEAD_LEN);
+            head.setAttribute('width', HEAD_W);
+            head.setAttribute('height', HEAD_LEN);
+        }
+        head.setAttribute('rx', HEAD_W / 2);
+        head.setAttribute('ry', HEAD_W / 2);
+        head.setAttribute('class', 'match-head');
+        group.appendChild(head);
+    } else {
+        const outline = document.createElementNS(NS, 'rect');
+        outline.setAttribute('x', cx - w / 2);
+        outline.setAttribute('y', cy - h / 2);
+        outline.setAttribute('width', w);
+        outline.setAttribute('height', h);
+        outline.setAttribute('rx', Math.min(w, h) / 2);
+        outline.setAttribute('ry', Math.min(w, h) / 2);
+        outline.setAttribute('class', 'slot-outline');
+        outline.dataset.symIdx = symIdx;
+        outline.dataset.slotName = slotName;
+        group.appendChild(outline);
+    }
+    g.appendChild(group);
+}
+
+/* ============================================================
+   DRAG-AND-DROP
+   ============================================================ */
+let draggedElement = null;
+let draggedFrom = null;
+let dragOffset = { x: 0, y: 0 };
+
+function onDragStart(e) {
+    e.preventDefault();
+    ensureAudio(); // разблокируем звук при первом взаимодействии
+
+    const symIdx = parseInt(e.target.dataset.symIdx);
+    const slotName = e.target.dataset.slotName;
+    if (isNaN(symIdx) || !slotName) return;
+
+    setMessage('', '');
+    document.getElementById('bulb').className = 'bulb';
+
+    draggedFrom = { symIdx, slotName };
+    sfxPick();
+
+    const rect = e.target.getBoundingClientRect();
+
+    const temp = document.createElement('div');
+    temp.className = 'dragged-match';
+    temp.innerHTML = `
+        <svg width="${rect.width}" height="${rect.height}" viewBox="0 0 ${rect.width} ${rect.height}">
+            <rect x="0" y="0" width="${rect.width}" height="${rect.height}"
+                  fill="#1a2a3a" stroke="#00e5ff" stroke-width="1.5" rx="4"/>
+            <rect x="${rect.width - 15}" y="0" width="15" height="${rect.height}"
+                  fill="#ff2d95" rx="4"/>
+        </svg>
+    `;
+    temp.style.left = rect.left + 'px';
+    temp.style.top = rect.top + 'px';
+    temp.style.width = rect.width + 'px';
+    temp.style.height = rect.height + 'px';
+
+    document.body.appendChild(temp);
+    draggedElement = temp;
+
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+
+    e.target.style.opacity = '0.3';
+
+    document.addEventListener('pointermove', onDragMove);
+    document.addEventListener('pointerup', onDragEnd);
+}
+
+function onDragMove(e) {
+    if (!draggedElement) return;
+    e.preventDefault();
+    draggedElement.style.left = (e.clientX - dragOffset.x) + 'px';
+    draggedElement.style.top = (e.clientY - dragOffset.y) + 'px';
+    highlightSlotUnderCursor(e.clientX, e.clientY);
+}
+
+function onDragEnd(e) {
+    if (!draggedElement) return;
+
+    document.querySelectorAll('.slot-outline.active').forEach(el => el.classList.remove('active'));
+
+    const target = findSlotAt(e.clientX, e.clientY);
+
+    draggedElement.remove();
+    draggedElement = null;
+
+    document.querySelectorAll('.match-stick').forEach(el => el.style.opacity = '1');
+
+    if (target && draggedFrom) {
+        const { symIdx: fromSym, slotName: fromSlot } = draggedFrom;
+        const { symIdx: toSym, slotName: toSlot } = target;
+
+        if (fromSym === toSym && fromSlot === toSlot) {
+            // вернули на место
+        } else if (symbols[toSym].slots[toSlot] === 'match') {
+            setMessage('Этот слот уже занят.', 'error');
+            sfxError();
+        } else {
+            symbols[fromSym].slots[fromSlot] = 'empty';
+            symbols[toSym].slots[toSlot] = 'match';
+            symbols[fromSym].char = charFromSlots(symbols[fromSym]);
+            symbols[toSym].char = charFromSlots(symbols[toSym]);
+            render();
+            sfxDrop();
+        }
+    }
+
+    draggedFrom = null;
+    document.removeEventListener('pointermove', onDragMove);
+    document.removeEventListener('pointerup', onDragEnd);
+}
+
+function findSlotAt(clientX, clientY) {
+    const slots = document.querySelectorAll('.slot-outline');
+    for (let slot of slots) {
+        const rect = slot.getBoundingClientRect();
+        const padding = 20;
+        if (clientX >= rect.left - padding && clientX <= rect.right + padding &&
+            clientY >= rect.top - padding && clientY <= rect.bottom + padding) {
+            return {
+                symIdx: parseInt(slot.dataset.symIdx),
+                slotName: slot.dataset.slotName
+            };
+        }
+    }
+    return null;
+}
+
+function highlightSlotUnderCursor(clientX, clientY) {
+    document.querySelectorAll('.slot-outline.active').forEach(el => el.classList.remove('active'));
+    const target = findSlotAt(clientX, clientY);
+    if (target) {
+        const { symIdx, slotName } = target;
+        const el = document.querySelector(`.slot-outline[data-sym-idx="${symIdx}"][data-slot-name="${slotName}"]`);
+        if (el) el.classList.add('active');
+    }
+}
+
+/* ============================================================
+   ЛОГИКА
+   ============================================================ */
+function charFromSlots(sym) {
+    const filled = Object.entries(sym.slots)
+        .filter(([, s]) => s === 'match')
+        .map(([n]) => n)
+        .sort()
+        .join(',');
+
+    if (sym.type === 'digit') {
+        for (const [ch, occ] of Object.entries(GLYPHS)) {
+            if ([...occ].sort().join(',') === filled) {
+                return ch;
+            }
+        }
+        return '?';
+    } else {
+        for (const [ch, def] of Object.entries(SPECIAL_GLYPHS)) {
+            if ([...def.occupied].sort().join(',') === filled) {
+                return ch;
+            }
+        }
+        return '?';
+    }
+}
+
+function validateExpression() {
+    const expr = symbols.map(s => s.char).join('');
+    const bulb = document.getElementById('bulb');
+    bulb.className = 'bulb';
+
+    const m = expr.match(/^(\d)([+\-])(\d)=(\d)$/);
+    if (!m) {
+        setMessage(`Некорректное выражение: «${expr}».`, 'error');
+        bulb.classList.add('error');
+        sfxError();
+        return;
+    }
+
+    const a = +m[1], op = m[2], b = +m[3], c = +m[4];
+    const left = op === '+' ? a + b : a - b;
+
+    if (left === c) {
+        bulb.classList.add('success');
+        setMessage(`Верно! ${a} ${op} ${b} = ${c}`, 'success');
+        sfxSuccess();
+
+        // Автоматический переход на следующую задачу через 1.5 сек
+        setTimeout(() => {
+            if (currentIdx + 1 < TASKS_FINAL.length) {
+                loadTask(currentIdx + 1);
+            } else {
+                loadTask(0); // если это была последняя — начинаем заново
+            }
+        }, 3000);
+    } else {
+        bulb.classList.add('error');
+        setMessage(`Пока нет: ${a} ${op} ${b} = ${left}, а не ${c}.`, 'error');
+        sfxError();
+    }
+}
+
+function setMessage(text, type) {
+    const el = document.getElementById('message');
+    el.className = 'message';
+    if (!text) { el.textContent = ''; return; }
+    el.classList.add(type || 'info');
+    el.textContent = text;
+}
+
+/* ============================================================
+   УПРАВЛЕНИЕ
+   ============================================================ */
+function loadTask(idx) {
+    currentIdx = ((idx % TASKS_FINAL.length) + TASKS_FINAL.length) % TASKS_FINAL.length;
+    const t = TASKS_FINAL[currentIdx];
+    symbols = buildSymbols(t.text);
+    setMessage('', '');
+    document.getElementById('bulb').className = 'bulb';
+    document.getElementById('hintText').textContent = '';
+    document.getElementById('taskNav').textContent =
+        `ЗАДАЧА ${currentIdx + 1} / ${TASKS_FINAL.length}`;
+    render();
+}
+
+// Инициализация
+TASKS_FINAL = buildRealTasks();
+
+document.getElementById('checkBtn').addEventListener('click', () => {
+    sfxClick();
+    validateExpression();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+    sfxClick();
+    loadTask(currentIdx);
+});
+document.getElementById('hintBtn').addEventListener('click', () => {
+    sfxClick();
+    document.getElementById('hintText').textContent = 'Подсказка: ' + TASKS_FINAL[currentIdx].hint;
+});
+document.getElementById('prevBtn').addEventListener('click', () => {
+    sfxClick();
+    //loadTask(currentIdx - 1);
+    window.location.href = './i-bs.html';
+});
+// document.getElementById('nextBtn').addEventListener('click', () => {
+//     sfxClick();
+//     loadTask(currentIdx + 1);
+// });
+
+// Принудительный старт с двойной страховкой
+function startGame() {
+    try {
+        loadTask(0);
+    } catch (e) {
+        console.error('Ошибка при старте:', e);
+    }
+}
+
+// Пытаемся запустить сразу, но если DOM ещё не готов — ждём
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startGame);
+} else {
+    startGame();
+}
+
+// Гарантированный перезапуск после полной загрузки (с небольшой паузой)
+// window.addEventListener('load', () => {
+//     setTimeout(startGame, 100);
+// });
+
+// // И ещё раз через 500 мс — на случай совсем медленной загрузки
+// setTimeout(startGame, 500);
+
+// Гарантированный перезапуск после полной загрузки (с небольшой паузой)
+window.addEventListener('click', () => {
+  loadTask(currentIdx);
+}, { once: true });
+
+</script>
+</body>
+</html>
