@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Быки и Коровы</title>
+<link rel="icon" type="image/png" href="../res/favicon-64.png" sizes="64x64">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -169,6 +170,7 @@
     transform: none;
   }
 
+/*  */
   .btn-new {
     background: linear-gradient(135deg, #00d9ff, #0099cc);
     color: #fff;
@@ -365,9 +367,37 @@
     border-left: 3px solid #00d9ff;
   }
 
+
+
+
   .rules-btn {
     border-right: 3px solid #e94560;
   }
+
+  /* ⬇️⬇️⬇️ ВСТАВИТЬ ЗДЕСЬ ⬇️⬇️⬇️ */
+  .top-right {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+    pointer-events: none;
+  }
+
+  .top-right .top-btn {
+    pointer-events: auto;
+    justify-content: center;
+  }
+
+  .top-btn.new-btn {
+    border-right: 3px solid #00d9ff;
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.18), rgba(0, 153, 204, 0.18));
+  }
+
+  .top-btn.new-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(0, 153, 204, 0.3));
+    border-color: rgba(0, 217, 255, 0.7);
+  }
+  /* ⬆️⬆️⬆️ КОНЕЦ ВСТАВКИ ⬆️⬆️⬆️ */
 
   /* ===== МОДАЛЬНОЕ ОКНО ПРАВИЛ ===== */
   .modal-overlay {
@@ -517,9 +547,14 @@
   <a href="bulls-cows.html" class="top-btn menu-btn" title="Вернуться в меню">
     🏠 NEON
   </a>
-  <button class="top-btn rules-btn" onclick="openRules()" title="Правила игры">
-    📖 ПРАВИЛА
-  </button>
+  <div class="top-right">
+    <button class="top-btn rules-btn" onclick="openRules()" title="Правила игры">
+      📖 ПРАВИЛА
+    </button>
+    <button class="top-btn" id="newBtn" onclick="newGame()" title="Новая игра">
+      🔄 НОВАЯ ИГРА
+    </button>
+  </div>
 </div>
 
 <div class="game-container">
@@ -546,8 +581,6 @@
   </div>
 
   <div class="history" id="history"></div>
-
-  <button class="btn btn-new" id="newBtn" onclick="newGame()">🔄 Новая игра</button>
 </div>
 
 <!-- ===== МОДАЛЬНОЕ ОКНО ПРАВИЛ ===== -->

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Быки и Коровы</title>
 <link rel="stylesheet" href="./neon.css" />
+<link rel="icon" type="image/png" href="../res/favicon-64.png" sizes="64x64">
 <style>
   /* =====================================================
      ВСЁ, ЧТО ПЕРЕСЕКАЕТСЯ С neon.css — УБРАНО
@@ -208,8 +209,14 @@
     justify-content: center;
   }
 
-  .btn-new {
-    margin-top: 4px;
+  .top-right .btn-new {
+    pointer-events: auto;
+    margin-top: 0;
+    padding: 10px 16px;
+    font-size: clamp(11px, 2.8vw, 13px);
+    letter-spacing: 2px;
+    border-radius: 10px;
+    width: 100%;
   }
 
   /* ===== ИСТОРИЯ ===== */
@@ -497,6 +504,7 @@
   <div class="top-right">
     <button class="back-btn" onclick="openRules()" title="Правила игры">📖 СПРАВКА</button>
     <a href="bulls-cows-a.html" class="back-btn" title="Поменять шкурку">✦ Шкурка</a>
+    <button class="btn btn-new" id="newBtn" onclick="newGame()">⟳ НОВАЯ ИГРА</button>
   </div>
 </div>
 
@@ -519,8 +527,6 @@
   </div>
 
   <div class="history" id="history"></div>
-
-  <button class="btn btn-new" id="newBtn" onclick="newGame()">⟳ НОВАЯ ИГРА</button>
 </div>
 
 <!-- ===== МОДАЛКА СПРАВКИ ===== -->
