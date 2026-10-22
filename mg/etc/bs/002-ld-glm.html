@@ -227,14 +227,16 @@
         <button class="btn" type="button" data-key="right" aria-label="Вправо">▶</button>
       </div>
       <div class="digs">
-        <button class="btn dig" type="button" data-key="digLeft" aria-label="Копать слева">◀ КОПАТЬ ⛏</button>
+        <button class="btn dig" type="button" data-key="digLeft"  aria-label="Копать слева">◀ КОПАТЬ ⛏</button>
         <button class="btn dig" type="button" data-key="digRight" aria-label="Копать справа">⛏ КОПАТЬ ▶</button>
       </div>
     </div>
 
     <p class="help">
-      Управление: <b>← →</b> — ходьба, <b>↑ ↓</b> — лестницы, <b>Z / X</b> (или , / .) — копать яму
-      слева / справа, <b>ENTER</b> — старт, <b>P</b> — пауза, <b>M</b> — звук.
+      Управление: <b>← →</b> — ходьба, <b>↑ ↓</b> — лестницы,
+      <b>Z/X</b> — копать слева/справа,
+      <b>ПРОБЕЛ</b> — копать в сторону взгляда,
+      <b>ENTER</b> — старт, <b>P</b> — пауза, <b>M</b> — звук.
       Собери всё золото — откроются скрытые лестницы, беги в верхний ряд.
       С лестницы можно спрыгнуть вбок в любой момент. Падать можно с любой высоты,
       но охранника лучше заманивать в яму: засыпая, она его поглощает.
@@ -244,10 +246,48 @@
 
 <script>
 // src/lib/game/levels.ts
-var COLS = 28;
+var COLS = 39;
 var ROWS = 16;
-var RAW_LEVELS = [
-  [
+var RAW_LEVELS = [ 
+  //   {c: 39, r: 16, rows:
+  //   [
+  //   "#                                     #",
+  //   "# E E E E E E E E                     #",
+  //   "#                                     #",
+  //   "##################H####################",
+  //   "#                 H                   #",
+  //   "#                 H                   #",
+  //   "##################H####################",
+  //   "#                #H#                  #",
+  //   "#                #H#                  #",
+  //   "##################H####################",
+  //   "#                #H#                  #",
+  //   "#                #H#     -            #",
+  //   "##################H###### ###########H#",
+  //   "#                 H                  H#",
+  //   "# P               H                  H#",
+  //   "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  // ]},
+  {c: 39, r: 16, rows:
+    [
+    "#        H                            #",
+    "#        H    E                       #",
+    "#  $ -   H   $  ---     $             #",
+    "#H### ##########   #H##################",
+    "#H                  H                 #",
+    "#H$ - E   H###     H                  #",
+    "#### #####H########## ##########H######",
+    "#         H                     H     #",
+    "#  $      H     H##H  -       H###H  $#",
+    "##############H####### ######H#########",
+    "#             H              H        #",
+    "#     $       H   -      H######H    $#",
+    "##### #H######H### ########    ########",
+    "#      H                E             #",
+    "# P    H   $              H#####H    $#",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ]},
+  {c: 28, r: 16, rows:[
     "        H          H        ",
     "        H    E     H        ",
     "  $     H   $  ----H   $    ",
@@ -264,8 +304,8 @@ var RAW_LEVELS = [
     "             H         E    ",
     " P        $  H              ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-  ],
-  [
+  ]},
+  {c: 28, r: 16, rows:[
     "    H                       ",
     "    H                       ",
     "  $ H     E     ---      $  ",
@@ -282,8 +322,8 @@ var RAW_LEVELS = [
     "       H                    ",
     " P     H            $     $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-  ],
-  [
+  ]},
+  {c: 28, r: 16, rows:[
     "  H                         ",
     "  H                         ",
     "  H     $        $  E       ",
@@ -300,8 +340,8 @@ var RAW_LEVELS = [
     "              H             ",
     "  P   $       H   $       $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-  ],
-  [
+  ]},
+  {c: 28, r: 16, rows:[
     "                H        S  ",
     "                H        S  ",
     "  $      ----   H     E $S  ",
@@ -318,8 +358,8 @@ var RAW_LEVELS = [
     "    H             H         ",
     "  $ H         P   H       $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-  ],
-  [
+  ]},
+  {c: 28, r: 16, rows:[
     "   H                        ",
     "   H                        ",
     "   H  $   H  ---E  ---  $   ",
@@ -336,8 +376,8 @@ var RAW_LEVELS = [
     "             H        H     ",
     "  $ P     $ EH  $     H   $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-  ],
-  [
+  ]},
+  {c: 28, r: 16, rows:[
     " H                        S ",
     " H                        S ",
     " H ---  $ H   E      $    S ",
@@ -354,7 +394,7 @@ var RAW_LEVELS = [
     "      H              H      ",
     "$     H  E  $    P   H   $  ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-  ]
+  ]},
 ];
 
 // src/lib/game/engine.ts
@@ -370,7 +410,7 @@ var GUARD_WALK =  80;
 var GUARD_CLIMB = 60;
 
 var DIG_TIME = 0.45;
-var HOLE_REFILL = 10.0; /// для Роннико
+var HOLE_REFILL = 4.0; /// для Роннико
 var STUCK_MIN = 2.2;
 var STUCK_RAND = 1.3;
 var RESPAWN_DELAY = 3;
@@ -387,6 +427,7 @@ var cell = (type) => ({
   warned: false,
   revealTimer: 0
 });
+
 function makeActor(x, y) {
   return {
     x,
@@ -469,7 +510,9 @@ class Game {
   }
   loadLevel(index) {
     this.levelIndex = index;
-    const raw = RAW_LEVELS[index];
+    const raw = RAW_LEVELS[index].rows;
+    ROWS = RAW_LEVELS[index].r;
+    COLS = RAW_LEVELS[index].c;
     this.cells = [];
     this.guards = [];
     this.respawns = [];
@@ -690,9 +733,10 @@ class Game {
             this.killPlayer();
           for (const g of [...this.guards]) {
             const gc = this.centerCol(g.x);
-            const gr = this.rowOf(g.y + T / 2);
+          //const gr = this.rowOf(g.y + T / 2); // 🔴
+            const gr = this.rowOf(g.y); 
             if (gr === r && gc === c)
-              this.killGuard(g);
+              this.killGuard(g, true);
           }
         }
       }
@@ -784,6 +828,8 @@ class Game {
         this.collectPlayerGold();
         return;
       }
+
+      //////////////////////////////////////////////////////////////////////////
       case "climb": {
         p.anim += dt;
         const vy = inp.up ? -CLIMB : inp.down ? CLIMB : 0;
@@ -839,6 +885,8 @@ class Game {
         this.collectPlayerGold();
         return;
       }
+      //////////////////////////////////////////////////////////////////////////
+
       case "fall": {
         this.stepFall(p, FALL_SPEED * dt, true);
         return;
@@ -928,23 +976,38 @@ class Game {
       const newRow = this.rowOf(newY);
       const above = this.tileAt(newRow, c);
       if (!above || !this.passable(above)) {
-        newY = Math.max(newY, newRow * T + T);
+        a.y = Math.round(a.y / T) * T;
+        a.state = "walk";
+        a.climbBlockCd = 0.3;
+        return;
       }
       a.y = newY;
-    } else if (vy > 0) {
-      const feetRow = this.rowOf(a.y + T - 1);
-      const belowTile = this.tileAt(feetRow + 1, c);
-      if (belowTile && belowTile.type === "ladder") {
-        a.y += speed * dt;
-      } else if (belowTile && this.passable(belowTile)) {
-        const limitY = (feetRow + 1) * T - T;
-        a.y = Math.min(limitY, a.y + speed * dt);
-        if (a.y >= limitY - 0.01) {
-          a.y = limitY;
-          a.state = "fall";
-        }
-      }
+} else if (vy > 0) {
+  const feetRow = this.rowOf(a.y + T - 1);
+  const belowTile = this.tileAt(feetRow + 1, c);
+
+  if (belowTile && belowTile.type === "ladder") {
+    // снизу лестница — продолжаем спуск
+    a.y += speed * dt;
+  } else if (belowTile && this.passable(belowTile)) {
+    // снизу пусто/проходимо — съезжаем до пола и падаем
+    const limitY = (feetRow + 1) * T - T;
+    a.y = Math.min(limitY, a.y + speed * dt);
+    if (a.y >= limitY - 0.01) {
+      a.y = limitY;
+      a.state = "fall";
     }
+  } else {
+    // снизу стена — доводим спуск до пола и встаём
+    const limitY = (feetRow + 1) * T - T;
+    a.y = Math.min(limitY, a.y + speed * dt);
+    if (a.y >= limitY - 0.01) {
+      a.y = limitY;
+      a.state = "walk";
+      a.climbBlockCd = 0.3;
+    }
+  }
+}
   }
   stepFall(a, dist, isPlayer) {
     let remaining = dist;
@@ -1045,16 +1108,17 @@ class Game {
         continue;
       const g = makeActor(c * T, 0);
       g.state = "fall";
-      g.frozen = 0.4;
+      g.frozen = 0; /// +
       this.guards.push(g);
       return;
     }
   }
-  killGuard(g) {
+  killGuard(g, inHole = false) { /// +
     const idx = this.guards.indexOf(g);
     if (idx >= 0)
       this.guards.splice(idx, 1);
-    if (g.carryingGold) {
+
+    if (g.carryingGold && !inHole) {  /// +
       const r = this.rowOf(g.y);
       const c = this.centerCol(g.x);
       const spots = [
@@ -1082,12 +1146,14 @@ class Game {
     const dx = Math.sign(pc - c);
     const dy = Math.sign(pr - r);
     const cur = this.tileAt(r, c);
+     const below = this.tileAt(r + 1, c);  /// +
     if (cur && cur.type === "ladder") {
       if (dy < 0 && this.passable(this.tileAt(r - 1, c))) {
         g.state = "climb";
         g.climbDir = -1;
         return;
       }
+
       if (dy > 0 && this.passable(this.tileAt(r + 1, c))) {
         g.state = "climb";
         g.climbDir = 1;
@@ -1105,6 +1171,25 @@ class Game {
       }
       return;
     }
+
+    // ── 2) Стоим НАД лестницей (лестница сразу под ногами) ─────
+    if (below && below.type === "ladder") {
+      if (dy > 0) {
+        // игрок ниже — спускаемся вниз по лестнице
+        g.state = "climb";
+        g.climbDir = 1;
+        g.x = c * T;   // выравниваем по центру колонки, чтобы climbMove не потерял лестницу
+        return;
+      }
+      if (dy < 0 && this.passable(this.tileAt(r - 1, c))) {
+        // игрок выше — сначала лезем вверх (если есть куда)
+        // но раз мы над лестницей, "вверх" не по лестнице — просто идём вбок
+        // → падаем вниз в fall, чтобы попасть на лестницу? Нет, оставим как walk:
+        // пропускаем эту ветку — пусть идёт вбок по обычной логике.
+      }
+      // Игрок на той же высоте или выше — не спускаемся, идём обычной логикой
+    }
+
     if (dy < 0) {
       let target = -1;
       const offsets = [];
@@ -1673,7 +1758,7 @@ function renderGame(g, game, t) {
       drawText(g, "НАЖМИ ENTER ИЛИ ТАПНИ ПО ПОЛЮ", VIEW_W / 2, HUD_H + 330, 24, "#ffffff", "center");
     }
     drawText(g, `РЕКОРД: ${game.hiscore}`, VIEW_W / 2, HUD_H + 380, 18, "#8f99a6", "center");
-    drawText(g, "← → ходьба · ↑ ↓ лестницы · Z / X — копать · P пауза · M звук", VIEW_W / 2, HUD_H + 430, 15, "#6d7885", "center");
+    drawText(g, "← → ходьба · ↑ ↓ лестницы · Z,X,ПРОБЕЛ — копать · P пауза · M звук", VIEW_W / 2, HUD_H + 430, 15, "#6d7885", "center");
   } else if (game.phase === "intro") {
     dim(0.45);
     drawText(g, `УРОВЕНЬ ${game.levelIndex + 1}`, VIEW_W / 2, HUD_H + 150, 40, "#ffffff", "center");
@@ -1896,7 +1981,13 @@ function boot() {
       case "Enter":
       case "Space":
         e.preventDefault();
-        game.confirm();
+        // В игре — копать в сторону взгляда; иначе — подтверждение (старт/меню)
+        if (game.phase === "playing" && !game.paused) {
+          if (game.player.dir >= 0) input.digRight = true;
+          else                       input.digLeft = true;
+        } else {
+          game.confirm();
+        }
         break;
       case "KeyP":
       case "Escape":
