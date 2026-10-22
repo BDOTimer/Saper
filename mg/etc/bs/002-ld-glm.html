@@ -362,11 +362,13 @@ var T = 32;
 var HUD_H = 44;
 var VIEW_W = COLS * T;
 var VIEW_H = ROWS * T + HUD_H;
-var WALK = 150;
-var CLIMB = 115;
+var WALK = 150;    // скорость ходьбы ИГРОКА по горизонтали (px/сек)
+var CLIMB = 115;   // скорость лазания ИГРОКА по лестницам (px/сек)
+
 var FALL_SPEED = 270;
-var GUARD_WALK = 106;
-var GUARD_CLIMB = 82;
+var GUARD_WALK =  80;
+var GUARD_CLIMB = 60;
+
 var DIG_TIME = 0.45;
 var HOLE_REFILL = 10.0; /// для Роннико
 var STUCK_MIN = 2.2;
