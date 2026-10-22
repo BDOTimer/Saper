@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Lode Runner — неоновая аркада (1983)</title>
+<meta name="description" content="Классический Lode Runner в неоновом стиле: 6 уровней, копание ям, охранники, скрытые лестницы. Всё в одном файле.">
+<link rel="stylesheet" href="neon-bs.css" />
+<style>
+  /* ===== Дополнительные стили под неоновую тему ===== */
+  body {
+    overflow: auto;
+    align-items: center;
+    padding: 16px 8px 28px;
+  }
+
+  .game-container {
+    max-width: 940px;
+  }
+
+  .game-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .game-header h1 {
+    text-align: left;
+    margin: 0;
+  }
+
+  .hdr-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tagline {
+    font-size: 12px;
+    color: #0ff;
+    opacity: 0.45;
+    letter-spacing: 2px;
+  }
+
+  #lr-mute {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+    line-height: 1;
+    background: rgba(0, 255, 255, 0.08);
+    color: #0ff;
+    border: 2px solid #0ff;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+    transition: all 0.2s ease;
+    padding: 0;
+  }
+
+  #lr-mute:hover,
+  #lr-mute:active {
+    background: rgba(0, 255, 255, 0.25);
+    color: #fff;
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.6),
+      inset 0 0 20px rgba(0, 255, 255, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .board {
+    padding: 12px;
+    min-height: 0;
+    display: block;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.15),
+      inset 0 0 20px rgba(0, 255, 255, 0.05);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: manipulation;
+  }
+
+  /* ===== Панель управления ===== */
+  .touch {
+    margin-top: 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    touch-action: none;
+  }
+
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 56px);
+    gap: 6px;
+  }
+
+  .pad .spacer {
+    width: 56px;
+    height: 56px;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    min-width: 56px;
+    padding: 0 14px;
+    background: rgba(0, 255, 255, 0.08);
+    border: 2px solid #0ff;
+    border-radius: 12px;
+    color: #0ff;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+    cursor: pointer;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn:hover,
+  .btn:active {
+    background: rgba(0, 255, 255, 0.25);
+    color: #fff;
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.6),
+      inset 0 0 20px rgba(0, 255, 255, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .dig {
+    color: #ff6ec4;
+    border-color: #ff2d95;
+    background: rgba(255, 45, 149, 0.08);
+    box-shadow: 0 0 15px rgba(255, 45, 149, 0.3);
+    font-size: 13px;
+    gap: 6px;
+  }
+
+  .dig:hover,
+  .dig:active {
+    background: rgba(255, 45, 149, 0.25);
+    color: #fff;
+    box-shadow: 0 0 25px rgba(255, 45, 149, 0.7),
+      inset 0 0 20px rgba(255, 45, 149, 0.2);
+  }
+
+  .digs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ===== Подсказки ===== */
+  .help {
+    margin-top: 18px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #0ff;
+    opacity: 0.55;
+    letter-spacing: 1px;
+  }
+
+  .help b {
+    color: #6effff;
+    opacity: 1;
+  }
+
+  @media (max-width: 639px) {
+    .help { display: none; }
+    .tagline { display: none; }
+    .pad { grid-template-columns: repeat(3, 50px); }
+    .pad .spacer { width: 50px; height: 50px; }
+    .btn { height: 50px; min-width: 50px; font-size: 18px; }
+    .dig { font-size: 11px; padding: 0 10px; }
+  }
+
+  @media (max-width: 600px) {
+    .corner-btn { display: none; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== Кнопка навигации ===== -->
+  <a href="./i-bs.html" class="corner-btn corner-btn--left" aria-label="Назад">
+    <span class="corner-arrow">◀</span>
+  </a>
+
+  <div class="game-container">
+    <div class="game-header">
+      <h1>LODE RUNNER</h1>
+      <div class="hdr-right">
+        <span class="tagline">классика 1983 · неон</span>
+        <button id="lr-mute" type="button" aria-label="Звук вкл/выкл">🔊</button>
+      </div>
+    </div>
+
+    <div class="task-nav">СОБЕРИ ВСЁ ЗОЛОТО · КОПАЙ ЯМЫ · БЕГИ НАВЕРХ</div>
+
+    <div class="board">
+      <canvas id="lr-canvas" width="896" height="556" aria-label="Игровое поле Lode Runner"></canvas>
+    </div>
+
+    <div class="touch">
+      <div class="pad">
+        <span class="spacer"></span>
+        <button class="btn" type="button" data-key="up" aria-label="Вверх">▲</button>
+        <span class="spacer"></span>
+        <button class="btn" type="button" data-key="left" aria-label="Влево">◀</button>
+        <button class="btn" type="button" data-key="down" aria-label="Вниз">▼</button>
+        <button class="btn" type="button" data-key="right" aria-label="Вправо">▶</button>
+      </div>
+      <div class="digs">
+        <button class="btn dig" type="button" data-key="digLeft" aria-label="Копать слева">⛏ КОПАТЬ ◀</button>
+        <button class="btn dig" type="button" data-key="digRight" aria-label="Копать справа">КОПАТЬ ▶ ⛏</button>
+      </div>
+    </div>
+
+    <p class="help">
+      Управление: <b>← →</b> — ходьба, <b>↑ ↓</b> — лестницы, <b>Z / X</b> (или , / .) — копать яму
+      слева / справа, <b>ENTER</b> — старт, <b>P</b> — пауза, <b>M</b> — звук.
+      Собери всё золото — откроются скрытые лестницы, беги в верхний ряд.
+      С лестницы можно спрыгнуть вбок в любой момент. Падать можно с любой высоты,
+      но охранника лучше заманивать в яму: засыпая, она его поглощает.
+      Осторожно: не окажись в яме, когда она зарастёт!
+    </p>
+  </div>
+
+<script>
+// src/lib/game/levels.ts
+var COLS = 28;
+var ROWS = 16;
+var RAW_LEVELS = [
+  [
+    "        H          H        ",
+    "        H    E     H        ",
+    "  $     H   $  ----H   $    ",
+    "################   H########",
+    "                   H        ",
+    " $---E             H        ",
+    "#### ####H########### ######",
+    "         H           $      ",
+    "  $      H           ---$   ",
+    "#############H######## #####",
+    "             H              ",
+    "     $       H        $     ",
+    "##### #######H########## ###",
+    "             H         E    ",
+    " P        $  H              ",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ],
+  [
+    "    H                       ",
+    "    H                       ",
+    "  $ H     E     ---      $  ",
+    "################  #H########",
+    "                   H        ",
+    "        $  ---     H  E   $ ",
+    "####  ###### ######H########",
+    "                   H        ",
+    "  $  E             H   ---$ ",
+    "#######H################S###",
+    "       H                S   ",
+    "  $    H      $     E   S   ",
+    "#######H######## ###@@@@####",
+    "       H                    ",
+    " P     H            $     $ ",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ],
+  [
+    "  H                         ",
+    "  H                         ",
+    "  H     $        $  E       ",
+    "#####H###@@@@###############",
+    "     H                      ",
+    "  $  H    E     $           ",
+    "#####H##############@@@@#S##",
+    "     H                   S  ",
+    "   $ H           E ---$ $S  ",
+    "##############H##### ####S##",
+    "              H             ",
+    "    E         H $       $   ",
+    "########@@@@ #H#############",
+    "              H             ",
+    "  P   $       H   $       $ ",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ],
+  [
+    "                H        S  ",
+    "                H        S  ",
+    "  $      ----   H     E $S  ",
+    "#########H  ##########H##S##",
+    "         H            H  S  ",
+    "   $  E  H    ----    H  S$ ",
+    "#########H#####  #####H#####",
+    "         H            H     ",
+    "  $      H ---  $   E H   $ ",
+    "####H####### #####H#########",
+    "    H             H         ",
+    "  $ H  ---    $    H  E   $ ",
+    "####H### @@@######H#########",
+    "    H             H         ",
+    "  $ H         P   H       $ ",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ],
+  [
+    "   H                        ",
+    "   H                        ",
+    "   H  $   H  ---E  ---  $   ",
+    "##########H### #####S#######",
+    "          H         S       ",
+    "  $ --- E H   $     S       ",
+    "##### ####H###### ##S####H##",
+    "          H         S    H  ",
+    " ---$     H         S  E H$ ",
+    "## ##########H#### ###H#####",
+    "             H        H     ",
+    "  $ E --- $  H        H   $ ",
+    "####### #####H#@@#####H#####",
+    "             H        H     ",
+    "  $ P     $ EH  $     H   $ ",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ],
+  [
+    " H                        S ",
+    " H                        S ",
+    " H ---  $ H   E      $    S ",
+    "##### ####H#######H#######S#",
+    "          H       H       S ",
+    "$---$     H ---$  H E   $ S ",
+    "## #####@@H## ####H#########",
+    "          H       H         ",
+    "  $     E H   --- H     ---$",
+    "######H######## #####H### ##",
+    "      H              H      ",
+    "  $   H      $ --- E H   $  ",
+    "######H###@@#### ####H######",
+    "      H              H      ",
+    "$     H  E  $    P   H   $  ",
+    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+  ]
+];
+
+// src/lib/game/engine.ts
+var T = 32;
+var HUD_H = 44;
+var VIEW_W = COLS * T;
+var VIEW_H = ROWS * T + HUD_H;
+var WALK = 150;
+var CLIMB = 115;
+var FALL_SPEED = 270;
+var GUARD_WALK = 106;
+var GUARD_CLIMB = 82;
+var DIG_TIME = 0.45;
+var HOLE_REFILL = 4.6;
+var STUCK_MIN = 2.2;
+var STUCK_RAND = 1.3;
+var RESPAWN_DELAY = 3;
+var DEATH_TIME = 1.4;
+var INTRO_TIME = 1.3;
+var COMPLETE_TIME = 1.9;
+var GOLD_POINTS = 250;
+var TRAP_POINTS = 75;
+var EXTRA_LIFE_EVERY = 20000;
+var cell = (type) => ({
+  type,
+  isHole: false,
+  holeTimer: 0,
+  warned: false,
+  revealTimer: 0
+});
+function makeActor(x, y) {
+  return {
+    x,
+    y,
+    dir: 1,
+    state: "fall",
+    timer: 0,
+    anim: 0,
+    digDir: 1,
+    climbDir: 1,
+    moveDir: 0,
+    carryingGold: false,
+    frozen: 0,
+    decideCd: 0,
+    targetX: 0,
+    targetY: 0,
+    dropRopeRow: -1
+  };
+}
+
+class Game {
+  sfx;
+  phase = "title";
+  paused = false;
+  levelIndex = 0;
+  score = 0;
+  lives = 5;
+  hiscore = 0;
+  nextExtra = EXTRA_LIFE_EVERY;
+  cells = [];
+  player = makeActor(0, 0);
+  guards = [];
+  respawns = [];
+  goldLeft = 0;
+  revealed = false;
+  revealFx = 0;
+  banner = 0;
+  bannerText = "";
+  phaseTimer = 0;
+  shake = 0;
+  time = 0;
+  input = {
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    digLeft: false,
+    digRight: false
+  };
+  constructor(sfx) {
+    this.sfx = sfx;
+    try {
+      if (typeof window !== "undefined") {
+        this.hiscore = Number(window.localStorage.getItem("lr-hiscore") ?? "0") || 0;
+      }
+    } catch {}
+    this.loadLevel(0);
+  }
+  get levelCount() {
+    return RAW_LEVELS.length;
+  }
+  saveHiscore() {
+    if (this.score > this.hiscore)
+      this.hiscore = this.score;
+    try {
+      window.localStorage.setItem("lr-hiscore", String(this.hiscore));
+    } catch {}
+  }
+  addScore(n) {
+    this.score += n;
+    if (this.score > this.hiscore)
+      this.hiscore = this.score;
+    if (this.score >= this.nextExtra) {
+      this.lives += 1;
+      this.nextExtra += EXTRA_LIFE_EVERY;
+      this.bannerText = "ДОПОЛНИТЕЛЬНАЯ ЖИЗНЬ!";
+      this.banner = 2.4;
+      this.sfx.extra();
+    }
+  }
+  loadLevel(index) {
+    this.levelIndex = index;
+    const raw = RAW_LEVELS[index];
+    this.cells = [];
+    this.guards = [];
+    this.respawns = [];
+    this.revealed = false;
+    this.revealFx = 0;
+    this.banner = 0;
+    this.goldLeft = 0;
+    let px = T;
+    let py = T * (ROWS - 2);
+    let guardIdx = 0;
+    for (let r = 0;r < ROWS; r++) {
+      const rowCells = [];
+      const line = (raw[r] ?? "").padEnd(COLS, " ").slice(0, COLS);
+      for (let c = 0;c < COLS; c++) {
+        const ch = line[c];
+        switch (ch) {
+          case "#":
+            rowCells.push(cell("brick"));
+            break;
+          case "@":
+            rowCells.push(cell("solid"));
+            break;
+          case "H":
+            rowCells.push(cell("ladder"));
+            break;
+          case "-":
+            rowCells.push(cell("rope"));
+            break;
+          case "S":
+            rowCells.push(cell("hidden"));
+            break;
+          case "$":
+            rowCells.push(cell("gold"));
+            this.goldLeft += 1;
+            break;
+          case "P":
+            px = c * T;
+            py = r * T;
+            rowCells.push(cell("empty"));
+            break;
+          case "E": {
+            const g = makeActor(c * T, r * T);
+            g.frozen = 0.9 + guardIdx * 0.7;
+            guardIdx += 1;
+            this.guards.push(g);
+            rowCells.push(cell("empty"));
+            break;
+          }
+          default:
+            rowCells.push(cell("empty"));
+        }
+      }
+      this.cells.push(rowCells);
+    }
+    this.player = makeActor(px, py);
+    this.player.state = "fall";
+  }
+  startGame() {
+    this.score = 0;
+    this.lives = 5;
+    this.nextExtra = EXTRA_LIFE_EVERY;
+    this.loadLevel(0);
+    this.phase = "intro";
+    this.phaseTimer = INTRO_TIME;
+    this.paused = false;
+    this.sfx.start();
+  }
+  toTitle() {
+    this.phase = "title";
+    this.paused = false;
+    this.loadLevel(0);
+  }
+  confirm() {
+    if (this.phase === "title")
+      this.startGame();
+    else if (this.phase === "gameover" || this.phase === "victory")
+      this.toTitle();
+    else if (this.paused)
+      this.paused = false;
+  }
+  togglePause(force) {
+    if (this.phase !== "playing" && this.phase !== "intro")
+      return;
+    this.paused = force ?? !this.paused;
+  }
+  tileAt(r, c) {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS)
+      return null;
+    return this.cells[r][c];
+  }
+  passable(cellObj) {
+    if (!cellObj)
+      return false;
+    return cellObj.type !== "brick" && cellObj.type !== "solid";
+  }
+  support(cellObj) {
+    if (!cellObj)
+      return false;
+    return cellObj.type === "brick" || cellObj.type === "solid" || cellObj.type === "ladder";
+  }
+  colOf(x) {
+    return Math.floor(x / T);
+  }
+  rowOf(y) {
+    return Math.floor(y / T);
+  }
+  centerCol(x) {
+    return Math.floor((x + T / 2) / T);
+  }
+  alignedY(y) {
+    const m = y % T;
+    return m < 0.5 || m > T - 0.5;
+  }
+  supportBelow(a) {
+    const c = this.centerCol(a.x);
+    return this.support(this.tileAt(this.rowOf(a.y + T - 1), c));
+  }
+  collectGoldAt(r, c) {
+    const cellObj = this.tileAt(r, c);
+    if (cellObj && cellObj.type === "gold") {
+      cellObj.type = "empty";
+      this.goldLeft -= 1;
+      this.addScore(GOLD_POINTS);
+      this.sfx.gold();
+    }
+  }
+  update(dt) {
+    this.time += dt;
+    if (this.paused)
+      return;
+    this.shake = Math.max(0, this.shake - dt);
+    this.banner = Math.max(0, this.banner - dt);
+    this.revealFx = Math.max(0, this.revealFx - dt);
+    switch (this.phase) {
+      case "title":
+      case "gameover":
+      case "victory":
+        break;
+      case "intro":
+        this.phaseTimer -= dt;
+        if (this.phaseTimer <= 0)
+          this.phase = "playing";
+        break;
+      case "dying":
+        this.phaseTimer -= dt;
+        if (this.phaseTimer <= 0) {
+          this.lives -= 1;
+          if (this.lives <= 0) {
+            this.saveHiscore();
+            this.phase = "gameover";
+            this.sfx.gameOver();
+          } else {
+            this.loadLevel(this.levelIndex);
+            this.phase = "intro";
+            this.phaseTimer = INTRO_TIME;
+          }
+        }
+        break;
+      case "complete":
+        this.phaseTimer -= dt;
+        if (this.phaseTimer <= 0) {
+          if (this.levelIndex + 1 >= RAW_LEVELS.length) {
+            this.saveHiscore();
+            this.phase = "victory";
+          } else {
+            this.loadLevel(this.levelIndex + 1);
+            this.phase = "intro";
+            this.phaseTimer = INTRO_TIME;
+          }
+        }
+        break;
+      case "playing":
+        this.updateHoles(dt);
+        this.updateReveal(dt);
+        this.updatePlayer(dt);
+        this.updateGuards(dt);
+        this.updateRespawns(dt);
+        this.checkCollisions();
+        this.checkComplete();
+        break;
+    }
+  }
+  updateReveal(dt) {
+    if (!this.revealed)
+      return;
+    for (let r = 0;r < ROWS; r++) {
+      for (let c = 0;c < COLS; c++) {
+        const cellObj = this.cells[r][c];
+        if (cellObj.type === "hidden" && cellObj.revealTimer > 0) {
+          cellObj.revealTimer -= dt;
+          if (cellObj.revealTimer <= 0) {
+            cellObj.type = "ladder";
+            cellObj.revealTimer = 0;
+          }
+        }
+      }
+    }
+  }
+  updateHoles(dt) {
+    for (let r = 0;r < ROWS; r++) {
+      for (let c = 0;c < COLS; c++) {
+        const cellObj = this.cells[r][c];
+        if (!cellObj.isHole)
+          continue;
+        cellObj.holeTimer -= dt;
+        if (!cellObj.warned && cellObj.holeTimer <= 1.2) {
+          cellObj.warned = true;
+          this.sfx.refillWarn();
+        }
+        if (cellObj.holeTimer <= 0) {
+          cellObj.type = "brick";
+          cellObj.isHole = false;
+          cellObj.holeTimer = 0;
+          cellObj.warned = false;
+          const pc = this.centerCol(this.player.x);
+          const pr = this.rowOf(this.player.y + T / 2);
+          if (pr === r && pc === c)
+            this.killPlayer();
+          for (const g of [...this.guards]) {
+            const gc = this.centerCol(g.x);
+            const gr = this.rowOf(g.y + T / 2);
+            if (gr === r && gc === c)
+              this.killGuard(g);
+          }
+        }
+      }
+    }
+  }
+  digBlock(dir) {
+    const p = this.player;
+    if (p.state !== "walk" || !this.alignedY(p.y))
+      return;
+    const r = this.rowOf(p.y);
+    const c = this.centerCol(p.x);
+    const target = this.tileAt(r + 1, c + dir);
+    if (!target || target.type !== "brick")
+      return;
+    p.state = "dig";
+    p.timer = DIG_TIME;
+    p.digDir = dir;
+    p.dir = dir;
+    this.sfx.dig();
+  }
+  killPlayer() {
+    if (this.phase !== "playing")
+      return;
+    this.phase = "dying";
+    this.phaseTimer = DEATH_TIME;
+    this.shake = 0.45;
+    this.sfx.death();
+  }
+  snapToRope(a, row) {
+    a.y = row * T;
+    a.state = "rope";
+    a.dropRopeRow = -1;
+  }
+  updatePlayer(dt) {
+    const p = this.player;
+    const inp = this.input;
+    if (inp.digLeft) {
+      inp.digLeft = false;
+      this.digBlock(-1);
+    }
+    if (inp.digRight) {
+      inp.digRight = false;
+      this.digBlock(1);
+    }
+    if (p.state === "dig") {
+      p.timer -= dt;
+      p.anim += dt;
+      if (p.timer <= 0) {
+        const r2 = this.rowOf(p.y);
+        const c2 = this.centerCol(p.x);
+        const target = this.tileAt(r2 + 1, c2 + p.digDir);
+        if (target && target.type === "brick") {
+          target.type = "empty";
+          target.isHole = true;
+          target.holeTimer = HOLE_REFILL;
+          target.warned = false;
+        }
+        p.state = "walk";
+      }
+      return;
+    }
+    const c = this.centerCol(p.x);
+    const r = this.rowOf(p.y);
+    switch (p.state) {
+      case "rope": {
+        p.anim += dt;
+        const dirIn = inp.left ? -1 : inp.right ? 1 : 0;
+        if (dirIn !== 0) {
+          p.dir = dirIn;
+          p.x = Math.max(0, Math.min(VIEW_W - T, p.x + dirIn * WALK * dt));
+        }
+        if (inp.down) {
+          p.state = "fall";
+          p.dropRopeRow = this.rowOf(p.y);
+          return;
+        }
+        const cc = this.centerCol(p.x);
+        const ropeRow = this.rowOf(p.y);
+        const cur = this.tileAt(ropeRow, cc);
+        if (!cur || cur.type !== "rope") {
+          const below = this.tileAt(ropeRow + 1, cc);
+          if (this.support(below))
+            p.state = "walk";
+          else {
+            p.state = "fall";
+            p.dropRopeRow = -1;
+          }
+        }
+        this.collectPlayerGold();
+        return;
+      }
+      case "climb": {
+        p.anim += dt;
+        const vy = inp.up ? -CLIMB : inp.down ? CLIMB : 0;
+        if (vy !== 0)
+          p.climbDir = vy < 0 ? -1 : 1;
+        const dirIn = inp.left ? -1 : inp.right ? 1 : 0;
+        if (dirIn !== 0) {
+          const aligned = this.alignedY(p.y);
+          const rA = this.rowOf(p.y);
+          const rB = rA + 1;
+          const sA = this.tileAt(rA, c + dirIn);
+          const sB = this.tileAt(rB, c + dirIn);
+          let exitRow = -1;
+          let snap = false;
+          if (this.passable(sA) && (aligned || this.passable(sB))) {
+            exitRow = rA;
+          } else if (!aligned) {
+            const rowsToTry = Math.round(p.y / T) === rA ? [rA, rB] : [rB, rA];
+            for (const k of rowsToTry) {
+              const inCol = this.tileAt(k, c);
+              if (inCol && this.passable(inCol) && this.passable(this.tileAt(k, c + dirIn))) {
+                exitRow = k;
+                snap = true;
+                break;
+              }
+            }
+          }
+          if (exitRow >= 0) {
+            if (snap)
+              p.y = exitRow * T;
+            p.dir = dirIn;
+            p.x += dirIn * Math.min(WALK * dt, 8);
+            if (this.centerCol(p.x) !== c) {
+              const nc = this.centerCol(p.x);
+              const nr = this.rowOf(p.y + T / 2);
+              const here = this.tileAt(nr, nc);
+              if (here && here.type === "rope") {
+                this.snapToRope(p, nr);
+              } else if (this.alignedY(p.y) && this.support(this.tileAt(nr + 1, nc))) {
+                p.y = Math.round(p.y / T) * T;
+                p.state = "walk";
+              } else {
+                p.state = "fall";
+                p.dropRopeRow = -1;
+              }
+            }
+            this.collectPlayerGold();
+            return;
+          }
+        }
+        if (vy !== 0)
+          this.climbMove(p, vy, dt, CLIMB);
+        this.collectPlayerGold();
+        return;
+      }
+      case "fall": {
+        this.stepFall(p, FALL_SPEED * dt, true);
+        return;
+      }
+      case "walk":
+      default: {
+        p.anim += dt;
+        const cc = this.centerCol(p.x);
+        const rr = this.rowOf(p.y);
+        if (!this.support(this.tileAt(rr + 1, cc))) {
+          const here = this.tileAt(rr, cc);
+          if (here && here.type === "rope") {
+            this.snapToRope(p, rr);
+          } else {
+            p.state = "fall";
+            p.dropRopeRow = -1;
+          }
+          return;
+        }
+        const dirIn = inp.left ? -1 : inp.right ? 1 : 0;
+        if (dirIn !== 0) {
+          p.dir = dirIn;
+          const newX = p.x + dirIn * WALK * dt;
+          const leadCol = dirIn > 0 ? this.colOf(newX + T - 1) : this.colOf(newX);
+          const wall = this.tileAt(rr, leadCol);
+          if (wall && !this.passable(wall)) {
+            p.x = dirIn > 0 ? leadCol * T - T : (leadCol + 1) * T;
+          } else {
+            p.x = Math.max(0, Math.min(VIEW_W - T, newX));
+          }
+          if (this.centerCol(p.x) !== cc) {
+            const below = this.tileAt(rr + 1, this.centerCol(p.x));
+            if (!this.support(below)) {
+              const here = this.tileAt(rr, this.centerCol(p.x));
+              if (here && here.type === "rope") {
+                this.snapToRope(p, rr);
+              } else {
+                p.state = "fall";
+                p.dropRopeRow = -1;
+              }
+              return;
+            }
+          }
+        }
+        const cc2 = this.centerCol(p.x);
+        if (inp.up && this.tileAt(rr, cc2)?.type === "ladder") {
+          p.x = cc2 * T;
+          p.state = "climb";
+          return;
+        }
+        if (inp.down && this.tileAt(rr + 1, cc2)?.type === "ladder" && this.tileAt(rr, cc2)?.type !== "ladder") {
+          p.x = cc2 * T;
+          p.state = "climb";
+          p.climbDir = 1;
+          p.y += CLIMB * dt;
+          return;
+        }
+        this.collectPlayerGold();
+        return;
+      }
+    }
+  }
+  collectPlayerGold() {
+    const p = this.player;
+    const c = this.centerCol(p.x);
+    const rTop = this.rowOf(p.y + 6);
+    const rBottom = this.rowOf(p.y + T - 6);
+    this.collectGoldAt(rTop, c);
+    if (rBottom !== rTop)
+      this.collectGoldAt(rBottom, c);
+  }
+  climbMove(a, vy, dt, speed) {
+    const c = this.centerCol(a.x);
+    if (vy < 0) {
+      const headRow = this.rowOf(a.y);
+      const headTile = this.tileAt(headRow, c);
+      if (headTile && headTile.type !== "ladder" && this.passable(headTile)) {
+        const targetY = headRow * T;
+        a.y = Math.max(targetY, a.y - speed * dt);
+        if (a.y <= targetY + 0.01) {
+          a.y = targetY;
+          a.state = "walk";
+        }
+        return;
+      }
+      let newY = a.y - speed * dt;
+      const newRow = this.rowOf(newY);
+      const above = this.tileAt(newRow, c);
+      if (!above || !this.passable(above)) {
+        newY = Math.max(newY, newRow * T + T);
+      }
+      a.y = newY;
+    } else if (vy > 0) {
+      const feetRow = this.rowOf(a.y + T - 1);
+      const belowTile = this.tileAt(feetRow + 1, c);
+      if (belowTile && belowTile.type === "ladder") {
+        a.y += speed * dt;
+      } else if (belowTile && this.passable(belowTile)) {
+        const limitY = (feetRow + 1) * T - T;
+        a.y = Math.min(limitY, a.y + speed * dt);
+        if (a.y >= limitY - 0.01) {
+          a.y = limitY;
+          a.state = "fall";
+        }
+      }
+    }
+  }
+  stepFall(a, dist, isPlayer) {
+    let remaining = dist;
+    while (remaining > 0 && a.state === "fall") {
+      const step = Math.min(8, remaining);
+      remaining -= step;
+      const prevTopRow = this.rowOf(a.y);
+      a.y += step;
+      const c = this.centerCol(a.x);
+      const topRow = this.rowOf(a.y);
+      const feetRow = this.rowOf(a.y + T - 1);
+      if (isPlayer) {
+        this.collectGoldAt(topRow, c);
+        if (feetRow !== topRow)
+          this.collectGoldAt(feetRow, c);
+      } else if (!a.carryingGold) {
+        const t1 = this.tileAt(topRow, c);
+        const t2 = this.tileAt(feetRow, c);
+        if (t1 && t1.type === "gold" || t2 && t2.type === "gold") {
+          if (t1 && t1.type === "gold")
+            t1.type = "empty";
+          if (t2 && t2.type === "gold")
+            t2.type = "empty";
+          this.goldLeft -= 1;
+          a.carryingGold = true;
+        }
+      }
+      if (isPlayer) {
+        const curTop = this.tileAt(topRow, c);
+        if (curTop && curTop.type === "rope" && topRow > prevTopRow && topRow !== a.dropRopeRow) {
+          this.snapToRope(a, topRow);
+          return;
+        }
+        if (a.dropRopeRow >= 0 && topRow > a.dropRopeRow)
+          a.dropRopeRow = -1;
+        const below = this.tileAt(topRow + 1, c);
+        if (this.support(below) && a.y + T >= (topRow + 1) * T) {
+          a.y = (topRow + 1) * T - T;
+          a.state = "walk";
+          a.anim = 0;
+          return;
+        }
+        if (this.input.up || this.input.down) {
+          const g1 = this.tileAt(topRow + 1, c);
+          if (g1 && g1.type === "ladder") {
+            a.y = (topRow + 1) * T;
+            a.x = c * T;
+            a.state = "climb";
+            return;
+          }
+          const g2 = this.tileAt(topRow, c);
+          if (g2 && g2.type === "ladder") {
+            a.y = topRow * T;
+            a.x = c * T;
+            a.state = "climb";
+            return;
+          }
+        }
+      } else {
+        const curTop = this.tileAt(topRow, c);
+        if (curTop && curTop.isHole && topRow > prevTopRow) {
+          a.y = topRow * T;
+          a.x = c * T;
+          a.state = "stuck";
+          a.timer = STUCK_MIN + Math.random() * STUCK_RAND;
+          a.anim = 0;
+          this.addScore(TRAP_POINTS);
+          this.sfx.trap();
+          return;
+        }
+        const below = this.tileAt(topRow + 1, c);
+        if (this.support(below) && a.y + T >= (topRow + 1) * T) {
+          a.y = (topRow + 1) * T - T;
+          a.state = "walk";
+          a.anim = 0;
+          return;
+        }
+      }
+    }
+  }
+  updateRespawns(dt) {
+    for (let i = this.respawns.length - 1;i >= 0; i--) {
+      this.respawns[i] -= dt;
+      if (this.respawns[i] <= 0) {
+        this.respawns.splice(i, 1);
+        this.spawnGuard();
+      }
+    }
+  }
+  spawnGuard() {
+    const pCol = this.centerCol(this.player.x);
+    for (let attempt = 0;attempt < 14; attempt++) {
+      const c = Math.floor(Math.random() * COLS);
+      const t = this.tileAt(0, c);
+      if (!t || !this.passable(t) || t.type === "rope")
+        continue;
+      if (Math.abs(c - pCol) < 5)
+        continue;
+      const g = makeActor(c * T, 0);
+      g.state = "fall";
+      g.frozen = 0.4;
+      this.guards.push(g);
+      return;
+    }
+  }
+  killGuard(g) {
+    const idx = this.guards.indexOf(g);
+    if (idx >= 0)
+      this.guards.splice(idx, 1);
+    if (g.carryingGold) {
+      const r = this.rowOf(g.y);
+      const c = this.centerCol(g.x);
+      const spots = [
+        [r - 1, c],
+        [r, c - 1],
+        [r, c + 1]
+      ];
+      for (const [rr, cc] of spots) {
+        const t = this.tileAt(rr, cc);
+        if (t && t.type === "empty" && !t.isHole) {
+          t.type = "gold";
+          this.goldLeft += 1;
+          break;
+        }
+      }
+    }
+    this.respawns.push(RESPAWN_DELAY);
+  }
+  guardDecide(g) {
+    const r = this.rowOf(g.y);
+    const c = this.centerCol(g.x);
+    const p = this.player;
+    const pr = this.rowOf(p.y + T / 2);
+    const pc = this.centerCol(p.x);
+    const dx = Math.sign(pc - c);
+    const dy = Math.sign(pr - r);
+    const cur = this.tileAt(r, c);
+    if (cur && cur.type === "ladder") {
+      if (dy < 0 && this.passable(this.tileAt(r - 1, c))) {
+        g.state = "climb";
+        g.climbDir = -1;
+        return;
+      }
+      if (dy > 0 && this.passable(this.tileAt(r + 1, c))) {
+        g.state = "climb";
+        g.climbDir = 1;
+        return;
+      }
+      if (dx !== 0 && this.support(this.tileAt(r + 1, c)) && this.passable(this.tileAt(r, c + dx))) {
+        g.moveDir = dx;
+        return;
+      }
+      if (this.passable(this.tileAt(r - 1, c))) {
+        g.state = "climb";
+        g.climbDir = -1;
+      } else {
+        g.moveDir = 0;
+      }
+      return;
+    }
+    if (dy < 0) {
+      let target = -1;
+      const offsets = [];
+      for (let off = 0;off <= 6; off++) {
+        offsets.push(off, -off);
+      }
+      offsets.sort((a, b) => Math.abs(a) - Math.abs(b) || (dx >= 0 ? a - b : b - a));
+      for (const off of offsets) {
+        const c2 = c + off;
+        if (c2 < 0 || c2 >= COLS)
+          continue;
+        const t1 = this.tileAt(r, c2);
+        const t2 = this.tileAt(r - 1, c2);
+        if (t1 && t1.type === "ladder" && t2 && t2.type === "ladder") {
+          target = c2;
+          break;
+        }
+      }
+      if (target >= 0) {
+        if (target === c) {
+          g.state = "climb";
+          g.climbDir = -1;
+        } else {
+          g.moveDir = Math.sign(target - c);
+        }
+      } else {
+        g.moveDir = dx || (Math.random() < 0.5 ? -1 : 1);
+      }
+      return;
+    }
+    if (dx !== 0) {
+      const ahead = this.tileAt(r, c + dx);
+      if (ahead && !this.passable(ahead)) {
+        const down = this.tileAt(r + 1, c);
+        if (down && down.type === "ladder" && cur && cur.type === "ladder") {
+          g.state = "climb";
+          g.climbDir = 1;
+        } else {
+          g.moveDir = -dx;
+        }
+      } else {
+        g.moveDir = dx;
+      }
+    } else {
+      g.moveDir = 0;
+    }
+  }
+  updateGuards(dt) {
+    for (const g of this.guards) {
+      if (g.frozen > 0) {
+        g.frozen -= dt;
+        continue;
+      }
+      g.decideCd -= dt;
+      const alignedG = this.alignedY(g.y) && (g.x % T < 0.5 || g.x % T > T - 0.5);
+      switch (g.state) {
+        case "stuck": {
+          g.anim += dt;
+          g.timer -= dt;
+          if (g.timer <= 0) {
+            const r = this.rowOf(g.y);
+            const c = this.centerCol(g.x);
+            const pCol = this.centerCol(this.player.x);
+            const prefer = Math.sign(pCol - c) || 1;
+            const sides = prefer >= 0 ? [1, -1] : [-1, 1];
+            let chosen = 0;
+            for (const s of sides) {
+              const t = this.tileAt(r - 1, c + s);
+              if (t && this.passable(t) && t.type !== "rope" && this.support(this.tileAt(r, c + s))) {
+                chosen = s;
+                break;
+              }
+            }
+            if (chosen) {
+              if (g.carryingGold) {
+                const holeCell = this.tileAt(r, c);
+                if (holeCell && holeCell.type === "empty") {
+                  holeCell.type = "gold";
+                  this.goldLeft += 1;
+                  g.carryingGold = false;
+                }
+              }
+              g.state = "climbout";
+              g.targetX = (c + chosen) * T;
+              g.targetY = (r - 1) * T;
+              g.moveDir = chosen;
+            } else {
+              g.timer = 0.8;
+            }
+          }
+          break;
+        }
+        case "climbout": {
+          g.anim += dt;
+          const sp = GUARD_WALK * 1.5 * dt;
+          const spY = GUARD_CLIMB * 1.7 * dt;
+          if (g.x < g.targetX)
+            g.x = Math.min(g.targetX, g.x + sp);
+          else if (g.x > g.targetX)
+            g.x = Math.max(g.targetX, g.x - sp);
+          if (g.y > g.targetY)
+            g.y = Math.max(g.targetY, g.y - spY);
+          if (Math.abs(g.x - g.targetX) < 1 && Math.abs(g.y - g.targetY) < 1) {
+            g.x = g.targetX;
+            g.y = g.targetY;
+            g.state = "walk";
+            g.decideCd = 0;
+          }
+          break;
+        }
+        case "fall": {
+          g.anim += dt;
+          this.stepFall(g, FALL_SPEED * dt, false);
+          break;
+        }
+        case "climb": {
+          g.anim += dt;
+          const before = g.y;
+          this.climbMove(g, g.climbDir * GUARD_CLIMB, dt, GUARD_CLIMB);
+          if (Math.abs(g.y - before) < 0.001) {
+            g.y = Math.round(g.y / T) * T;
+            g.state = "walk";
+            g.decideCd = 0;
+          }
+          break;
+        }
+        case "walk":
+        default: {
+          g.anim += dt;
+          const cc = this.centerCol(g.x);
+          const rr = this.rowOf(g.y);
+          if (!this.support(this.tileAt(rr + 1, cc))) {
+            g.state = "fall";
+            break;
+          }
+          if (alignedG && g.decideCd <= 0) {
+            this.guardDecide(g);
+            g.decideCd = 0.14;
+          }
+          if (g.moveDir !== 0) {
+            const dir = g.moveDir;
+            g.dir = dir;
+            const newX = g.x + dir * GUARD_WALK * dt;
+            const leadCol = dir > 0 ? this.colOf(newX + T - 1) : this.colOf(newX);
+            const wall = this.tileAt(rr, leadCol);
+            if (wall && !this.passable(wall)) {
+              g.x = dir > 0 ? leadCol * T - T : (leadCol + 1) * T;
+              g.moveDir = 0;
+              g.decideCd = 0;
+            } else {
+              g.x = Math.max(0, Math.min(VIEW_W - T, newX));
+            }
+            if (this.centerCol(g.x) !== cc && !this.support(this.tileAt(rr + 1, this.centerCol(g.x)))) {
+              g.state = "fall";
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+  checkCollisions() {
+    if (this.phase !== "playing")
+      return;
+    const p = this.player;
+    for (const g of this.guards) {
+      if (g.frozen > 0)
+        continue;
+      if (Math.abs(p.x - g.x) < T - 10 && Math.abs(p.y - g.y) < T - 8) {
+        this.killPlayer();
+        return;
+      }
+    }
+  }
+  checkComplete() {
+    if (this.goldLeft > 0)
+      return;
+    if (!this.revealed) {
+      this.revealed = true;
+      this.revealFx = 1.4;
+      this.bannerText = "ЗОЛОТО СОБРАНО! БЕГИ НАВЕРХ!";
+      this.banner = 3;
+      this.sfx.reveal();
+      for (let r = 0;r < ROWS; r++) {
+        for (let c = 0;c < COLS; c++) {
+          const cellObj = this.cells[r][c];
+          if (cellObj.type === "hidden")
+            cellObj.revealTimer = 0.7;
+        }
+      }
+    }
+    const p = this.player;
+    if (this.alignedY(p.y) && this.rowOf(p.y) === 0) {
+      const bonus = 1500 + this.levelIndex * 250;
+      this.addScore(bonus);
+      this.phase = "complete";
+      this.phaseTimer = COMPLETE_TIME;
+      this.sfx.win();
+    }
+  }
+}
+
+// src/lib/game/render.ts
+var BG = "#0e63b8";
+var BG_DARK = "#0a4e94";
+var brickTile = null;
+var solidTile = null;
+var ladderTile = null;
+var ropeTile = null;
+var goldFrames = null;
+function makeCanvas(w, h) {
+  const cv = document.createElement("canvas");
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext("2d");
+  return [cv, ctx];
+}
+function buildBrick() {
+  const [cv, g] = makeCanvas(T, T);
+  g.fillStyle = "#4a100c";
+  g.fillRect(0, 0, T, T);
+  const drawBrickRow = (y, offset) => {
+    for (let bx = -16;bx < T; bx += 16) {
+      const x = bx + offset;
+      g.fillStyle = "#a83226";
+      g.fillRect(x + 1, y + 1, 14, 13);
+      g.fillStyle = "#c94b38";
+      g.fillRect(x + 1, y + 1, 14, 2);
+      g.fillStyle = "#7c1f14";
+      g.fillRect(x + 1, y + 12, 14, 2);
+    }
+  };
+  drawBrickRow(0, 0);
+  drawBrickRow(16, 8);
+  return cv;
+}
+function buildSolid() {
+  const [cv, g] = makeCanvas(T, T);
+  g.fillStyle = "#171b21";
+  g.fillRect(0, 0, T, T);
+  g.fillStyle = "#3d434c";
+  g.fillRect(1, 1, T - 2, T - 2);
+  g.fillStyle = "#586170";
+  g.fillRect(1, 1, T - 2, 3);
+  g.fillRect(1, 1, 3, T - 2);
+  g.fillStyle = "#242932";
+  g.fillRect(1, T - 5, T - 2, 4);
+  g.fillRect(T - 5, 1, 4, T - 2);
+  g.fillStyle = "#14181d";
+  g.fillRect(5, 5, 3, 3);
+  g.fillRect(T - 9, 5, 3, 3);
+  g.fillRect(5, T - 9, 3, 3);
+  g.fillRect(T - 9, T - 9, 3, 3);
+  return cv;
+}
+function buildLadder() {
+  const [cv, g] = makeCanvas(T, T);
+  g.fillStyle = "#20262e";
+  g.fillRect(5, 0, 6, T);
+  g.fillRect(21, 0, 6, T);
+  g.fillStyle = "#dfe3e8";
+  g.fillRect(5, 0, 4, T);
+  g.fillRect(21, 0, 4, T);
+  for (let y = 3;y < T; y += 8) {
+    g.fillStyle = "#20262e";
+    g.fillRect(4, y + 3, 24, 2);
+    g.fillStyle = "#cfd4da";
+    g.fillRect(4, y, 24, 3);
+    g.fillStyle = "#f2f5f8";
+    g.fillRect(4, y, 24, 1);
+  }
+  return cv;
+}
+function buildRope() {
+  const [cv, g] = makeCanvas(T, T);
+  g.fillStyle = "#7d848c";
+  g.fillRect(0, 15, T, 5);
+  g.fillStyle = "#eceff2";
+  g.fillRect(0, 14, T, 4);
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 14, T, 1);
+  return cv;
+}
+function buildGold() {
+  const frames = [];
+  for (let f = 0;f < 2; f++) {
+    const [cv, g] = makeCanvas(T, T);
+    g.fillStyle = "#6b4a00";
+    g.fillRect(5, 10, 22, 16);
+    g.fillStyle = "#f4bc10";
+    g.fillRect(6, 11, 20, 14);
+    g.fillStyle = "#ffe266";
+    g.fillRect(6, 11, 20, 3);
+    g.fillStyle = "#c98f06";
+    g.fillRect(6, 17, 20, 2);
+    g.fillStyle = "#6b4a00";
+    g.fillRect(14, 15, 4, 5);
+    g.fillStyle = "#8a5f00";
+    g.fillRect(6, 24, 20, 1);
+    if (f === 1) {
+      g.fillStyle = "#ffffff";
+      g.fillRect(9, 12, 2, 2);
+      g.fillRect(23, 20, 2, 2);
+    }
+    frames.push(cv);
+  }
+  return frames;
+}
+function getTiles() {
+  if (!brickTile) {
+    brickTile = buildBrick();
+    solidTile = buildSolid();
+    ladderTile = buildLadder();
+    ropeTile = buildRope();
+    goldFrames = buildGold();
+  }
+  return {
+    brickTile,
+    solidTile,
+    ladderTile,
+    ropeTile,
+    goldFrames
+  };
+}
+var PLAYER_COLORS = {
+  body: "#23262e",
+  bodyDark: "#101218",
+  limb: "#2e323d",
+  skin: "#e0a878",
+  hair: "#15171d"
+};
+var GUARD_COLORS = {
+  body: "#b8342a",
+  bodyDark: "#6e1610",
+  limb: "#8e2018",
+  skin: "#e0a878",
+  hair: "#3a0e0a",
+  visor: "#1a1d24"
+};
+function drawFigure(g, a, colors, t, offsetY = HUD_H) {
+  const x = Math.round(a.x);
+  const y = Math.round(a.y + offsetY);
+  const frame = Math.floor(a.anim * 9) % 2;
+  g.save();
+  g.translate(x, y);
+  const pose = a.state;
+  g.fillStyle = colors.hair;
+  g.fillRect(11, 1, 10, 4);
+  g.fillStyle = colors.skin;
+  g.fillRect(11, 5, 10, 6);
+  g.fillStyle = "#14161c";
+  const eyeX = a.dir > 0 ? 17 : 13;
+  g.fillRect(eyeX, 6, 2, 3);
+  if (colors.visor) {
+    g.fillStyle = colors.visor;
+    g.fillRect(10, 5, 12, 3);
+  }
+  g.fillStyle = colors.body;
+  g.fillRect(9, 11, 14, 11);
+  g.fillStyle = colors.bodyDark;
+  g.fillRect(9, 20, 14, 2);
+  if (pose === "climb") {
+    g.fillStyle = colors.limb;
+    g.fillRect(6, 4, 3, 9);
+    g.fillRect(23, 8, 3, 9);
+    g.fillStyle = colors.bodyDark;
+    if (frame === 0) {
+      g.fillRect(10, 22, 5, 9);
+      g.fillRect(17, 22, 5, 7);
+    } else {
+      g.fillRect(10, 22, 5, 7);
+      g.fillRect(17, 22, 5, 9);
+    }
+  } else if (pose === "rope") {
+    g.fillStyle = colors.limb;
+    g.fillRect(6, 4, 3, 10);
+    g.fillRect(23, 4, 3, 10);
+    g.fillStyle = colors.bodyDark;
+    g.fillRect(10, 22, 5, 8);
+    g.fillRect(17, 22, 5, 8);
+  } else if (pose === "fall") {
+    g.fillStyle = colors.limb;
+    g.fillRect(5, 12, 4, 3);
+    g.fillRect(23, 12, 4, 3);
+    g.fillStyle = colors.bodyDark;
+    g.fillRect(9, 22, 5, 8);
+    g.fillRect(18, 22, 5, 9);
+  } else if (pose === "dig") {
+    const dir = a.digDir;
+    g.fillStyle = colors.limb;
+    const armX = dir > 0 ? 22 : 7;
+    g.fillRect(armX, 12, 3, 4);
+    g.fillStyle = "#8a5f2a";
+    if (dir > 0) {
+      g.fillRect(24, 12, 2, 9);
+      g.fillStyle = "#9aa3ad";
+      g.fillRect(23, 20, 5, 5);
+    } else {
+      g.fillRect(6, 12, 2, 9);
+      g.fillStyle = "#9aa3ad";
+      g.fillRect(4, 20, 5, 5);
+    }
+    g.fillStyle = colors.bodyDark;
+    g.fillRect(10, 22, 5, 9);
+    g.fillRect(17, 22, 5, 9);
+  } else if (pose === "stuck") {
+    const wig = Math.floor(t * 10) % 2 === 0 ? 1 : -1;
+    g.fillStyle = colors.limb;
+    g.fillRect(5, 14 + wig, 4, 3);
+    g.fillRect(23, 14 - wig, 4, 3);
+    g.fillStyle = colors.bodyDark;
+    g.fillRect(10, 22, 5, 9);
+    g.fillRect(17, 22, 5, 9);
+  } else {
+    g.fillStyle = colors.limb;
+    g.fillRect(7, 12, 3, 4);
+    g.fillRect(22, 12, 3, 4);
+    g.fillStyle = colors.bodyDark;
+    if (frame === 0) {
+      g.fillRect(8, 22, 6, 9);
+      g.fillRect(18, 22, 6, 8);
+    } else {
+      g.fillRect(8, 22, 6, 8);
+      g.fillRect(18, 22, 6, 9);
+    }
+  }
+  g.restore();
+}
+function drawText(g, text, x, y, size, color, align = "left", shadow = true) {
+  g.font = `bold ${size}px "Courier New", ui-monospace, monospace`;
+  g.textAlign = align;
+  g.textBaseline = "top";
+  if (shadow) {
+    g.fillStyle = "rgba(0,0,0,0.7)";
+    g.fillText(text, x + 2, y + 2);
+  }
+  g.fillStyle = color;
+  g.fillText(text, x, y);
+}
+function renderGame(g, game, t) {
+  const { brickTile: brick, solidTile: solid, ladderTile: ladder, ropeTile: rope, goldFrames: goldFrames2 } = getTiles();
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = "#08090c";
+  g.fillRect(0, 0, VIEW_W, VIEW_H);
+  g.save();
+  if (game.shake > 0) {
+    const amp = game.shake * 8;
+    g.translate(Math.round((Math.random() * 2 - 1) * amp), Math.round((Math.random() * 2 - 1) * amp));
+  }
+  g.fillStyle = BG;
+  g.fillRect(0, HUD_H, VIEW_W, ROWS * T);
+  g.fillStyle = BG_DARK;
+  for (let r = 0;r < ROWS; r++) {
+    if (r % 2 === 1)
+      g.fillRect(0, HUD_H + r * T, VIEW_W, T);
+  }
+  const offsetY = HUD_H;
+  const goldFrame = goldFrames2[Math.floor(t * 3) % 2];
+  for (let r = 0;r < ROWS; r++) {
+    for (let c = 0;c < COLS; c++) {
+      const cellObj = game.cells[r][c];
+      const x = c * T;
+      const y = offsetY + r * T;
+      switch (cellObj.type) {
+        case "brick":
+          g.drawImage(brick, x, y);
+          break;
+        case "solid":
+          g.drawImage(solid, x, y);
+          break;
+        case "ladder":
+          g.drawImage(ladder, x, y);
+          break;
+        case "rope":
+          g.drawImage(rope, x, y);
+          break;
+        case "gold":
+          g.drawImage(goldFrame, x, y);
+          break;
+        case "hidden":
+          if (cellObj.revealTimer > 0) {
+            const blink = Math.floor(t * 12) % 2 === 0;
+            if (blink) {
+              g.globalAlpha = 0.8;
+              g.drawImage(ladder, x, y);
+              g.globalAlpha = 1;
+            }
+          }
+          break;
+        case "empty":
+          if (cellObj.isHole) {
+            if (cellObj.holeTimer < 1.2) {
+              const blink = Math.floor(cellObj.holeTimer * 8) % 2 === 0;
+              if (blink) {
+                g.globalAlpha = 0.45;
+                g.drawImage(brick, x, y);
+                g.globalAlpha = 1;
+              }
+            }
+          }
+          break;
+      }
+    }
+  }
+  for (const guard of game.guards) {
+    if (guard.frozen > 0) {
+      if (Math.floor(t * 6) % 2 === 0) {
+        g.globalAlpha = 0.5;
+        drawFigure(g, guard, GUARD_COLORS, t);
+        g.globalAlpha = 1;
+      }
+      continue;
+    }
+    if (guard.carryingGold) {
+      g.drawImage(goldFrames2[0], Math.round(guard.x), Math.round(guard.y - 14 + HUD_H));
+    }
+    drawFigure(g, guard, GUARD_COLORS, t);
+  }
+  const p = game.player;
+  if (game.phase !== "dying" || Math.floor(t * 10) % 2 === 0) {
+    drawFigure(g, p, PLAYER_COLORS, t);
+  }
+  g.restore();
+  g.fillStyle = "#0b0d11";
+  g.fillRect(0, 0, VIEW_W, HUD_H);
+  g.fillStyle = "#23262e";
+  g.fillRect(0, HUD_H - 2, VIEW_W, 2);
+  const fmt = (n, len) => String(Math.max(0, Math.floor(n))).padStart(len, "0");
+  drawText(g, `ОЧКИ ${fmt(game.score, 6)}`, 10, 13, 16, "#f2f3f5");
+  drawText(g, `РЕКОРД ${fmt(game.hiscore, 6)}`, 190, 13, 16, "#8f99a6");
+  drawText(g, `УР.${game.levelIndex + 1}/${game.levelCount}`, 396, 13, 16, "#8f99a6");
+  drawText(g, `ЗОЛОТО ${game.goldLeft}`, 500, 13, 16, "#f4bc10");
+  for (let i = 0;i < Math.min(game.lives, 8); i++) {
+    const lx = VIEW_W - 14 - i * 16;
+    g.fillStyle = "#e0a878";
+    g.fillRect(lx, 12, 8, 5);
+    g.fillStyle = "#23262e";
+    g.fillRect(lx, 17, 8, 11);
+    g.fillStyle = "#23262e";
+    g.fillRect(lx + 1, 28, 2, 4);
+    g.fillRect(lx + 5, 28, 2, 4);
+  }
+  if (game.banner > 0 && game.phase === "playing") {
+    const blink = Math.floor(t * 4) % 2 === 0;
+    if (blink) {
+      drawText(g, game.bannerText, VIEW_W / 2, HUD_H + 12, 22, "#ffe266", "center");
+    }
+  }
+  const dim = (alpha) => {
+    g.fillStyle = `rgba(4,8,14,${alpha})`;
+    g.fillRect(0, HUD_H, VIEW_W, ROWS * T);
+  };
+  if (game.phase === "title") {
+    dim(0.68);
+    drawText(g, "LODE RUNNER", VIEW_W / 2, HUD_H + 70, 56, "#f4bc10", "center");
+    drawText(g, "КЛАССИЧЕСКАЯ АРКАДА 1983", VIEW_W / 2, HUD_H + 140, 18, "#cfd4da", "center");
+    const demoP = { ...game.player, x: VIEW_W / 2 - 120, y: 190, state: "walk", anim: t, dir: 1 };
+    const demoG = { ...game.player, x: VIEW_W / 2 + 90, y: 190, state: "walk", anim: t * 1.2, dir: -1 };
+    drawFigure(g, demoP, PLAYER_COLORS, t, 0);
+    drawFigure(g, demoG, GUARD_COLORS, t, 0);
+    g.drawImage(goldFrames2[0], VIEW_W / 2 - 12, HUD_H + 186);
+    drawText(g, "СОБЕРИ ВСЁ ЗОЛОТО И УБЕГИ НАВЕРХ", VIEW_W / 2, HUD_H + 250, 18, "#9fd1ff", "center");
+    drawText(g, "КОПАЙ ЯМЫ И ЗАМАНИВАЙ ОХРАННИКОВ", VIEW_W / 2, HUD_H + 276, 18, "#9fd1ff", "center");
+    if (Math.floor(t * 2) % 2 === 0) {
+      drawText(g, "НАЖМИ ENTER ИЛИ ТАПНИ ПО ПОЛЮ", VIEW_W / 2, HUD_H + 330, 24, "#ffffff", "center");
+    }
+    drawText(g, `РЕКОРД: ${game.hiscore}`, VIEW_W / 2, HUD_H + 380, 18, "#8f99a6", "center");
+    drawText(g, "← → ходьба · ↑ ↓ лестницы · Z / X — копать · P пауза · M звук", VIEW_W / 2, HUD_H + 430, 15, "#6d7885", "center");
+  } else if (game.phase === "intro") {
+    dim(0.45);
+    drawText(g, `УРОВЕНЬ ${game.levelIndex + 1}`, VIEW_W / 2, HUD_H + 150, 40, "#ffffff", "center");
+    drawText(g, `ЗОЛОТО: ${game.goldLeft}  ·  ОХРАННИКОВ: ${game.guards.length}`, VIEW_W / 2, HUD_H + 210, 20, "#f4bc10", "center");
+  } else if (game.phase === "dying") {
+    drawText(g, "ПОПАЛСЯ!", VIEW_W / 2, HUD_H + 140, 36, "#ff6b5e", "center");
+  } else if (game.phase === "complete") {
+    dim(0.45);
+    drawText(g, "УРОВЕНЬ ПРОЙДЕН!", VIEW_W / 2, HUD_H + 150, 38, "#7dff8a", "center");
+    drawText(g, `БОНУС +${1500 + game.levelIndex * 250}`, VIEW_W / 2, HUD_H + 208, 22, "#f4bc10", "center");
+  } else if (game.phase === "gameover") {
+    dim(0.7);
+    drawText(g, "ИГРА ОКОНЧЕНА", VIEW_W / 2, HUD_H + 130, 44, "#ff6b5e", "center");
+    drawText(g, `ОЧКИ: ${game.score}   РЕКОРД: ${game.hiscore}`, VIEW_W / 2, HUD_H + 200, 22, "#ffffff", "center");
+    if (Math.floor(t * 2) % 2 === 0) {
+      drawText(g, "ENTER — В МЕНЮ", VIEW_W / 2, HUD_H + 270, 24, "#f4bc10", "center");
+    }
+  } else if (game.phase === "victory") {
+    dim(0.7);
+    drawText(g, "ПОБЕДА!", VIEW_W / 2, HUD_H + 110, 52, "#f4bc10", "center");
+    drawText(g, "ТЫ ПРОШЁЛ ВСЕ УРОВНИ!", VIEW_W / 2, HUD_H + 185, 24, "#ffffff", "center");
+    drawText(g, `ИТОГО ОЧКОВ: ${game.score}`, VIEW_W / 2, HUD_H + 230, 22, "#7dff8a", "center");
+    if (Math.floor(t * 2) % 2 === 0) {
+      drawText(g, "ENTER — В МЕНЮ", VIEW_W / 2, HUD_H + 300, 24, "#f4bc10", "center");
+    }
+  }
+  if (game.paused && (game.phase === "playing" || game.phase === "intro")) {
+    dim(0.55);
+    drawText(g, "ПАУЗА", VIEW_W / 2, HUD_H + 160, 44, "#ffffff", "center");
+    drawText(g, "P ИЛИ ТАП — ПРОДОЛЖИТЬ", VIEW_W / 2, HUD_H + 225, 18, "#8f99a6", "center");
+  }
+}
+
+// src/lib/game/audio.ts
+function createSfx() {
+  let ctx = null;
+  let master = null;
+  let muted = false;
+  try {
+    if (typeof window !== "undefined" && window.localStorage.getItem("lr-muted") === "1") {
+      muted = true;
+    }
+  } catch {}
+  const ensure = () => {
+    if (typeof window === "undefined")
+      return;
+    if (!ctx) {
+      try {
+        const AC = window.AudioContext ?? window.webkitAudioContext;
+        ctx = new AC;
+        master = ctx.createGain();
+        master.gain.value = 0.32;
+        master.connect(ctx.destination);
+      } catch {
+        ctx = null;
+      }
+    }
+    if (ctx && ctx.state === "suspended")
+      ctx.resume();
+  };
+  const tone = (f0, f1, dur, type = "square", vol = 0.5, delay = 0) => {
+    if (!ctx || !master || muted)
+      return;
+    const t0 = ctx.currentTime + delay;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(Math.max(30, f0), t0);
+    if (f1 !== f0)
+      o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g);
+    g.connect(master);
+    o.start(t0);
+    o.stop(t0 + dur + 0.03);
+  };
+  const noise = (dur, vol = 0.4, delay = 0) => {
+    if (!ctx || !master || muted)
+      return;
+    const t0 = ctx.currentTime + delay;
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0;i < len; i++)
+      data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 900;
+    src.connect(f);
+    f.connect(g);
+    g.connect(master);
+    src.start(t0);
+  };
+  return {
+    ensure,
+    isMuted: () => muted,
+    toggleMute() {
+      muted = !muted;
+      try {
+        window.localStorage.setItem("lr-muted", muted ? "1" : "0");
+      } catch {}
+      return muted;
+    },
+    dig() {
+      noise(0.14, 0.5);
+      tone(150, 90, 0.12, "square", 0.35);
+    },
+    gold() {
+      tone(1240, 1240, 0.06, "square", 0.45);
+      tone(1860, 1860, 0.1, "square", 0.45, 0.06);
+    },
+    trap() {
+      tone(320, 90, 0.28, "sawtooth", 0.55);
+    },
+    death() {
+      tone(640, 60, 0.65, "square", 0.6);
+      tone(320, 40, 0.65, "sawtooth", 0.35, 0.05);
+    },
+    refillWarn() {
+      tone(220, 220, 0.07, "square", 0.5);
+      tone(220, 220, 0.07, "square", 0.5, 0.13);
+      tone(220, 220, 0.07, "square", 0.5, 0.26);
+    },
+    reveal() {
+      tone(660, 660, 0.1, "square", 0.45);
+      tone(880, 880, 0.1, "square", 0.45, 0.1);
+      tone(1320, 1320, 0.2, "square", 0.5, 0.2);
+    },
+    win() {
+      [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, f, 0.14, "square", 0.5, i * 0.11));
+    },
+    gameOver() {
+      [440, 349, 293, 220, 146].forEach((f, i) => tone(f, f * 0.85, 0.24, "sawtooth", 0.5, i * 0.17));
+    },
+    extra() {
+      tone(880, 1760, 0.16, "square", 0.5);
+      tone(1760, 880, 0.2, "square", 0.4, 0.16);
+    },
+    start() {
+      [392, 523, 659, 784].forEach((f, i) => tone(f, f, 0.1, "square", 0.45, i * 0.08));
+    }
+  };
+}
+
+// scripts/standalone-entry.ts
+function boot() {
+  const canvas = document.getElementById("lr-canvas");
+  if (!canvas)
+    return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx)
+    return;
+  canvas.width = VIEW_W;
+  canvas.height = VIEW_H;
+  const sfx = createSfx();
+  const game = new Game(sfx);
+  const input = {
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    digLeft: false,
+    digRight: false
+  };
+  game.input = input;
+  window.__lrGame = game;
+  const muteBtn = document.getElementById("lr-mute");
+  const syncMute = () => {
+    if (muteBtn)
+      muteBtn.textContent = sfx.isMuted() ? "\uD83D\uDD07" : "\uD83D\uDD0A";
+  };
+  const setKey = (code, down) => {
+    switch (code) {
+      case "ArrowLeft":
+      case "KeyA":
+        input.left = down;
+        return true;
+      case "ArrowRight":
+      case "KeyD":
+        input.right = down;
+        return true;
+      case "ArrowUp":
+      case "KeyW":
+        input.up = down;
+        return true;
+      case "ArrowDown":
+      case "KeyS":
+        input.down = down;
+        return true;
+      default:
+        return false;
+    }
+  };
+  const onKeyDown = (e) => {
+    sfx.ensure();
+    if (game.paused && game.phase !== "title" && game.phase !== "gameover" && game.phase !== "victory") {
+      game.togglePause(false);
+    }
+    if (setKey(e.code, true)) {
+      e.preventDefault();
+      return;
+    }
+    switch (e.code) {
+      case "KeyZ":
+      case "Comma":
+      case "KeyQ":
+        input.digLeft = true;
+        break;
+      case "KeyX":
+      case "Period":
+      case "KeyE":
+        input.digRight = true;
+        break;
+      case "Enter":
+      case "Space":
+        e.preventDefault();
+        game.confirm();
+        break;
+      case "KeyP":
+      case "Escape":
+        game.togglePause();
+        break;
+      case "KeyM":
+        sfx.toggleMute();
+        syncMute();
+        break;
+    }
+  };
+  const onKeyUp = (e) => {
+    setKey(e.code, false);
+  };
+  const onBlur = () => {
+    input.left = input.right = input.up = input.down = false;
+    game.togglePause(true);
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") {
+      input.left = input.right = input.up = input.down = false;
+    }
+  };
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", onBlur);
+  document.addEventListener("visibilitychange", onVisibility);
+  document.querySelectorAll("[data-key]").forEach((btn) => {
+    const key = btn.dataset.key;
+    const press = (down) => {
+      sfx.ensure();
+      input[key] = down;
+    };
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      press(true);
+      try {
+        btn.setPointerCapture?.(e.pointerId);
+      } catch {}
+    });
+    btn.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      press(false);
+    });
+    btn.addEventListener("pointercancel", () => press(false));
+    btn.addEventListener("pointerleave", () => press(false));
+    btn.addEventListener("contextmenu", (e) => e.preventDefault());
+  });
+  canvas.addEventListener("pointerdown", () => {
+    sfx.ensure();
+    game.confirm();
+  });
+  muteBtn?.addEventListener("click", () => {
+    sfx.ensure();
+    sfx.toggleMute();
+    syncMute();
+  });
+  let raf = 0;
+  let last = performance.now();
+  const loop = (ts) => {
+    const dt = Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    game.update(dt);
+    renderGame(ctx, game, ts / 1000);
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
+
+</script>
+</body>
+</html>

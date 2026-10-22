@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Lode Runner JS - Ladder Top Fix</title>
+    <style>
+        body {
+            background-color: #222;
+            color: white;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        canvas {
+            border: 2px solid #555;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+        }
+        .info { margin-top: 10px; text-align: center; }
+        #debug { font-size: 12px; color: #aaa; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="info">
+        <h1>Lode Runner</h1>
+        <p>Управление: <b>Стрелки</b> — движение/лазание, <b>Z</b> — копать влево, <b>X</b> — копать вправо</p>
+        <p id="score">Золото: 0 / 0</p>
+        <p id="debug">X: 0, Y: 0</p>
+    </div>
+    <canvas id="game" width="600" height="480"></canvas>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        
+        const TILE_SIZE = 30;
+        const COLS = 20; 
+        const ROWS = 16;
+
+        // Типы клеток
+        const EMPTY = 0;
+        const BRICK = 1;
+        const LADDER = 2;
+        const ROPE = 3;
+        const GOLD = 4;
+
+        // Карта (без "Я", игрок ставится кодом)
+        const levelMap = [
+            "####################", // 0
+            "#      $           #", // 1
+            "#    #####         #", // 2
+            "#    #   #         #", // 3
+            "#    # H #     $   #", // 4
+            "#    # H #   ##### #", // 5
+            "#    # H #   #   # #", // 6
+            "####H# H ### #   # #", // 7
+            "#   H  H     #   # #", // 8
+            "#   H  H     #   # #", // 9
+            "#  #####H    #   # #", // 10
+            "#  #    H    #   # #", // 11
+            "#  #   $H    ###H# #", // 12
+            "#  #   #        H  #", // 13
+            "#      #       $H  #", // 14
+            "####################"  // 15
+        ];
+
+        let grid = [];
+        let goldCount = 0;
+        let digTimers = []; 
+
+        function parseLevel() {
+            grid = [];
+            goldCount = 0;
+            digTimers = [];
+            for (let y = 0; y < ROWS; y++) {
+                let row = [];
+                let timerRow = [];
+                let line = levelMap[y] || "                    "; 
+                for (let x = 0; x < COLS; x++) {
+                    let char = line[x];
+                    let type = EMPTY;
+                    
+                    if (char === '#') type = BRICK;
+                    else if (char === 'H') type = LADDER;
+                    else if (char === '-') type = ROPE;
+                    else if (char === '$') {
+                        type = GOLD;
+                        goldCount++;
+                    }
+                    row.push(type);
+                    timerRow.push(0);
+                }
+                grid.push(row);
+                digTimers.push(timerRow);
+            }
+        }
+
+        // --- Игрок ---
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.speed = 3;
+                this.vx = 0;
+                this.vy = 0;
+                this.onGround = false;
+                this.onLadder = false;
+                this.digging = false;
+                this.digTimer = 0;
+                this.collectedGold = 0;
+                this.climbing = false;
+            }
+
+            update() {
+                if (this.digging) {
+                    this.digTimer--;
+                    if (this.digTimer <= 0) this.digging = false;
+                    return;
+                }
+
+                this.handleInput();
+                this.applyPhysics();
+                
+                document.getElementById('debug').innerText = 
+                    `X: ${Math.floor(this.x)}, Y: ${Math.floor(this.y)} | На полу: ${this.onGround} | На лестнице: ${this.onLadder} | Держится: ${this.climbing}`;
+            }
+
+            handleInput() {
+                this.vx = 0;
+                this.vy = 0;
+
+                // Определяем позицию центра
+                let cx = Math.floor((this.x + TILE_SIZE/2) / TILE_SIZE);
+                let cy = Math.floor((this.y + TILE_SIZE/2) / TILE_SIZE);
+                
+                let tile = (grid[cy] && grid[cy][cx]) ? grid[cy][cx] : EMPTY;
+                let isLadder = (tile === LADDER || tile === ROPE);
+
+                // --- ЛОГИКА ЗАХВАТА ЛЕСТНИЦЫ ---
+                // Если мы над лестницей ИЛИ на ней, и не жмём в стороны
+                if (isLadder) {
+                    if (!keys['ArrowLeft'] && !keys['ArrowRight']) {
+                        this.climbing = true;
+                    } else {
+                        this.climbing = false;
+                    }
+                } else {
+                    // Если мы НЕ на лестнице, но находимся НАД ней (на верхней клетке)
+                    // Проверяем, не хотим ли мы спуститься
+                    let tileBelow = (grid[cy+1] && grid[cy+1][cx]) ? grid[cy+1][cx] : EMPTY;
+                    if ((tileBelow === LADDER || tileBelow === ROPE) && keys['ArrowDown']) {
+                        this.climbing = true;
+                    } else {
+                        this.climbing = false;
+                    }
+                }
+
+                // Управление
+                if (this.climbing) {
+                    if (keys['ArrowUp']) this.vy = -this.speed;
+                    if (keys['ArrowDown']) this.vy = this.speed;
+                } else {
+                    this.vy = 3; // Гравитация
+                }
+
+                if (keys['ArrowLeft']) this.vx = -this.speed;
+                if (keys['ArrowRight']) this.vx = this.speed;
+
+                this.onLadder = isLadder;
+
+                // Копание
+                if (!this.climbing && this.onGround && !this.digging) {
+                    if (keys['z'] || keys['Z']) this.startDig(-1);
+                    if (keys['x'] || keys['X']) this.startDig(1);
+                }
+            }
+
+            startDig(dir) {
+                this.digging = true;
+                this.digTimer = 15;
+                let digX = Math.floor((this.x + TILE_SIZE/2) / TILE_SIZE) + dir;
+                let digY = Math.floor((this.y + TILE_SIZE/2) / TILE_SIZE);
+
+                if (grid[digY] && grid[digY][digX] === BRICK) {
+                    grid[digY][digX] = EMPTY;
+                    digTimers[digY][digX] = 180;
+                } else {
+                    this.digging = false;
+                }
+            }
+
+            applyPhysics() {
+                // --- ГОРИЗОНТАЛЬНОЕ ДВИЖЕНИЕ ---
+                if (this.vx !== 0) {
+                    let nextX = this.x + this.vx;
+                    if (!this.checkCollision(nextX, this.y)) {
+                        this.x = nextX;
+                    } else {
+                        if (this.vx > 0) this.x = Math.floor(this.x / TILE_SIZE) * TILE_SIZE;
+                        if (this.vx < 0) this.x = Math.floor(this.x / TILE_SIZE) * TILE_SIZE;
+                    }
+                }
+
+                // --- ВЕРТИКАЛЬНОЕ ДВИЖЕНИЕ ---
+                if (this.climbing) {
+                    // На лестнице
+                    if (this.vy !== 0) {
+                        let nextY = this.y + this.vy;
+                        // Проверка на столкновение с кирпичом (но не с лестницей)
+                        if (!this.checkCollision(this.x, nextY)) {
+                            this.y = nextY;
+                        } else {
+                            // Если упёрлись в кирпич, останавливаемся
+                            this.vy = 0;
+                        }
+                    }
+                    this.onGround = false; 
+                } else {
+                    // Гравитация
+                    let nextY = this.y + this.vy;
+                    
+                    // КЛЮЧЕВОЙ МОМЕНТ: Если мы стоим на лестнице (верхняя клетка) и нажали вниз,
+                    // мы не должны проваливаться сквозь неё.
+                    let cx = Math.floor((this.x + TILE_SIZE/2) / TILE_SIZE);
+                    let cy = Math.floor((this.y + TILE_SIZE/2) / TILE_SIZE);
+                    let tileHere = (grid[cy] && grid[cy][cx]) ? grid[cy][cx] : EMPTY;
+                    let isOnLadderTop = (tileHere === LADDER || tileHere === ROPE);
+
+                    if (this.checkCollision(this.x, nextY)) {
+                        // Приземление на кирпич
+                        this.vy = 0;
+                        this.onGround = true;
+                        this.y = Math.floor((this.y + TILE_SIZE) / TILE_SIZE) * TILE_SIZE - TILE_SIZE;
+                    } else if (isOnLadderTop && this.vy > 0) {
+                        // Если мы на верхней клетке лестницы и падаем, 
+                        // мы не проваливаемся, а "стоим" на лестнице
+                        this.vy = 0;
+                        this.onGround = true;
+                        // Выравниваем по клетке
+                        this.y = Math.floor((this.y + TILE_SIZE) / TILE_SIZE) * TILE_SIZE - TILE_SIZE;
+                    } else {
+                        // Падение
+                        this.y = nextY;
+                        this.onGround = false;
+                    }
+                }
+
+                // Сбор золота
+                let cx = Math.floor((this.x + TILE_SIZE/2) / TILE_SIZE);
+                let cy = Math.floor((this.y + TILE_SIZE/2) / TILE_SIZE);
+                if (grid[cy] && grid[cy][cx] === GOLD) {
+                    grid[cy][cx] = EMPTY;
+                    this.collectedGold++;
+                    document.getElementById('score').innerText = `Золото: ${this.collectedGold} / ${goldCount}`;
+                }
+            }
+
+            checkCollision(x, y) {
+                let left = Math.floor(x / TILE_SIZE);
+                let right = Math.floor((x + TILE_SIZE - 1) / TILE_SIZE);
+                let top = Math.floor(y / TILE_SIZE);
+                let bottom = Math.floor((y + TILE_SIZE - 1) / TILE_SIZE);
+
+                if (left < 0 || right >= COLS || top < 0 || bottom >= ROWS) return true;
+
+                if (grid[top][left] === BRICK) return true;
+                if (grid[top][right] === BRICK) return true;
+                if (grid[bottom][left] === BRICK) return true;
+                if (grid[bottom][right] === BRICK) return true;
+                return false;
+            }
+
+            draw() {
+                ctx.fillStyle = this.digging ? 'red' : (this.climbing ? '#FFAA00' : '#FFD700');
+                ctx.fillRect(this.x + 2, this.y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                ctx.fillStyle = 'black';
+                let eyeX = this.x + (this.vx > 0 ? 18 : this.vx < 0 ? 6 : 12);
+                ctx.fillRect(eyeX, this.y + 8, 4, 4);
+            }
+        }
+
+        // --- Враг ---
+        class Enemy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.speed = 1.5;
+                this.vx = 0;
+                this.vy = 0;
+                this.onLadder = false;
+            }
+
+            update(player) {
+                let dx = player.x - this.x;
+                let dy = player.y - this.y;
+
+                let cx = Math.floor((this.x + TILE_SIZE/2) / TILE_SIZE);
+                let cy = Math.floor((this.y + TILE_SIZE/2) / TILE_SIZE);
+                let tile = (grid[cy] && grid[cy][cx]) ? grid[cy][cx] : EMPTY;
+                this.onLadder = (tile === LADDER || tile === ROPE);
+
+                if (Math.abs(dx) > 5) this.vx = dx > 0 ? this.speed : -this.speed;
+                else this.vx = 0;
+
+                if (this.onLadder && Math.abs(dy) > 5) {
+                    this.vy = dy > 0 ? this.speed : -this.speed;
+                } else if (!this.onLadder) {
+                    this.vy = 2;
+                }
+
+                let nextX = this.x + this.vx;
+                if (!this.checkCollision(nextX, this.y)) this.x = nextX;
+
+                let nextY = this.y + this.vy;
+                if (!this.checkCollision(this.x, nextY)) {
+                    this.y = nextY;
+                } else if (this.vy > 0) {
+                    this.y = Math.floor((this.y + TILE_SIZE) / TILE_SIZE) * TILE_SIZE - TILE_SIZE;
+                    this.vy = 0;
+                }
+
+                if (Math.abs(this.x - player.x) < TILE_SIZE/2 && Math.abs(this.y - player.y) < TILE_SIZE/2) {
+                    setTimeout(() => {
+                        alert("Вас поймали! Рестарт.");
+                        resetGame();
+                    }, 10);
+                }
+            }
+
+            checkCollision(x, y) {
+                let left = Math.floor(x / TILE_SIZE);
+                let right = Math.floor((x + TILE_SIZE - 1) / TILE_SIZE);
+                let top = Math.floor(y / TILE_SIZE);
+                let bottom = Math.floor((y + TILE_SIZE - 1) / TILE_SIZE);
+                if (left < 0 || right >= COLS || top < 0 || bottom >= ROWS) return true;
+                if (grid[top][left] === BRICK || grid[top][right] === BRICK) return true;
+                if (grid[bottom][left] === BRICK || grid[bottom][right] === BRICK) return true;
+                return false;
+            }
+
+            draw() {
+                ctx.fillStyle = '#FF4500';
+                ctx.fillRect(this.x + 2, this.y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            }
+        }
+
+        // --- Управление ---
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'z', 'Z', 'x', 'X'].includes(e.key)) {
+                e.preventDefault();
+            }
+            keys[e.key] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // --- Инициализация ---
+        let player;
+        let enemies = [];
+
+        function resetGame() {
+            parseLevel();
+            player = new Player(TILE_SIZE * 2, TILE_SIZE * 1); 
+            
+            enemies = [
+                new Enemy(TILE_SIZE * 15, TILE_SIZE * 3), 
+                new Enemy(TILE_SIZE * 5, TILE_SIZE * 11)  
+            ];
+            document.getElementById('score').innerText = `Золото: 0 / ${goldCount}`;
+        }
+
+        // --- Рендеринг ---
+        function drawMap() {
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    let tile = grid[y][x];
+                    let px = x * TILE_SIZE;
+                    let py = y * TILE_SIZE;
+
+                    if (digTimers[y][x] > 0) {
+                        digTimers[y][x]--;
+                        if (digTimers[y][x] === 0) grid[y][x] = BRICK;
+                    }
+
+                    if (tile === BRICK) {
+                        ctx.fillStyle = '#8B0000';
+                        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = '#500000';
+                        ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+                        ctx.beginPath();
+                        ctx.moveTo(px, py + TILE_SIZE/2);
+                        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE/2);
+                        ctx.stroke();
+                    } else if (tile === LADDER) {
+                        ctx.fillStyle = '#AAA';
+                        ctx.fillRect(px + 10, py, 10, TILE_SIZE); 
+                        ctx.fillStyle = '#CCC';
+                        for(let i=0; i<TILE_SIZE; i+=8) {
+                            ctx.fillRect(px + 5, py + i, 20, 4);
+                        }
+                    } else if (tile === ROPE) {
+                        ctx.fillStyle = '#DDD';
+                        ctx.fillRect(px, py + TILE_SIZE/2 - 2, TILE_SIZE, 4);
+                    } else if (tile === GOLD) {
+                        ctx.fillStyle = '#FFD700';
+                        ctx.beginPath();
+                        ctx.arc(px + TILE_SIZE/2, py + TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#B8860B';
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function gameLoop() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            player.update();
+            enemies.forEach(e => e.update(player));
+
+            drawMap();
+            player.draw();
+            enemies.forEach(e => e.draw());
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        resetGame();
+        gameLoop();
+    </script>
+</body>
+</html>
