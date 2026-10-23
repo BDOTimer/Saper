@@ -949,14 +949,14 @@ class Lodge {
     // ФУНДАМЕНТ (беловатый, уходит в землю)
     // ================================================
     const foundationMat = new THREE.MeshStandardMaterial({
-      color: 0xc8c4b8,       // беловато-серый, как бутовый камень
+      color: 0x607080,       // беловато-серый, как бутовый камень
       roughness: 0.95,
       metalness: 0.02
     });
 
     // Высота: 0.7 м над землёй + 1.5 м в землю = 2.2 м всего
-    const foundationTopVisible = 0.7;  // сколько торчит над землёй
-    const foundationIntoGround = 1.5;  // сколько уходит в землю
+    const foundationTopVisible = 0.9;  // сколько торчит над землёй
+    const foundationIntoGround = 2.0;  // сколько уходит в землю
     const foundationHeight = foundationTopVisible + foundationIntoGround;
 
     // Позиция: центр фундамента ниже поверхности, чтобы нижняя часть была в земле
@@ -1130,21 +1130,21 @@ class Lodge {
 
     // Правый скат
     const roofRight = new THREE.Mesh(roofGeo, roofMat);
-    roofRight.position.set(W/4, 0.6 + H + roofH/2, 0);
+    roofRight.position.set(W/4, 0.3 + H + roofH/2, 0);
     roofRight.rotation.z = -Math.atan2(roofH, W/2 + roofOverhang);
     roofRight.castShadow = true;
     this.group.add(roofRight);
 
     // Левый скат
     const roofLeft = new THREE.Mesh(roofGeo, roofMat);
-    roofLeft.position.set(-W/4, 0.6 + H + roofH/2, 0);
+    roofLeft.position.set(-W/4, 0.3 + H + roofH/2, 0);
     roofLeft.rotation.z = Math.atan2(roofH, W/2 + roofOverhang);
     roofLeft.castShadow = true;
     this.group.add(roofLeft);
 
     // Конёк крыши (верхнее бревно)
     const ridge = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.12, D + roofOverhang * 2, 8),
+      new THREE.CylinderGeometry(0.12, 0.9, D + roofOverhang * 2, 8),
       roofEdgeMat
     );
     ridge.rotation.x = Math.PI / 2;
@@ -1164,7 +1164,7 @@ class Lodge {
         depth: 0.1, bevelEnabled: false
       });
       const gable = new THREE.Mesh(extrudeGeo, logDarkMat);
-      gable.position.set(0, 0.6 + H, side * (D/2 - 0.05));
+      gable.position.set(0, 0.3 + H, side * (D/2 - 0.05));
       gable.castShadow = true;
       this.group.add(gable);
     }
@@ -1176,10 +1176,10 @@ class Lodge {
     const chimneyBase = 0.6 + H + roofH * 0.7;
     
     const chimney = new THREE.Mesh(
-      new THREE.BoxGeometry(0.6, 2.0, 0.6),
+      new THREE.BoxGeometry(0.6, 2.5, 0.6),
       stoneMat
     );
-    chimney.position.set(chimneyX, chimneyBase + 1.0, 0);
+    chimney.position.set(chimneyX, chimneyBase + 0.4, 0);
     chimney.castShadow = true;
     this.group.add(chimney);
 
@@ -1188,7 +1188,7 @@ class Lodge {
       new THREE.BoxGeometry(0.5, 0.05, 0.5),
       new THREE.MeshBasicMaterial({ color: 0x1a1a1a })
     );
-    chimneyTop.position.set(chimneyX, chimneyBase + 2.02, 0);
+    chimneyTop.position.set(chimneyX, chimneyBase + 1.8, 0);
     this.group.add(chimneyTop);
 
     // ================================================
