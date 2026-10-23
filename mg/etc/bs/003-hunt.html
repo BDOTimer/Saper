@@ -43,9 +43,42 @@
 <div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
 <div id="flash"></div>
 
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "app/": "./?v=0.4.7.2/"
+    }
+  }
+</script>
+<script type="module">    
+    import * as THREE from "three";
+    window.THREE = THREE;
+
+    // import {    GLTFLoader }  from "three/addons/loaders/GLTFLoader.js";
+    // import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+    // window.GLTFLoader    = GLTFLoader;
+    // window.SkeletonUtils = SkeletonUtils;
+
+      // window.addEventListener("three-ready", () => {
+      //   const s = document.createElement("script");
+      //   s.src = "./glb-models/glb-factor.js";
+      //   document.body.appendChild(s);
+      // }, { once: true });
+
+    window.dispatchEvent(new Event("three-ready"));
+</script>
+<!--
 <script src="../three-128.js"></script>
+-->
 <script src="../snd/etc-sound-lib.js"></script>
-<script>
+<script type="module">
+
+    import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
 // ============================================================
 // СЦЕНА
 // ============================================================
@@ -61,6 +94,69 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
+
+// ============================================================
+// ENV MAP для металлических поверхностей (блеск стволов)
+// ============================================================
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+// Генерируем окружение из сцены (купол неба + облака)
+const envScene = new THREE.Scene();
+// Копируем небо и облака в отдельную сцену (или используем тот же sky)
+// Проще всего — сделать временный скай-купол:
+const envSkyGeo = new THREE.SphereGeometry(100, 32, 32);
+const envSkyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: {
+    topColor: { value: new THREE.Color(0x2a6dd4) },
+    bottomColor: { value: new THREE.Color(0xa8d8f0) },
+    offset: { value: 20 },
+    exponent: { value: 0.6 }
+  },
+  vertexShader: `
+    varying vec3 vWorldPosition;
+    void main() {
+      vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPosition.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform vec3 topColor;
+    uniform vec3 bottomColor;
+    uniform float offset;
+    uniform float exponent;
+    varying vec3 vWorldPosition;
+    void main() {
+      float h = normalize(vWorldPosition + offset).y;
+      gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h,0.0), exponent), 0.0)), 1.0);
+    }`
+});
+envScene.add(new THREE.Mesh(envSkyGeo, envSkyMat));
+
+// Солнце в env-сцене (для блика на металле)
+const envSun = new THREE.Mesh(
+  new THREE.SphereGeometry(6, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xffffdd })
+);
+envSun.position.set(50, 60, 40);
+envScene.add(envSun);
+
+// Небольшая "земля" в env (чтобы снизу металл не был чёрным)
+const envGround = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 400),
+  new THREE.MeshBasicMaterial({ color: 0x4a7c3a })
+);
+envGround.rotation.x = -Math.PI / 2;
+envGround.position.y = -5;
+envScene.add(envGround);
+
+const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
+scene.environment = envMap;   // это глобально применит ко всем PBR-материалам
+
+// Опционально — сильнее видно на объектах
+// scene.environmentIntensity = 1.0;  // доступно в новых версиях
+
 
 // Освещение
 const ambient = new THREE.AmbientLight(0xffffff, 0.65);
