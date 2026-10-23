@@ -29,6 +29,63 @@
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: #fff; opacity: 0; pointer-events: none; z-index: 5;
   }
+
+    /* ===== Мобильное управление ===== */
+  #joystick-zone {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.3);
+    z-index: 20;
+    display: none; /* показываем только на тач-устройствах */
+    touch-action: none;
+  }
+  #joystick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50px;
+    height: 50px;
+    margin: -25px 0 0 -25px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+    border: 2px solid rgba(255,255,255,0.6);
+    pointer-events: none;
+  }
+  #shoot-btn {
+    position: fixed;
+    bottom: 40px;
+    right: 30px;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: rgba(255,50,50,0.5);
+    border: 3px solid rgba(255,255,255,0.6);
+    color: #fff;
+    font-size: 36px;
+    font-weight: bold;
+    display: none;
+    z-index: 20;
+    touch-action: none;
+    user-select: none;
+  }
+  /* Показываем элементы только на тач-устройствах */
+  .is-touch #joystick-zone,
+  .is-touch #shoot-btn {
+    display: block;
+  }
+  .is-touch #crosshair { display: block; }
+  .is-touch #info { display: none; }
+
+  /* 
+  #joystick-zone, #shoot-btn { display: none; }
+  .is-touch #joystick-zone, .is-touch #shoot-btn { display: block; }
+   */
+
 </style>
 </head>
 <body>
@@ -42,6 +99,11 @@
 <div id="crosshair">✛</div>
 <div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
 <div id="flash"></div>
+
+  <div id="joystick-zone">
+    <div id="joystick-knob"></div>
+  </div>
+  <button id="shoot-btn">💥</button>
 
 <script type="importmap">
   {
@@ -78,6 +140,9 @@
     import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+if (isTouch) document.body.classList.add('is-touch');
 
 // ============================================================
 // СЦЕНА
@@ -1156,8 +1221,14 @@ function getAimEndPoint() {
 document.addEventListener('keydown', e => keys[e.code] = true);
 document.addEventListener('keyup', e => keys[e.code] = false);
 
+// ============================================================
+// УПРАВЛЕНИЕ: мышь (десктоп) или свайпы (тач)
+// ============================================================
+let touchLookId = null;
+let touchLookStart = { x: 0, y: 0 };
+
 document.addEventListener('mousemove', e => {
-  if (document.pointerLockElement === renderer.domElement) {
+  if (!isTouch && document.pointerLockElement === renderer.domElement) {
     euler.y -= e.movementX * mouseSensitivity;
     euler.x -= e.movementY * mouseSensitivity;
     euler.x = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, euler.x));
@@ -1165,13 +1236,58 @@ document.addEventListener('mousemove', e => {
   }
 });
 
+// Свайп по экрану для обзора (правая половина экрана)
+renderer.domElement.addEventListener('touchstart', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    // Правая половина экрана — обзор
+    if (t.clientX > window.innerWidth * 0.35 && touchLookId === null) {
+      touchLookId = t.identifier;
+      touchLookStart.x = t.clientX;
+      touchLookStart.y = t.clientY;
+    }
+  }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchmove', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === touchLookId) {
+      const dx = t.clientX - touchLookStart.x;
+      const dy = t.clientY - touchLookStart.y;
+      euler.y -= dx * 0.005;
+      euler.x -= dy * 0.005;
+      euler.x = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, euler.x));
+      camera.quaternion.setFromEuler(euler);
+      touchLookStart.x = t.clientX;
+      touchLookStart.y = t.clientY;
+    }
+  }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchend', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === touchLookId) {
+      touchLookId = null;
+    }
+  }
+}, { passive: true });
+
+// Десктоп: клик = pointer lock / выстрел
 renderer.domElement.addEventListener('click', () => {
+  if (isTouch) {
+    // На тач-устройстве клик по экрану = выстрел (или pointer lock не нужен)
+    // Ничего не делаем — стрельба через кнопку #shoot-btn
+    return;
+  }
   if (document.pointerLockElement !== renderer.domElement) {
     renderer.domElement.requestPointerLock();
+    if (window.SNDS) kit.unlockAudio();
   } else {
     shoot();
   }
 });
+
 
 // Вспышка
 const flashEl = document.getElementById('flash');
@@ -1279,16 +1395,23 @@ const playerPos = new THREE.Vector3(0, 1.7, 0);
 function updatePlayer(dt) {
   const speed = keys['ShiftLeft'] ? 14 : 8;
   const dir = new THREE.Vector3();
-  
+
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   forward.y = 0;
   forward.normalize();
   const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0));
 
+  // Десктоп: клавиши
   if (keys['KeyW']) dir.add(forward);
   if (keys['KeyS']) dir.sub(forward);
   if (keys['KeyD']) dir.add(right);
   if (keys['KeyA']) dir.sub(right);
+
+  // Тач: джойстик
+  if (isTouch && (joyVector.x !== 0 || joyVector.y !== 0)) {
+    dir.add(forward.clone().multiplyScalar(-joyVector.y)); // вверх джойстика = вперёд
+    dir.add(right.clone().multiplyScalar(joyVector.x));    // вправо джойстика = вправо
+  }
 
   if (dir.lengthSq() > 0) dir.normalize().multiplyScalar(speed);
 
@@ -1302,6 +1425,72 @@ function updatePlayer(dt) {
   }
 
   camera.position.copy(playerPos);
+}
+
+// ============================================================
+// ВИРТУАЛЬНЫЙ ДЖОЙСТИК (тач)
+// ============================================================
+const joyZone = document.getElementById('joystick-zone');
+const joyKnob = document.getElementById('joystick-knob');
+let joyId = null;
+let joyCenter = { x: 0, y: 0 };
+let joyVector = { x: 0, y: 0 };  // -1..1, где -1 = влево/вверх, 1 = вправо/вниз
+
+if (isTouch && joyZone) {
+  joyZone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = joyZone.getBoundingClientRect();
+    joyCenter.x = rect.left + rect.width / 2;
+    joyCenter.y = rect.top + rect.height / 2;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (joyId === null) {
+        joyId = e.changedTouches[i].identifier;
+        joyVector.x = 0;
+        joyVector.y = 0;
+      }
+    }
+  }, { passive: false });
+
+  joyZone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === joyId) {
+        let dx = t.clientX - joyCenter.x;
+        let dy = t.clientY - joyCenter.y;
+        const maxRadius = 40; // радиус в пикселях
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len > maxRadius) {
+          dx = dx / len * maxRadius;
+          dy = dy / len * maxRadius;
+        }
+        joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        joyVector.x = dx / maxRadius;
+        joyVector.y = dy / maxRadius;
+      }
+    }
+  }, { passive: false });
+
+  joyZone.addEventListener('touchend', e => {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joyId) {
+        joyId = null;
+        joyVector.x = 0;
+        joyVector.y = 0;
+        joyKnob.style.transform = 'translate(0px, 0px)';
+      }
+    }
+  }, { passive: false });
+}
+
+// Кнопка выстрела (тач)
+const shootBtn = document.getElementById('shoot-btn');
+if (isTouch && shootBtn) {
+  shootBtn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    shoot();
+  }, { passive: false });
 }
 
 // ============================================================
@@ -1373,15 +1562,6 @@ window.addEventListener('resize', () => {
 
 animate();
 
-renderer.domElement.addEventListener('click', () => {
-  if (document.pointerLockElement !== renderer.domElement) {
-    renderer.domElement.requestPointerLock();
-    // 🔓 Явно будим аудио-контекст
-    if (window.SNDS) kit.unlockAudio();
-  } else {
-    shoot();
-  }
-});
 </script>
 </body>
 </html>
