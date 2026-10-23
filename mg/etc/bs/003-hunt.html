@@ -1139,12 +1139,43 @@ function shoot() {
 
 function spawnDuck() {
   if (nature.spawnPoints.length === 0) return;
-  const sp = nature.spawnPoints[Math.floor(Math.random() * nature.spawnPoints.length)];
-  const spawnPos = new THREE.Vector3(sp.x, 1.5, sp.z);
+
+  // Радиус, в котором разрешён спавн уток (от игрока)
+  const SPAWN_RADIUS_MIN = 15;  // не ближе 15 м (чтобы не появлялись в упор)
+  const SPAWN_RADIUS_MAX = 35;  // не дальше 45 м (чтобы было видно и интересно)
+
+  // Отбираем подходящие точки
+  const candidates = [];
+  for (let i = 0; i < nature.spawnPoints.length; i++) {
+    const sp = nature.spawnPoints[i];
+    const dx = sp.x - camera.position.x;
+    const dz = sp.z - camera.position.z;
+    const distSq = dx * dx + dz * dz;
+    if (distSq >= SPAWN_RADIUS_MIN * SPAWN_RADIUS_MIN &&
+        distSq <= SPAWN_RADIUS_MAX * SPAWN_RADIUS_MAX) {
+      candidates.push(sp);
+    }
+  }
+
+  // Если в радиусе нет кустов/деревьев — просто берём любую точку поблизости вручную
+  let spawnPos;
+  if (candidates.length > 0) {
+    const sp = candidates[Math.floor(Math.random() * candidates.length)];
+    spawnPos = new THREE.Vector3(sp.x, 1.5, sp.z);
+  } else {
+    // Фолбэк: случайная точка вокруг игрока
+    const angle = Math.random() * Math.PI * 2;
+    const dist = SPAWN_RADIUS_MIN + Math.random() * (SPAWN_RADIUS_MAX - SPAWN_RADIUS_MIN);
+    spawnPos = new THREE.Vector3(
+      camera.position.x + Math.cos(angle) * dist,
+      1.5,
+      camera.position.z + Math.sin(angle) * dist
+    );
+  }
+
   const target = camera.position.clone();
   ducks.push(new Duck(scene, spawnPos, target));
 }
-
 // Движение игрока
 const playerVel = new THREE.Vector3();
 const playerPos = new THREE.Vector3(0, 1.7, 0);
