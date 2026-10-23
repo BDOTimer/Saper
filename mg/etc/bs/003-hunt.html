@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ОХОТА НА УТОК</title>
+<link rel="stylesheet" href="neon-bs.css" />
+<link rel="icon" type="image/png" href="../../res/favicon-64.png" sizes="64x64">
+<style>
+  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #000; }
+  canvas { display: block; }
+  #score {
+    position: fixed; top: 20px; left: 20px; color: #fff;
+    font-size: 24px; font-weight: bold;
+    text-shadow: 2px 2px 4px #000; z-index: 10;
+    background: rgba(0,0,0,0.4); padding: 10px 20px; border-radius: 8px;
+  }
+  #crosshair {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: #ff2200; font-size: 10px; font-weight: bold; z-index: 10;
+    text-shadow: 0 0 1px #000; pointer-events: none; user-select: none;
+  }
+  #info {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 14px; z-index: 10;
+    background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 8px;
+    text-shadow: 1px 1px 2px #000;
+  }
+  #flash {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: #fff; opacity: 0; pointer-events: none; z-index: 5;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== Кнопка навигации ===== -->
+  <a href="./i-bs.html" class="corner-btn corner-btn--right" aria-label="Назад">
+    <span class="corner-arrow">🪜</span>
+  </a>
+
+<div id="score">Утки: 0</div>
+<div id="crosshair">✛</div>
+<div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
+<div id="flash"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../snd/etc-sound-lib.js"></script>
+<script>
+// ============================================================
+// СЦЕНА
+// ============================================================
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xa0c8e8, 40, 200);
+scene.background = new THREE.Color(0x87CEEB);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.05, 500);
+camera.position.set(0, 1.7, 0);
+scene.add(camera); 
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// Освещение
+const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+scene.add(ambient);
+const sunLight = new THREE.DirectionalLight(0xfff5cc, 0.9);
+sunLight.position.set(50, 80, 30);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(1024, 1024);
+sunLight.shadow.camera.left = -80;
+sunLight.shadow.camera.right = 80;
+sunLight.shadow.camera.top = 80;
+sunLight.shadow.camera.bottom = -80;
+scene.add(sunLight);
+
+// Земля
+const groundGeo = new THREE.PlaneGeometry(400, 400, 20, 20);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x4a7c3a });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ============================================================
+// CLASS: Небо + Солнце + Облака
+// ============================================================
+class Sky {
+  constructor(scene) {
+    this.scene = scene;
+    this.clouds = [];
+    this.createSkyDome();
+    this.createSun();
+    this.createClouds();
+  }
+
+  createSkyDome() {
+    const geo = new THREE.SphereGeometry(300, 32, 32);
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x2a6dd4) },
+        bottomColor: { value: new THREE.Color(0xa8d8f0) },
+        offset: { value: 20 },
+        exponent: { value: 0.6 }
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition + offset).y;
+          gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h,0.0), exponent), 0.0)), 1.0);
+        }`
+    });
+    this.scene.add(new THREE.Mesh(geo, mat));
+  }
+
+  createSun() {
+    // Солнце
+    const sunGeo = new THREE.SphereGeometry(8, 16, 16);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+    this.sun = new THREE.Mesh(sunGeo, sunMat);
+    this.sun.position.set(120, 140, 100);
+    this.scene.add(this.sun);
+
+    // Свечение вокруг солнца
+    const glowGeo = new THREE.SphereGeometry(14, 16, 16);
+    const glowMat = new THREE.MeshBasicMaterial({ 
+      color: 0xffdd88, transparent: true, opacity: 0.3 
+    });
+    this.sunGlow = new THREE.Mesh(glowGeo, glowMat);
+    this.sunGlow.position.copy(this.sun.position);
+    this.scene.add(this.sunGlow);
+  }
+
+  createClouds() {
+    const cloudMat = new THREE.MeshLambertMaterial({ 
+      color: 0xffffff, transparent: true, opacity: 0.85 
+    });
+    for (let i = 0; i < 12; i++) {
+      const cloudGroup = new THREE.Group();
+      const parts = 3 + Math.floor(Math.random() * 4);
+      for (let j = 0; j < parts; j++) {
+        const size = 4 + Math.random() * 5;
+        const geo = new THREE.SphereGeometry(size, 8, 8);
+        const part = new THREE.Mesh(geo, cloudMat);
+        part.position.set(
+          (j - parts/2) * 6 + Math.random() * 3,
+          Math.random() * 2,
+          Math.random() * 4
+        );
+        cloudGroup.add(part);
+      }
+      cloudGroup.position.set(
+        (Math.random() - 0.5) * 300,
+        50 + Math.random() * 30,
+        (Math.random() - 0.5) * 300
+      );
+      cloudGroup.userData.speed = 0.02 + Math.random() * 0.05;
+      this.clouds.push(cloudGroup);
+      this.scene.add(cloudGroup);
+    }
+  }
+
+  update(dt) {
+    this.clouds.forEach(c => {
+      c.position.x += c.userData.speed * dt * 5;
+      if (c.position.x > 180) c.position.x = -180;
+    });
+  }
+}
+
+// ============================================================
+// CLASS: Природа (деревья + кусты + камни + камыши)
+// ============================================================
+class Nature {
+  constructor(scene) {
+    this.scene = scene;
+    this.spawnPoints = []; // места где водятся утки
+    this.createForest();
+  }
+
+  createTree(x, z, scale = 1) {
+    const group = new THREE.Group();
+    
+    // Ствол
+    const trunkGeo = new THREE.CylinderGeometry(0.4*scale, 0.6*scale, 4*scale, 8);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1e });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 2*scale;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    // Крона — несколько сфер
+    const leafMat = new THREE.MeshLambertMaterial({ color: 0x2e5c1e });
+    for (let i = 0; i < 4; i++) {
+      const size = (1.8 + Math.random()*0.8) * scale;
+      const leafGeo = new THREE.SphereGeometry(size, 8, 8);
+      const leaf = new THREE.Mesh(leafGeo, leafMat);
+      leaf.position.set(
+        (Math.random()-0.5) * 2*scale,
+        4*scale + Math.random()*1.5*scale,
+        (Math.random()-0.5) * 2*scale
+      );
+      leaf.castShadow = true;
+      group.add(leaf);
+    }
+    
+    group.position.set(x, 0, z);
+    group.userData.type = 'tree';
+    return group;
+  }
+
+  createBush(x, z, scale = 1) {
+    const group = new THREE.Group();
+    const bushMat = new THREE.MeshLambertMaterial({ color: 0x3a7a2a });
+    for (let i = 0; i < 5; i++) {
+      const size = (0.6 + Math.random()*0.5) * scale;
+      const geo = new THREE.SphereGeometry(size, 6, 6);
+      const b = new THREE.Mesh(geo, bushMat);
+      b.position.set(
+        (Math.random()-0.5) * 1.5*scale,
+        size*0.7,
+        (Math.random()-0.5) * 1.5*scale
+      );
+      b.castShadow = true;
+      group.add(b);
+    }
+    group.position.set(x, 0, z);
+    group.userData.type = 'bush';
+    return group;
+  }
+
+  createRock(x, z, scale = 1) {
+    const geo = new THREE.DodecahedronGeometry(scale, 0);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x777777 });
+    const rock = new THREE.Mesh(geo, mat);
+    rock.position.set(x, scale*0.5, z);
+    rock.scale.set(
+      1 + Math.random()*0.4,
+      0.6 + Math.random()*0.3,
+      1 + Math.random()*0.4
+    );
+    rock.rotation.set(Math.random(), Math.random(), Math.random());
+    rock.castShadow = true;
+    rock.userData.type = 'rock';
+    return rock;
+  }
+
+  createReeds(x, z) {
+    const group = new THREE.Group();
+    const reedMat = new THREE.MeshLambertMaterial({ color: 0x8b9a3a });
+    const count = 8 + Math.floor(Math.random()*8);
+    for (let i = 0; i < count; i++) {
+      const h = 1.5 + Math.random()*1.5;
+      const geo = new THREE.CylinderGeometry(0.04, 0.06, h, 4);
+      const reed = new THREE.Mesh(geo, reedMat);
+      reed.position.set(
+        (Math.random()-0.5) * 2,
+        h/2,
+        (Math.random()-0.5) * 2
+      );
+      reed.rotation.z = (Math.random()-0.5) * 0.3;
+      group.add(reed);
+    }
+    group.position.set(x, 0, z);
+    group.userData.type = 'reeds';
+    return group;
+  }
+
+  createForest() {
+    // Деревья по периметру и вдалеке
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 25 + Math.random() * 60;
+      const x = Math.cos(angle) * dist;
+      const z = Math.sin(angle) * dist;
+      const tree = this.createTree(x, z, 0.8 + Math.random()*0.6);
+      this.scene.add(tree);
+      if (Math.random() < 0.5) this.spawnPoints.push({x, z});
+    }
+
+    // Кусты ближе
+    for (let i = 0; i < 30; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 10 + Math.random() * 40;
+      const x = Math.cos(angle) * dist;
+      const z = Math.sin(angle) * dist;
+      this.scene.add(this.createBush(x, z, 0.7 + Math.random()*0.6));
+      if (Math.random() < 0.4) this.spawnPoints.push({x, z});
+    }
+
+    // Камни
+    for (let i = 0; i < 15; i++) {
+      const x = (Math.random()-0.5) * 90;
+      const z = (Math.random()-0.5) * 90;
+      if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
+      this.scene.add(this.createRock(x, z, 0.5 + Math.random()*1.2));
+    }
+
+    // Камыши (у воды / по краям)
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 15 + Math.random() * 35;
+      const x = Math.cos(angle) * dist;
+      const z = Math.sin(angle) * dist;
+      this.scene.add(this.createReeds(x, z));
+    }
+  }
+}
+
+// ============================================================
+// CLASS: Пуля (трассер) — светящийся след от выстрела
+// ============================================================
+class Bullet {
+  constructor(scene) {
+    this.scene = scene;
+    this.active = false;
+    this.life = 0;
+    this.maxLife = 0.18;      // сколько живёт трассер (сек)
+    this.speed = 600;         // визуальная скорость, м/с
+
+    this.start = new THREE.Vector3();
+    this.end = new THREE.Vector3();
+    this.dir = new THREE.Vector3();
+    this.totalDist = 0;
+    this.traveled = 0;
+
+    // --- Меш трассера: тонкий светящийся цилиндр ---
+    const geo = new THREE.CylinderGeometry(0.05, 0.05, 1, 6);
+    // Цилиндр по умолчанию вдоль Y — повернём так, чтобы он смотрел по Z
+    geo.rotateX(Math.PI / 2);
+    geo.translate(0, 0, -0.5); // начало в (0,0,0), конец в (0,0,-1)
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffdd66,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.visible = false;
+    this.scene.add(this.mesh);
+
+    // --- Яркая "голова" пули ---
+    const headGeo = new THREE.SphereGeometry(0.04, 8, 8);
+    const headMat = new THREE.MeshBasicMaterial({
+      color: 0xffffcc,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.head = new THREE.Mesh(headGeo, headMat);
+    this.head.visible = false;
+    this.scene.add(this.head);
+
+    // --- Вспышка в точке попадания ---
+    const sparkGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const sparkMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa33,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.spark = new THREE.Mesh(sparkGeo, sparkMat);
+    this.spark.visible = false;
+    this.scene.add(this.spark);
+  }
+
+  fire(start, end) {
+    this.start.copy(start);
+    this.end.copy(end);
+    this.dir.subVectors(end, start);
+    this.totalDist = this.dir.length();
+    if (this.totalDist < 0.001) return;
+    this.dir.normalize();
+    this.traveled = 0;
+    this.life = 0;
+    this.active = true;
+
+    this.mesh.visible = true;
+    this.head.visible = true;
+    this.mesh.material.opacity = 1;
+    this.head.material.opacity = 1;
+    this.spark.visible = false;
+
+    // Позиционируем голову в начале
+    this.head.position.copy(start);
+  }
+
+  update(dt) {
+    if (!this.active) return;
+
+    this.life += dt;
+    this.traveled += this.speed * dt;
+
+    const headPos = new THREE.Vector3();
+    const progress = Math.min(1, this.traveled / this.totalDist);
+
+    // Позиция головы пули
+    headPos.copy(this.start).addScaledVector(this.dir, this.traveled);
+    if (progress >= 1) headPos.copy(this.end);
+
+    this.head.position.copy(headPos);
+
+    // Трассер: линия от точки старта (или хвоста) до головы
+    // Хвост тянется на фиксированную длину позади головы
+    const trailLen = Math.min(this.traveled, 6.0); // длина шлейфа
+    const tailPos = new THREE.Vector3().copy(headPos)
+      .addScaledVector(this.dir, -trailLen);
+
+    this.mesh.position.copy(tailPos);
+    this.mesh.lookAt(headPos);
+    // Масштабируем по длине (цилиндр изначально длиной 1)
+    this.mesh.scale.set(1, 1, trailLen);
+
+    // Затухание
+    const t = this.life / this.maxLife;
+    const fade = 1 - t;
+    this.mesh.material.opacity = Math.max(0, fade);
+    this.head.material.opacity = Math.max(0, fade);
+
+    // Достигли цели — вспышка попадания
+    if (progress >= 1) {
+      this.spark.position.copy(this.end);
+      this.spark.visible = true;
+      const sparkT = Math.min(1, (this.life - this.totalDist / this.speed) / 0.12);
+      this.spark.material.opacity = Math.max(0, 1 - sparkT);
+      this.spark.scale.setScalar(1 + sparkT * 2);
+    }
+
+    if (this.life > this.maxLife) {
+      this.active = false;
+      this.mesh.visible = false;
+      this.head.visible = false;
+      this.spark.visible = false;
+    }
+  }
+}
+
+// ============================================================
+// CLASS: Ружьё (вид от первого лица) — детализированная модель
+// ============================================================
+class Gun {
+  constructor(camera) {
+    this.camera = camera;
+    this.model = new THREE.Group();
+    this.recoil = 0;
+    this.buildModel();
+    camera.add(this.model);
+  }
+
+  buildModel() {
+    // ---------- Материалы ----------
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x1e1e22, metalness: 0.9, roughness: 0.35
+    });
+    const metalDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x0f0f12, metalness: 0.95, roughness: 0.25
+    });
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x5a2f12, metalness: 0.05, roughness: 0.75
+    });
+    const woodLightMat = new THREE.MeshStandardMaterial({
+      color: 0x7a421c, metalness: 0.05, roughness: 0.65
+    });
+    const brassMat = new THREE.MeshStandardMaterial({
+      color: 0xc9a227, metalness: 1.0, roughness: 0.3
+    });
+    const sightRedMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+
+    // ==================================================
+    // СТВОЛЫ (двустволка, горизонтальный спаринг)
+    // ==================================================
+    const barrelLen = 1.55;
+    const barrelRadius = 0.032;
+
+    const barrelL = new THREE.Mesh(
+      new THREE.CylinderGeometry(barrelRadius, barrelRadius * 1.05, barrelLen, 16),
+      metalMat
+    );
+    barrelL.rotation.x = Math.PI / 2;
+    barrelL.position.set(-0.045, 0, -0.95);
+    this.model.add(barrelL);
+
+    const barrelR = barrelL.clone();
+    barrelR.position.set(0.045, 0, -0.95);
+    this.model.add(barrelR);
+
+    // Дульные срезы (тёмные кольца в конце стволов)
+    const muzzleGeo = new THREE.TorusGeometry(barrelRadius * 0.95, 0.006, 8, 16);
+    const muzzleL = new THREE.Mesh(muzzleGeo, metalDarkMat);
+    muzzleL.position.set(-0.045, 0, -0.95 - barrelLen / 2);
+    this.model.add(muzzleL);
+    const muzzleR = muzzleL.clone();
+    muzzleR.position.x = 0.045;
+    this.model.add(muzzleR);
+
+    // Вентилируемая прицельная планка между стволами
+    const ribGeo = new THREE.BoxGeometry(0.028, 0.012, barrelLen);
+    const rib = new THREE.Mesh(ribGeo, metalDarkMat);
+    rib.position.set(0, barrelRadius * 0.95, -0.95);
+    this.model.add(rib);
+
+    // ==================================================
+    // ПРИЦЕЛ: мушка + целик
+    // ==================================================
+    // --- Мушка (красная точка на конце) ---
+    const frontSightBase = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.025, 0.03),
+      metalDarkMat
+    );
+    frontSightBase.position.set(0, barrelRadius + 0.018, -0.95 - barrelLen / 2 + 0.04);
+    this.model.add(frontSightBase);
+
+    const frontSightDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.012, 10, 10),
+      sightRedMat
+    );
+    frontSightDot.position.set(0, barrelRadius + 0.035, -0.95 - barrelLen / 2 + 0.04);
+    this.model.add(frontSightDot);
+
+    // --- Целик (задний прицел с прорезью) ---
+    // Основание
+    const rearSightBase = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.015, 0.04),
+      metalDarkMat
+    );
+    rearSightBase.position.set(0, barrelRadius + 0.015, -0.95 + barrelLen / 2 - 0.12);
+    this.model.add(rearSightBase);
+
+    // Левый и правый "рога" целика (образуют U-прорезь)
+    const hornGeo = new THREE.BoxGeometry(0.012, 0.03, 0.03);
+    const hornL = new THREE.Mesh(hornGeo, metalDarkMat);
+    hornL.position.set(-0.02, barrelRadius + 0.035, -0.95 + barrelLen / 2 - 0.12);
+    this.model.add(hornL);
+
+    const hornR = hornL.clone();
+    hornR.position.x = 0.02;
+    this.model.add(hornR);
+
+    // ==================================================
+    // КОРОБКА (receiver)
+    // ==================================================
+    const receiver = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.09, 0.32),
+      metalMat
+    );
+    receiver.position.set(0, -0.01, -0.02);
+    this.model.add(receiver);
+
+    // Декоративная гравировка на коробке (тонкие линии)
+    const engraveMat = new THREE.MeshStandardMaterial({
+      color: 0x555555, metalness: 0.8, roughness: 0.4
+    });
+    for (let i = 0; i < 3; i++) {
+      const line = new THREE.Mesh(
+        new THREE.BoxGeometry(0.001, 0.05, 0.02),
+        engraveMat
+      );
+      line.position.set(0.066, -0.005, -0.08 + i * 0.06);
+      this.model.add(line);
+    }
+
+    // ==================================================
+    // ПРИКЛАД (из дерева, с изгибом)
+    // ==================================================
+    // Основная часть приклада
+    const stockMain = new THREE.Mesh(
+      new THREE.BoxGeometry(0.09, 0.11, 0.45),
+      woodMat
+    );
+    stockMain.position.set(0, -0.03, 0.30);
+    stockMain.rotation.x = 0.08;
+    this.model.add(stockMain);
+
+    // "Пятка" приклада (затыльник — резиновый тёмный)
+    const buttpad = new THREE.Mesh(
+      new THREE.BoxGeometry(0.095, 0.12, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
+    );
+    buttpad.position.set(0, -0.06, 0.52);
+    buttpad.rotation.x = 0.08;
+    this.model.add(buttpad);
+
+    // Шейка приклада (переход к коробке)
+    const stockNeck = new THREE.Mesh(
+      new THREE.BoxGeometry(0.075, 0.075, 0.18),
+      woodMat
+    );
+    stockNeck.position.set(0, -0.05, 0.12);
+    this.model.add(stockNeck);
+
+    // ==================================================
+    // ЦЕВЬЁ (forend) — под стволами
+    // ==================================================
+    const forend = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.07, 0.42),
+      woodLightMat
+    );
+    forend.position.set(0, -0.055, -0.62);
+    this.model.add(forend);
+
+    // Небольшие насечки на цевье (для хвата)
+    for (let i = 0; i < 5; i++) {
+      const notch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.13, 0.002, 0.008),
+        metalDarkMat
+      );
+      notch.position.set(0, -0.02, -0.78 + i * 0.06);
+      this.model.add(notch);
+    }
+
+    // ==================================================
+    // СПУСКОВОЙ КРЮЧОК + СКОБА
+    // ==================================================
+    const triggerGuard = new THREE.Mesh(
+      new THREE.TorusGeometry(0.035, 0.006, 8, 16, Math.PI),
+      metalDarkMat
+    );
+    triggerGuard.rotation.x = Math.PI;
+    triggerGuard.rotation.z = Math.PI / 2;
+    triggerGuard.position.set(0, -0.075, 0.05);
+    this.model.add(triggerGuard);
+
+    const trigger = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.005, 0.005, 0.045, 8),
+      metalDarkMat
+    );
+    trigger.rotation.z = 0.25;
+    trigger.position.set(0, -0.07, 0.045);
+    this.model.add(trigger);
+
+    // ==================================================
+    // КУРКИ (два, для двустволки) — справа и слева
+    // ==================================================
+    const hammerGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.04, 8);
+    const hammerL = new THREE.Mesh(hammerGeo, metalDarkMat);
+    hammerL.position.set(-0.045, 0.04, 0.06);
+    hammerL.rotation.x = -0.5;
+    this.model.add(hammerL);
+
+    const hammerR = hammerL.clone();
+    hammerR.position.x = 0.045;
+    this.model.add(hammerR);
+
+    // ==================================================
+    // КНОПКА / ФЛАЖОК ПРЕДОХРАНИТЕЛЯ
+    // ==================================================
+    const safety = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.015, 0.05),
+      brassMat
+    );
+    safety.position.set(0.05, 0.03, 0.1);
+    this.model.add(safety);
+
+    // ==================================================
+    // ПОЗИЦИЯ В РУКАХ (справа снизу, как в FPS)
+    // ==================================================
+    this.model.position.set(0.24, -0.22, -0.30);
+    this.model.rotation.y = -0.06;
+    this.model.rotation.z = 0.02;
+
+    // Всё в тени
+    this.model.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  }
+
+  fire() {
+    this.recoil = 1.0;
+    if (window.SNDS && SNDS.shoot) SNDS.shoot.play();
+    setTimeout(() => {
+      if (window.SNDS && SNDS.dzin) SNDS.dzin.play();
+    }, 180);
+  }
+
+  update(dt) {
+    if (this.recoil > 0) {
+      this.recoil -= dt * 6;
+      if (this.recoil < 0) this.recoil = 0;
+    }
+    const r = this.recoil;
+    // Отдача: ствол уходит назад и вверх
+    this.model.position.z = -0.30 + r * 0.14;
+    this.model.position.y = -0.22 + r * 0.05;
+    this.model.rotation.x = r * 0.22;
+  }
+}
+
+// ============================================================
+// CLASS: Утка
+// ============================================================
+class Duck {
+  constructor(scene, spawnPos, targetPos) {
+    this.scene = scene;
+    this.alive = true;
+    this.falling = false;
+    this.removeMe = false;
+    this.fallSpeed = 0;
+    this.fallRotSpeed = 0;
+    this.life = 0;
+    this.wingPhase = Math.random() * Math.PI * 2;
+
+    this.group = new THREE.Group();
+    this.buildModel();
+    this.group.position.copy(spawnPos);
+    this.group.position.y = Math.max(2, spawnPos.y + 2 + Math.random()*2);
+    this.scene.add(this.group);
+
+    this.velocity = new THREE.Vector3(
+      (Math.random() - 0.3) * 6,
+      2 + Math.random() * 3,
+      (Math.random() - 0.5) * 6
+    );
+    this.targetPos = targetPos.clone();
+    this.wanderTimer = 0;
+  }
+
+  buildModel() {
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4a3a2a });
+    const headMat = new THREE.MeshLambertMaterial({ color: 0x2a5a3a });
+    const beakMat = new THREE.MeshLambertMaterial({ color: 0xffaa00 });
+    const wingMat = new THREE.MeshLambertMaterial({ color: 0x6a5a4a });
+
+    // Тело
+    const bodyGeo = new THREE.SphereGeometry(0.28, 10, 8);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.scale.set(1.5, 0.9, 1);
+    this.group.add(body);
+
+    // Шея + голова
+    const neckGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.25, 8);
+    const neck = new THREE.Mesh(neckGeo, headMat);
+    neck.position.set(0.35, 0.12, 0);
+    neck.rotation.z = -0.5;
+    this.group.add(neck);
+
+    const headGeo = new THREE.SphereGeometry(0.15, 10, 8);
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.set(0.5, 0.22, 0);
+    this.group.add(head);
+
+    // Клюв
+    const beakGeo = new THREE.ConeGeometry(0.06, 0.2, 6);
+    const beak = new THREE.Mesh(beakGeo, beakMat);
+    beak.rotation.z = -Math.PI/2;
+    beak.position.set(0.68, 0.2, 0);
+    this.group.add(beak);
+
+    // Глаза
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const eyeGeo = new THREE.SphereGeometry(0.025, 6, 6);
+    const eye1 = new THREE.Mesh(eyeGeo, eyeMat);
+    eye1.position.set(0.55, 0.26, 0.08);
+    this.group.add(eye1);
+    const eye2 = eye1.clone();
+    eye2.position.z = -0.08;
+    this.group.add(eye2);
+
+    // Крылья
+    this.wingL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.4, 0.7),
+      wingMat
+    );
+    this.wingL.position.set(0, 0.15, 0.35);
+    this.group.add(this.wingL);
+
+    this.wingR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.4, 0.7),
+      wingMat
+    );
+    this.wingR.position.set(0, 0.15, -0.35);
+    this.group.add(this.wingR);
+
+    // Хвост
+    const tailGeo = new THREE.ConeGeometry(0.15, 0.3, 6);
+    const tail = new THREE.Mesh(tailGeo, bodyMat);
+    tail.rotation.z = Math.PI/2;
+    tail.position.set(-0.45, 0.05, 0);
+    this.group.add(tail);
+
+    this.group.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  }
+
+  getBoundingBox() {
+    return new THREE.Box3().setFromObject(this.group);
+  }
+
+  hit() {
+    if (!this.alive) return false;
+    this.alive = false;
+    this.falling = true;
+    this.fallSpeed = 2;
+    this.fallRotSpeed = (Math.random() - 0.5) * 8;
+    // 💀 Звук подбитой утки
+    if (window.SNDS && SNDS.death) SNDS.death.play();
+    return true;
+  }
+
+  update(dt) {
+    if (this.alive) {
+      this.life += dt;
+      
+      // Полёт по дуге с изменением направления
+      this.wanderTimer += dt;
+      if (this.wanderTimer > 1.2) {
+        this.wanderTimer = 0;
+        this.velocity.x += (Math.random() - 0.5) * 4;
+        this.velocity.z += (Math.random() - 0.5) * 4;
+        // Улетает — поднимается
+        this.velocity.y += Math.random() * 1;
+      }
+      this.velocity.y -= dt * 1.5; // гравитация дуги
+
+      this.group.position.addScaledVector(this.velocity, dt);
+
+      // Направление по скорости
+      const horiz = new THREE.Vector3(this.velocity.x, 0, this.velocity.z);
+      if (horiz.lengthSq() > 0.01) {
+        this.group.rotation.y = Math.atan2(-this.velocity.z, this.velocity.x);
+      }
+
+      // Взмахи крыльев
+      this.wingPhase += dt * 18;
+      const flap = Math.sin(this.wingPhase) * 0.9;
+      this.wingL.rotation.x = flap;
+      this.wingR.rotation.x = -flap;
+
+      // Если утка слишком далеко/высоко — удалить
+      if (this.group.position.y > 35 || 
+          this.group.position.length() > 150) {
+        this.removeMe = true;
+      }
+    } else if (this.falling) {
+      // Падение
+      this.fallSpeed += dt * 25;
+      this.group.position.y -= this.fallSpeed * dt;
+      this.group.rotation.x += this.fallRotSpeed * dt;
+      this.group.rotation.z += this.fallRotSpeed * 0.7 * dt;
+
+      // Крылья в "мертвом" положении
+      this.wingL.rotation.x = -1.5;
+      this.wingR.rotation.x = 1.5;
+
+      if (this.group.position.y <= 0.3) {
+        this.group.position.y = 0.3;
+        this.falling = false;
+        // Убрать через мгновение
+        setTimeout(() => { this.removeMe = true; }, 800);
+      }
+    }
+  }
+
+  dispose() {
+    this.scene.remove(this.group);
+    this.group.traverse(o => {
+      if (o.isMesh) {
+        o.geometry.dispose();
+        if (o.material.dispose) o.material.dispose();
+      }
+    });
+  }
+}
+
+// ============================================================
+// CLASS: Гильза (вылетает после выстрела)
+// ============================================================
+class Shell {
+  constructor(scene) {
+    this.scene = scene;
+    this.active = false;
+    this.life = 0;
+    this.maxLife = 3.0;
+    this.landed = false;
+
+    this.velocity = new THREE.Vector3();
+    this.angularVel = new THREE.Vector3();
+    
+    const matPlastic = new THREE.MeshStandardMaterial({ 
+      color: 0xdd1111, roughness: 0.3, metalness: 0.2 
+    });
+    const matBrass = new THREE.MeshStandardMaterial({ 
+      color: 0xffcc33, roughness: 0.2, metalness: 0.9 
+    });
+
+    this.mesh = new THREE.Group();
+    
+    // Основная часть (пластик) — УВЕЛИЧЕНА В 2 РАЗА
+    const bodyGeo = new THREE.CylinderGeometry(0.024, 0.024, 0.08, 8);
+    bodyGeo.rotateZ(Math.PI / 2);
+    const body = new THREE.Mesh(bodyGeo, matPlastic);
+    body.position.x = -0.01;
+    this.mesh.add(body);
+
+    // Донце (латунь)
+    const baseGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.02, 8);
+    baseGeo.rotateZ(Math.PI / 2);
+    const base = new THREE.Mesh(baseGeo, matBrass);
+    base.position.x = 0.03;
+    this.mesh.add(base);
+
+    this.mesh.visible = false;
+    this.mesh.castShadow = true;
+    this.scene.add(this.mesh);
+  }
+
+  fire(startPos, startVel) {
+    this.active = true;
+    this.life = 0;
+    this.landed = false;
+    this.mesh.visible = true;
+    this.mesh.position.copy(startPos);
+    this.mesh.scale.set(1, 1, 1);
+    this.velocity.copy(startVel);
+    
+    this.angularVel.set(
+      (Math.random() - 0.5) * 25,
+      (Math.random() - 0.5) * 25,
+      (Math.random() - 0.5) * 25
+    );
+    this.mesh.rotation.set(0, 0, 0);
+  }
+
+  update(dt) {
+    if (!this.active) return;
+
+    this.life += dt;
+
+    if (!this.landed) {
+      this.velocity.y -= 15.0 * dt; // чуть сильнее гравитация для эффектности
+      this.mesh.position.addScaledVector(this.velocity, dt);
+      
+      this.mesh.rotation.x += this.angularVel.x * dt;
+      this.mesh.rotation.y += this.angularVel.y * dt;
+      this.mesh.rotation.z += this.angularVel.z * dt;
+      
+      if (this.mesh.position.y <= 0.03) {
+        this.mesh.position.y = 0.03;
+        this.landed = true;
+        this.velocity.set(0, 0, 0);
+        this.angularVel.set(0, 0, 0);
+        this.mesh.rotation.set(Math.PI / 2, Math.random() * Math.PI, 0);
+        
+        // Звук падения гильзы (используем dzin с библиотеки)
+        if (window.SNDS && SNDS.dzin) SNDS.dzin.play();
+      }
+    } else {
+      // Лежит на земле, исчезает в конце
+      if (this.life > this.maxLife - 0.5) {
+        const scale = Math.max(0.01, (this.maxLife - this.life) / 0.5);
+        this.mesh.scale.set(scale, scale, scale);
+      }
+    }
+
+    if (this.life > this.maxLife) {
+      this.active = false;
+      this.mesh.visible = false;
+    }
+  }
+}
+
+// Пул гильз
+const shellPool = [];
+const SHELL_POOL_SIZE = 12;
+for (let i = 0; i < SHELL_POOL_SIZE; i++) {
+  shellPool.push(new Shell(scene));
+}
+let shellIndex = 0;
+function getShell() {
+  const s = shellPool[shellIndex];
+  shellIndex = (shellIndex + 1) % SHELL_POOL_SIZE;
+  return s;
+}
+
+// ============================================================
+// ИГРОВАЯ ЛОГИКА
+// ============================================================
+const sky = new Sky(scene);
+const nature = new Nature(scene);
+const gun = new Gun(camera);
+const ducks = [];
+let score = 0;
+let timeSinceSpawn = 0;
+const spawnInterval = 1.6; // секунд
+
+// Пул трассеров (переиспользуем, чтобы не создавать объекты каждый выстрел)
+const bulletPool = [];
+const BULLET_POOL_SIZE = 8;
+for (let i = 0; i < BULLET_POOL_SIZE; i++) {
+  bulletPool.push(new Bullet(scene));
+}
+let bulletIndex = 0;
+function getBullet() {
+  const b = bulletPool[bulletIndex];
+  bulletIndex = (bulletIndex + 1) % BULLET_POOL_SIZE;
+  return b;
+}
+
+// Управление
+const keys = {};
+const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const mouseSensitivity = 0.0022;
+
+function getAimEndPoint() {
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+  let endPoint = new THREE.Vector3();
+  const maxDist = 250;
+
+  // 1) Утки (приоритет — как в shoot())
+  let closestDist = Infinity;
+  let hitPoint = null;
+
+  ducks.forEach(duck => {
+    if (!duck.alive) return;
+    const box = duck.getBoundingBox();
+    const p = raycaster.ray.intersectBox(box, new THREE.Vector3());
+    if (p) {
+      const d = p.distanceTo(camera.position);
+      if (d < closestDist && d < maxDist) {
+        closestDist = d;
+        hitPoint = p;
+      }
+    }
+  });
+
+  // 2) Земля (плоскость y=0)
+  if (!hitPoint) {
+    const t = -raycaster.ray.origin.y / raycaster.ray.direction.y;
+    if (t > 0 && t < maxDist) {
+      hitPoint = raycaster.ray.origin.clone()
+        .addScaledVector(raycaster.ray.direction, t);
+    }
+  }
+
+  // 3) Если ничего не нашли — точка вдалеке
+  if (!hitPoint) {
+    hitPoint = raycaster.ray.origin.clone()
+      .addScaledVector(raycaster.ray.direction, maxDist);
+  }
+
+  return hitPoint;
+}
+
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement === renderer.domElement) {
+    euler.y -= e.movementX * mouseSensitivity;
+    euler.x -= e.movementY * mouseSensitivity;
+    euler.x = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, euler.x));
+    camera.quaternion.setFromEuler(euler);
+  }
+});
+
+renderer.domElement.addEventListener('click', () => {
+  if (document.pointerLockElement !== renderer.domElement) {
+    renderer.domElement.requestPointerLock();
+  } else {
+    shoot();
+  }
+});
+
+// Вспышка
+const flashEl = document.getElementById('flash');
+let flashTimer = 0;
+
+function shoot() {
+  gun.fire();
+
+  flashEl.style.opacity = '0.6';
+  flashTimer = 0.08;
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+  let closestHit = null;
+  let closestDist = Infinity;
+
+  ducks.forEach(duck => {
+    if (!duck.alive) return;
+    const box = duck.getBoundingBox();
+    const hit = raycaster.ray.intersectBox(box, new THREE.Vector3());
+    if (hit) {
+      const dist = hit.distanceTo(camera.position);
+      if (dist < closestDist && dist < 120) {
+        closestDist = dist;
+        closestHit = duck;
+      }
+    }
+  });
+
+  // --- Трассер ---
+  const muzzleWorld = new THREE.Vector3();
+  gun.model.localToWorld(muzzleWorld.set(0, 0.03, -1.7));
+  const start = muzzleWorld.clone().lerp(camera.position, 0.15);
+  const end = getAimEndPoint();
+  getBullet().fire(start, end);
+
+  // --- ВЫЛЕТ ГИЛЬЗЫ ---
+  // Точка выброса (локальные координаты ружья)
+  const ejectPos = new THREE.Vector3(0.12, 0.08, -1.0);
+  gun.model.localToWorld(ejectPos);
+  
+  // Направление вылета — тоже ЛОКАЛЬНОЕ для ружья (вправо, вверх, чуть назад)
+  const ejectDir = new THREE.Vector3(1, 0.8, 0.2).normalize();
+  // Переводим направление из локального пространства ружья в мировое
+  const ejectDirWorld = ejectDir.clone().transformDirection(gun.model.matrixWorld);
+  
+  const ejectSpeed = 4.0 + Math.random() * 2.0;
+  const ejectVel = ejectDirWorld.multiplyScalar(ejectSpeed);
+  
+  getShell().fire(ejectPos, ejectVel);
+
+  if (closestHit) {
+    closestHit.hit();
+    score++;
+    document.getElementById('score').textContent = 'Утки: ' + score;
+  } else {
+    if (window.SNDS && SNDS.damag) SNDS.damag.play();
+  }
+}
+
+function spawnDuck() {
+  if (nature.spawnPoints.length === 0) return;
+  const sp = nature.spawnPoints[Math.floor(Math.random() * nature.spawnPoints.length)];
+  const spawnPos = new THREE.Vector3(sp.x, 1.5, sp.z);
+  const target = camera.position.clone();
+  ducks.push(new Duck(scene, spawnPos, target));
+}
+
+// Движение игрока
+const playerVel = new THREE.Vector3();
+const playerPos = new THREE.Vector3(0, 1.7, 0);
+
+function updatePlayer(dt) {
+  const speed = keys['ShiftLeft'] ? 14 : 8;
+  const dir = new THREE.Vector3();
+  
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  forward.y = 0;
+  forward.normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0));
+
+  if (keys['KeyW']) dir.add(forward);
+  if (keys['KeyS']) dir.sub(forward);
+  if (keys['KeyD']) dir.add(right);
+  if (keys['KeyA']) dir.sub(right);
+
+  if (dir.lengthSq() > 0) dir.normalize().multiplyScalar(speed);
+
+  playerVel.lerp(dir, Math.min(1, dt * 12));
+  playerPos.addScaledVector(playerVel, dt);
+
+  // Ограничения
+  const maxR = 80;
+  if (playerPos.length() > maxR) {
+    playerPos.setLength(maxR);
+  }
+
+  camera.position.copy(playerPos);
+}
+
+// ============================================================
+// АНИМАЦИОННЫЙ ЦИКЛ
+// ============================================================
+let lastTime = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.1) dt = 0.1;
+
+  // Обновления
+  sky.update(dt);
+  gun.update(dt);
+  updatePlayer(dt);
+
+  // Спавн уток
+  timeSinceSpawn += dt;
+  if (timeSinceSpawn > spawnInterval) {
+    timeSinceSpawn = 0;
+    if (ducks.filter(d => d.alive).length < 8) {
+      spawnDuck();
+    }
+  }
+
+  // Обновление уток
+  for (let i = ducks.length - 1; i >= 0; i--) {
+    const d = ducks[i];
+    d.update(dt);
+    if (d.removeMe) {
+      d.dispose();
+      ducks.splice(i, 1);
+    }
+  }
+
+    // Обновление трассеров
+    for (let i = 0; i < bulletPool.length; i++) {
+    bulletPool[i].update(dt);
+    }
+
+    // Обновление гильз (ДОБАВИТЬ ЭТО)
+    for (let i = 0; i < shellPool.length; i++) {
+      shellPool[i].update(dt);
+    }
+
+  // Вспышка
+  if (flashTimer > 0) {
+    flashTimer -= dt;
+    if (flashTimer <= 0) {
+      flashEl.style.opacity = '0';
+    } else {
+      flashEl.style.opacity = Math.max(0, flashTimer / 0.08 * 0.6);
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// Обработка ресайза
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+
+renderer.domElement.addEventListener('click', () => {
+  if (document.pointerLockElement !== renderer.domElement) {
+    renderer.domElement.requestPointerLock();
+    // 🔓 Явно будим аудио-контекст
+    if (window.SNDS) kit.unlockAudio();
+  } else {
+    shoot();
+  }
+});
+</script>
+</body>
+</html>
