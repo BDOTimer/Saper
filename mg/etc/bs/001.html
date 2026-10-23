@@ -6,6 +6,73 @@
 <title>Спички: переложи одну палочку</title>
 <link rel="stylesheet" href="neon-bs.css">
 <link rel="icon" type="image/png" href="../../res/favicon-64.png" sizes="64x64">
+<style>
+/* Минимальные стили для счётчика и баннера проверки,
+   чтобы не зависеть от neon-bs.css */
+.counter {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px auto 4px;
+    padding: 6px 14px;
+    border: 1px solid rgba(0,229,255,.35);
+    border-radius: 10px;
+    font-family: monospace;
+    font-size: 15px;
+    letter-spacing: 1px;
+    color: #9fe9ff;
+    background: rgba(0,20,30,.45);
+    user-select: none;
+}
+.counter .cnt-val {
+    font-weight: bold;
+    color: #00e5ff;
+    min-width: 1.2em;
+    text-align: center;
+}
+.counter .cnt-max { color: #ff2d95; }
+
+/* Баннер ПРОВЕРИТЬ — теперь не кнопка, а индикатор */
+.check-banner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 22px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,229,255,.35);
+    background: rgba(0,20,30,.5);
+    color: #7fb8cc;
+    font-weight: bold;
+    letter-spacing: 2px;
+    font-size: 14px;
+    cursor: default;
+    transition: all .25s ease;
+    user-select: none;
+}
+.check-banner.checking {
+    color: #001018;
+    background: linear-gradient(135deg, #00e5ff, #7cffd4);
+    border-color: #00e5ff;
+    box-shadow: 0 0 18px rgba(0,229,255,.8), 0 0 36px rgba(0,229,255,.4);
+    animation: bannerPulse .5s ease-in-out infinite alternate;
+}
+.check-banner.success {
+    color: #001018;
+    background: linear-gradient(135deg, #38ff9c, #b6ff5c);
+    border-color: #38ff9c;
+    box-shadow: 0 0 18px rgba(56,255,156,.8);
+}
+.check-banner.fail {
+    color: #1a0008;
+    background: linear-gradient(135deg, #ff2d95, #ff7a5c);
+    border-color: #ff2d95;
+    box-shadow: 0 0 18px rgba(255,45,149,.8);
+}
+@keyframes bannerPulse {
+    from { transform: scale(1); }
+    to   { transform: scale(1.04); }
+}
+</style>
 </head>
 <body>
 
@@ -17,7 +84,13 @@
     <div class="board" id="board"></div>
 
     <div class="controls">
-        <button class="btn-primary" id="checkBtn">ПРОВЕРИТЬ</button>
+        <div class="counter" title="Счётчик перекладок">
+            <span>КОЛИЧЕСТВО ПЕРЕКЛАДОК:</span>
+            <span class="cnt-val" id="cntVal">0</span>
+            <span>/</span>
+            <span class="cnt-max" id="cntMax">1</span>
+        </div>
+        <div class="check-banner" id="checkBanner">ПРОВЕРКА</div>
         <div class="bulb" id="bulb"></div>
         <button id="resetBtn">СБРОС</button>
         <button id="hintBtn">ПОДСКАЗКА</button>
@@ -29,9 +102,6 @@
 
 <!-- Угловые стрелки для переключения задач -->
 <button class="corner-btn corner-btn--left"  id="prevBtn" aria-label="Предыдущая задача">‹</button>
-<!--
-<button class="corner-btn corner-btn--right" id="nextBtn" aria-label="Следующая задача">›</button>
--->
 
 <script>
 /* ============================================================
@@ -210,6 +280,11 @@ function buildRealTasks() {
 let TASKS_FINAL = [];
 let currentIdx = 0;
 let symbols = [];
+
+// Правило: можно переложить только T спичек
+const T = 1;
+// Счётчик перекладок
+let CNT = 0;
 
 // Для рендера
 const SCALE = 56;
@@ -414,10 +489,12 @@ function drawSpecialMatch(g, cx, cy, w, h, state, symIdx, slotName) {
 let draggedElement = null;
 let draggedFrom = null;
 let dragOffset = { x: 0, y: 0 };
+let isChecking = false; // блокировка ввода во время проверки
 
 function onDragStart(e) {
+    if (isChecking) return;
     e.preventDefault();
-    ensureAudio(); // разблокируем звук при первом взаимодействии
+    ensureAudio();
 
     const symIdx = parseInt(e.target.dataset.symIdx);
     const slotName = e.target.dataset.slotName;
@@ -478,12 +555,14 @@ function onDragEnd(e) {
 
     document.querySelectorAll('.match-stick').forEach(el => el.style.opacity = '1');
 
+    let moved = false;
+
     if (target && draggedFrom) {
         const { symIdx: fromSym, slotName: fromSlot } = draggedFrom;
         const { symIdx: toSym, slotName: toSlot } = target;
 
         if (fromSym === toSym && fromSlot === toSlot) {
-            // вернули на место
+            // вернули на место — не считается перекладкой
         } else if (symbols[toSym].slots[toSlot] === 'match') {
             setMessage('Этот слот уже занят.', 'error');
             sfxError();
@@ -494,12 +573,22 @@ function onDragEnd(e) {
             symbols[toSym].char = charFromSlots(symbols[toSym]);
             render();
             sfxDrop();
+            moved = true;
         }
     }
 
     draggedFrom = null;
     document.removeEventListener('pointermove', onDragMove);
     document.removeEventListener('pointerup', onDragEnd);
+
+    if (moved) {
+        CNT++;
+        updateCounter();
+        if (CNT >= T) {
+            // Автоматическая проверка при достижении лимита
+            setTimeout(runAutoCheck, 250);
+        }
+    }
 }
 
 function findSlotAt(clientX, clientY) {
@@ -555,40 +644,96 @@ function charFromSlots(sym) {
     }
 }
 
-function validateExpression() {
-    const expr = symbols.map(s => s.char).join('');
+function updateCounter() {
+    document.getElementById('cntVal').textContent = CNT;
+    document.getElementById('cntMax').textContent = T;
+}
+
+/* ============================================================
+   АВТОПРОВЕРКА (запускается сама при CNT === T)
+   ============================================================ */
+function runAutoCheck() {
+    if (isChecking) return;
+    isChecking = true;
+
+    const banner = document.getElementById('checkBanner');
     const bulb = document.getElementById('bulb');
+
+    // 1. Баннер загорается — идёт проверка
+    banner.classList.remove('success', 'fail');
+    banner.classList.add('checking');
+    banner.textContent = 'ПРОВЕРКА…';
     bulb.className = 'bulb';
+    setMessage('', '');
+    sfxClick();
 
-    const m = expr.match(/^(\d)([+\-])(\d)=(\d)$/);
-    if (!m) {
-        setMessage(`Некорректное выражение: «${expr}».`, 'error');
-        bulb.classList.add('error');
-        sfxError();
-        return;
-    }
+    // 2. Небольшая пауза для визуального эффекта, затем вердикт
+    setTimeout(() => {
+        const expr = symbols.map(s => s.char).join('');
+        const m = expr.match(/^(\d)([+\-])(\d)=(\d)$/);
 
-    const a = +m[1], op = m[2], b = +m[3], c = +m[4];
-    const left = op === '+' ? a + b : a - b;
+        if (!m) {
+            banner.classList.remove('checking');
+            banner.classList.add('fail');
+            banner.textContent = 'НЕВЕРНО';
+            bulb.classList.add('error');
+            setMessage(`Некорректное выражение: «${expr}».`, 'error');
+            sfxError();
+            finishCheck();
+            return;
+        }
 
-    if (left === c) {
-        bulb.classList.add('success');
-        setMessage(`Верно! ${a} ${op} ${b} = ${c}`, 'success');
-        sfxSuccess();
+        const a = +m[1], op = m[2], b = +m[3], c = +m[4];
+        const left = op === '+' ? a + b : a - b;
 
-        // Автоматический переход на следующую задачу через 1.5 сек
-        setTimeout(() => {
-            if (currentIdx + 1 < TASKS_FINAL.length) {
-                loadTask(currentIdx + 1);
-            } else {
-                loadTask(0); // если это была последняя — начинаем заново
-            }
-        }, 3000);
-    } else {
-        bulb.classList.add('error');
-        setMessage(`Пока нет: ${a} ${op} ${b} = ${left}, а не ${c}.`, 'error');
-        sfxError();
-    }
+        if (left === c) {
+            banner.classList.remove('checking');
+            banner.classList.add('success');
+            banner.textContent = 'ВЕРНО!';
+            bulb.classList.add('success');
+            setMessage(`Верно! ${a} ${op} ${b} = ${c}`, 'success');
+            sfxSuccess();
+            finishCheck();
+
+            // Переход к следующей задаче
+            setTimeout(() => {
+                if (currentIdx + 1 < TASKS_FINAL.length) {
+                    loadTask(currentIdx + 1);
+                } else {
+                    loadTask(0);
+                }
+            }, 2200);
+        } else {
+            banner.classList.remove('checking');
+            banner.classList.add('fail');
+            banner.textContent = 'НЕВЕРНО';
+            bulb.classList.add('error');
+            setMessage(`Пока нет: ${a} ${op} ${b} = ${left}, а не ${c}.`, 'error');
+            sfxError();
+            finishCheck();
+        }
+    }, 550);
+}
+
+// После проверки: обнуляем CNT, разрешаем ввод, через паузу возвращаем баннер в исходное состояние
+function finishCheck() {
+    CNT = 0;
+    updateCounter();
+
+    setTimeout(() => {
+        isChecking = false;
+        const banner = document.getElementById('checkBanner');
+        // Не сбрасываем цвет успеха/неудачи мгновенно — даём увидеть.
+        // Но ввод уже разблокирован; при новом перетаскивании баннер сбросится.
+    }, 300);
+}
+
+// Сброс баннера в нейтральное состояние при новом действии
+function resetBanner() {
+    const banner = document.getElementById('checkBanner');
+    if (banner.classList.contains('checking')) return;
+    banner.classList.remove('success', 'fail');
+    banner.textContent = 'ПРОВЕРИТЬ';
 }
 
 function setMessage(text, type) {
@@ -606,6 +751,13 @@ function loadTask(idx) {
     currentIdx = ((idx % TASKS_FINAL.length) + TASKS_FINAL.length) % TASKS_FINAL.length;
     const t = TASKS_FINAL[currentIdx];
     symbols = buildSymbols(t.text);
+
+    // Сброс состояния
+    CNT = 0;
+    isChecking = false;
+    updateCounter();
+    resetBanner();
+
     setMessage('', '');
     document.getElementById('bulb').className = 'bulb';
     document.getElementById('hintText').textContent = '';
@@ -617,57 +769,47 @@ function loadTask(idx) {
 // Инициализация
 TASKS_FINAL = buildRealTasks();
 
-document.getElementById('checkBtn').addEventListener('click', () => {
-    sfxClick();
-    validateExpression();
+// Кнопка ПРОВЕРИТЬ — больше не кнопка, а баннер-индикатор.
+// Клик по ней ничего не запускает (проверка автоматическая).
+document.getElementById('checkBanner').addEventListener('click', () => {
+    // Намеренно пусто: проверка запускается автоматически при CNT === T.
+    // Если хочется дать лёгкий отклик — можно оставить звук клика:
+    // sfxClick();
 });
+
 document.getElementById('resetBtn').addEventListener('click', () => {
     sfxClick();
     loadTask(currentIdx);
 });
+
 document.getElementById('hintBtn').addEventListener('click', () => {
     sfxClick();
     document.getElementById('hintText').textContent = 'Подсказка: ' + TASKS_FINAL[currentIdx].hint;
 });
+
 document.getElementById('prevBtn').addEventListener('click', () => {
     sfxClick();
-    //loadTask(currentIdx - 1);
     window.location.href = './i-bs.html';
 });
-// document.getElementById('nextBtn').addEventListener('click', () => {
-//     sfxClick();
-//     loadTask(currentIdx + 1);
-// });
 
-// Принудительный старт с двойной страховкой
+// Принудительный старт
 function startGame() {
     try {
+        updateCounter();
         loadTask(0);
     } catch (e) {
         console.error('Ошибка при старте:', e);
     }
 }
 
-// Пытаемся запустить сразу, но если DOM ещё не готов — ждём
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startGame);
 } else {
     startGame();
 }
 
-// Гарантированный перезапуск после полной загрузки (с небольшой паузой)
-// window.addEventListener('load', () => {
-//     setTimeout(startGame, 100);
-// });
-
-// // И ещё раз через 500 мс — на случай совсем медленной загрузки
-// setTimeout(startGame, 500);
-
-// Гарантированный перезапуск после полной загрузки (с небольшой паузой)
-window.addEventListener('click', () => {
-  loadTask(currentIdx);
-}, { once: true });
-
+// Старый хак с перезагрузкой по клику убран — он мешал бы новой логике.
+// (Раньше: window.addEventListener('click', () => loadTask(currentIdx), { once: true });)
 </script>
 </body>
 </html>

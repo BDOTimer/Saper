@@ -246,8 +246,6 @@
 
 <script>
 // src/lib/game/levels.ts
-var COLS = 39;
-var ROWS = 16;
 var RAW_LEVELS = [ 
   //   {c: 39, r: 16, rows:
   //   [
@@ -275,7 +273,7 @@ var RAW_LEVELS = [
     "#  $ -   H   $  ---     $             #",
     "#H### ##########   #H##################",
     "#H                  H                 #",
-    "#H$ - E   H###     H                  #",
+    "#H$ - E   H###      H                 #",
     "#### #####H########## ##########H######",
     "#         H                     H     #",
     "#  $      H     H##H  -       H###H  $#",
@@ -290,20 +288,20 @@ var RAW_LEVELS = [
   {c: 28, r: 16, rows:[
     "        H          H        ",
     "        H    E     H        ",
-    "  $     H   $  ----H   $    ",
+    "  $     H   $   ---H   $    ",
     "################   H########",
     "                   H        ",
-    " $---E             H        ",
+    " $  -E             H        ",
     "#### ####H########### ######",
     "         H           $      ",
-    "  $      H           ---$   ",
+    "  $      H            - $   ",
     "#############H######## #####",
     "             H              ",
     "     $       H        $     ",
     "##### #######H########## ###",
     "             H         E    ",
     " P        $  H              ",
-    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    "@@@@@@@#@#@@@@@@@@@#@#@@@@@@"
   ]},
   {c: 28, r: 16, rows:[
     "    H                       ",
@@ -397,14 +395,19 @@ var RAW_LEVELS = [
   ]},
 ];
 
+
+var COLS = RAW_LEVELS[0].c;
+var ROWS = RAW_LEVELS[0].r;
+
 // src/lib/game/engine.ts
 var T = 32;
 var HUD_H = 44;
 var VIEW_W = COLS * T;
 var VIEW_H = ROWS * T + HUD_H;
+var canvasRef = null;
+
 var WALK = 150;    // скорость ходьбы ИГРОКА по горизонтали (px/сек)
 var CLIMB = 115;   // скорость лазания ИГРОКА по лестницам (px/сек)
-
 var FALL_SPEED = 270;
 var GUARD_WALK =  80;
 var GUARD_CLIMB = 60;
@@ -427,6 +430,11 @@ var cell = (type) => ({
   warned: false,
   revealTimer: 0
 });
+
+function recomputeView() {
+  VIEW_W = COLS * T;
+  VIEW_H = ROWS * T + HUD_H;
+}
 
 function makeActor(x, y) {
   return {
@@ -508,6 +516,7 @@ class Game {
       this.sfx.extra();
     }
   }
+
   loadLevel(index) {
     this.levelIndex = index;
     const raw = RAW_LEVELS[index].rows;
@@ -518,7 +527,7 @@ class Game {
     this.respawns = [];
     this.revealed = false;
     this.revealFx = 0;
-    this.banner = 0;
+    this.banner   = 0;
     this.goldLeft = 0;
     let px = T;
     let py = T * (ROWS - 2);
@@ -567,6 +576,13 @@ class Game {
       }
       this.cells.push(rowCells);
     }
+
+    recomputeView();
+    if (typeof canvasRef !== "undefined" && canvasRef) {
+      canvasRef.width  = VIEW_W;
+      canvasRef.height = VIEW_H;
+    }
+
     this.player = makeActor(px, py);
     this.player.state = "fall";
   }
@@ -1912,6 +1928,7 @@ function createSfx() {
 // scripts/standalone-entry.ts
 function boot() {
   const canvas = document.getElementById("lr-canvas");
+  canvasRef = canvas;
   if (!canvas)
     return;
   const ctx = canvas.getContext("2d");
