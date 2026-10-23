@@ -247,7 +247,7 @@
 <script>
 // src/lib/game/levels.ts
 var RAW_LEVELS = [ 
-  //   {c: 39, r: 16, rows:
+  //   {r: 16, rows:
   //   [
   //   "#                                     #",
   //   "# E E E E E E E E                     #",
@@ -266,7 +266,7 @@ var RAW_LEVELS = [
   //   "# P               H                  H#",
   //   "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
   // ]},
-  {c: 39, r: 16, rows:
+  {r: 16, rows:
     [
     "#        H                            #",
     "#        H    E                       #",
@@ -285,7 +285,7 @@ var RAW_LEVELS = [
     "# P    H   $              H#####H    $#",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
   ]},
-  {c: 28, r: 16, rows:[
+  {r: 16, rows:[
     "        H          H        ",
     "        H    E     H        ",
     "  $     H   $   ---H   $    ",
@@ -303,7 +303,7 @@ var RAW_LEVELS = [
     " P        $  H              ",
     "@@@@@@@#@#@@@@@@@@@#@#@@@@@@"
   ]},
-  {c: 28, r: 16, rows:[
+  {r: 16, rows:[
     "    H                       ",
     "    H                       ",
     "  $ H     E     ---      $  ",
@@ -321,7 +321,7 @@ var RAW_LEVELS = [
     " P     H            $     $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
   ]},
-  {c: 28, r: 16, rows:[
+  {r: 16, rows:[
     "  H                         ",
     "  H                         ",
     "  H     $        $  E       ",
@@ -339,7 +339,7 @@ var RAW_LEVELS = [
     "  P   $       H   $       $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
   ]},
-  {c: 28, r: 16, rows:[
+  {r: 16, rows:[
     "                H        S  ",
     "                H        S  ",
     "  $      ----   H     E $S  ",
@@ -357,7 +357,7 @@ var RAW_LEVELS = [
     "  $ H         P   H       $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
   ]},
-  {c: 28, r: 16, rows:[
+  {r: 16, rows:[
     "   H                        ",
     "   H                        ",
     "   H  $   H  ---E  ---  $   ",
@@ -375,7 +375,7 @@ var RAW_LEVELS = [
     "  $ P     $ EH  $     H   $ ",
     "@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
   ]},
-  {c: 28, r: 16, rows:[
+  {r: 16, rows:[
     " H                        S ",
     " H                        S ",
     " H ---  $ H   E      $    S ",
@@ -395,9 +395,8 @@ var RAW_LEVELS = [
   ]},
 ];
 
-
-var COLS = RAW_LEVELS[0].c;
 var ROWS = RAW_LEVELS[0].r;
+var COLS = RAW_LEVELS[0].length / ROWS;
 
 // src/lib/game/engine.ts
 var T = 32;
@@ -431,10 +430,15 @@ var cell = (type) => ({
   revealTimer: 0
 });
 
-function recomputeView() {
+function recomputeView(i) {
+  const lvl = RAW_LEVELS[i];
+  ROWS = lvl.r;
+  COLS = lvl.rows[0].length;   // длина первой строки массива rows
+  if(lvl.rows.length % ROWS != 0) console.error("Поверь столбцы в уровнях..."); 
   VIEW_W = COLS * T;
   VIEW_H = ROWS * T + HUD_H;
 }
+recomputeView(0);
 
 function makeActor(x, y) {
   return {
@@ -452,6 +456,7 @@ function makeActor(x, y) {
     decideCd: 0,
     targetX: 0,
     targetY: 0,
+    goldTimer: 0,
     dropRopeRow: -1
   };
 }
@@ -519,9 +524,8 @@ class Game {
 
   loadLevel(index) {
     this.levelIndex = index;
+    recomputeView(index);
     const raw = RAW_LEVELS[index].rows;
-    ROWS = RAW_LEVELS[index].r;
-    COLS = RAW_LEVELS[index].c;
     this.cells = [];
     this.guards = [];
     this.respawns = [];
@@ -577,7 +581,7 @@ class Game {
       this.cells.push(rowCells);
     }
 
-    recomputeView();
+    recomputeView(index);
     if (typeof canvasRef !== "undefined" && canvasRef) {
       canvasRef.width  = VIEW_W;
       canvasRef.height = VIEW_H;
@@ -998,112 +1002,115 @@ class Game {
         return;
       }
       a.y = newY;
-} else if (vy > 0) {
-  const feetRow = this.rowOf(a.y + T - 1);
-  const belowTile = this.tileAt(feetRow + 1, c);
+    } else if (vy > 0) {
+      const feetRow = this.rowOf(a.y + T - 1);
+      const belowTile = this.tileAt(feetRow + 1, c);
 
-  if (belowTile && belowTile.type === "ladder") {
-    // снизу лестница — продолжаем спуск
-    a.y += speed * dt;
-  } else if (belowTile && this.passable(belowTile)) {
-    // снизу пусто/проходимо — съезжаем до пола и падаем
-    const limitY = (feetRow + 1) * T - T;
-    a.y = Math.min(limitY, a.y + speed * dt);
-    if (a.y >= limitY - 0.01) {
-      a.y = limitY;
-      a.state = "fall";
+      if (belowTile && belowTile.type === "ladder") {
+        // снизу лестница — продолжаем спуск
+        a.y += speed * dt;
+      } else if (belowTile && this.passable(belowTile)) {
+        // снизу пусто/проходимо — съезжаем до пола и падаем
+        const limitY = (feetRow + 1) * T - T;
+        a.y = Math.min(limitY, a.y + speed * dt);
+        if (a.y >= limitY - 0.01) {
+          a.y = limitY;
+          a.state = "fall";
+        }
+      } else {
+        // снизу стена — доводим спуск до пола и встаём
+        const limitY = (feetRow + 1) * T - T;
+        a.y = Math.min(limitY, a.y + speed * dt);
+        if (a.y >= limitY - 0.01) {
+          a.y = limitY;
+          a.state = "walk";
+          a.climbBlockCd = 0.3;
+        }
+      }
     }
-  } else {
-    // снизу стена — доводим спуск до пола и встаём
-    const limitY = (feetRow + 1) * T - T;
-    a.y = Math.min(limitY, a.y + speed * dt);
-    if (a.y >= limitY - 0.01) {
-      a.y = limitY;
-      a.state = "walk";
-      a.climbBlockCd = 0.3;
+  }
+
+stepFall(a, dist, isPlayer) {
+  let remaining = dist;
+  while (remaining > 0 && a.state === "fall") {
+    const step = Math.min(8, remaining);
+    remaining -= step;
+    const prevTopRow = this.rowOf(a.y);
+    a.y += step;
+    const c = this.centerCol(a.x);
+    const topRow = this.rowOf(a.y);
+    const feetRow = this.rowOf(a.y + T - 1);
+    if (isPlayer) {
+      this.collectGoldAt(topRow, c);
+      if (feetRow !== topRow)
+        this.collectGoldAt(feetRow, c);
+    } else if (!a.carryingGold) {
+      const t1 = this.tileAt(topRow, c);
+      const t2 = this.tileAt(feetRow, c);
+      if (t1 && t1.type === "gold" || t2 && t2.type === "gold") {
+        if (t1 && t1.type === "gold")
+          t1.type = "empty";
+        if (t2 && t2.type === "gold")
+          t2.type = "empty";
+        this.goldLeft -= 1;
+        a.carryingGold = true;
+        a.goldTimer = 0;
+      }
+    }
+    if (isPlayer) {
+      const curTop = this.tileAt(topRow, c);
+      if (curTop && curTop.type === "rope" && topRow > prevTopRow && topRow !== a.dropRopeRow) {
+        this.snapToRope(a, topRow);
+        return;
+      }
+      if (a.dropRopeRow >= 0 && topRow > a.dropRopeRow)
+        a.dropRopeRow = -1;
+      const below = this.tileAt(topRow + 1, c);
+      if (this.support(below) && a.y + T >= (topRow + 1) * T) {
+        a.y = (topRow + 1) * T - T;
+        a.state = "walk";
+        a.anim = 0;
+        return;
+      }
+      if (this.input.up || this.input.down) {
+        const g1 = this.tileAt(topRow + 1, c);
+        if (g1 && g1.type === "ladder") {
+          a.y = (topRow + 1) * T;
+          a.x = c * T;
+          a.state = "climb";
+          return;
+        }
+        const g2 = this.tileAt(topRow, c);
+        if (g2 && g2.type === "ladder") {
+          a.y = topRow * T;
+          a.x = c * T;
+          a.state = "climb";
+          return;
+        }
+      }
+    } else {
+      const curTop = this.tileAt(topRow, c);
+      if (curTop && curTop.isHole && topRow > prevTopRow) {
+        a.y = topRow * T;
+        a.x = c * T;
+        a.state = "stuck";
+        a.timer = STUCK_MIN + Math.random() * STUCK_RAND;
+        a.anim = 0;
+        this.addScore(TRAP_POINTS);
+        this.sfx.trap();
+        return;
+      }
+      const below = this.tileAt(topRow + 1, c);
+      if (this.support(below) && a.y + T >= (topRow + 1) * T) {
+        a.y = (topRow + 1) * T - T;
+        a.state = "walk";
+        a.anim = 0;
+        return;
+      }
     }
   }
 }
-  }
-  stepFall(a, dist, isPlayer) {
-    let remaining = dist;
-    while (remaining > 0 && a.state === "fall") {
-      const step = Math.min(8, remaining);
-      remaining -= step;
-      const prevTopRow = this.rowOf(a.y);
-      a.y += step;
-      const c = this.centerCol(a.x);
-      const topRow = this.rowOf(a.y);
-      const feetRow = this.rowOf(a.y + T - 1);
-      if (isPlayer) {
-        this.collectGoldAt(topRow, c);
-        if (feetRow !== topRow)
-          this.collectGoldAt(feetRow, c);
-      } else if (!a.carryingGold) {
-        const t1 = this.tileAt(topRow, c);
-        const t2 = this.tileAt(feetRow, c);
-        if (t1 && t1.type === "gold" || t2 && t2.type === "gold") {
-          if (t1 && t1.type === "gold")
-            t1.type = "empty";
-          if (t2 && t2.type === "gold")
-            t2.type = "empty";
-          this.goldLeft -= 1;
-          a.carryingGold = true;
-        }
-      }
-      if (isPlayer) {
-        const curTop = this.tileAt(topRow, c);
-        if (curTop && curTop.type === "rope" && topRow > prevTopRow && topRow !== a.dropRopeRow) {
-          this.snapToRope(a, topRow);
-          return;
-        }
-        if (a.dropRopeRow >= 0 && topRow > a.dropRopeRow)
-          a.dropRopeRow = -1;
-        const below = this.tileAt(topRow + 1, c);
-        if (this.support(below) && a.y + T >= (topRow + 1) * T) {
-          a.y = (topRow + 1) * T - T;
-          a.state = "walk";
-          a.anim = 0;
-          return;
-        }
-        if (this.input.up || this.input.down) {
-          const g1 = this.tileAt(topRow + 1, c);
-          if (g1 && g1.type === "ladder") {
-            a.y = (topRow + 1) * T;
-            a.x = c * T;
-            a.state = "climb";
-            return;
-          }
-          const g2 = this.tileAt(topRow, c);
-          if (g2 && g2.type === "ladder") {
-            a.y = topRow * T;
-            a.x = c * T;
-            a.state = "climb";
-            return;
-          }
-        }
-      } else {
-        const curTop = this.tileAt(topRow, c);
-        if (curTop && curTop.isHole && topRow > prevTopRow) {
-          a.y = topRow * T;
-          a.x = c * T;
-          a.state = "stuck";
-          a.timer = STUCK_MIN + Math.random() * STUCK_RAND;
-          a.anim = 0;
-          this.addScore(TRAP_POINTS);
-          this.sfx.trap();
-          return;
-        }
-        const below = this.tileAt(topRow + 1, c);
-        if (this.support(below) && a.y + T >= (topRow + 1) * T) {
-          a.y = (topRow + 1) * T - T;
-          a.state = "walk";
-          a.anim = 0;
-          return;
-        }
-      }
-    }
-  }
+
   updateRespawns(dt) {
     for (let i = this.respawns.length - 1;i >= 0; i--) {
       this.respawns[i] -= dt;
@@ -1129,30 +1136,44 @@ class Game {
       return;
     }
   }
-  killGuard(g, inHole = false) { /// +
-    const idx = this.guards.indexOf(g);
-    if (idx >= 0)
-      this.guards.splice(idx, 1);
 
-    if (g.carryingGold && !inHole) {  /// +
-      const r = this.rowOf(g.y);
-      const c = this.centerCol(g.x);
-      const spots = [
-        [r - 1, c],
-        [r, c - 1],
-        [r, c + 1]
-      ];
-      for (const [rr, cc] of spots) {
-        const t = this.tileAt(rr, cc);
-        if (t && t.type === "empty" && !t.isHole) {
-          t.type = "gold";
-          this.goldLeft += 1;
-          break;
-        }
+dropGoldNear(g) {
+  const r0 = this.rowOf(g.y);
+  const c0 = this.centerCol(g.x);
+  const candidates = [];
+  candidates.push([r0, c0]);
+  for (let rad = 1; rad <= 3; rad++) {
+    for (let dr = -rad; dr <= rad; dr++) {
+      for (let dc = -rad; dc <= rad; dc++) {
+        if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+        candidates.push([r0 + dr, c0 + dc]);
       }
     }
-    this.respawns.push(RESPAWN_DELAY);
   }
+  for (const [rr, cc] of candidates) {
+    const t = this.tileAt(rr, cc);
+    if (!t) continue;
+    if (t.type === "empty" && !t.isHole) {
+      t.type = "gold";
+      this.goldLeft += 1;
+      return true;
+    }
+  }
+  return false;
+}
+
+killGuard(g, inHole = false) {
+  const idx = this.guards.indexOf(g);
+  if (idx >= 0)
+    this.guards.splice(idx, 1);
+
+  if (g.carryingGold) {
+    g.carryingGold = false;
+    this.dropGoldNear(g);
+  }
+  this.respawns.push(RESPAWN_DELAY);
+}
+  
   guardDecide(g) {
     const r = this.rowOf(g.y);
     const c = this.centerCol(g.x);
@@ -1253,121 +1274,128 @@ class Game {
       g.moveDir = 0;
     }
   }
-  updateGuards(dt) {
-    for (const g of this.guards) {
-      if (g.frozen > 0) {
-        g.frozen -= dt;
-        continue;
+
+updateGuards(dt) {
+  for (const g of this.guards) {
+    if (g.frozen > 0) {
+      g.frozen -= dt;
+      continue;
+    }
+
+    // таймаут ношения золота: если сторож носит его слишком долго — сбрасывает
+    if (g.carryingGold) {
+      g.goldTimer += dt;
+      if (g.goldTimer > 20) {
+        g.carryingGold = false;
+        g.goldTimer = 0;
+        this.dropGoldNear(g);
       }
-      g.decideCd -= dt;
-      const alignedG = this.alignedY(g.y) && (g.x % T < 0.5 || g.x % T > T - 0.5);
-      switch (g.state) {
-        case "stuck": {
-          g.anim += dt;
-          g.timer -= dt;
-          if (g.timer <= 0) {
-            const r = this.rowOf(g.y);
-            const c = this.centerCol(g.x);
-            const pCol = this.centerCol(this.player.x);
-            const prefer = Math.sign(pCol - c) || 1;
-            const sides = prefer >= 0 ? [1, -1] : [-1, 1];
-            let chosen = 0;
-            for (const s of sides) {
-              const t = this.tileAt(r - 1, c + s);
-              if (t && this.passable(t) && t.type !== "rope" && this.support(this.tileAt(r, c + s))) {
-                chosen = s;
-                break;
-              }
-            }
-            if (chosen) {
-              if (g.carryingGold) {
-                const holeCell = this.tileAt(r, c);
-                if (holeCell && holeCell.type === "empty") {
-                  holeCell.type = "gold";
-                  this.goldLeft += 1;
-                  g.carryingGold = false;
-                }
-              }
-              g.state = "climbout";
-              g.targetX = (c + chosen) * T;
-              g.targetY = (r - 1) * T;
-              g.moveDir = chosen;
-            } else {
-              g.timer = 0.8;
-            }
-          }
-          break;
-        }
-        case "climbout": {
-          g.anim += dt;
-          const sp = GUARD_WALK * 1.5 * dt;
-          const spY = GUARD_CLIMB * 1.7 * dt;
-          if (g.x < g.targetX)
-            g.x = Math.min(g.targetX, g.x + sp);
-          else if (g.x > g.targetX)
-            g.x = Math.max(g.targetX, g.x - sp);
-          if (g.y > g.targetY)
-            g.y = Math.max(g.targetY, g.y - spY);
-          if (Math.abs(g.x - g.targetX) < 1 && Math.abs(g.y - g.targetY) < 1) {
-            g.x = g.targetX;
-            g.y = g.targetY;
-            g.state = "walk";
-            g.decideCd = 0;
-          }
-          break;
-        }
-        case "fall": {
-          g.anim += dt;
-          this.stepFall(g, FALL_SPEED * dt, false);
-          break;
-        }
-        case "climb": {
-          g.anim += dt;
-          const before = g.y;
-          this.climbMove(g, g.climbDir * GUARD_CLIMB, dt, GUARD_CLIMB);
-          if (Math.abs(g.y - before) < 0.001) {
-            g.y = Math.round(g.y / T) * T;
-            g.state = "walk";
-            g.decideCd = 0;
-          }
-          break;
-        }
-        case "walk":
-        default: {
-          g.anim += dt;
-          const cc = this.centerCol(g.x);
-          const rr = this.rowOf(g.y);
-          if (!this.support(this.tileAt(rr + 1, cc))) {
-            g.state = "fall";
-            break;
-          }
-          if (alignedG && g.decideCd <= 0) {
-            this.guardDecide(g);
-            g.decideCd = 0.14;
-          }
-          if (g.moveDir !== 0) {
-            const dir = g.moveDir;
-            g.dir = dir;
-            const newX = g.x + dir * GUARD_WALK * dt;
-            const leadCol = dir > 0 ? this.colOf(newX + T - 1) : this.colOf(newX);
-            const wall = this.tileAt(rr, leadCol);
-            if (wall && !this.passable(wall)) {
-              g.x = dir > 0 ? leadCol * T - T : (leadCol + 1) * T;
-              g.moveDir = 0;
-              g.decideCd = 0;
-            } else {
-              g.x = Math.max(0, Math.min(VIEW_W - T, newX));
-            }
-            if (this.centerCol(g.x) !== cc && !this.support(this.tileAt(rr + 1, this.centerCol(g.x)))) {
-              g.state = "fall";
+    } else {
+      g.goldTimer = 0;
+    }
+
+    g.decideCd -= dt;
+    const alignedG = this.alignedY(g.y) && (g.x % T < 0.5 || g.x % T > T - 0.5);
+    switch (g.state) {
+      case "stuck": {
+        g.anim += dt;
+        g.timer -= dt;
+        if (g.timer <= 0) {
+          const r = this.rowOf(g.y);
+          const c = this.centerCol(g.x);
+          const pCol = this.centerCol(this.player.x);
+          const prefer = Math.sign(pCol - c) || 1;
+          const sides = prefer >= 0 ? [1, -1] : [-1, 1];
+          let chosen = 0;
+          for (const s of sides) {
+            const t = this.tileAt(r - 1, c + s);
+            if (t && this.passable(t) && t.type !== "rope" && this.support(this.tileAt(r, c + s))) {
+              chosen = s;
               break;
             }
           }
+          if (chosen) {
+            g.state = "climbout";
+            g.targetX = (c + chosen) * T;
+            g.targetY = (r - 1) * T;
+            g.moveDir = chosen;
+          } else {
+            g.timer = 0.8;
+          }
+        }
+        break;
+      }
+      case "climbout": {
+        g.anim += dt;
+        const sp = GUARD_WALK * 1.5 * dt;
+        const spY = GUARD_CLIMB * 1.7 * dt;
+        if (g.x < g.targetX)
+          g.x = Math.min(g.targetX, g.x + sp);
+        else if (g.x > g.targetX)
+          g.x = Math.max(g.targetX, g.x - sp);
+        if (g.y > g.targetY)
+          g.y = Math.max(g.targetY, g.y - spY);
+        if (Math.abs(g.x - g.targetX) < 1 && Math.abs(g.y - g.targetY) < 1) {
+          g.x = g.targetX;
+          g.y = g.targetY;
+          g.state = "walk";
+          g.decideCd = 0;
+        }
+        break;
+      }
+      case "fall": {
+        g.anim += dt;
+        this.stepFall(g, FALL_SPEED * dt, false);
+        break;
+      }
+      case "climb": {
+        g.anim += dt;
+        const before = g.y;
+        this.climbMove(g, g.climbDir * GUARD_CLIMB, dt, GUARD_CLIMB);
+        if (Math.abs(g.y - before) < 0.001) {
+          g.y = Math.round(g.y / T) * T;
+          g.state = "walk";
+          g.decideCd = 0;
+        }
+        break;
+      }
+      case "walk":
+      default: {
+        g.anim += dt;
+        const cc = this.centerCol(g.x);
+        const rr = this.rowOf(g.y);
+        if (!this.support(this.tileAt(rr + 1, cc))) {
+          g.state = "fall";
           break;
         }
+        if (alignedG && g.decideCd <= 0) {
+          this.guardDecide(g);
+          g.decideCd = 0.14;
+        }
+        if (g.moveDir !== 0) {
+          const dir = g.moveDir;
+          g.dir = dir;
+          const newX = g.x + dir * GUARD_WALK * dt;
+          const leadCol = dir > 0 ? this.colOf(newX + T - 1) : this.colOf(newX);
+          const wall = this.tileAt(rr, leadCol);
+          if (wall && !this.passable(wall)) {
+            g.x = dir > 0 ? leadCol * T - T : (leadCol + 1) * T;
+            g.moveDir = 0;
+            g.decideCd = 0;
+          } else {
+            g.x = Math.max(0, Math.min(VIEW_W - T, newX));
+          }
+          if (this.centerCol(g.x) !== cc && !this.support(this.tileAt(rr + 1, this.centerCol(g.x)))) {
+            g.state = "fall";
+            break;
+          }
+        }
+        break;
       }
     }
   }
+}
+
   checkCollisions() {
     if (this.phase !== "playing")
       return;
