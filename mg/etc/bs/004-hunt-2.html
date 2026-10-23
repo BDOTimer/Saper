@@ -2,12 +2,39 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ОХОТА НА УТОК</title>
 <link rel="stylesheet" href="neon-bs.css" />
 <link rel="icon" type="image/png" href="../../res/favicon-64.png" sizes="64x64">
 <style>
-  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #000; }
-  canvas { display: block; }
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: Arial, sans-serif;
+  position: fixed;        /* фиксируем body, чтобы iOS не «прыгал» */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overscroll-behavior: none;
+  touch-action: none;     /* запрещает скролл/зум жестами на body */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  touch-action: none;
+}
   #score {
     position: fixed; top: 20px; left: 20px; color: #fff;
     font-size: 24px; font-weight: bold;
@@ -133,9 +160,17 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHei
 camera.position.set(0, 1.7, 0);
 scene.add(camera); 
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: "high-performance"
+});
+
+// DPR ограничиваем 2 — иначе на Retina/iPad Pro будет тормозить
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(dpr);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.8;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2337,11 +2372,30 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+function resizeRenderer() {
+  // visualViewport корректно отдаёт размер даже с адресной строкой
+  const w = window.visualViewport
+    ? window.visualViewport.width
+    : window.innerWidth;
+  const h = window.visualViewport
+    ? window.visualViewport.height
+    : window.innerHeight;
+
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
+}
+
+window.addEventListener('resize', resizeRenderer);
+window.addEventListener('orientationchange', () => {
+  // на повороте экрана ждём немного, чтобы браузер обновил размеры
+  setTimeout(resizeRenderer, 100);
 });
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resizeRenderer);
+  window.visualViewport.addEventListener('scroll', resizeRenderer);
+}
 
 animate();
 </script>
