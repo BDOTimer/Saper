@@ -277,7 +277,7 @@ class Terrain {
 
     let reliefMask;
     if (distFromCenter < flatZone) {
-      reliefMask = 0.15;   // лёгкие бугры даже в центре
+      reliefMask = 0.2;   // лёгкие бугры даже в центре
     } else {
       reliefMask = Math.min(1, 0.15 + (distFromCenter - flatZone) / transition);
     }
@@ -360,7 +360,7 @@ class Terrain {
 const terrain = new Terrain(scene, {
   size: 400,
   segments: 200,
-  height: 20,
+  height: 30,
   seed: 12345
 });
 
