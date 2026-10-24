@@ -307,8 +307,8 @@ class Terrain {
 
     // 4) Маска: возле центра — плоская равнина (для удобства), к краям — всё выше
     const distFromCenter = Math.sqrt(x * x + z * z);
-    const flatZone = 18;    // радиус ровной площадки
-    const transition = 70;  // за сколько метров до "полного" рельефа
+    const flatZone   = 30;    // радиус ровной площадки
+    const transition = 100;  // за сколько метров до "полного" рельефа
 
     let reliefMask;
     if (distFromCenter < flatZone) {
@@ -393,7 +393,7 @@ class Terrain {
 }
 
 const terrain = new Terrain(scene, {
-  size: 400,
+  size: 600,
   segments: 200,
   height: 30,
   seed: 12345
@@ -788,11 +788,11 @@ class Nature {
     // --- Деревья: не ближе 1 м от воды и не на крутых склонах ---
     let treeAttempts = 0;
     let treesPlaced = 0;
-    while (treesPlaced < 40 && treeAttempts < 300) {
+    while (treesPlaced < 80 && treeAttempts < 600) {
 
       treeAttempts++;
       const angle = Math.random() * Math.PI * 2;
-      const dist = 25 + Math.random() * 60;
+      const dist = 25 + Math.random() * 110;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist; 
 
@@ -809,10 +809,10 @@ class Nature {
     // --- Кусты: не под водой, но на склонах можно ---
     let bushAttempts = 0;
     let bushesPlaced = 0;
-    while (bushesPlaced < 30 && bushAttempts < 300) {
+    while (bushesPlaced < 60 && bushAttempts < 500) {
       bushAttempts++;
       const angle = Math.random() * Math.PI * 2;
-      const dist = 10 + Math.random() * 40;
+      const dist = 10 + Math.random() * 90;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
 
@@ -825,8 +825,8 @@ class Nature {
 
     // --- Камни: можно и в воде, и на берегу ---
     for (let i = 0; i < 20; i++) {
-      const x = (Math.random()-0.5) * 110;
-      const z = (Math.random()-0.5) * 110;
+      const x = (Math.random()-0.5) * 200;
+      const z = (Math.random()-0.5) * 200;
       if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
       this.scene.add(this.createRock(x, z, 0.5 + Math.random()*1.2));
     }
@@ -839,7 +839,7 @@ class Nature {
     //    находится "у самой воды" (мелководье / берег)
     const reedsCandidates = [];
     const scanStep = 2.0;  // шаг сетки (2 м)
-    const scanRange = 110; // до 110 м от центра
+    const scanRange = 110; // до 180 м от центра
 
     for (let x = -scanRange; x <= scanRange; x += scanStep) {
       for (let z = -scanRange; z <= scanRange; z += scanStep) {
@@ -859,7 +859,7 @@ class Nature {
       [reedsCandidates[i], reedsCandidates[j]] = [reedsCandidates[j], reedsCandidates[i]];
     }
 
-    const REEDS_COUNT = 150; // ← больше зарослей!
+    const REEDS_COUNT = 220; // ← больше зарослей!
     let reedsPlaced = 0;
     
     for (let i = 0; i < reedsCandidates.length && reedsPlaced < REEDS_COUNT; i++) {
@@ -2250,7 +2250,7 @@ function updatePlayer(dt) {
   playerVel.lerp(dir, Math.min(1, dt * 12));
   playerPos.addScaledVector(playerVel, dt);
 
-  const maxR = 80;
+  const maxR = 140;
   if (playerPos.length() > maxR) {
     playerPos.setLength(maxR);
   }
