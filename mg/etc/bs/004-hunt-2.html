@@ -42,7 +42,7 @@ canvas {
     background: rgba(0,0,0,0.4); padding: 10px 20px; border-radius: 8px;
   }
   #crosshair {
-    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    position: fixed; top: 50%; left: calc(50% + 10px); ; transform: translate(-50%, -50%);
     color: #ff2200; font-size: 10px; font-weight: bold; z-index: 10;
     text-shadow: 0 0 1px #000; pointer-events: none; user-select: none;
   }
@@ -1556,7 +1556,7 @@ class Gun {
     const brassMat = new THREE.MeshStandardMaterial({
       color: 0xc9a227, metalness: 1.0, roughness: 0.3
     });
-    const sightRedMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+    const sightRedMat = new THREE.MeshBasicMaterial({ color: 0xafa2a0 });
 
     const barrelLen = 1.55;
     const barrelRadius = 0.032;
@@ -1708,8 +1708,11 @@ class Gun {
     safety.position.set(0.05, 0.03, 0.1);
     this.model.add(safety);
 
+    // ==================================================
+    // ПОЗИЦИЯ В РУКАХ (справа снизу, как в FPS)
+    // ==================================================
     this.model.position.set(0.24, -0.22, -0.30);
-    this.model.rotation.y = -0.06;
+    this.model.rotation.y = 0.0;
     this.model.rotation.z = 0.02;
 
     this.model.traverse(o => { if (o.isMesh) o.castShadow = false; });
