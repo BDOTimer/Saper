@@ -280,6 +280,7 @@ class Breathing {
     this.cameraBobY = 0;
     this.cameraRoll = 0;
     this.cameraYaw = 0;
+    this.cameraPitch = 0;
 
     // Параметры дыхания камеры
     this.camBreathAmp = 0.012;
@@ -388,17 +389,20 @@ class Breathing {
     const camRoll = Math.sin(this.camBreathPhase) * this.camBreathAmp;
     const camBobY = Math.sin(this.camBreathPhase * 0.8) * this.camBreathBobAmp;
     const camYaw = Math.sin(this.camBreathPhase * 0.5) * this.camBreathAmp * 0.6;
+    const camPitch = Math.sin(this.camBreathPhase * 0.7) * this.camBreathAmp * 0.4;
 
-    let walkRoll = 0, walkBobY = 0;
+    let walkRoll = 0, walkBobY = 0, walkPitch = 0;
     if (isMoving) {
       walkRoll = Math.sin(this.walkBob * 1.0) * 0.004;
       walkBobY = Math.abs(Math.sin(this.walkBob)) * 0.008;
+      walkPitch = Math.sin(this.walkBob * 2) * 0.003;  // ← добавить
     }
 
     // Сохраняем для применения в animate()
     this.cameraBobY = camBobY + walkBobY;
     this.cameraRoll = camRoll + walkRoll;
     this.cameraYaw = camYaw;
+     this.cameraPitch = camPitch + walkPitch;
 
     // ==========================================
     // 2. Пар изо рта — раз в N секунд
@@ -2538,9 +2542,11 @@ function animate() {
   updatePlayer(dt);
 
   // В animate() после updatePlayer:
+  // В animate() после updatePlayer:
   cameraPivot.position.y = playerPos.y + breathing.cameraBobY;
-  cameraPivot.rotation.z = breathing.cameraRoll;    // наклон
-  cameraPivot.rotation.y = breathing.cameraYaw * 0.3;
+  cameraPivot.rotation.z = breathing.cameraRoll;
+  cameraPivot.rotation.x = 0;   // сброс — мышь управляет camera.rotation.x
+  cameraPivot.rotation.y = 0;   // сброс — мышь управляет camera.rotation.y
 
   timeSinceSpawn += dt;
   if (timeSinceSpawn > spawnInterval) {
