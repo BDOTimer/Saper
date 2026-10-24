@@ -157,8 +157,10 @@ scene.fog = new THREE.Fog(0xa0c8e8, 20, 120);
 scene.background = new THREE.Color(0x87CEEB);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.05, 500);
-camera.position.set(0, 1.7, 0);
-scene.add(camera); 
+const cameraPivot = new THREE.Group();  // ← контейнер для дыхания
+cameraPivot.position.set(0, 1.7, 0);
+cameraPivot.add(camera);                // камера внутри пивота
+scene.add(cameraPivot);  
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -242,6 +244,196 @@ sunLight.shadow.camera.right = 150;
 sunLight.shadow.camera.top = 150;
 sunLight.shadow.camera.bottom = -150;
 scene.add(sunLight);
+
+// ============================================================
+// CLASS: Дыхание охотника (покачивание + пар изо рта)
+// ============================================================
+class Breathing {
+  constructor(scene, camera, gun) {
+    this.scene = scene;
+    this.camera = camera;
+    this.gun = gun;
+
+    this.time = 0;
+    this.breathPhase = 0;
+
+    // Параметры дыхания
+    this.breathSpeed = 1.4;       // «частота» дыхания (рад/сек)
+    this.breathAmp = 0.015;       // амплитуда покачивания ружья (рад)
+
+    // Параметры пара
+    this.steamInterval = 3.0;     // раз в 3 сек — облачко пара
+    this.steamTimer = 0;
+
+    // Пул частиц пара
+    this.steamPool = [];
+    this.steamActive = false;
+    for (let i = 0; i < 6; i++) {
+      this.steamPool.push(this.createSteamParticle());
+    }
+
+    // Лёгкое покачивание при ходьбе
+    this.walkBob = 0;
+    this.lastPos = new THREE.Vector3().copy(camera.position);
+
+        // Покачивание камеры (для применения в animate)
+    this.cameraBobY = 0;
+    this.cameraRoll = 0;
+    this.cameraYaw = 0;
+
+    // Параметры дыхания камеры
+    this.camBreathAmp = 0.012;
+    this.camBreathBobAmp = 0.015;
+    this.camBreathPhase = Math.PI / 2;
+  }
+
+  createSteamParticle() {
+    const geo = new THREE.SphereGeometry(0.04, 6, 6);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.visible = false;
+    mesh.renderOrder = 100;
+    // Крепим к камере, чтобы пар всегда был перед лицом
+    this.camera.add(mesh);
+    return {
+      mesh: mesh,
+      life: 0,
+      maxLife: 1.2,
+      velocity: new THREE.Vector3(),
+      active: false
+    };
+  }
+
+  // Выпустить пар изо рта (один выдох)
+  emitSteam() {
+    // Найти свободную частицу
+    let free = null;
+    for (let i = 0; i < this.steamPool.length; i++) {
+      if (!this.steamPool[i].active) {
+        free = this.steamPool[i];
+        break;
+      }
+    }
+    if (!free) return;
+
+    free.active = true;
+    free.life = 0;
+    // Позиция перед камерой (немного вниз и вперёд — как изо рта)
+    free.mesh.position.set(
+      (Math.random() - 0.5) * 0.05,
+      -0.12 + Math.random() * 0.03,
+      -0.35
+    );
+    free.mesh.scale.setScalar(1);
+    free.mesh.visible = true;
+    free.mesh.material.opacity = 0;
+    // Скорость: медленно вперёд и вниз
+    free.velocity.set(
+      (Math.random() - 0.5) * 0.1,
+      -0.05 - Math.random() * 0.05,
+      -0.15 - Math.random() * 0.1
+    );
+  }
+
+  update(dt, isMoving) {
+    this.time += dt;
+
+    // ==========================================
+    // 1. Покачивание ружья (дыхание + ходьба)
+    // ==========================================
+    this.breathPhase += dt * this.breathSpeed;
+
+    // Базовое покачивание от дыхания
+    let breathY = Math.sin(this.breathPhase) * this.breathAmp;
+    let breathX = Math.sin(this.breathPhase * 0.5) * this.breathAmp * 0.4;
+
+    // Дополнительное покачивание при ходьбе
+    if (isMoving) {
+      this.walkBob += dt * 10;
+      breathY += Math.sin(this.walkBob) * 0.01;
+      breathX += Math.cos(this.walkBob * 0.5) * 0.015;
+    } else {
+      // Плавно затухает
+      this.walkBob *= 0.95;
+    }
+
+    // Применяем только к модели ружья (не к камере, чтобы прицел не дёргался)
+    if (this.gun && this.gun.model) {
+      // Сохраняем базовую позицию ружья (из buildModel)
+      const baseY = -0.28;
+      const baseX = 0.20;
+
+      const recoilY = this.gun.recoil * 0.05;  // ← отдача тоже добавляет вверх
+      const recoilX = 0;
+      
+      // Небольшое смещение от дыхания
+      this.gun.model.position.y = baseY + breathY;
+      this.gun.model.position.x = baseX + breathX;
+      
+      // Лёгкий наклон от дыхания
+      this.gun.model.rotation.z = 0.02 + breathX * 2;
+    }
+
+    // ==========================================
+    // 1b. Покачивание КАМЕРЫ от дыхания
+    // ==========================================
+    this.camBreathPhase += dt * this.breathSpeed;
+
+    const camRoll = Math.sin(this.camBreathPhase) * this.camBreathAmp;
+    const camBobY = Math.sin(this.camBreathPhase * 0.8) * this.camBreathBobAmp;
+    const camYaw = Math.sin(this.camBreathPhase * 0.5) * this.camBreathAmp * 0.6;
+
+    let walkRoll = 0, walkBobY = 0;
+    if (isMoving) {
+      walkRoll = Math.sin(this.walkBob * 1.0) * 0.004;
+      walkBobY = Math.abs(Math.sin(this.walkBob)) * 0.008;
+    }
+
+    // Сохраняем для применения в animate()
+    this.cameraBobY = camBobY + walkBobY;
+    this.cameraRoll = camRoll + walkRoll;
+    this.cameraYaw = camYaw;
+
+    // ==========================================
+    // 2. Пар изо рта — раз в N секунд
+    // ==========================================
+    this.steamTimer += dt;
+    if (this.steamTimer > this.steamInterval) {
+      this.steamTimer = 0;
+      //this.emitSteam();
+    }
+
+    // Обновляем частицы пара
+    for (let i = 0; i < this.steamPool.length; i++) {
+      const p = this.steamPool[i];
+      if (!p.active) continue;
+
+      p.life += dt;
+      
+      // Движение
+      p.mesh.position.addScaledVector(p.velocity, dt);
+      
+      // Затухание и рост
+      const t = p.life / p.maxLife;
+      p.mesh.material.opacity = Math.sin(t * Math.PI) * 0.5; // плавное появление/исчезновение
+      p.mesh.scale.setScalar(1 + t * 3);
+      
+      // Немного «колыхания»
+      p.mesh.position.x += Math.sin(p.life * 4) * dt * 0.05;
+      
+      if (p.life >= p.maxLife) {
+        p.active = false;
+        p.mesh.visible = false;
+      }
+    }
+  }
+}
 
 // ============================================================
 // ЛАНДШАФТ — процедурный (более холмистый)
@@ -1635,21 +1827,21 @@ class Gun {
       this.model.add(line);
     }
 
-    const stockMain = new THREE.Mesh(
-      new THREE.BoxGeometry(0.09, 0.11, 0.45),
-      woodMat
-    );
-    stockMain.position.set(0, -0.03, 0.30);
-    stockMain.rotation.x = 0.08;
-    this.model.add(stockMain);
+    // const stockMain = new THREE.Mesh(
+    //   new THREE.BoxGeometry(0.09, 0.11, 0.45),
+    //   woodMat
+    // );
+    // stockMain.position.set(0, -0.03, 0.30);
+    // stockMain.rotation.x = 0.08;
+    // this.model.add(stockMain);
 
-    const buttpad = new THREE.Mesh(
-      new THREE.BoxGeometry(0.095, 0.12, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
-    );
-    buttpad.position.set(0, -0.06, 0.52);
-    buttpad.rotation.x = 0.08;
-    this.model.add(buttpad);
+    // const buttpad = new THREE.Mesh(
+    //   new THREE.BoxGeometry(0.095, 0.12, 0.04),
+    //   new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
+    // );
+    // buttpad.position.set(0, -0.06, 0.52);
+    // buttpad.rotation.x = 0.08;
+    // this.model.add(buttpad);
 
     const stockNeck = new THREE.Mesh(
       new THREE.BoxGeometry(0.075, 0.075, 0.18),
@@ -1659,7 +1851,7 @@ class Gun {
     this.model.add(stockNeck);
 
     const forend = new THREE.Mesh(
-      new THREE.BoxGeometry(0.13, 0.07, 0.35),
+      new THREE.BoxGeometry(0.128, 0.07, 0.35),
       woodLightMat
     );
     forend.position.set(0, -0.055, -0.25);
@@ -1732,9 +1924,13 @@ class Gun {
       if (this.recoil < 0) this.recoil = 0;
     }
     const r = this.recoil;
+    
+    // Z и rotation.x — только от отдачи (дыхание их не трогает)
     this.model.position.z = -0.30 + r * 0.14;
-    this.model.position.y = -0.22 + r * 0.05;
     this.model.rotation.x = r * 0.22;
+    
+    // Y и X — обновляются в Breathing (не трогаем)
+    // this.model.position.y = -0.28 + r * 0.05;  // ← ЗАКОММЕНТИРОВАТЬ
   }
 }
 
@@ -2011,6 +2207,7 @@ function getShell() {
 const sky = new Sky(scene);
 const nature = new Nature(scene);
 const gun = new Gun(camera);
+const breathing = new Breathing(scene, camera, gun);
 const lodge = new Lodge(scene, 0, -12);  // ← координаты можно менять
 
 const ducks = [];
@@ -2258,7 +2455,7 @@ function updatePlayer(dt) {
   const groundY = terrain.getHeightAt(playerPos.x, playerPos.z);
   playerPos.y = groundY + 1.7;
 
-  camera.position.copy(playerPos);
+  cameraPivot.position.copy(playerPos);
 }
 
 const joyZone = document.getElementById('joystick-zone');
@@ -2334,9 +2531,16 @@ function animate() {
   if (dt > 0.1) dt = 0.1;
 
   sky.update(dt);
+  const isMoving = playerVel.lengthSq() > 0.5;
+  breathing.update(dt, isMoving);
   gun.update(dt);
   lodge.update(dt);
   updatePlayer(dt);
+
+  // В animate() после updatePlayer:
+  cameraPivot.position.y = playerPos.y + breathing.cameraBobY;
+  cameraPivot.rotation.z = breathing.cameraRoll;    // наклон
+  cameraPivot.rotation.y = breathing.cameraYaw * 0.3;
 
   timeSinceSpawn += dt;
   if (timeSinceSpawn > spawnInterval) {
