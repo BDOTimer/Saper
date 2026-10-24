@@ -24,6 +24,9 @@ export class Gun {
       forendL:      { value: 0.35,  min: 0.10, max: 0.70, step: 0.005,label: "Длина цевья" },
       sightSize:    { value: 0.012, min: 0.004,max: 0.03, step: 0.001,label: "Размер мушки" },
     };
+    
+    /** @type {Map<string, {p:THREE.Vector3, r:THREE.Euler, s:THREE.Vector3}>} */
+    this._transformOverrides = new Map();
 
     this.buildModel();
     camera.add(this.model);
@@ -237,6 +240,7 @@ export class Gun {
 
     this.model.add(triggerGroup);
 
+    this.model.traverse(o => this._applyOverride(o));
     this.model.traverse(o => { if (o.isMesh) o.castShadow = false; });
   }
 
@@ -258,5 +262,28 @@ export class Gun {
     const r = this.recoil;
     this.model.position.z = -0.30 + r * 0.14;
     this.model.rotation.x = r * 0.22;
+  }
+
+  /*
+   * Вызывается из редактора при изменении трансформаций ноды.
+   * Запоминает override по имени группы/меша — чтобы applyParams()
+   * не сбрасывал пользовательские правки.
+   */
+  setOverride(name, transform) {
+    if (!name) return;
+    this._transformOverrides.set(name, transform);
+  }
+
+  getOverride(name) {
+    return this._transformOverrides.get(name);
+  }
+
+  _applyOverride(obj) {
+    if (!obj.name) return;
+    const t = this._transformOverrides.get(obj.name);
+    if (!t) return;
+    if (t.p) obj.position.copy(t.p);
+    if (t.r) obj.rotation.copy(t.r);
+    if (t.s) obj.scale.copy(t.s);
   }
 }

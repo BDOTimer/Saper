@@ -86,15 +86,22 @@ export class SelectionOutline {
    * Передайте null/undefined, чтобы просто снять предыдущую подсветку.
    */
   select(object3D) {
-    this.clear();
-    if (!object3D) return;
+    if (!object3D) {
+      this.clear();
+      return;
+    }
 
     const meshes = [];
     object3D.traverse?.(o => {
-      if (o.isMesh && o.visible) meshes.push(o);
+      if (!o.isMesh || !o.visible) return;
+      if (this._isHelper(o)) return;
+      meshes.push(o);
     });
 
-    if (meshes.length === 0) return;
+    if (meshes.length === 0) {
+      this.clear();
+      return;
+    }
 
     this._current = object3D;
     this._meshes = meshes;
@@ -151,5 +158,19 @@ export class SelectionOutline {
 
     // обновляем и MSAA render target, если он хранится у нас
     if (this._msaaTarget) this._msaaTarget.setSize(w, h);
+  }
+
+    /**
+   * Проверяет, помечен ли объект (или любой его предок) как helper.
+   * Гизмо, оси, сетка — все помечаются userData.isHelper = true
+   * и исключаются из обводки.
+   */
+  _isHelper(obj) {
+    let cur = obj;
+    while (cur) {
+      if (cur.userData && cur.userData.isHelper) return true;
+      cur = cur.parent;
+    }
+    return false;
   }
 }
