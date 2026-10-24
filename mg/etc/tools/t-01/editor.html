@@ -1,0 +1,694 @@
+<!-- editor.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>РЕДАКТОР</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; font-family: system-ui, sans-serif; color: #ddd; }
+  #app { position: fixed; inset: 0; display: flex; }
+  #viewport { flex: 1; position: relative; }
+  #viewport canvas { display: block; }
+
+  /* ---------- Сайдбар ---------- */
+  #sidebar {
+    width: 340px; min-width: 260px; max-width: 60vw;
+    background: #181a1f; border-left: 1px solid #2a2d34;
+    display: flex; flex-direction: column;
+    resize: horizontal; overflow: hidden;
+    /* ui-scale влияет ТОЛЬКО на дерево (см. #tree) */
+    --tree-scale: 1;
+  }
+
+  /* Общий стиль заголовков секций */
+  .section-head {
+    margin: 0; padding: 8px 12px; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; color: #8fa8c8;
+    border-bottom: 1px solid #2a2d34; background: #1d2027;
+    display: flex; justify-content: space-between; align-items: center;
+    user-select: none;
+  }
+  .section-head .hint { font-size: 10px; color: #556; text-transform: none; letter-spacing: 0; }
+
+  /* ---------- Дерево: 70% ---------- */
+  #tree-wrap {
+    flex: 7 1 0;          /* 70% */
+    min-height: 80px;
+    display: flex; flex-direction: column;
+    border-bottom: 1px solid #2a2d34;
+    overflow: hidden;
+  }
+  #tree {
+    flex: 1 1 auto; overflow: auto;
+    padding: 6px 0;
+    font-size: calc(13px * var(--tree-scale));
+    line-height: calc(1.5 * var(--tree-scale));
+  }
+
+  /* ---------- Свойства: 30% ---------- */
+  #params-wrap {
+    flex: 3 1 0;          /* 30% */
+    min-height: 80px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #params { flex: 1 1 auto; overflow: auto; padding: 10px 12px; }
+
+  /* ---------- Ноды дерева ---------- */
+  .node { padding: 2px 12px; cursor: pointer; white-space: nowrap; border-left: 3px solid transparent; }
+  .node:hover { background: #22262e; }
+  .node.selected { background: #1f3a52; border-left-color: #5aa0e0; color: #fff; }
+  .node .depth { color: #556; margin-right: 4px; }
+  .node .type { color: #6a8; font-size: 0.85em; margin-left: 6px; }
+
+  /* ---------- Параметры ---------- */
+  .param-row { margin-bottom: 10px; }
+  .param-row label { display: flex; justify-content: space-between; font-size: 12px; color: #aab; margin-bottom: 3px; }
+  .param-row .val { color: #e8a55a; font-variant-numeric: tabular-nums; }
+  .param-row input[type=range] { width: 100%; accent-color: #5aa0e0; }
+
+  /* ---------- Кнопки внизу ---------- */
+  #buttons {
+    padding: 10px 12px; border-top: 1px solid #2a2d34;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    background: #16181d;
+  }
+  #buttons .full { grid-column: 1 / -1; }
+  button {
+    padding: 8px 10px; background: #2a3a52; color: #dde;
+    border: 1px solid #3a4d6a; border-radius: 4px; cursor: pointer; font-size: 13px;
+    font-family: inherit;
+  }
+  button:hover { background: #35496a; }
+  button.primary { background: #2e6a3e; border-color: #3f8a52; color: #eaffea; }
+  button.primary:hover { background: #3a8050; }
+
+  /* ---------- Вьюер ---------- */
+  #viewer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  #viewer-overlay.open { display: flex; }
+  #viewer-box {
+    width: 80vw; max-width: 1000px; height: 75vh;
+    background: #0d0f12; border: 1px solid #2a2d34; border-radius: 6px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #viewer-head { padding: 8px 12px; background: #1d2027; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+  #viewer-head button { flex: none; padding: 4px 12px; }
+  #viewer-content {
+    flex: 1; margin: 0; padding: 12px; overflow: auto;
+    font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; line-height: 1.5;
+    color: #c8e0c8; white-space: pre; background: #0a0c0e;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="viewport"></div>
+
+  <div id="sidebar">
+    <!-- ДЕРЕВО (70%) -->
+    <div id="tree-wrap">
+      <h3 class="section-head">Дерево нодов <span class="hint">Ctrl+колесо</span></h3>
+      <div id="tree"></div>
+    </div>
+
+    <!-- СВОЙСТВА (30%) -->
+    <div id="params-wrap">
+      <h3 class="section-head">Параметры детали</h3>
+      <div id="params"><div style="color:#667;">Выберите деталь в дереве…</div></div>
+    </div>
+
+    <!-- КНОПКИ -->
+    <div id="buttons">
+      <button id="btn-rotate-y">Поворот Y</button>
+      <button id="btn-rotate-z">Поворот Z</button>
+      <button id="btn-scale-minus">Масштаб −</button>
+      <button id="btn-scale-plus">Масштаб +</button>
+      <button id="btn-compile" class="primary full">Компилировать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Вьюер -->
+<div id="viewer-overlay">
+  <div id="viewer-box">
+    <div id="viewer-head">
+      <span>virtual://gun.compile.js</span>
+      <button id="viewer-close">Закрыть</button>
+    </div>
+    <pre id="viewer-content"></pre>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "app/": "./?v=0.4.7.2/"
+  }
+}
+</script>
+
+<script type="module">
+  import * as THREE from "three";
+  window.THREE = THREE;
+  window.dispatchEvent(new Event("three-ready"));
+</script>
+<!--
+<script src="../snd/etc-sound-lib.js"></script>
+-->
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { SelectionOutline } from "./app/selection-outline.js";
+import { SelectionSync } from "./app/selection-sync.js";
+import { Gun } from "./app/gun.js";
+
+// ============================================================
+// Сцена
+// ============================================================
+const viewport = document.getElementById('viewport');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x10131a);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+const envMap = envRT.texture;
+scene.environment = envMap;
+
+const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 0.01, 100);
+camera.position.set(1.4, 0.9, 1.6);
+
+const outline = new SelectionOutline(renderer, scene, camera, viewport, {
+  color: 0xff2a2a,
+  edgeStrength: 6,
+  edgeThickness: 1.5,
+});
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enablePan = false;
+controls.minDistance = 0.5;
+controls.maxDistance = 8;
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x302520, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(3, 5, 4);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xffd9b0, 1.0);
+fill.position.set(-4, 2, -3);
+scene.add(fill);
+
+// ============================================================
+// Сетка + цветные оси XYZ (тонкие — из цилиндров, не из линий)
+// Оси приподняты над плоскостью сетки против z-fighting.
+// ============================================================
+const GRID_Y = -0.5;
+const AXES_Y_LIFT = 0.004;
+const AXIS_LEN = 1.0;
+const AXIS_RADIUS = 0.0017;    // ≈ 1px-эквивалент при дефолтном зуме; в 4 раза тоньше прежних толстых
+
+const grid = new THREE.GridHelper(6, 24, 0x2a3a4a, 0x1a2530);
+grid.position.y = GRID_Y;
+scene.add(grid);
+
+// --- Цветные оси XYZ из тонких цилиндров ---
+// Красная — X, Зелёная — Y, Синяя — Z
+function makeAxis(color, dir, length = AXIS_LEN, radius = AXIS_RADIUS) {
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    depthWrite: false,
+    depthTest:  false,
+    transparent: true,
+    opacity: 1.0,
+  });
+  const geo = new THREE.CylinderGeometry(radius, radius, length, 6, 1);
+  const mesh = new THREE.Mesh(geo, mat);
+
+  // Базовая ориентация цилиндра — вдоль +Y.
+  // Для X поворачиваем на -90° по Z, для Z — на +90° по X.
+  if (dir.x !== 0) { mesh.rotation.z = -Math.PI / 2 * Math.sign(dir.x); }
+  else if (dir.z !== 0) { mesh.rotation.x =  Math.PI / 2 * Math.sign(dir.z); }
+  // Y по умолчанию и так смотрит вверх
+
+  // Цилиндр растёт из центра, поэтому сдвигаем к «половине» оси
+  const half = dir.clone().multiplyScalar(length / 2);
+  mesh.position.copy(half);
+
+  // Общий подъём над сеткой
+  mesh.position.y += GRID_Y + AXES_Y_LIFT;
+  mesh.renderOrder = 1;
+  return mesh;
+}
+
+scene.add(makeAxis(0xff3030, new THREE.Vector3( 1, 0, 0))); // X
+scene.add(makeAxis(0x30ff30, new THREE.Vector3( 0, 1, 0))); // Y
+scene.add(makeAxis(0x3080ff, new THREE.Vector3( 0, 0, 1))); // Z
+
+// --- Конусы-стрелки на концах (тоже тонкие) ---
+function makeAxisArrow(color, dir, length = AXIS_LEN) {
+  const r = 0.008;                  // радиус основания конуса (×~5 тоньше прежних 0.03)
+  const h = 0.06;                   // высота
+  const g = new THREE.ConeGeometry(r, h, 4);
+  const m = new THREE.MeshBasicMaterial({ color, depthWrite: false });
+  const cone = new THREE.Mesh(g, m);
+
+  if (dir.x !== 0) cone.rotation.z = -Math.PI / 2 * Math.sign(dir.x);
+  else if (dir.z !== 0) cone.rotation.x =  Math.PI / 2 * Math.sign(dir.z);
+
+  cone.position.copy(dir).multiplyScalar(length);
+  cone.position.y += GRID_Y + AXES_Y_LIFT;
+  cone.renderOrder = 1;
+  return cone;
+}
+scene.add(makeAxisArrow(0xff3030, new THREE.Vector3( 1, 0, 0)));
+scene.add(makeAxisArrow(0x30ff30, new THREE.Vector3( 0, 1, 0)));
+scene.add(makeAxisArrow(0x3080ff, new THREE.Vector3( 0, 0, 1)));
+
+// ============================================================
+// Ружьё
+// ============================================================
+const gunRoot = new THREE.Group();
+scene.add(gunRoot);
+
+const gun = new Gun(gunRoot, envMap);
+gun.model.position.set(0, 0, 0);
+gun.model.rotation.set(0, 0, 0);
+
+// --- Синхронизация выбора между деревом нодов, вьюпортом и пересборкой модели ---
+const sync = new SelectionSync(gun.model, {
+  // кликнули ноду или восстановили выбор — подсветить во вьюпорте + строку в дереве
+  onSelect: (obj) => {
+    outline.select(obj);
+    highlightTreeRow(obj);
+  },
+  onClear: () => {
+    outline.clear();
+    unhighlightTreeRow();
+  },
+  onResync: (fresh) => {
+    outline.select(fresh);
+    highlightTreeRow(fresh);
+  },
+  onResyncFailed: () => {
+    outline.clear();
+    unhighlightTreeRow();
+  },
+});
+
+function highlightTreeRow(obj) {
+  document.querySelectorAll('.node.selected').forEach(n => n.classList.remove('selected'));
+  const row = [...treeEl.querySelectorAll('.node')].find(n => n.dataset.uuid === obj.uuid);
+  if (row) row.classList.add('selected');
+}
+
+function unhighlightTreeRow() {
+  document.querySelectorAll('.node.selected').forEach(n => n.classList.remove('selected'));
+}
+
+// Для отладки в консоле:
+window.outline = outline;
+window.sync    = sync;
+window.gun     = gun;
+window.THREE   = THREE;
+
+// ============================================================
+// ПЛАВНЫЙ ЗУМ ВЬЮПОРТА (колесо над вьюпортом)
+// Меняет camera.zoom → модель, сетка и оси масштабируются вместе.
+// ============================================================
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 6.0;
+const ZOOM_STEP = 1.25;            // шаг для кнопок
+const WHEEL_SENSITIVITY = 0.0025;  // чувствительность колеса
+
+const zoomState = {
+  current: 1.0,
+  target: 1.0,
+  speed: 10.0,
+};
+
+function setTargetZoom(v) {
+  zoomState.target = THREE.MathUtils.clamp(v, ZOOM_MIN, ZOOM_MAX);
+}
+function addTargetZoom(factor) {
+  setTargetZoom(zoomState.target * factor);   // мультипликативно — равномерно на всём диапазоне
+}
+
+document.getElementById('btn-scale-plus').addEventListener('click', () => addTargetZoom(ZOOM_STEP));
+document.getElementById('btn-scale-minus').addEventListener('click', () => addTargetZoom(1 / ZOOM_STEP));
+
+viewport.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  let dy = e.deltaY;
+  if (e.deltaMode === 1) dy *= 16;
+  else if (e.deltaMode === 2) dy *= 100;
+  dy = THREE.MathUtils.clamp(dy, -100, 100);
+
+  // экспоненциальный множитель — плавно на любом масштабе
+  const factor = Math.exp(-dy * WHEEL_SENSITIVITY);
+  addTargetZoom(factor);
+}, { passive: false });
+
+controls.enableZoom = false;
+
+// ============================================================
+// Дерево нодов + параметры
+// ============================================================
+const treeEl = document.getElementById('tree');
+const paramsEl = document.getElementById('params');
+
+let selectedNode = null;
+
+function buildTree() {
+  treeEl.innerHTML = '';
+  treeEl.appendChild(makeNodeRow('Ружьё', gun.model, 0, 'group', true));
+
+  gun.model.children.forEach(child => {
+    if (child.isGroup) {
+      treeEl.appendChild(makeNodeRow(child.name || child.type, child, 1, 'group'));
+      child.children.forEach(gc => {
+        treeEl.appendChild(makeNodeRow(gc.name || gc.type, gc, 2, gc.type));
+      });
+    } else {
+      treeEl.appendChild(makeNodeRow(child.name || child.type, child, 1, child.type));
+    }
+  });
+}
+
+function makeNodeRow(name, obj, depth, type, root = false) {
+  const row = document.createElement('div');
+  row.className = 'node';
+  row.dataset.uuid = obj.uuid;
+  row.innerHTML = `<span class="depth">${'│ '.repeat(depth)}${root ? '◉' : '•'}</span>${name}<span class="type">${type}</span>`;
+  row.addEventListener('click', () => selectNode(obj, row));
+  return row;
+}
+
+function selectNode(obj, row) {
+  // 1) визуальная подсветка строки
+  document.querySelectorAll('.node.selected').forEach(n => n.classList.remove('selected'));
+  if (row) row.classList.add('selected');
+
+  // 2) выбор в sync — запоминает путь и выставляет outline через onSelect
+  sync.select(obj);
+
+  // 3) параметры
+  renderParamsFor(obj);
+}
+
+function renderParamsFor(obj) {
+  paramsEl.innerHTML = '';
+  const name = obj.name || obj.type;
+
+  const map = {
+    barrels:  ['barrelLen', 'barrelRadius', 'barrelSpread', 'ribThick'],
+    receiver: ['receiverW', 'receiverH', 'receiverL'],
+    stock:    ['stockNeckW', 'stockNeckL'],
+    forend:   ['forendW', 'forendH', 'forendL'],
+    sights:   ['sightSize', 'barrelRadius'],
+    trigger:  [],
+  };
+  const keys = map[name] || Object.keys(gun.params);
+
+  if (!keys.length) {
+    paramsEl.innerHTML = `<div style="color:#667;">У детали «${name}» нет редактируемых параметров.</div>`;
+    return;
+  }
+
+  keys.forEach(key => {
+    const p = gun.params[key];
+    if (!p) return;
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    row.innerHTML = `
+      <label>${p.label}<span class="val">${p.value.toFixed(3)}</span></label>
+      <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.value}" />
+    `;
+    const input = row.querySelector('input');
+    const valEl = row.querySelector('.val');
+
+    // ВАЖНО: не пересоздаём панель. Обновляем только 3D-модель
+    // и синхронизируем все СЛАЙДЕРЫ (того же ключа) по значению.
+    input.addEventListener('input', () => {
+        const v = parseFloat(input.value);
+        p.value = v;
+        valEl.textContent = v.toFixed(3);
+
+        gun.applyParams();        // 1) новая модель, новые uuid
+
+        buildTree();              // 2) ПЕРЕстроить дерево с новыми uuid
+                                    //    (иначе dataset.uuid в DOM устарел)
+
+        sync.resync();            // 3) восстановить выбор по пути,
+                                    //    onResync обновит outline и подсветит строку
+
+        syncSlidersForKey(key);
+    });
+
+    input.addEventListener('change', () => {
+    // resync уже произошёл на input; change можно использовать
+    // для лёгкой «доводки» дерева, если нужно
+    sync.resync();
+    });
+
+    paramsEl.appendChild(row);
+  });
+}
+
+// Обновляет DOM-слайдеры (если параметр присутствует в панели более одного раза,
+// например barrelRadius и в barrels, и в sights)
+function syncSlidersForKey(key) {
+  const p = gun.params[key];
+  if (!p) return;
+  paramsEl.querySelectorAll('.param-row').forEach(row => {
+    const labelEl = row.querySelector('label');
+    const input = row.querySelector('input');
+    const valEl = row.querySelector('.val');
+    if (!input || !labelEl) return;
+    // сопоставляем строку по label — можно пометить data-key, но и так сойдёт:
+    // сверяем по тексту label (p.label уникален)
+    if (labelEl.firstChild && labelEl.firstChild.textContent === p.label) {
+      if (document.activeElement !== input) {
+        input.value = p.value;
+      }
+      if (valEl) valEl.textContent = p.value.toFixed(3);
+    }
+  });
+}
+
+// ============================================================
+// Вращение (Y/Z) — по кнопкам (доп. к OrbitControls)
+// ============================================================
+let rotY = 0, rotZ = 0;
+document.getElementById('btn-rotate-y').addEventListener('click', () => {
+  rotY += Math.PI / 8;
+  gunRoot.rotation.y = rotY;
+});
+document.getElementById('btn-rotate-z').addEventListener('click', () => {
+  rotZ += Math.PI / 8;
+  gunRoot.rotation.z = rotZ;
+});
+
+// ============================================================
+// МАСШТАБ UI-ДЕРЕВА (Ctrl+колесо над сайдбаром, диапазон 0.7..1.4)
+// ============================================================
+const sidebar = document.getElementById('sidebar');
+const treeWrap = document.getElementById('tree-wrap');
+const TREE_SCALE_MIN = 0.7;
+const TREE_SCALE_MAX = 1.4;
+let treeScale = 1.0;
+
+function applyTreeScale() {
+  sidebar.style.setProperty('--tree-scale', treeScale.toFixed(3));
+}
+
+treeWrap.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  const dir = Math.sign(e.deltaY);
+  treeScale = THREE.MathUtils.clamp(
+    treeScale - dir * 0.05,
+    TREE_SCALE_MIN,
+    TREE_SCALE_MAX
+  );
+  applyTreeScale();
+}, { passive: false });
+
+// ============================================================
+// Компиляция
+// ============================================================
+function compileGunSource() {
+  const p = gun.params;
+  const lines = [];
+  lines.push('// ============================================================');
+  lines.push('// VIRTUAL COMPILE OUTPUT — процедурное ружьё');
+  lines.push('// Сгенерировано редактором: ' + new Date().toISOString());
+  lines.push('// ============================================================');
+  lines.push('');
+  lines.push('export const GUN_PARAMS = {');
+  Object.entries(p).forEach(([k, v]) => {
+    lines.push(`  ${k}: ${v.value}, // ${v.label} [${v.min} .. ${v.max}]`);
+  });
+  lines.push('};');
+  lines.push('');
+  lines.push('// --- Процедурная сборка ---');
+  lines.push('export function buildGun(THREE, materials) {');
+  lines.push('  const root = new THREE.Group();');
+  lines.push('  const P = GUN_PARAMS;');
+  lines.push('');
+  lines.push('  // === Стволы ===');
+  lines.push('  const barrelGroup = new THREE.Group();');
+  lines.push('  barrelGroup.name = "barrels";');
+  lines.push('  for (const sx of [-P.barrelSpread, P.barrelSpread]) {');
+  lines.push('    const b = new THREE.Mesh(');
+  lines.push('      new THREE.CylinderGeometry(P.barrelRadius, P.barrelRadius * 1.05, P.barrelLen, 16),');
+  lines.push('      materials.bluedSteel');
+  lines.push('    );');
+  lines.push('    b.rotation.x = Math.PI / 2;');
+  lines.push('    b.position.set(sx, 0, -0.95);');
+  lines.push('    barrelGroup.add(b);');
+  lines.push('  }');
+  lines.push('  root.add(barrelGroup);');
+  lines.push('');
+  lines.push('  // === Ствольная коробка ===');
+  lines.push('  const receiver = new THREE.Mesh(');
+  lines.push('    new THREE.BoxGeometry(P.receiverW, P.receiverH, P.receiverL),');
+  lines.push('    materials.metal');
+  lines.push('  );');
+  lines.push('  receiver.name = "receiver";');
+  lines.push('  receiver.position.set(0, -0.01, -0.02);');
+  lines.push('  root.add(receiver);');
+  lines.push('');
+  lines.push('  // === Цевьё ===');
+  lines.push('  const forend = new THREE.Mesh(');
+  lines.push('    new THREE.BoxGeometry(P.forendW, P.forendH, P.forendL),');
+  lines.push('    materials.woodLight');
+  lines.push('  );');
+  lines.push('  forend.name = "forend";');
+  lines.push('  forend.position.set(0, -0.055, -0.25);');
+  lines.push('  root.add(forend);');
+  lines.push('');
+  lines.push('  // === Приклад ===');
+  lines.push('  const stock = new THREE.Mesh(');
+  lines.push('    new THREE.BoxGeometry(P.stockNeckW, P.stockNeckW, P.stockNeckL),');
+  lines.push('    materials.wood');
+  lines.push('  );');
+  lines.push('  stock.name = "stockNeck";');
+  lines.push('  stock.position.set(0, -0.05, 0.12);');
+  lines.push('  root.add(stock);');
+  lines.push('');
+  lines.push('  // === Мушка ===');
+  lines.push('  const sight = new THREE.Mesh(');
+  lines.push('    new THREE.SphereGeometry(P.sightSize, 10, 10),');
+  lines.push('    materials.sightRed');
+  lines.push('  );');
+  lines.push('  sight.name = "frontSightDot";');
+  lines.push('  sight.position.set(0, P.barrelRadius + P.sightSize * 3, -0.95 - P.barrelLen / 2 + 0.04);');
+  lines.push('  root.add(sight);');
+  lines.push('');
+  lines.push('  return root;');
+  lines.push('}');
+  lines.push('');
+  lines.push('// Конец сгенерированного файла.');
+  return lines.join('\n');
+}
+
+const overlay = document.getElementById('viewer-overlay');
+const viewerContent = document.getElementById('viewer-content');
+document.getElementById('btn-compile').addEventListener('click', () => {
+  viewerContent.textContent = compileGunSource();
+  overlay.classList.add('open');
+});
+document.getElementById('viewer-close').addEventListener('click', () => {
+  overlay.classList.remove('open');
+});
+overlay.addEventListener('click', e => {
+  if (e.target === overlay) overlay.classList.remove('open');
+});
+
+// ============================================================
+// Цикл рендера + плавное масштабирование
+// ============================================================
+let last = performance.now();
+
+function animate(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+ // --- Плавный зум вьюпорта ---
+if (Math.abs(zoomState.current - zoomState.target) > 1e-5) {
+  const t = 1 - Math.exp(-zoomState.speed * dt);
+  zoomState.current += (zoomState.target - zoomState.current) * t;
+  camera.zoom = zoomState.current;
+  camera.updateProjectionMatrix();
+} else if (zoomState.current !== zoomState.target) {
+  zoomState.current = zoomState.target;
+  camera.zoom = zoomState.current;
+  camera.updateProjectionMatrix();
+}
+
+  gun.update?.(dt);
+  controls.update();
+  outline.render();
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// ============================================================
+// Ресайз
+// ============================================================
+function onResize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  // EffectComposer держит собственные render targets — обновим их тоже
+  outline._onResize();     // или сделай публичный метод resize()
+}
+window.addEventListener('resize', onResize);
+new ResizeObserver(onResize).observe(viewport);
+
+// ============================================================
+// Старт
+// ============================================================
+applyTreeScale();
+buildTree();
+
+// renderer.domElement.addEventListener("pointerdown", (e) => {
+//   // если клик не попал по UI-панели — просто снимаем (мягко)
+//   if (e.button !== 0) return;
+//   // не мешаем OrbitControls: снимаем обводку только по пустому месту,
+//   // но без raycast это неточно — оставим как «по Esc»
+// });
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    sync.clear();
+    selectedNode = null;     // если ещё где-то используется
+  }
+});
+</script>
+</body>
+</html>
+
+<!--
+Если когда-нибудь gun.model пересоздастся полностью:
+
+sync.setRoot(gun.model);
+buildTree();
+-->
