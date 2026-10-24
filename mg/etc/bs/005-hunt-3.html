@@ -2224,8 +2224,8 @@ const ejectSpeed = 0.5 + Math.random();
 const ejectVel = ejectDirWorld.multiplyScalar(ejectSpeed);
 
 ejectVel.x += (Math.random() - 0.5) * 0.8;
-ejectVel.y += 1.0 + (Math.random());
-ejectVel.z  = -0.3;
+ejectVel.y += 2.6 + (Math.random());
+ejectVel.z  = -1.6;
 
 getShell().fire(ejectPos, ejectVel);
 
