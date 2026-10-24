@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <title>РЕДАКТОР</title>
+<link rel="icon" type="image/png" href="../../../res/favicon-64.png" sizes="64x64">
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; font-family: system-ui, sans-serif; color: #ddd; }
   #app { position: fixed; inset: 0; display: flex; }
@@ -96,25 +97,45 @@
   /* --- СТРОКА ТРАНСФОРМА: Position / Rotation / Scale --- */
   .xform-section {
     display: grid;
-    grid-template-columns: 70px 1fr 1fr 1fr;   /* метка | X | Y | Z */
-    gap: 4px 6px;
+    grid-template-columns: 80px 1fr 1fr 1fr;
+    gap: 6px 8px;
     align-items: center;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
   }
   .xform-section .label {
-    color: #8fa8c8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: #8fa8c8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
   }
   .xform-section input[type=number] {
     width: 100%; box-sizing: border-box;
     background: #1d2027; color: #dde;
-    border: 1px solid #2a2d34; border-radius: 3px;
-    padding: 3px 4px; font-size: 12px; font-family: inherit;
+    border: 1px solid #2a2d34; border-radius: 4px;
+    padding: 6px 8px; font-size: 14px; font-family: inherit;
     text-align: right;
+    min-height: 28px;
   }
   .xform-section input[type=number]:focus { outline: none; border-color: #5aa0e0; }
-  .xform-section input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
 
-  .xform-empty { color: #667; font-size: 12px; padding: 6px 0; }
+  /* ✅ УВЕЛИЧЕННЫЕ СПИННЕРЫ (стрелки вверх/вниз) */
+  .xform-section input[type=number]::-webkit-inner-spin-button,
+  .xform-section input[type=number]::-webkit-outer-spin-button {
+    opacity: 1;
+    height: 28px;
+    width: 18px;
+    cursor: pointer;
+  }
+
+  /* Для Firefox — спиннеры там всегда видимы, но увеличим сам инпут */
+  .xform-section input[type=number] {
+    appearance: auto;
+    -moz-appearance: number-input;
+  }
+
+.xform-empty {
+  color: #667;
+  font-size: 13px;      /* было 12px */
+  padding: 10px 0;      /* было 6px 0 */
+  line-height: 1.5;
+}
 
   /* ---------- Строки параметров ---------- */
   .param-row { margin-bottom: 10px; }
@@ -199,6 +220,7 @@
       <button id="btn-scale-minus">Масштаб −</button>
       <button id="btn-scale-plus">Масштаб +</button>
       <button id="btn-compile" class="primary full">Компилировать</button>
+      <button id="btn-load" class="full">Загрузить .js…</button>
     </div>
   </div>
 </div>
@@ -487,6 +509,7 @@ function renderTransformFor(obj) {
       input.type = 'number';
       input.step = String(step);
       input.value = Number(vector[axis]).toFixed(3);
+
       input.addEventListener('input', () => {
         const v = parseFloat(input.value);
         if (!isFinite(v)) return;
@@ -601,10 +624,15 @@ function renderParamsFor(obj) {
       p.value = v;
       valEl.textContent = v.toFixed(3);
 
-      gun.applyParams();     // 1) новая модель
-      buildTree();           // 2) новое дерево (uuid актуальны)
-      sync.resync();         // 3) восстановить выбор + обводку + подсветку
-      renderTransformFor(sync.getSelected());  // 4) обновить панель трансформаций
+      if (gun.model.userData.fromFile && gun._compiledApplyParams) {
+        gun._compiledApplyParams(gun.model, gun.params);
+      } else {
+        gun.applyParams();
+      }
+
+      buildTree();
+      sync.resync();
+      renderTransformFor(sync.getSelected());
       syncSlidersForKey(key);
     });
 
@@ -661,116 +689,247 @@ treeScaleSource.addEventListener('wheel', (e) => {
 // ============================================================
 function compileGunSource() {
   const p = gun.params;
-  const lines = [];
-  const matVar = {};    // material uuid -> имя переменной
+
+  // -------- Собираем материалы из gun.model --------
+  const materialMap = new Map();   // uuid -> {varName, def}
   let matIdx = 0;
 
-  // регистрируем материалы (по uuid), чтобы не дублировать
-  const registerMaterial = (m) => {
-    if (!m || !m.uuid) return 'null';
-    if (matVar[m.uuid]) return matVar[m.uuid];
-    const name = 'mat_' + (matIdx++);
-    matVar[m.uuid] = name;
-    // сохраняем параметры материала
-    lines.push(`  const ${name} = new THREE.MeshStandardMaterial({`);
-    if (m.color) lines.push(`    color: 0x${m.color.getHexString()},`);
-    if ('metalness' in m) lines.push(`    metalness: ${m.metalness},`);
-    if ('roughness' in m) lines.push(`    roughness: ${m.roughness},`);
-    if ('opacity' in m) lines.push(`    opacity: ${m.opacity},`);
-    if ('transparent' in m) lines.push(`    transparent: ${m.transparent},`);
-    if ('emissive' in m) lines.push(`    emissive: 0x${m.emissive.getHexString()},`);
-    lines.push(`  });`);
-    return name;
+  const f = (n) => Number.isFinite(n) ? Number(n).toFixed(6) : '0';
+
+  const registerMaterial = (mat) => {
+    if (!mat) return 'null';
+    if (materialMap.has(mat.uuid)) return materialMap.get(mat.uuid).varName;
+    const varName = `mat_${matIdx++}`;
+    const def = {
+      name: mat.name || null,
+      type: mat.type || 'MeshStandardMaterial',
+      props: {},
+    };
+    if (mat.color?.isColor)      def.props.color = '0x' + mat.color.getHexString();
+    if (mat.emissive?.isColor)   def.props.emissive = '0x' + mat.emissive.getHexString();
+    for (const k of ['metalness', 'roughness', 'opacity', 'envMapIntensity']) {
+      if (typeof mat[k] === 'number') def.props[k] = mat[k];
+    }
+    if (typeof mat.transparent === 'boolean') def.props.transparent = mat.transparent;
+    if (typeof mat.depthWrite === 'boolean')  def.props.depthWrite = mat.depthWrite;
+    if (typeof mat.depthTest === 'boolean')   def.props.depthTest  = mat.depthTest;
+    if (typeof mat.side === 'number')         def.props.side       = mat.side;
+    if (typeof mat.flatShading === 'boolean') def.props.flatShading = mat.flatShading;
+
+    materialMap.set(mat.uuid, { varName, def });
+    return varName;
   };
 
-  const f = (n) => Number(n).toFixed(4);
+  // -------- Собираем геометрию --------
+  const serializeGeometry = (g) => {
+    const t = g.type;
+    const pr = g.parameters || {};
+    switch (t) {
+      case 'BoxGeometry':
+        return `new THREE.BoxGeometry(${f(pr.width)}, ${f(pr.height)}, ${f(pr.depth)})`;
+      case 'CylinderGeometry':
+        return `new THREE.CylinderGeometry(${f(pr.radiusTop)}, ${f(pr.radiusBottom)}, ${f(pr.height)}, ${pr.radialSegments|0}, ${pr.heightSegments|0})`;
+      case 'SphereGeometry':
+        return `new THREE.SphereGeometry(${f(pr.radius)}, ${pr.widthSegments|0}, ${pr.heightSegments|0})`;
+      case 'ConeGeometry':
+        return `new THREE.ConeGeometry(${f(pr.radius)}, ${f(pr.height)}, ${pr.radialSegments|0})`;
+      case 'TorusGeometry':
+        return `new THREE.TorusGeometry(${f(pr.radius)}, ${f(pr.tube)}, ${pr.radialSegments|0}, ${pr.tubularSegments|0}, ${f(pr.arc)})`;
+      case 'PlaneGeometry':
+        return `new THREE.PlaneGeometry(${f(pr.width)}, ${f(pr.height)})`;
+      case 'CircleGeometry':
+        return `new THREE.CircleGeometry(${f(pr.radius)}, ${pr.segments|0})`;
+      default:
+        return `/* ${t} не сериализован */ new THREE.BufferGeometry()`;
+    }
+  };
 
-  // сериализация Object3D рекурсивно
+  // -------- Рекурсивный обход Object3D --------
+  const modelLines = [];
   const serializeObject = (obj, varName) => {
-    // дети
     const children = obj.children.filter(c => !c.userData?.isHelper);
-    if (children.length === 0) return;
-
     children.forEach((child, i) => {
-      const childVar = `${varName}_${i}`;
+      const cv = `${varName}_${i}`;
 
-      // --- группа ---
       if (child.isGroup) {
-        lines.push(`  const ${childVar} = new THREE.Group();`);
-        lines.push(`  ${childVar}.name = ${JSON.stringify(child.name || '')};`);
-        serializeObject(child, childVar);
-        lines.push(`  ${varName}.add(${childVar});`);
+        modelLines.push(`    const ${cv} = new THREE.Group();`);
+        if (child.name) modelLines.push(`    ${cv}.name = ${JSON.stringify(child.name)};`);
+        modelLines.push(`    ${cv}.position.set(${f(child.position.x)}, ${f(child.position.y)}, ${f(child.position.z)});`);
+        modelLines.push(`    ${cv}.rotation.set(${f(child.rotation.x)}, ${f(child.rotation.y)}, ${f(child.rotation.z)});`);
+        modelLines.push(`    ${cv}.scale.set(${f(child.scale.x)}, ${f(child.scale.y)}, ${f(child.scale.z)});`);
+        serializeObject(child, cv);
+        modelLines.push(`    ${varName}.add(${cv});`);
         return;
       }
 
-      // --- меш ---
       if (child.isMesh) {
-        const g = child.geometry;
-        const mName = registerMaterial(child.material);
-        const gtype = g.type;
-        let geoCode = 'new THREE.BufferGeometry()';
-        const pr = g.parameters || {};
-
-        switch (gtype) {
-          case 'BoxGeometry':
-            geoCode = `new THREE.BoxGeometry(${pr.width}, ${pr.height}, ${pr.depth})`;
-            break;
-          case 'CylinderGeometry':
-            geoCode = `new THREE.CylinderGeometry(${pr.radiusTop}, ${pr.radiusBottom}, ${pr.height}, ${pr.radialSegments}, ${pr.heightSegments || 1})`;
-            break;
-          case 'SphereGeometry':
-            geoCode = `new THREE.SphereGeometry(${pr.radius}, ${pr.widthSegments}, ${pr.heightSegments})`;
-            break;
-          case 'TorusGeometry':
-            geoCode = `new THREE.TorusGeometry(${pr.radius}, ${pr.tube}, ${pr.radialSegments}, ${pr.tubularSegments}, ${pr.arc || Math.PI * 2})`;
-            break;
-          case 'ConeGeometry':
-            geoCode = `new THREE.ConeGeometry(${pr.radius}, ${pr.height}, ${pr.radialSegments})`;
-            break;
-          default:
-            geoCode = `/* ${gtype} — не сериализовано */ new THREE.BufferGeometry()`;
-        }
-
-        lines.push(`  const ${childVar} = new THREE.Mesh(${geoCode}, ${mName});`);
-        lines.push(`  ${childVar}.name = ${JSON.stringify(child.name || '')};`);
-        lines.push(`  ${childVar}.position.set(${f(child.position.x)}, ${f(child.position.y)}, ${f(child.position.z)});`);
-        lines.push(`  ${childVar}.rotation.set(${f(child.rotation.x)}, ${f(child.rotation.y)}, ${f(child.rotation.z)});`);
-        lines.push(`  ${childVar}.scale.set(${f(child.scale.x)}, ${f(child.scale.y)}, ${f(child.scale.z)});`);
-        lines.push(`  ${varName}.add(${childVar});`);
-        return;
+        const mVar = registerMaterial(child.material);
+        const geo = serializeGeometry(child.geometry);
+        modelLines.push(`    const ${cv} = new THREE.Mesh(${geo}, ${mVar});`);
+        if (child.name) modelLines.push(`    ${cv}.name = ${JSON.stringify(child.name)};`);
+        modelLines.push(`    ${cv}.position.set(${f(child.position.x)}, ${f(child.position.y)}, ${f(child.position.z)});`);
+        modelLines.push(`    ${cv}.rotation.set(${f(child.rotation.x)}, ${f(child.rotation.y)}, ${f(child.rotation.z)});`);
+        modelLines.push(`    ${cv}.scale.set(${f(child.scale.x)}, ${f(child.scale.y)}, ${f(child.scale.z)});`);
+        if (child.castShadow)    modelLines.push(`    ${cv}.castShadow = true;`);
+        if (child.receiveShadow) modelLines.push(`    ${cv}.receiveShadow = true;`);
+        modelLines.push(`    ${varName}.add(${cv});`);
       }
-
-      // --- прочее (Line, Points) — пропускаем ---
     });
   };
 
-  // ===== Заголовок файла =====
-  lines.push('// ============================================================');
-  lines.push('// VIRTUAL COMPILE OUTPUT — процедурное ружьё');
-  lines.push('// Сгенерировано редактором: ' + new Date().toISOString());
-  lines.push('// ============================================================');
-  lines.push('');
-  lines.push('export const GUN_PARAMS = {');
-  Object.entries(p).forEach(([k, v]) => {
-    lines.push(`  ${k}: ${v.value}, // ${v.label} [${v.min} .. ${v.max}]`);
-  });
-  lines.push('};');
-  lines.push('');
-  lines.push('// --- Сборка по текущей модели (все группы и меши) ---');
-  lines.push('export function buildGun(THREE) {');
-  lines.push('  const root = new THREE.Group();');
-  lines.push('  root.name = "gun";');
-
-  // материалы и меши — рекурсивно от gun.model
-  // gun.model — это Group, его дети — то, что нужно обойти
   serializeObject(gun.model, 'root');
 
-  lines.push('');
-  lines.push('  return root;');
-  lines.push('}');
-  lines.push('');
-  lines.push('// Конец сгенерированного файла.');
-  return lines.join('\n');
+  // -------- Собираем файл --------
+  const L = [];
+  L.push('// ============================================================');
+  L.push('// PROCEDURAL GUN — полный снимок модели');
+  L.push('// Сгенерировано: ' + new Date().toISOString());
+  L.push('// ============================================================');
+  L.push('');
+  L.push('import * as THREE from "three";');
+  L.push('');
+
+  // -------- GUN_PARAMS --------
+  L.push('// ============================================================');
+  L.push('// ПАРАМЕТРЫ (используются для UI-редактирования)');
+  L.push('// ============================================================');
+  L.push('export const GUN_PARAMS = {');
+  for (const [key, meta] of Object.entries(p)) {
+    const parts = [`value: ${meta.value}`];
+    if (typeof meta.min   === 'number') parts.push(`min: ${meta.min}`);
+    if (typeof meta.max   === 'number') parts.push(`max: ${meta.max}`);
+    if (typeof meta.step  === 'number') parts.push(`step: ${meta.step}`);
+    if (typeof meta.label === 'string') parts.push(`label: ${JSON.stringify(meta.label)}`);
+    L.push(`  ${key}: { ${parts.join(', ')} },`);
+  }
+  L.push('};');
+  L.push('');
+
+  // -------- MATERIALS --------
+  L.push('// ============================================================');
+  L.push('// МАТЕРИАЛЫ (создаются один раз на уровне модуля)');
+  L.push('// ============================================================');
+  for (const { varName, def } of materialMap.values()) {
+    const ctor = `THREE.${def.type}`;
+    L.push(`const ${varName} = new ${ctor}({`);
+    for (const [k, v] of Object.entries(def.props)) {
+      L.push(`  ${k}: ${typeof v === 'string' ? v : v},`);
+    }
+    L.push(`});`);
+    if (def.name) L.push(`${varName}.name = ${JSON.stringify(def.name)};`);
+    L.push('');
+  }
+  // экспортируем как объект для удобства
+  L.push('export const MATERIALS = {');
+  for (const { varName } of materialMap.values()) {
+    L.push(`  ${varName},`);
+  }
+  L.push('};');
+  L.push('');
+
+  // -------- buildGun --------
+  L.push('// ============================================================');
+  L.push('// СБОРКА — возвращает THREE.Group с текущим состоянием');
+  L.push('// ============================================================');
+  L.push('export function buildGun(envMap = null) {');
+  L.push('  const root = new THREE.Group();');
+  L.push('  root.name = "gun";');
+  L.push('');
+  for (const line of modelLines) L.push(line);
+  L.push('');
+  L.push('  // опциональная подстановка envMap');
+  L.push('  if (envMap) {');
+  L.push('    root.traverse(o => {');
+  L.push('      if (o.isMesh && o.material) {');
+  L.push('        o.material.envMap = envMap;');
+  L.push('        o.material.needsUpdate = true;');
+  L.push('      }');
+  L.push('    });');
+  L.push('  }');
+  L.push('  return root;');
+  L.push('}');
+  L.push('');
+
+  // -------- applyParams --------
+  L.push('// ============================================================');
+  L.push('// ПРИМЕНЕНИЕ ПАРАМЕТРОВ — мутирует существующие меши');
+  L.push('// (нужно для редактора: слайдеры двигают ПАРАМЕТРЫ, а не пересобирают всё)');
+  L.push('// ============================================================');
+  L.push('export function applyParams(root, params = GUN_PARAMS) {');
+  L.push('  const P = params;');
+  L.push('  const get = (k) => P[k]?.value ?? GUN_PARAMS[k]?.value;');
+  L.push('  const r = (name) => root.getObjectByName(name);');
+  L.push('');
+  L.push('  // стволы');
+  L.push('  const barrelL = r("barrelL"), barrelR = r("barrelR");');
+  L.push('  const rib = r("rib");');
+  L.push('  const muzzleL = r("muzzleL"), muzzleR = r("muzzleR");');
+  L.push('  const barrelLen = get("barrelLen");');
+  L.push('  const barrelRadius = get("barrelRadius");');
+  L.push('  const spread = get("barrelSpread");');
+  L.push('  if (barrelL) {');
+  L.push('    barrelL.geometry.dispose();');
+  L.push('    barrelL.geometry = new THREE.CylinderGeometry(barrelRadius, barrelRadius * 1.05, barrelLen, 16);');
+  L.push('    barrelL.position.x = -spread;');
+  L.push('  }');
+  L.push('  if (barrelR) {');
+  L.push('    barrelR.geometry.dispose();');
+  L.push('    barrelR.geometry = new THREE.CylinderGeometry(barrelRadius, barrelRadius * 1.05, barrelLen, 16);');
+  L.push('    barrelR.position.x = spread;');
+  L.push('  }');
+  L.push('  if (rib) {');
+  L.push('    rib.geometry.dispose();');
+  L.push('    rib.geometry = new THREE.BoxGeometry(0.028, get("ribThick"), barrelLen);');
+  L.push('    rib.position.set(0, barrelRadius * 0.95, -0.95);');
+  L.push('  }');
+  L.push('  const zMuzzle = -0.95 - barrelLen / 2;');
+  L.push('  if (muzzleL) { muzzleL.geometry.dispose(); muzzleL.geometry = new THREE.TorusGeometry(barrelRadius * 0.95, 0.006, 8, 16); muzzleL.position.set(-spread, 0, zMuzzle); }');
+  L.push('  if (muzzleR) { muzzleR.geometry.dispose(); muzzleR.geometry = new THREE.TorusGeometry(barrelRadius * 0.95, 0.006, 8, 16); muzzleR.position.set(spread, 0, zMuzzle); }');
+  L.push('');
+  L.push('  // мушка');
+  L.push('  const dot = r("frontSightDot");');
+  L.push('  if (dot) {');
+  L.push('    dot.geometry.dispose();');
+  L.push('    dot.geometry = new THREE.SphereGeometry(get("sightSize"), 10, 10);');
+  L.push('    dot.position.set(0, barrelRadius + get("sightSize") * 3, -0.95 - barrelLen / 2 + 0.04);');
+  L.push('  }');
+  L.push('');
+  L.push('  // ствольная коробка');
+  L.push('  const receiver = r("receiverBody");');
+  L.push('  if (receiver) {');
+  L.push('    receiver.geometry.dispose();');
+  L.push('    receiver.geometry = new THREE.BoxGeometry(get("receiverW"), get("receiverH"), get("receiverL"));');
+  L.push('  }');
+  L.push('');
+  L.push('  // приклад');
+  L.push('  const stock = r("stockNeck");');
+  L.push('  if (stock) {');
+  L.push('    stock.geometry.dispose();');
+  L.push('    stock.geometry = new THREE.BoxGeometry(get("stockNeckW"), get("stockNeckW"), get("stockNeckL"));');
+  L.push('  }');
+  L.push('');
+  L.push('  // цевьё');
+  L.push('  const forend = r("forendBody");');
+  L.push('  if (forend) {');
+  L.push('    forend.geometry.dispose();');
+  L.push('    forend.geometry = new THREE.BoxGeometry(get("forendW"), get("forendH"), get("forendL"));');
+  L.push('  }');
+  L.push('}');
+  L.push('');
+
+  // -------- dispose --------
+  L.push('// ============================================================');
+  L.push('// УБОРКА (только геометрия — материалы общие на модуль)');
+  L.push('// ============================================================');
+  L.push('export function dispose(root) {');
+  L.push('  root.traverse(o => {');
+  L.push('    if (o.isMesh) o.geometry?.dispose();');
+  L.push('  });');
+  L.push('}');
+  L.push('');
+  L.push('// Конец файла.');
+
+  return L.join('\n');
 }
 
 const overlay = document.getElementById('viewer-overlay');
@@ -785,45 +944,121 @@ document.getElementById('btn-compile').addEventListener('click', () => {
 });
 
 // ============================================================
-// Сохранение скомпилированного файла
+// Сохранение скомпилированного файла (скачивание)
 // ============================================================
 const DEFAULT_FILENAME = 'gun.compile.js';
 
-async function saveCompiledFile() {
-  const content = lastCompiledSource || compileGunSource();
-  const filename = prompt('Имя файла:', DEFAULT_FILENAME);
-  if (!filename) return;   // отмена
+function sanitizeFilename(name) {
+  // trim
+  name = (name || '').trim();
+  if (!name) return null;
 
-  // --- Современный путь: File System Access API (Chrome / Edge / Opera) ---
-  if ('showDirectoryPicker' in window) {
-    try {
-      const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      await writable.close();
-      return;
-    } catch (err) {
-      // Пользователь нажал «Отмена» в диалоге выбора папки — тихо выходим
-      if (err?.name === 'AbortError') return;
-      console.error('Ошибка сохранения через showDirectoryPicker:', err);
-      // fallthrough — попробуем через download
-    }
+  // нормализация Unicode + удаление невидимых символов
+  name = name.normalize('NFC')
+             .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
+
+  // запрещённые символы в файловых системах
+  name = name.replace(/[\/\\:*?"<>|]/g, '_');
+
+  // не только точки/пробелы
+  if (/^[.\s]+$/.test(name)) return null;
+
+  // убираем точки/пробелы в конце (Windows-недопустимо)
+  name = name.replace(/[.\s]+$/, '');
+
+  // гарантируем .js
+  if (!/\.js$/i.test(name)) name += '.js';
+
+  return name;
+}
+
+function saveCompiledFile() {
+  const content = lastCompiledSource || compileGunSource();
+
+  // Спросить имя файла (по умолчанию gun.compile.js)
+  const raw = prompt('Имя файла:', DEFAULT_FILENAME);
+  if (raw === null) return;   // отмена
+  const filename = sanitizeFilename(raw);
+  if (!filename) {
+    alert('Недопустимое имя файла.');
+    return;
   }
 
-  // --- Fallback: обычное скачивание (Firefox / Safari) ---
-  const blob = new Blob([content], { type: 'text/javascript' });
+  // --- Скачивание через Blob + <a download> ---
+  const blob = new Blob([content], { type: 'text/javascript;charset=utf-8' });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
+
   document.body.appendChild(a);
   a.click();
   a.remove();
+
+  // освободить память через секунду
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Кнопка «Сохранить…» в окне вьюера
 document.getElementById('viewer-save').addEventListener('click', saveCompiledFile);
+
+// ============================================================
+// Загрузка из файла
+// ============================================================
+async function loadGunFromFile(file) {
+  const source = await file.text();
+  const blob = new Blob([source], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  let mod;
+  try {
+    mod = await import(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  const { GUN_PARAMS, buildGun, applyParams, dispose, MATERIALS } = mod;
+  if (typeof buildGun !== 'function') {
+    throw new Error('В файле нет экспорта buildGun(envMap)');
+  }
+
+  // 1. Собрать модель
+  const newModel = buildGun(envMap);
+  newModel.userData.fromFile = true;
+
+  // 2. Обновить params
+  gun.params = {};
+  for (const [key, meta] of Object.entries(GUN_PARAMS || {})) {
+    gun.params[key] = {
+      value: meta.value,
+      min:   meta.min   ?? 0,
+      max:   meta.max   ?? (meta.value * 2 || 1),
+      step:  meta.step  ?? 0.001,
+      label: meta.label ?? key,
+    };
+  }
+
+  // 3. Заменить модель
+  if (gun.model.parent) gun.model.parent.remove(gun.model);
+  gun.model = newModel;
+  gun.model.position.set(0, 0, 0);
+  gun.model.rotation.set(0, 0, 0);
+  gunRoot.add(gun.model);
+
+  // 4. Запомнить applyParams — чтобы слайдеры его дёргали
+  gun._compiledApplyParams = applyParams;
+
+  // 5. Обновить синхронизацию
+  sync.setRoot(gun.model);
+  sync.clear();
+  buildTree();
+  unhighlightTreeRow();
+  renderTransformFor(null);
+  renderParamsFor(null);
+  gizmo.detach();
+  outline.clear();
+}
 
 ///============================================================
 
@@ -877,8 +1112,34 @@ new ResizeObserver(onResize).observe(viewport);
 applyTreeScale();
 buildTree();
 
+// ============================================================
+// ЗАГРУЗКА .js ФАЙЛА
+// ============================================================
+const fileLoader = document.getElementById('file-loader');
+const btnLoad = document.getElementById('btn-load');
+
+if (btnLoad) {
+  btnLoad.addEventListener('click', () => fileLoader.click());
+}
+
+fileLoader.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    await loadGunFromFile(file);
+  } catch (err) {
+    console.error('Ошибка загрузки:', err);
+    alert('Ошибка загрузки файла: ' + (err?.message || err));
+  } finally {
+    fileLoader.value = '';   // чтобы повторный выбор того же файла работал
+  }
+});
+
 // Отладка
 window.__editor = { THREE, renderer, scene, camera, controls, outline, sync, gun, gunRoot, gizmo };
 </script>
+
+<!-- Скрытый input для загрузки .js-файла -->
+<input type="file" id="file-loader" accept=".js,application/javascript,text/javascript" style="display:none" />
 </body>
 </html>

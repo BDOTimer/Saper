@@ -164,10 +164,10 @@
 // ============================================================
 const Vol = 0.3; // Settings.volume;
 const kit = SND.createSoundKit({
-    shoot   : { src: "../snd/shoot-1.mp3", volume: Vol, pool: 4 }, // Выстрел
-    death   : { src: "../snd/death-1.mp3", volume: Vol, pool: 3 }, // Подбитая утка
-    damag   : { src: "../snd/damag-1.mp3", volume: Vol, pool: 3 }, // Дамаг
-    dzin    : { src: "../snd/dzin-1.mp3" , volume: Vol, pool: 4 }, // Затвор ружья
+    shoot   : { src: "./snd/shoot-1.mp3", volume: Vol, pool: 4 }, // Выстрел
+    death   : { src: "./snd/death-1.mp3", volume: Vol, pool: 3 }, // Подбитая утка
+    damag   : { src: "./snd/damag-1.mp3", volume: Vol, pool: 3 }, // Дамаг
+    dzin    : { src: "./snd/dzin-1.mp3" , volume: Vol, pool: 4 }, // Затвор ружья
 });
 
 kit.autoUnlock();

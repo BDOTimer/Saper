@@ -5,15 +5,9 @@
   <meta charset="UTF-8" />
   <title>Three.js Gun Viewer // NEON</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    /* ==== ПЕРЕМЕННЫЕ ТЕМ ==== */
     :root {
-      /* Тёмная тема — выраженный градиент */
       --bg-top: #1a1a3a;
       --bg-mid: #0a0a18;
       --bg-bottom: #000000;
@@ -22,37 +16,24 @@
       --neon-bg: rgba(0, 255, 255, 0.08);
       --neon-bg-hover: rgba(0, 255, 255, 0.25);
       --text-color: #0ff;
-      --grid-color: rgba(0, 255, 255, 0.08);
       --radial-glow: rgba(0, 255, 255, 0.18);
       --dropzone-bg: rgba(0, 255, 255, 0.08);
       --dropzone-border: #0ff;
-      --fog-color: 0x0a0a18;
-      --grid-main: 0x00ffff;
-      --grid-sub: 0x003333;
     }
 
-body.light-theme {
-  /* Светлая тема — тёплый градиент */
-  --bg-top: #fff;       /* тёплый персиковый */
-  --bg-mid: #f0f0d0;       /* кремово-жёлтый (акцент) */
-  --bg-bottom: #e0c9a6;    /* тёплый беж/терракота */
-  
-  --neon-color: #8d5524;   /* тёплый коричневый вместо бирюзы */
-  --neon-glow: rgba(141, 85, 36, 0.5);
-  --neon-bg: rgba(141, 85, 36, 0.08);
-  --neon-bg-hover: rgba(141, 85, 36, 0.22);
-  --text-color: #5d3a1a;   /* глубокий коричневый для текста */
-  
-  --grid-color: rgba(141, 85, 36, 0.09);
-  --radial-glow: rgba(255, 255, 230, 0.7); /* тёплое свечение сверху */
-  
-  --dropzone-bg: rgba(141, 85, 36, 0.08);
-  --dropzone-border: #8d5524;
-  
-  --fog-color: 0xe8dcc0;   /* тёплый туман под стать градиенту */
-  --grid-main: 0x8d5524;   /* линии сетки — коричневые */
-  --grid-sub: 0xc9a870;    /* подсетка — светлый беж */
-}
+    body.light-theme {
+      --bg-top: #fff;
+      --bg-mid: #f0f0d0;
+      --bg-bottom: #e0c9a6;
+      --neon-color: #8d5524;
+      --neon-glow: rgba(141, 85, 36, 0.5);
+      --neon-bg: rgba(141, 85, 36, 0.08);
+      --neon-bg-hover: rgba(141, 85, 36, 0.22);
+      --text-color: #5d3a1a;
+      --radial-glow: rgba(255, 255, 230, 0.7);
+      --dropzone-bg: rgba(141, 85, 36, 0.08);
+      --dropzone-border: #8d5524;
+    }
 
     html, body {
       height: 100%;
@@ -62,7 +43,6 @@ body.light-theme {
       transition: color 0.4s ease;
     }
 
-    /* ==== МНОГОСЛОЙНЫЙ ГРАДИЕНТНЫЙ ФОН ==== */
     body {
       background:
         radial-gradient(ellipse at 50% 0%, var(--radial-glow) 0%, transparent 60%),
@@ -71,7 +51,6 @@ body.light-theme {
       transition: background 0.5s ease;
     }
 
-    /* ==== Контейнер вьюера ==== */
     .viewer-container {
       position: relative;
       width: 100%;
@@ -81,7 +60,6 @@ body.light-theme {
       z-index: 1;
     }
 
-    /* Canvas — прозрачный, чтобы видеть CSS-градиент */
     #canvas {
       display: block;
       width: 100%;
@@ -90,7 +68,6 @@ body.light-theme {
       background: transparent;
     }
 
-    /* ==== Зона загрузки ==== */
     #drop-zone {
       position: absolute;
       top: 20px;
@@ -122,11 +99,8 @@ body.light-theme {
     }
 
     body.light-theme #drop-zone:hover,
-    body.light-theme #drop-zone.dragover {
-      color: var(--text-color);
-    }
+    body.light-theme #drop-zone.dragover { color: var(--text-color); }
 
-    /* ==== Статус бар ==== */
     #status {
       position: absolute;
       bottom: 20px;
@@ -144,33 +118,15 @@ body.light-theme {
       box-shadow: 0 0 15px var(--neon-glow);
       transition: all 0.3s ease;
       backdrop-filter: blur(4px);
+      white-space: pre-wrap;
     }
 
-    body.light-theme #status {
-      background: rgba(255, 255, 255, 0.5);
-    }
+    body.light-theme #status { background: rgba(255, 255, 255, 0.5); }
+    #status.success { border-color: #0f0; color: #0f0; box-shadow: 0 0 15px rgba(0,255,0,0.5); }
+    body.light-theme #status.success { border-color: #008000; color: #008000; }
+    #status.error { border-color: #f0f; color: #f0f; box-shadow: 0 0 15px rgba(255,0,255,0.5); }
+    body.light-theme #status.error { border-color: #c000c0; color: #c000c0; }
 
-    #status.success {
-      border-color: #0f0;
-      color: #0f0;
-      box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
-    }
-    body.light-theme #status.success {
-      border-color: #008000;
-      color: #008000;
-    }
-
-    #status.error {
-      border-color: #f0f;
-      color: #f0f;
-      box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
-    }
-    body.light-theme #status.error {
-      border-color: #c000c0;
-      color: #c000c0;
-    }
-
-    /* ==== Кнопки ==== */
     .btn {
       display: flex;
       align-items: center;
@@ -199,45 +155,21 @@ body.light-theme {
     }
 
     body.light-theme .btn:hover,
-    body.light-theme .btn:active {
-      color: var(--text-color);
-    }
+    body.light-theme .btn:active { color: var(--text-color); }
 
-    #reset-btn {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      z-index: 10;
-    }
-
+    #reset-btn { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
     #theme-toggle {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 10;
-      width: 48px;
-      height: 48px;
-      padding: 0;
-      font-size: 22px;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.75; }
+      position: absolute; top: 20px; right: 20px; z-index: 10;
+      width: 48px; height: 48px; padding: 0; font-size: 22px;
     }
   </style>
 </head>
 <body>
 
   <div class="viewer-container">
-    <div id="drop-zone">
-      [ ЗАГРУЗИТЬ МОДЕЛЬ .JS ]
-    </div>
-    
+    <div id="drop-zone">[ ЗАГРУЗИТЬ МОДЕЛЬ .JS ]</div>
     <canvas id="canvas"></canvas>
-    
     <div id="status">СТАТУС: ОЖИДАНИЕ ФАЙЛА...</div>
-    
     <button id="reset-btn" class="btn">СБРОС КАМЕРЫ</button>
     <button id="theme-toggle" class="btn" title="Переключить тему">🌙</button>
   </div>
@@ -256,9 +188,8 @@ body.light-theme {
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     class GunViewer {
-
-        static SIZE =  10;
-        static STEP = 0.5;
+      static SIZE = 10;
+      static STEP = 0.5;
 
       constructor(canvasId, dropZoneId, statusId) {
         this.canvas = document.getElementById(canvasId);
@@ -270,11 +201,17 @@ body.light-theme {
         this.camera = null;
         this.renderer = null;
         this.controls = null;
+
         this.gunGroup = null;
         this.gridHelper = null;
+        this.axesGroup = null;
+
         this.isLightTheme = false;
 
-        this.axesGroup = null;
+        // Ссылки на загруженный модуль
+        this.module = null;
+        this.moduleBlobUrl = null;
+        this.applyParams = null;
 
         this._init();
         this._setupDrop();
@@ -287,10 +224,7 @@ body.light-theme {
 
       _init() {
         this.scene = new THREE.Scene();
-        // Прозрачный фон — виден CSS-градиент
         this.scene.background = null;
-
-        // Туман — темный, чтобы сливаться с нижней частью градиента
         this.scene.fog = new THREE.Fog(0x0a0a18, 6, 30);
 
         const w = window.innerWidth;
@@ -306,7 +240,6 @@ body.light-theme {
         });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setSize(w, h);
-        // Прозрачный clear color — CSS-градиент просвечивает
         this.renderer.setClearColor(0x000000, 0);
 
         this.controls = new OrbitControls(this.camera, this.canvas);
@@ -316,8 +249,7 @@ body.light-theme {
 
         // Свет
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const hemi = new THREE.HemisphereLight(0x00ffff, 0x440044, 0.8);
-        this.scene.add(hemi);
+        this.scene.add(new THREE.HemisphereLight(0x00ffff, 0x440044, 0.8));
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
         dirLight.position.set(4, 8, 6);
@@ -329,11 +261,14 @@ body.light-theme {
 
         // Сетка
         this.gridHelper = new THREE.GridHelper(
-            GunViewer.SIZE, GunViewer.SIZE/GunViewer.STEP, 0x003333, 0x003333);
+          GunViewer.SIZE,
+          GunViewer.SIZE / GunViewer.STEP,
+          0x003333, 0x003333
+        );
         this.gridHelper.position.y = -0.001;
         this.scene.add(this.gridHelper);
 
-        // === Цветные главные оси (X и Z) ===
+        // Оси
         this.axesGroup = new THREE.Group();
         this.axesGroup.name = 'mainAxes';
         this.scene.add(this.axesGroup);
@@ -366,109 +301,146 @@ body.light-theme {
         });
       }
 
-    _updateSceneTheme() {
-        // Удаляем старую сетку
+      _updateSceneTheme() {
         if (this.gridHelper) {
-            this.scene.remove(this.gridHelper);
-            this.gridHelper.geometry.dispose();
-            if (Array.isArray(this.gridHelper.material)) {
+          this.scene.remove(this.gridHelper);
+          this.gridHelper.geometry.dispose();
+          if (Array.isArray(this.gridHelper.material)) {
             this.gridHelper.material.forEach(m => m.dispose());
-            } else {
+          } else {
             this.gridHelper.material.dispose();
-            }
-            this.gridHelper = null;
+          }
+          this.gridHelper = null;
         }
 
-        // Создаём новую сетку с контрастными цветами
         if (this.isLightTheme) {
-            this.scene.fog.color.setHex(0xe8dcc0);
-            // Тёмные линии на тёплом фоне — хорошо видно
-            this.gridHelper = new THREE.GridHelper(
-                GunViewer.SIZE, GunViewer.SIZE/GunViewer.STEP, 0x6b4423, 0xa67c52);
+          this.scene.fog.color.setHex(0xe8dcc0);
+          this.gridHelper = new THREE.GridHelper(
+            GunViewer.SIZE, GunViewer.SIZE / GunViewer.STEP, 0xa67c52, 0xa67c52);
         } else {
-            this.scene.fog.color.setHex(0x0a0a18);
-            this.gridHelper = new THREE.GridHelper(
-                GunViewer.SIZE, GunViewer.SIZE/GunViewer.STEP, 0x00ffff, 0x003333);
+          this.scene.fog.color.setHex(0x0a0a18);
+          this.gridHelper = new THREE.GridHelper(
+            GunViewer.SIZE, GunViewer.SIZE / GunViewer.STEP, 0x003333, 0x003333);
         }
         this.gridHelper.position.y = -0.001;
+        this.gridHelper.material.fog = false;
         this.scene.add(this.gridHelper);
 
-        // Перекрашиваем главные оси
         this._buildMainAxes();
-    }
+      }
 
-      loadFromText(text) {
+      // ============================================================
+      // ЗАГРУЗКА МОДЕЛИ — через настоящий ES-модуль (Blob)
+      // ============================================================
+      async loadFromText(text) {
         try {
+          // Убираем старую модель
           if (this.gunGroup) {
             this.scene.remove(this.gunGroup);
-            this._disposeGroup(this.gunGroup);
+            this._disposeGun(this.gunGroup);
             this.gunGroup = null;
           }
+          if (this.moduleBlobUrl) {
+            URL.revokeObjectURL(this.moduleBlobUrl);
+            this.moduleBlobUrl = null;
+          }
+          this.module = null;
+          this.applyParams = null;
 
-          const cleaned = text
-            .replace(/^\s*export\s+default\s+/gm, '')
-            .replace(/^\s*export\s+\{[^}]*\}\s*;?\s*$/gm, '')
-            .replace(/^\s*export\s+/gm, '');
+          // Создаём Blob-URL для модуля.
+          // "three" резолвится через importmap, так что `import * as THREE from "three"` сработает.
+          const blob = new Blob([text], { type: 'application/javascript' });
+          const url = URL.createObjectURL(blob);
+          this.moduleBlobUrl = url;
 
-          const factory = new Function(
-            'THREE',
-            `${cleaned}
-             ;
-             if (typeof buildGun !== 'function') {
-               throw new Error('Функция buildGun не найдена');
-             }
-             return { buildGun, GUN_PARAMS: (typeof GUN_PARAMS !== 'undefined' ? GUN_PARAMS : null) };`
-          );
+          const mod = await import(/* @vite-ignore */ url);
+          this.module = mod;
 
-          const mod = factory(THREE);
-          console.log('GUN_PARAMS:', mod.GUN_PARAMS);
+          console.log('Модуль загружен. Экспорты:', Object.keys(mod));
+          console.log('GUN_PARAMS:', this._formatParams(mod.GUN_PARAMS));
 
-          let result;
-          try {
-            result = mod.buildGun(THREE);
-          } catch (e1) {
-            console.warn('buildGun(THREE) упал, пробуем buildGun():', e1);
-            result = mod.buildGun();
+          if (typeof mod.buildGun !== 'function') {
+            throw new Error('В файле не найден экспорт buildGun');
           }
 
-          if (!result || !result.isObject3D) {
+          // buildGun(envMap) — envMap пока null
+          const root = mod.buildGun(null);
+          if (!root || !root.isObject3D) {
             throw new Error('buildGun вернула не Object3D');
           }
 
-          const rootGroup = result.isGroup ? result : (() => {
+          // Если это Mesh — оборачиваем в Group
+          const gun = root.isGroup ? root : (() => {
             const g = new THREE.Group();
-            g.add(result);
+            g.add(root);
             return g;
           })();
 
           let meshCount = 0;
-          rootGroup.traverse((obj) => {
-            if (obj.isMesh) meshCount++;
-          });
-
+          gun.traverse(o => { if (o.isMesh) meshCount++; });
           if (meshCount === 0) throw new Error('Группа не содержит мешей');
 
-          this.gunGroup = rootGroup;
-          this.scene.add(this.gunGroup);
+          this.gunGroup = gun;
+          this.scene.add(gun);
+
+          // Сохраняем applyParams, если он есть
+          if (typeof mod.applyParams === 'function') {
+            this.applyParams = mod.applyParams;
+          }
 
           requestAnimationFrame(() => this._fitToScene());
-
           this._setStatus(`МОДЕЛЬ ЗАГРУЖЕНА // МЕШЕЙ: ${meshCount}`, 'success');
+
+          // Дополнительно: если есть applyParams, попробуем применить параметры
+          // (это обновит геометрию под текущие значения GUN_PARAMS,
+          //  важно, если шаблон был сохранён с параметрами, отличными от дефолтных)
+          if (this.applyParams && mod.GUN_PARAMS) {
+            try {
+              this.applyParams(gun, mod.GUN_PARAMS);
+              console.log('applyParams применён при загрузке');
+            } catch (e) {
+              console.warn('applyParams при загрузке упал:', e);
+            }
+          }
+
         } catch (e) {
           console.error(e);
           this._setStatus('ОШИБКА: ' + e.message, 'error');
         }
       }
 
+      _formatParams(params) {
+        if (!params) return null;
+        const out = {};
+        for (const k in params) {
+          const v = params[k];
+          out[k] = (v && typeof v === 'object' && 'value' in v) ? v.value : v;
+        }
+        return out;
+      }
+
+      _disposeGun(group) {
+        // Если модуль экспортирует dispose() — используем его (он не трогает общие материалы)
+        if (this.module && typeof this.module.dispose === 'function') {
+          try {
+            this.module.dispose(group);
+            return;
+          } catch (e) {
+            console.warn('module.dispose упал, используем fallback:', e);
+          }
+        }
+        this._disposeGroup(group);
+      }
+
       _disposeGroup(group) {
-        group.traverse((obj) => {
-          if (obj.isMesh) {
-            if (Array.isArray(obj.material)) {
-              obj.material.forEach((m) => m.dispose && m.dispose());
-            } else if (obj.material && obj.material.dispose) {
-              obj.material.dispose();
+        group.traverse(o => {
+          if (o.isMesh) {
+            if (Array.isArray(o.material)) {
+              o.material.forEach(m => m.dispose && m.dispose());
+            } else if (o.material && o.material.dispose) {
+              o.material.dispose();
             }
-            if (obj.geometry && obj.geometry.dispose) obj.geometry.dispose();
+            if (o.geometry && o.geometry.dispose) o.geometry.dispose();
           }
         });
       }
@@ -512,9 +484,8 @@ body.light-theme {
 
       _setupDrop() {
         const dropZone = this.dropZone;
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((name) => {
-          dropZone.addEventListener(name, (e) => {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
+          dropZone.addEventListener(name, e => {
             e.preventDefault();
             e.stopPropagation();
           }, false);
@@ -523,10 +494,9 @@ body.light-theme {
         dropZone.addEventListener('dragenter', () => dropZone.classList.add('dragover'));
         dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => {
+        dropZone.addEventListener('drop', e => {
           dropZone.classList.remove('dragover');
-          const dt = e.dataTransfer;
-          const files = dt.files;
+          const files = e.dataTransfer.files;
           if (files && files.length > 0) this._readFile(files[0]);
         });
 
@@ -534,7 +504,7 @@ body.light-theme {
           const input = document.createElement('input');
           input.type = 'file';
           input.accept = '.js';
-          input.onchange = (e) => {
+          input.onchange = e => {
             const files = e.target.files;
             if (files.length > 0) this._readFile(files[0]);
           };
@@ -545,87 +515,66 @@ body.light-theme {
       _readFile(file) {
         this._setStatus('ЧТЕНИЕ ФАЙЛА...', '');
         const reader = new FileReader();
-        reader.onload = (evt) => this.loadFromText(evt.target.result);
+        reader.onload = evt => this.loadFromText(evt.target.result);
         reader.onerror = () => this._setStatus('ОШИБКА ЧТЕНИЯ ФАЙЛА', 'error');
         reader.readAsText(file);
       }
 
-     _buildMainAxes() {
-        // Очищаем старые
+      _buildMainAxes() {
+        if (!this.axesGroup) {
+          this.axesGroup = new THREE.Group();
+          this.axesGroup.name = 'mainAxes';
+          this.scene.add(this.axesGroup);
+        }
+
         while (this.axesGroup.children.length > 0) {
-            const child = this.axesGroup.children.pop();
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-                if (Array.isArray(child.material)) {
-                    child.material.forEach(m => m.dispose());
-                } else {
-                    child.material.dispose();
-                }
-            }
+          const child = this.axesGroup.children.pop();
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material.dispose();
+          }
         }
 
         const isLight = this.isLightTheme;
+        const xColor = isLight ? 0xd84315 : 0xff3b30;
+        const zColor = isLight ? 0x1565c0 : 0x00aaff;
 
-        // Цвета осей
-        const xColor = isLight ? 0xd84315 : 0xff3b30; // X — тёплый/красный
-        const zColor = isLight ? 0x1565c0 : 0x00aaff; // Z — холодный/синий
+        const len = GunViewer.SIZE;
+        const thickness = 0.003;
+        const arrowLen = 0.35;
+        const arrowRadius = 0.06;
 
-        // Длина оси берется из размера сетки
-        const len = GunViewer.SIZE; 
-        const thickness   = 0.004; // Толщина самой линии (немного увеличим для видимости)
-        const arrowLen    = 0.35;  // Длина стрелки-конуса
-        const arrowRadius = 0.06; // Радиус основания стрелки
-
-        // Вспомогательная функция для создания материала
-        const createMat = (color) => new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.8,
-            metalness: 0.3,
-            roughness: 0.4,
+        const createMat = color => new THREE.MeshStandardMaterial({
+          color, emissive: color, emissiveIntensity: 0.8,
+          metalness: 0.3, roughness: 0.4,
         });
 
-        // --- ОСЬ X ---
+        // X
         const xMat = createMat(xColor);
         const xGroup = new THREE.Group();
-
-        // Линия оси X (цилиндр)
-        // Вычитаем длину стрелки из общей длины, чтобы стрелка была ровно на конце
-        const xCylGeo = new THREE.CylinderGeometry(thickness, thickness, len, 6);
-        const xCyl = new THREE.Mesh(xCylGeo, xMat);
-        xCyl.rotation.z = -Math.PI / 2; // ориентируем вдоль X
-        xCyl.position.x = 0; // сдвигаем, чтобы начало было в 0
+        const xCyl = new THREE.Mesh(new THREE.CylinderGeometry(thickness, thickness, len, 6), xMat);
+        xCyl.rotation.z = -Math.PI / 2;
+        xCyl.position.x = 0;
         xGroup.add(xCyl);
-
-        // Стрелка оси X (конус)
-        const xConeGeo = new THREE.ConeGeometry(arrowRadius, arrowLen, 8);
-        const xCone = new THREE.Mesh(xConeGeo, xMat);
-        xCone.rotation.z = -Math.PI / 2; // ориентируем вдоль X
-        xCone.position.x = len / 2; // ставим на конец
+        const xCone = new THREE.Mesh(new THREE.ConeGeometry(arrowRadius, arrowLen, 8), xMat);
+        xCone.rotation.z = -Math.PI / 2;
+        xCone.position.x = len / 2;
         xGroup.add(xCone);
-
-        xGroup.position.set(0, 0.002, 0); // чуть над сеткой
+        xGroup.position.set(0, 0.002, 0);
         this.axesGroup.add(xGroup);
 
-
-        // --- ОСЬ Z ---
+        // Z
         const zMat = createMat(zColor);
         const zGroup = new THREE.Group();
-
-        // Линия оси Z (цилиндр)
-        const zCylGeo = new THREE.CylinderGeometry(thickness, thickness, len, 6);
-        const zCyl = new THREE.Mesh(zCylGeo, zMat);
-        zCyl.rotation.x = Math.PI / 2; // ориентируем вдоль Z
+        const zCyl = new THREE.Mesh(new THREE.CylinderGeometry(thickness, thickness, len, 6), zMat);
+        zCyl.rotation.x = Math.PI / 2;
         zCyl.position.z = 0;
         zGroup.add(zCyl);
-
-        // Стрелка оси Z (конус)
-        const zConeGeo = new THREE.ConeGeometry(arrowRadius, arrowLen, 8);
-        const zCone = new THREE.Mesh(zConeGeo, zMat);
-        zCone.rotation.x = Math.PI / 2; // ориентируем вдоль Z
+        const zCone = new THREE.Mesh(new THREE.ConeGeometry(arrowRadius, arrowLen, 8), zMat);
+        zCone.rotation.x = Math.PI / 2;
         zCone.position.z = len / 2;
         zGroup.add(zCone);
-
         zGroup.position.set(0, 0.002, 0);
         this.axesGroup.add(zGroup);
       }
