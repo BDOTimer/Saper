@@ -163,6 +163,13 @@
       position: absolute; top: 20px; right: 20px; z-index: 10;
       width: 48px; height: 48px; padding: 0; font-size: 22px;
     }
+
+    #float-btn {
+        position: absolute;
+        top: 80px;
+        right: 20px;
+        z-index: 10;
+    }
   </style>
 </head>
 <body>
@@ -173,6 +180,7 @@
     <div id="status">СТАТУС: ОЖИДАНИЕ ФАЙЛА...</div>
     <button id="reset-btn" class="btn">СБРОС КАМЕРЫ</button>
     <button id="theme-toggle" class="btn" title="Переключить тему">🌙</button>
+    <button id="float-btn" class="btn">Вьюер ...</button>
   </div>
 
   <script type="importmap">
@@ -185,7 +193,7 @@
   </script>
 
   <script type="module">
-    import { GunViewer } from './gun-viewer.js';
+    import { GunViewer } from './gun-viewer-v2.js';
 
     // URL модели по умолчанию — та, что грузится автоматически при старте.
     const DEFAULT_MODEL_URL = './gun.compile.js';
@@ -198,6 +206,20 @@
       themeToggle: document.getElementById('theme-toggle'),
       defaultModelUrl: DEFAULT_MODEL_URL,
       autoLoad: true,
+    });
+
+    const floatBtn = document.getElementById('float-btn');
+    let isFloating = false;
+
+    floatBtn.addEventListener('click', () => {
+        isFloating = !isFloating;
+        if (isFloating) {
+            viewer.setViewport(60, 60);
+            floatBtn.textContent = 'ПОЛНЫЙ ЭКРАН';
+        } else {
+            viewer.resetViewport();
+            floatBtn.textContent = 'ПЛАШКА 60%';
+        }
     });
 
     // Для отладки из консоли:

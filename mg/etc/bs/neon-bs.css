@@ -328,3 +328,55 @@ button.btn-primary:hover, button.btn-primary:active {
 @media (max-width: 600px) {
   .corner-btn { display: none; }
 }
+
+/* ===== Кастомный неоновый курсор (в стиле neon-bs.css) ===== */
+html.neon-cursor,
+html.neon-cursor body,
+html.neon-cursor canvas:not(#gun-canvas),
+html.neon-cursor button,
+html.neon-cursor a {
+  cursor: none !important;
+}
+
+/* Сам прицел — фиксированный элемент, следует за мышью */
+#neon-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;   /* центрируем относительно точки */
+  pointer-events: none;
+  z-index: 99999;
+  display: none;
+  transition: opacity 0.15s ease;
+  opacity: 0.9;
+  will-change: transform;
+}
+
+#neon-cursor.visible { display: block; }
+
+/* Кольцо */
+#neon-cursor::before {
+  content: "";
+  position: absolute;
+  inset: 8px;                 /* кольцо 12×12 */
+  border: 1.5px solid #0ff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 6px #0ff,
+    inset 0 0 6px rgba(0, 255, 255, 0.4);
+}
+
+/* Перекрестие */
+#neon-cursor::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(#0ff, #0ff) center/1.5px 100% no-repeat,
+    linear-gradient(#0ff, #0ff) center/100% 1.5px no-repeat;
+  filter: drop-shadow(0 0 4px #0ff);
+  mask-image: radial-gradient(circle at center, transparent 5px, #000 5.5px);
+  -webkit-mask-image: radial-gradient(circle at center, transparent 5px, #000 5.5px);
+}

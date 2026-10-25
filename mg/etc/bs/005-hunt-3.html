@@ -106,6 +106,170 @@ canvas {
   }
   .is-touch #crosshair { display: block; }
   .is-touch #info { display: none; }
+
+  /* ===== Кнопка «Ружьё» ===== */
+  #gun-btn {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+
+    /* Габариты под текст */
+    min-width: 140px;
+    height: clamp(42px, 9vw, 54px);
+    padding: 10px 18px;
+    box-sizing: border-box;
+    white-space: nowrap;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    color: #0ff;
+    font-family: inherit;
+    font-size: clamp(13px, 3vw, 15px);
+    font-weight: 500;
+    letter-spacing: 1px;
+    line-height: 1;
+
+    background: rgba(0, 255, 255, 0.08);
+    border: 2px solid #0ff;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s ease;
+  }
+
+  #gun-btn:hover,
+  #gun-btn:active {
+    background: rgba(0, 255, 255, 0.25);
+    color: #fff;
+    box-shadow:
+      0 0 25px rgba(0, 255, 255, 0.6),
+      inset 0 0 20px rgba(0, 255, 255, 0.2);
+    transform: translateX(-50%) translateY(-2px);
+  }
+
+/* ===== Оверлей-плашка ===== */
+#gun-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#gun-overlay[hidden] { display: none; }
+
+#gun-panel {
+  position: relative;
+  width: 60vw;
+  height: 60vh;
+  max-width: 95vw;
+  max-height: 95vh;
+  border: 2px solid #0ff;
+  border-radius: 16px;
+  box-shadow: 0 0 40px rgba(0, 255, 255, 0.5);
+  overflow: hidden;
+  background: rgba(10, 10, 24, 0.9);
+}
+
+#gun-viewer-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;   /* ← добавить */
+}
+
+/* Переопределяем глобальное правило canvas для канваса вьюера */
+#gun-canvas {
+  position: static;
+  top: auto;
+  left: auto;
+  display: block;
+}
+
+#gun-status {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  color: #0ff;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #0ff;
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+#gun-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #0ff;
+  background: rgba(0, 0, 0, 0.6);
+  color: #0ff;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+}
+#gun-close:hover { background: rgba(0, 255, 255, 0.25); color: #fff; }
+
+.gun-theme-btn {
+  position: absolute;
+  top: 10px;
+  right: 56px;            /* левее крестика (он 36px + 10px отступ) */
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #0ff;
+  background: rgba(0, 0, 0, 0.6);
+  color: #0ff;
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+}
+.gun-theme-btn:hover { background: rgba(0, 255, 255, 0.25); color: #fff; }
+
+#gun-panel.light-theme {
+  background: rgba(240, 240, 208, 0.95);
+  border-color: #8d5524;
+  box-shadow: 0 0 40px rgba(141, 85, 36, 0.5);
+}
+#gun-panel.light-theme #gun-status {
+  color: #5d3a1a;
+  border-color: #8d5524;
+  background: rgba(255, 255, 255, 0.6);
+}
+#gun-panel.light-theme .gun-theme-btn,
+#gun-panel.light-theme #gun-close {
+  border-color: #8d5524;
+  color: #5d3a1a;
+  background: rgba(255, 255, 255, 0.7);
+}
+
 </style>
 </head>
 <body>
@@ -119,11 +283,29 @@ canvas {
 <div id="crosshair">✛</div>
 <div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
 <div id="flash"></div>
+<div id="neon-cursor"></div>
 
   <div id="joystick-zone">
     <div id="joystick-knob"></div>
   </div>
   <button id="shoot-btn">💥</button>
+
+  <!-- ===== Кнопка «Ружьё» ===== -->
+<button id="gun-btn" class="corner-btn corner-btn--left" title="Посмотреть ружьё">
+  🔫 РУЖЬЁ
+</button>
+
+<!-- ===== Плашка GunViewer ===== -->
+<div id="gun-overlay" hidden>
+  <div id="gun-panel">
+    <button id="gun-close" aria-label="Закрыть">✕</button>
+    <button id="gun-theme" class="gun-theme-btn" title="Переключить тему">🌙</button>
+    <div id="gun-viewer-container">
+      <canvas id="gun-canvas"></canvas>
+      <div id="gun-status">СТАТУС: ЗАГРУЗКА...</div>
+    </div>
+  </div>
+</div>
 
 <script type="importmap">
   {
@@ -151,6 +333,85 @@ canvas {
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
     import { buildGun, dispose as disposeGun } from "./gun.compile.js";
+
+// ============================================================
+
+  import { GunViewer } from './bs-js/gun-viewer-v2.js';
+
+  const overlay  = document.getElementById('gun-overlay');
+  const openBtn  = document.getElementById('gun-btn');
+  const closeBtn = document.getElementById('gun-close');
+  const canvas   = document.getElementById('gun-canvas');
+  const statusEl = document.getElementById('gun-status');
+
+  let viewer = null;
+  let isOpen = false;
+
+  function ensureViewer() {
+    if (viewer) return viewer;
+
+    viewer = new GunViewer({
+      canvas,
+      statusEl,
+      themeToggle: document.getElementById('gun-theme'),
+      themeTarget: document.getElementById('gun-panel'),   // ← класс уйдёт на панель
+      autoLoad: false,
+    });
+
+    return viewer;
+  }
+
+  async function openPanel() {
+    if (isOpen) return;
+    isOpen = true;
+    overlay.hidden = false;
+
+    const v = ensureViewer();
+
+    // Синхронизируем размеры после того, как overlay стал видимым
+    // и #gun-viewer-container получил реальные 60vw × 60vh.
+    requestAnimationFrame(() => {
+      v._isInlineViewport = true;
+      v._syncRendererToViewport();
+    });
+
+    if (!v.gunGroup) {
+      statusEl.textContent = 'ЗАГРУЗКА РУЖЬЯ...';
+      statusEl.className = '';
+      try {
+        await v.loadFromUrl('./gun.compile.js');
+      } catch (e) {
+        statusEl.textContent = 'ОШИБКА: ' + e.message;
+        statusEl.classList.add('error');
+      }
+    }
+  }
+
+  function closePanel() {
+    if (!isOpen) return;
+    isOpen = false;
+    overlay.hidden = true;
+
+    if (viewer) {
+      viewer._isInlineViewport = false;
+      viewer._onResize();
+    }
+  }
+
+  openBtn.addEventListener('click', openPanel);
+  closeBtn.addEventListener('click', closePanel);
+
+  // Клик по фону (вне панели) — закрыть
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePanel();
+  });
+
+  // Esc — закрыть
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && isOpen) closePanel();
+  });
+
+// ------------------------------------------------------------
 
 const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 if (isTouch) document.body.classList.add('is-touch');
@@ -2176,6 +2437,11 @@ renderer.domElement.addEventListener('touchend', e => {
 
 renderer.domElement.addEventListener('click', () => {
   if (isTouch) return;
+
+  if (cursorEnabled) {
+    setCursorEnabled(false);
+  }
+
   if (document.pointerLockElement !== renderer.domElement) {
     renderer.domElement.requestPointerLock();
   } else {
@@ -2464,6 +2730,54 @@ if (window.visualViewport) {
 }
 
 animate();
+
+
+// ===== Кастомный неоновый курсор + Ctrl =====
+const neonCursor = document.getElementById('neon-cursor');
+const rootEl = document.documentElement;
+
+let cursorEnabled = false;   // по умолчанию — стандартный курсор
+let mouseX = window.innerWidth / 2;
+let mouseY = window.innerHeight / 2;
+
+function setCursorEnabled(on) {
+  cursorEnabled = on;
+  rootEl.classList.toggle('neon-cursor', on);
+  if (neonCursor) neonCursor.classList.toggle('visible', on);
+
+  if (on) {
+    // Снимаем pointer lock — курсор должен быть свободен, чтобы дотянуться до кнопок
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+}
+
+// Отслеживаем позицию мыши (даже когда курсор скрыт — на всякий случай)
+window.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  if (neonCursor) {
+    neonCursor.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0)`;
+  }
+}, { passive: true });
+
+// Ctrl — переключение видимости курсора.
+// Используем keydown/keyup, чтобы Ctrl не «залипал» при переключении окна.
+window.addEventListener('keydown', (e) => {
+  // e.ctrlKey === true на keydown Control
+  if (e.key === 'Control' && !e.repeat) {
+    setCursorEnabled(!cursorEnabled);
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  // На отпускании Ctrl тоже можно, но обычно хватает toggle по keydown.
+  // Если хотите "пока зажат — скрыт", раскомментируйте:
+  // if (e.key === 'Control') setCursorEnabled(false);
+});
+
+// При потере фокуса окна — вернуть стандартный курсор (иначе Ctrl может «застрять»)
+window.addEventListener('blur', () => setCursorEnabled(false));
+
 </script>
 </body>
 </html>
