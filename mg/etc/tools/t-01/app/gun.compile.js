@@ -1,9 +1,9 @@
 // ============================================================
 // PROCEDURAL GUN — полный снимок модели
-// Сгенерировано: 2026-10-25T05:01:46.296Z
+// Сгенерировано: 2026-10-24T18:39:49.401Z
 // ============================================================
 
-import * as THREE from "three";
+// import * as THREE from "three";
 
 // ============================================================
 // ПАРАМЕТРЫ (используются для UI-редактирования)
@@ -17,10 +17,10 @@ export const GUN_PARAMS = {
   receiverH: { value: 0.09, min: 0.04, max: 0.2, step: 0.005, label: "Высота ств.коробки" },
   receiverL: { value: 0.32, min: 0.1, max: 0.6, step: 0.005, label: "Длина ств.коробки" },
   stockNeckW: { value: 0.075, min: 0.03, max: 0.15, step: 0.005, label: "Ширина шейки" },
-  stockNeckL: { value: 0.18, min: 0.05, max: 0.4, step: 0.005, label: "Длина шейки" },
-  forendW: { value: 0.128, min: 0.05, max: 0.25, step: 0.005, label: "Ширина цевья" },
+  stockNeckL: { value: 0.305, min: 0.05, max: 0.4, step: 0.005, label: "Длина шейки" },
+  forendW: { value: 0.065, min: 0.05, max: 0.25, step: 0.005, label: "Ширина цевья" },
   forendH: { value: 0.07, min: 0.03, max: 0.15, step: 0.005, label: "Высота цевья" },
-  forendL: { value: 0.35, min: 0.1, max: 0.7, step: 0.005, label: "Длина цевья" },
+  forendL: { value: 0.425, min: 0.1, max: 0.7, step: 0.005, label: "Длина цевья" },
   sightSize: { value: 0.012, min: 0.004, max: 0.03, step: 0.001, label: "Размер мушки" },
 };
 
@@ -252,10 +252,10 @@ export function buildGun(envMap = null) {
     root_3.position.set(0.000000, 0.000000, 0.000000);
     root_3.rotation.set(0.000000, 0.000000, 0.000000);
     root_3.scale.set(1.000000, 1.000000, 1.000000);
-    const root_3_0 = new THREE.Mesh(new THREE.BoxGeometry(0.075000, 0.075000, 0.180000), mat_5);
+    const root_3_0 = new THREE.Mesh(new THREE.BoxGeometry(0.075000, 0.075000, 0.305000), mat_5);
     root_3_0.name = "stockNeck";
-    root_3_0.position.set(0.000000, -0.050000, 0.120000);
-    root_3_0.rotation.set(0.000000, 0.000000, 0.000000);
+    root_3_0.position.set(0.000000, -0.050000, 0.200000);
+    root_3_0.rotation.set(0.174533, 0.000000, 0.000000);
     root_3_0.scale.set(1.000000, 1.000000, 1.000000);
     root_3.add(root_3_0);
     root.add(root_3);
@@ -264,7 +264,7 @@ export function buildGun(envMap = null) {
     root_4.position.set(0.000000, 0.000000, 0.000000);
     root_4.rotation.set(0.000000, 0.000000, 0.000000);
     root_4.scale.set(1.000000, 1.000000, 1.000000);
-    const root_4_0 = new THREE.Mesh(new THREE.BoxGeometry(0.128000, 0.070000, 0.350000), mat_6);
+    const root_4_0 = new THREE.Mesh(new THREE.BoxGeometry(0.065000, 0.070000, 0.425000), mat_6);
     root_4_0.name = "forendBody";
     root_4_0.position.set(0.000000, -0.055000, -0.250000);
     root_4_0.rotation.set(0.000000, 0.000000, 0.000000);
@@ -302,13 +302,13 @@ export function buildGun(envMap = null) {
     root_5.rotation.set(0.000000, 0.000000, 0.000000);
     root_5.scale.set(1.000000, 1.000000, 1.000000);
     const root_5_0 = new THREE.Mesh(new THREE.TorusGeometry(0.035000, 0.006000, 8, 16, 3.141593), mat_1);
-    root_5_0.position.set(0.000000, -0.075000, 0.050000);
-    root_5_0.rotation.set(3.141593, 0.000000, 1.570796);
+    root_5_0.position.set(0.000000, -0.050000, 0.000000);
+    root_5_0.rotation.set(1.745329, 1.570796, 1.570796);
     root_5_0.scale.set(1.000000, 1.000000, 1.000000);
     root_5.add(root_5_0);
     const root_5_1 = new THREE.Mesh(new THREE.CylinderGeometry(0.005000, 0.005000, 0.045000, 8, 1), mat_1);
-    root_5_1.position.set(0.000000, -0.070000, 0.045000);
-    root_5_1.rotation.set(0.000000, 0.000000, 0.250000);
+    root_5_1.position.set(0.000000, -0.050000, 0.010000);
+    root_5_1.rotation.set(0.349066, 0.000000, 0.000000);
     root_5_1.scale.set(1.000000, 1.000000, 1.000000);
     root_5.add(root_5_1);
     const root_5_2 = new THREE.Mesh(new THREE.CylinderGeometry(0.008000, 0.008000, 0.040000, 8, 1), mat_1);
@@ -322,9 +322,9 @@ export function buildGun(envMap = null) {
     root_5_3.scale.set(1.000000, 1.000000, 1.000000);
     root_5.add(root_5_3);
     const root_5_4 = new THREE.Mesh(new THREE.BoxGeometry(0.020000, 0.015000, 0.050000), mat_7);
-    root_5_4.position.set(0.050000, 0.030000, 0.100000);
+    root_5_4.position.set(0.040000, 0.030000, -0.020000);
     root_5_4.rotation.set(0.000000, 0.000000, 0.000000);
-    root_5_4.scale.set(1.000000, 1.000000, 1.000000);
+    root_5_4.scale.set(1.400000, 1.000000, 1.600000);
     root_5.add(root_5_4);
     root.add(root_5);
 

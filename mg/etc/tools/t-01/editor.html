@@ -259,13 +259,14 @@
 -->
 <script type="module">
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { OrbitControls    } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment  } from "three/addons/environments/RoomEnvironment.js";
 import { SelectionOutline } from "./app/selection-outline.js";
-import { SelectionSync } from "./app/selection-sync.js";
-import { TransformGizmo } from "./app/transform-gizmo.js";
+import { SelectionSync    } from "./app/selection-sync.js";
+import { TransformGizmo   } from "./app/transform-gizmo.js";
 
-import { Gun } from "./app/gun.js";
+import * as COMPILED from "./app/gun.compile.js";
+
 
 // ============================================================
 // Сцена
@@ -355,13 +356,54 @@ scene.add(makeAxisArrow(0xff3030, new THREE.Vector3(1, 0, 0)));
 scene.add(makeAxisArrow(0x30ff30, new THREE.Vector3(0, 1, 0)));
 scene.add(makeAxisArrow(0x3080ff, new THREE.Vector3(0, 0, 1)));
 
+// ... renderer, scene, camera, outline, envMap, controls, lights, grid, axes ...
+
+// ============================================================
+// ФАБРИКА: собрать «gun» из скомпилированного модуля
+// ============================================================
+function createGunFromCompiled(mod, envMap, gunRoot) {
+  const { GUN_PARAMS, buildGun, applyParams } = mod;
+
+  const params = {};
+  for (const [key, meta] of Object.entries(GUN_PARAMS || {})) {
+    params[key] = {
+      value: meta.value,
+      min:   meta.min   ?? 0,
+      max:   meta.max   ?? (meta.value * 2 || 1),
+      step:  meta.step  ?? 0.001,
+      label: meta.label ?? key,
+    };
+  }
+
+  const model = buildGun(envMap);
+  model.userData.fromFile = true;
+  model.position.set(0, 0, 0);
+  model.rotation.set(0, 0, 0);
+
+  return {
+    model,
+    params,
+    _compiledApplyParams: applyParams,
+    setOverride() {},
+    applyParams() {
+      if (this._compiledApplyParams) this._compiledApplyParams(this.model, this.params);
+    },
+    update() {},
+  };
+}
+
 // ============================================================
 // Ружьё
 // ============================================================
 const gunRoot = new THREE.Group();
 scene.add(gunRoot);
 
-const gun = new Gun(gunRoot, envMap);
+const gun = createGunFromCompiled(COMPILED, envMap, gunRoot);
+gunRoot.add(gun.model);
+
+// ... дальше sync, gizmo, всё остальное ...
+
+
 gun.model.position.set(0, 0, 0);
 gun.model.rotation.set(0, 0, 0);
 
