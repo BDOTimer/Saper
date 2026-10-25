@@ -716,7 +716,7 @@ class Grass {
     this.scene = scene;
     this.terrain = terrain;
     this.count = opts.count ?? 40000;       // количество травинок
-    this.radius = opts.radius ?? 90;        // радиус посадки (от центра карты)
+    this.radius = opts.radius ?? 240;        // радиус посадки (от центра карты)
     this.time = 0;
     this.build();
   }
@@ -1037,12 +1037,13 @@ const terrain = new Terrain(scene, {
   size: 600,
   segments: 200,
   height: 30,
-  seed: 12345
+  //seed: 12345
+  seed: 10000 * Math.random(),
 });
 
 const grass = new Grass(scene, terrain, {
   count: 40000,   // начните с 40к, при необходимости до 80к
-  radius: 95
+  radius: 300
 });
 
 // ============================================================
