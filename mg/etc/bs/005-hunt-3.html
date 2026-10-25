@@ -1678,7 +1678,7 @@ class Nature {
       if (Math.random() < 0.4) {
         const tipGeo = new THREE.CylinderGeometry(0.03 * clusterScale, 0.05 * clusterScale, 0.5);
         const tipMat = new THREE.MeshLambertMaterial({ color: 0x6a5a2a }); // коричневая метёлка
-        const tip = new THREE.Mesh(tipGeo, tipMat);
+        const tip    = new THREE.Mesh(tipGeo, tipMat);
         
         // Высота стебля = h, его центр в 0, значит верх стебля локально находится на y = h / 2
         tip.position.set(0, h / 2 - 0.3, 0);
