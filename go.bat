@@ -2,9 +2,24 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
+REM ============================================
+REM   НАСТРОЙКИ — меняй здесь
+REM ============================================
+set "START_PAGE=index"
+set "PAGE_EXT=.html"
+set "PORT=8000"
+REM ============================================
+
+REM Собираем полный URL и путь к файлу ЗАРАНЕЕ
+set "URL=http://localhost:%PORT%/%START_PAGE%%PAGE_EXT%"
+set "LOCAL_FILE=%CD%\%START_PAGE%%PAGE_EXT%"
+
 echo ============================================
 echo   Запуск локального сервера на Python
 echo   Папка: %CD%
+echo   Страница: %START_PAGE%%PAGE_EXT%
+echo   Порт: %PORT%
+echo   URL: %URL%
 echo ============================================
 echo.
 
@@ -18,12 +33,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM (Необязательно) Проверка, что файл существует
+if not exist "%LOCAL_FILE%" (
+    echo [ПРЕДУПРЕЖДЕНИЕ] Файл не найден: %LOCAL_FILE%
+    echo Браузер всё равно откроется, но страница может быть недоступна.
+    echo.
+)
+
 REM Создаём временный сервер с запретом кэширования
 > "%~dp0_no_cache_server.py" (
     echo import http.server
     echo import socketserver
     echo.
-    echo PORT = 8000
+    echo PORT = %PORT%
     echo.
     echo class NoCacheHandler^(http.server.SimpleHTTPRequestHandler^):
     echo     def end_headers^(self^):
@@ -40,7 +62,7 @@ REM Создаём временный сервер с запретом кэши�
 )
 
 REM Открыть браузер через 1 секунду (сервер успеет подняться)
-start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/t-01/editor.html"
+start "" cmd /c "timeout /t 1 >nul & start "" "%URL%""
 
 REM Запустить сервер без кэша (Ctrl+C — остановить)
 python "%~dp0_no_cache_server.py"
