@@ -368,18 +368,18 @@ canvas {
 
     const v = ensureViewer();
 
-    // Синхронизируем размеры после того, как overlay стал видимым
-    // и #gun-viewer-container получил реальные 60vw × 60vh.
     requestAnimationFrame(() => {
       v._isInlineViewport = true;
       v._syncRendererToViewport();
     });
 
     if (!v.gunGroup) {
-      statusEl.textContent = 'ЗАГРУЗКА РУЖЬЯ...';
+      statusEl.textContent = 'УСТАНОВКА РУЖЬЯ...';
       statusEl.className = '';
       try {
-        await v.loadFromUrl('./gun.compile.js');
+        // Модель уже построена в игре: gun.model — это THREE.Group от buildGun(envMap)
+        // Клонируем её внутрь GunViewer, чтобы не делить объекты между сценами.
+        v.setGun(gun.model);
       } catch (e) {
         statusEl.textContent = 'ОШИБКА: ' + e.message;
         statusEl.classList.add('error');

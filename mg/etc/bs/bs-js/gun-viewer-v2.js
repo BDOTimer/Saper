@@ -588,4 +588,62 @@ export class GunViewer {
 
     if (this.gunGroup) this._fitToScene();
   }
+
+   /**
+   * Устанавливает готовую модель (Object3D), не загружая модуль заново.
+   * Полезно, если модель уже построена в другом месте приложения.
+   * @param {THREE.Object3D} root
+   * @param {Object} [opts]
+   * @param {boolean} [opts.cloneMaterials=true] — клонировать материалы,
+   *        чтобы вьюер не влиял на исходную модель
+   */
+  setGun(root, opts = {}) {
+    if (!root || !root.isObject3D) {
+      throw new Error('GunViewer.setGun: ожидается THREE.Object3D');
+    }
+
+    if (this.gunGroup) {
+      this.scene.remove(this.gunGroup);
+      this._disposeGun(this.gunGroup);
+      this.gunGroup = null;
+    }
+
+    const clone = root.clone(true);
+    if (opts.cloneMaterials !== false) {
+      clone.traverse(o => {
+        if (!o.isMesh) return;
+        if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
+        else if (o.material) o.material = o.material.clone();
+      });
+    }
+
+    // Обёртка-«якорь», чтобы нормализовать позицию модели
+    const wrapper = new THREE.Group();
+    wrapper.add(clone);
+
+    // Нормализуем: центр по X/Z, низ по Y → модель стоит на y = 0
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = box.getCenter(new THREE.Vector3());
+
+    clone.position.x -= center.x;
+    clone.position.z -= center.z;
+    clone.position.y -= box.min.y;
+
+    // Если сетка была сдвинута прошлым setGun — вернуть на пол
+    if (this.gridHelper) this.gridHelper.position.y = -0.001;
+
+    this.gunGroup = wrapper;
+    this.scene.add(wrapper);
+
+    this.module = null;
+    this.applyParams = null;
+
+    let meshCount = 0;
+    wrapper.traverse(o => { if (o.isMesh) meshCount++; });
+
+    this._setStatus(`МОДЕЛЬ УСТАНОВЛЕНА // МЕШЕЙ: ${meshCount}`, 'success');
+    requestAnimationFrame(() => this._fitToScene());
+
+    return wrapper;
+  }
 }
