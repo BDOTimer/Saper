@@ -116,16 +116,27 @@ export class GunViewer {
     this.scene.add(this.axesGroup);
     this._buildMainAxes();
 
-    window.addEventListener('resize', () => this._onResize());
+    // ...
+    this._checkBrowserZoom();
+    
+    // Также полезно проверять при изменении размера окна
+    window.addEventListener('resize', () => {
+      this._onResize();
+      this._checkBrowserZoom();
+    });
+
     this._animate();
   }
 
   _onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    if (this.camera.aspect === w / h) return;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+
+    this._updateZoomSensitivity();
   }
 
   _animate() {
@@ -426,5 +437,29 @@ export class GunViewer {
     zGroup.add(zCone);
     zGroup.position.set(0, 0.002, 0);
     this.axesGroup.add(zGroup);
+  }
+
+  _checkBrowserZoom() {
+    // Сравниваем физическое разрешение и CSS-разрешение
+    const isZoomed = window.devicePixelRatio !== 1 || 
+                     Math.abs(window.innerWidth / document.documentElement.clientWidth - 1) > 0.01;
+    
+    if (isZoomed && this.statusEl) {
+      this._setStatus('⚠️ Для корректной работы 3D установите масштаб браузера на 100% (Ctrl + 0)', 'warning');
+      
+      // Автоматически скрываем сообщение через 5 секунд
+      setTimeout(() => {
+        if (this.statusEl && this.statusEl.textContent.includes('100%')) {
+          this.statusEl.textContent = '';
+        }
+      }, 5000);
+    }
+  }
+
+  _updateZoomSensitivity() {
+    // Базовая скорость (например, 0.5), деленная на текущий масштаб браузера
+    // Если масштаб 150% (dPR = 1.5), скорость станет 0.33, что компенсирует рывок
+    const baseSpeed = 0.5; 
+    this.controls.zoomSpeed = baseSpeed / window.devicePixelRatio;
   }
 }
