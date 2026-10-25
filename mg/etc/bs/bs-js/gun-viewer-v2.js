@@ -87,6 +87,7 @@ export class GunViewer {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
+      antialias: true,
       alpha: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -114,7 +115,7 @@ export class GunViewer {
     this.axesGroup.name = 'mainAxes';
     this.scene.add(this.axesGroup);
     this._buildMainAxes();
-
+    this.axesGroup.visible = false; 
     // ...
     this._checkBrowserZoom();
 
