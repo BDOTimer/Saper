@@ -28,8 +28,8 @@ export const GUN_PARAMS = {
 // МАТЕРИАЛЫ (создаются один раз на уровне модуля)
 // ============================================================
 const mat_0 = new THREE.MeshStandardMaterial({
-  color: 0x141822,
-  emissive: 0x000000,
+  color: 0x242832,
+  emissive: 0x040404,
   metalness: 0.9,
   roughness: 0.25,
   opacity: 1,
@@ -43,7 +43,7 @@ const mat_0 = new THREE.MeshStandardMaterial({
 
 const mat_1 = new THREE.MeshStandardMaterial({
   color: 0x0f0f12,
-  emissive: 0x000000,
+  emissive: 0x040404,
   metalness: 0.95,
   roughness: 0.25,
   opacity: 1,
@@ -66,7 +66,7 @@ const mat_2 = new THREE.MeshBasicMaterial({
 
 const mat_3 = new THREE.MeshStandardMaterial({
   color: 0x1a1e26,
-  emissive: 0x000000,
+  emissive: 0x040404,
   metalness: 0.85,
   roughness: 0.35,
   opacity: 1,
@@ -80,7 +80,7 @@ const mat_3 = new THREE.MeshStandardMaterial({
 
 const mat_4 = new THREE.MeshStandardMaterial({
   color: 0x555555,
-  emissive: 0x000000,
+  emissive: 0x040404,
   metalness: 0.8,
   roughness: 0.4,
   opacity: 1,
@@ -94,7 +94,7 @@ const mat_4 = new THREE.MeshStandardMaterial({
 
 const mat_5 = new THREE.MeshStandardMaterial({
   color: 0x5a2f12,
-  emissive: 0x000000,
+  emissive: 0x040404,
   metalness: 0.05,
   roughness: 0.75,
   opacity: 1,
@@ -108,7 +108,7 @@ const mat_5 = new THREE.MeshStandardMaterial({
 
 const mat_6 = new THREE.MeshStandardMaterial({
   color: 0x7a421c,
-  emissive: 0x000000,
+  emissive: 0x040404,
   metalness: 0.05,
   roughness: 0.65,
   opacity: 1,
@@ -122,7 +122,7 @@ const mat_6 = new THREE.MeshStandardMaterial({
 
 const mat_7 = new THREE.MeshStandardMaterial({
   color: 0xc9a227,
-  emissive: 0x000000,
+  emissive: 0x040404,
   metalness: 1,
   roughness: 0.3,
   opacity: 1,

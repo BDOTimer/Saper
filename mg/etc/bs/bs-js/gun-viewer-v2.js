@@ -99,16 +99,8 @@ export class GunViewer {
     this.controls.maxPolarAngle = Math.PI * 0.49;
     this._updateZoomSensitivity();
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    this.scene.add(new THREE.HemisphereLight(0x00ffff, 0x440044, 0.8));
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(4, 8, 6);
-    this.scene.add(dirLight);
-
-    const neonLight = new THREE.PointLight(0x00ffff, 2, 12);
-    neonLight.position.set(-3, 2, -2);
-    this.scene.add(neonLight);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    this.scene.add(new THREE.HemisphereLight(0x00ffff, 0x440044, 1.0));
 
     this.gridHelper = new THREE.GridHelper(
       GunViewer.SIZE,
@@ -125,6 +117,85 @@ export class GunViewer {
 
     // ...
     this._checkBrowserZoom();
+
+    ///+
+    // Простой процедурный environment map — даёт блики на металле
+// ===== Tone mapping =====
+this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+this.renderer.toneMappingExposure = 1.1;
+this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+// ===== Environment map (для металла) =====
+const pmrem = new THREE.PMREMGenerator(this.renderer);
+pmrem.compileEquirectangularShader();
+
+const envScene = new THREE.Scene();
+const skyGeo = new THREE.SphereGeometry(50, 16, 16);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: {
+    topColor:    { value: new THREE.Color(2.5, 2.8, 3.2) },
+    bottomColor: { value: new THREE.Color(0x080f0c) },
+  },
+  vertexShader: `
+    varying vec3 vWorldPos;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWorldPos = wp.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform vec3 topColor;
+    uniform vec3 bottomColor;
+    varying vec3 vWorldPos;
+    void main() {
+      float h = normalize(vWorldPos).y;
+      float t = pow(max(h, 0.0), 0.7);
+      gl_FragColor = vec4(mix(bottomColor, topColor, t), 1.0);
+    }`
+});
+envScene.add(new THREE.Mesh(skyGeo, skyMat));
+
+const envLamp1 = new THREE.Mesh(
+  new THREE.SphereGeometry(4, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
+);
+envLamp1.position.set(5, 15, 5);
+envScene.add(envLamp1);
+
+const envLamp2 = new THREE.Mesh(
+  new THREE.SphereGeometry(3, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0x00ffff })
+);
+envLamp2.position.set(-5, 15, -5);
+envScene.add(envLamp2);
+
+const envRT = pmrem.fromScene(envScene, 0.04);
+this.scene.environment = envRT.texture;
+
+skyGeo.dispose();
+skyMat.dispose();
+envLamp1.geometry.dispose();
+envLamp1.material.dispose();
+envLamp2.geometry.dispose();
+envLamp2.material.dispose();
+pmrem.dispose();
+
+// ===== Свет =====
+this.scene.add(new THREE.AmbientLight(0xffffff, 5.0));
+this.scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 11.0));
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 11.5);
+dirLight.position.set(6, 10, 8);
+this.scene.add(dirLight);
+
+const fillLight = new THREE.DirectionalLight(0xffffff, 11);
+fillLight.position.set(-6, 4, -4);
+this.scene.add(fillLight);
+
+const neonLight = new THREE.PointLight(0x00ffff, 11, 6);
+neonLight.position.set(-3, 2, -4);
+this.scene.add(neonLight);
     
     // Также полезно проверять при изменении размера окна
     window.addEventListener('resize', () => {
