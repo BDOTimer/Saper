@@ -1661,7 +1661,7 @@ class Nature {
 
       // Случайное положение внутри куртины (диск)
       const angle = Math.random() * Math.PI * 2;
-      const rad = Math.sqrt(Math.random()) * clusterRadius;
+      const rad   = Math.sqrt(Math.random()) * clusterRadius;
       reed.position.set(
         Math.cos(angle) * rad,
         h / 2,
@@ -1676,16 +1676,16 @@ class Nature {
 
       // Иногда добавляем «метёлку» (верхушку камыша)
       if (Math.random() < 0.4) {
-        const tipGeo = new THREE.ConeGeometry(0.05 * clusterScale, 0.25 * clusterScale, 5);
+        const tipGeo = new THREE.CylinderGeometry(0.03 * clusterScale, 0.05 * clusterScale, 0.5);
         const tipMat = new THREE.MeshLambertMaterial({ color: 0x6a5a2a }); // коричневая метёлка
         const tip = new THREE.Mesh(tipGeo, tipMat);
-        tip.position.set(
-          reed.position.x,
-          h + 0.1 * clusterScale,
-          reed.position.z
-        );
-        tip.rotation.z = reed.rotation.z;
-        group.add(tip);
+        
+        // Высота стебля = h, его центр в 0, значит верх стебля локально находится на y = h / 2
+        tip.position.set(0, h / 2 - 0.3, 0);
+        
+        // Добавляем метёлку как дочерний объект стебля (reed), 
+        // чтобы она автоматически и идеально наследовала все его повороты (наклон)
+        reed.add(tip);
       }
     }
 
