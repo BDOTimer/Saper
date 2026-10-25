@@ -1495,9 +1495,9 @@ class Conifers {
       dummy.position.set(p.x, p.h - 0.4, p.z);
       // Небольшой случайный поворот вокруг Y + лёгкий наклон
       dummy.rotation.set(
-        (Math.random() - 0.5) * 0.08,
+        (Math.random() - 0.5) * 0.4,
          Math.random() * Math.PI * 2,
-        (Math.random() - 0.5) * 0.08
+        (Math.random() - 0.5) * 0.4
       );
 
       // Масштаб: ёлки наверху чуть меньше (ветер/холод)
@@ -1508,10 +1508,20 @@ class Conifers {
       this.mesh.setMatrixAt(i, dummy.matrix);
 
       // Оттенок: тёмно-зелёный с вариацией
-      const hue   = 0.32 + (Math.random() - 0.5) * 0.04;   // ~115–125°
-      const sat   = 0.45 +  Math.random() * 0.2;
-      const light = 0.08 +  Math.random() * 0.10;
-      color.setHSL(hue, sat, light);
+      // const hue   = 0.32 + (Math.random() - 0.5) * 0.04;   // ~115–125°
+      // const sat   = 0.45 +  Math.random() * 0.2;
+      // const light = 0.08 +  Math.random() * 0.10;
+      // color.setHSL(hue, sat, light);
+      if(heightFactor > 0.6)
+      { const a = Math.random() * 0.40;
+        const b = Math.random() * 0.30;
+        color.set(a, a+b, a);
+      }
+      else
+      { const a = 0.8;
+        const b = Math.random() * 0.2;
+        color.set(a, a+b, a);
+      }
       this.mesh.setColorAt(i, color);
     }
 
