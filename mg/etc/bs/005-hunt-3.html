@@ -716,7 +716,7 @@ class Grass {
     this.scene = scene;
     this.terrain = terrain;
     this.count = opts.count ?? 40000;
-    this.radius = opts.radius ?? 90;
+    this.radius = opts.radius ?? 600;
     this.time = 0;
     this.mesh = null;            // ← пока не создан
     this.positions = [];
@@ -898,7 +898,7 @@ class Grass {
     this.lodTimer = 0;
 
     const camPos = camera.position;
-    const MAX_DIST = 40;
+    const MAX_DIST = 150;
     const MAX_DIST_SQ = MAX_DIST * MAX_DIST;
     const dummy = new THREE.Object3D();
 
@@ -1035,36 +1035,44 @@ class Terrain {
     const colors = new Float32Array(pos.count * 3);
 
     // Палитра по высоте
-    const cWater  = new THREE.Color(0x2e4a25); // тёмно-зелёная низина
-    const cGrass  = new THREE.Color(0x5a9b3a); // трава
-    const cGrass2 = new THREE.Color(0x3d6b2a); // тёмная трава
-    const cRock   = new THREE.Color(0x8a8470); // камень/сухая земля
-    const cSnow   = new THREE.Color(0xd8d8d0); // светлые вершины (лёгкая «пыль»)
+const cWater  = new THREE.Color(0x1e3a15); // тёмно-зелёная низина
+const cGrass  = new THREE.Color(0x5a9b3a); // трава
+const cGrass2 = new THREE.Color(0x3d6b2a); // тёмная трава
+const cRock   = new THREE.Color(0x7b5550); // тёмный камень
+const cRock2  = new THREE.Color(0x7a7460); // светлый камень
+const cSnow   = new THREE.Color(0xe8e8e0); // снег (только самые вершины)
 
-    const tmp = new THREE.Color();
-    const maxH = this.height * 2.2; // примерный максимум
-    const minH = -this.height * 0.6;
+const tmp = new THREE.Color();
+const minH = WATER_LEVEL - 2;   // ~ -4.5
+const maxH = this.height/2; // ~ 54
 
-    for (let i = 0; i < pos.count; i++) {
-      const y = pos.getY(i);
-      const t = Math.min(1, Math.max(0, (y - minH) / (maxH - minH)));
+for (let i = 0; i < pos.count; i++) {
+  const y = pos.getY(i);
+  const t = Math.min(1, Math.max(0, (y - minH) / (maxH - minH)));
 
-      if (t < 0.25) {
-        tmp.copy(cWater).lerp(cGrass, t / 0.25);
-      } else if (t < 0.6) {
-        tmp.copy(cGrass).lerp(cGrass2, (t - 0.25) / 0.35);
-      } else if (t < 0.85) {
-        tmp.copy(cGrass2).lerp(cRock, (t - 0.6) / 0.25);
-      } else {
-        tmp.copy(cRock).lerp(cSnow, (t - 0.85) / 0.15);
-      }
+  if (t < 0.2) {
+    // Низины: вода → трава
+    tmp.copy(cWater).lerp(cGrass, t / 0.2);
+  } else if (t < 0.5) {
+    // Средние высоты: трава → тёмная трава
+    tmp.copy(cGrass).lerp(cGrass2, (t - 0.2) / 0.3);
+  } else if (t < 0.75) {
+    // Верхние склоны: тёмная трава → тёмный камень
+    tmp.copy(cGrass2).lerp(cRock, (t - 0.5) / 0.25);
+  } else if (t < 0.95) {
+    // Высокие холмы: тёмный камень → светлый камень
+    tmp.copy(cRock).lerp(cRock2, (t - 0.75) / 0.2);
+  } else {
+    // Самые вершины (95-100%): камень → снег
+    tmp.copy(cRock2).lerp(cSnow, (t - 0.95) / 0.05);
+  }
 
-      // Небольшая шумовая вариация для «живости»
-      const v = 0.9 + 0.2 * this.noise2D(i * 0.13, i * 0.17);
-      colors[i * 3]     = tmp.r * v;
-      colors[i * 3 + 1] = tmp.g * v;
-      colors[i * 3 + 2] = tmp.b * v;
-    }
+  // Шумовая вариация для «живости»
+  const v = 0.85 + 0.3 * this.noise2D(i * 0.13, i * 0.17);
+  colors[i * 3]     = tmp.r * v;
+  colors[i * 3 + 1] = tmp.g * v;
+  colors[i * 3 + 2] = tmp.b * v;
+}
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     this.mesh = new THREE.Mesh(geo, mat);
@@ -1092,7 +1100,7 @@ const terrain = new Terrain(scene, {
 
 const grass = new Grass(scene, terrain, {
   count: 60000,   // начните с 40к, при необходимости до 80к
-  radius: 400
+  radius: 600
 });
 
 // ============================================================
@@ -1355,6 +1363,171 @@ class Sky {
 }
 
 // ============================================================
+// CLASS: Ёлка (инстансный меш — одна геометрия, много копий)
+// ============================================================
+class Conifers {
+  constructor(scene, terrain, opts = {}) {
+    this.scene   = scene;
+    this.terrain = terrain;
+    this.count   = opts.count   ?? 120;
+    this.minH    = opts.minH    ?? 6;      // ниже этой высоты ёлки не сажаем
+    this.maxH    = opts.maxH    ?? 999;    // выше — тоже не сажаем (снег/голый камень)
+    this.maxSlope = opts.maxSlope ?? 0.55; // не на обрывах
+    this.radius  = opts.radius  ?? 200;    // радиус посадки от центра
+
+    // Две геометрии: ствол + «слои» кроны (конусы)
+    this.build();
+  }
+
+  // --- Геометрия одной ёлки: ствол + 3 конуса, слитые в один BufferGeometry ---
+  createConiferGeometry() {
+    const geos = [];
+
+    // Ствол
+    const trunk = new THREE.CylinderGeometry(0.18, 0.28, 2.2, 6);
+    trunk.translate(0, 1.1, 0);
+    geos.push(trunk);
+
+    // Три конуса кроны — снизу вверх, каждый меньше предыдущего
+    const layers = [
+      { r: 2.2, h: 2.4, y: 2.6 },
+      { r: 1.6, h: 2.0, y: 4.1 },
+      { r: 1.0, h: 1.7, y: 5.4 },
+    ];
+    for (const L of layers) {
+      const cone = new THREE.ConeGeometry(L.r, L.h, 7);
+      cone.translate(0, L.y, 0);
+      geos.push(cone);
+    }
+
+    // Сливаем все геометрии в одну — это обязательно для InstancedMesh
+    return this.mergeGeometries(geos);
+  }
+
+  // --- Ручное слияние BufferGeometry (без импорта BufferGeometryUtils) ---
+  mergeGeometries(geos) {
+    // Приводим все к non-indexed, чтобы не возиться с индексами
+    const nonIndexed = geos.map(g => g.index ? g.toNonIndexed() : g);
+
+    let totalVerts = 0;
+    for (const g of nonIndexed) totalVerts += g.attributes.position.count;
+
+    const pos = new Float32Array(totalVerts * 3);
+    const norm = new Float32Array(totalVerts * 3);
+    let off = 0;
+
+    for (const g of nonIndexed) {
+      const p = g.attributes.position.array;
+      const n = g.attributes.normal.array;
+      pos.set (p, off * 3);
+      norm.set(n, off * 3);
+      off += g.attributes.position.count;
+    }
+
+    const merged = new THREE.BufferGeometry();
+    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    merged.setAttribute('normal',   new THREE.BufferAttribute(norm, 3));
+
+    // Освобождаем промежуточные
+    for (const g of geos) g.dispose();
+
+    return merged;
+  }
+
+  build() {
+    const geo = this.createConiferGeometry();
+
+    // Материал — тёмно-зелёный, чуть разный по цвету через instanceColor
+    const mat = new THREE.MeshLambertMaterial({
+      color: 0xffffff,
+      // Небольшой «шершавый» вид:
+      flatShading: false,
+    });
+
+    // Собираем точки посадки: высокие холмы, пологие, не под водой
+    const candidates = [];
+    const attempts = this.count * 25;
+
+    for (let i = 0; i < attempts && candidates.length < this.count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * this.radius;
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+
+      const h = this.terrain.getHeightAt(x, z);
+
+      // Только высокие холмы
+      if (h < this.minH) continue;
+      if (h > this.maxH) continue;
+      // Не под водой (на всякий случай)
+      if (h < WATER_LEVEL + 0.5) continue;
+
+      // Проверка уклона
+      const eps = 1.0;
+      const hL = this.terrain.getHeightAt(x - eps, z);
+      const hR = this.terrain.getHeightAt(x + eps, z);
+      const hU = this.terrain.getHeightAt(x, z - eps);
+      const hD = this.terrain.getHeightAt(x, z + eps);
+      const dx = (hR - hL) / (2 * eps);
+      const dz = (hD - hU) / (2 * eps);
+      const slope = Math.sqrt(dx * dx + dz * dz);
+      if (slope > this.maxSlope) continue;
+
+      candidates.push({ x, z, h });
+    }
+
+    if (candidates.length === 0) {
+      console.warn('Conifers: не найдено подходящих точек для посадки');
+      return;
+    }
+
+    this.mesh = new THREE.InstancedMesh(geo, mat, candidates.length);
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
+    this.mesh.frustumCulled = false; // чтобы не «пропадали» при больших сценах
+
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+
+    for (let i = 0; i < candidates.length; i++) {
+      const p = candidates[i];
+
+      dummy.position.set(p.x, p.h - 0.4, p.z);
+      // Небольшой случайный поворот вокруг Y + лёгкий наклон
+      dummy.rotation.set(
+        (Math.random() - 0.5) * 0.08,
+         Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.08
+      );
+
+      // Масштаб: ёлки наверху чуть меньше (ветер/холод)
+      const heightFactor = 1.0 - Math.min(0.4, (p.h - this.minH) * 0.01);
+      const s = (0.7 + Math.random() * 0.7) * heightFactor;
+      dummy.scale.set(s, s * (1 + Math.random()), s);
+      dummy.updateMatrix();
+      this.mesh.setMatrixAt(i, dummy.matrix);
+
+      // Оттенок: тёмно-зелёный с вариацией
+      const hue   = 0.32 + (Math.random() - 0.5) * 0.04;   // ~115–125°
+      const sat   = 0.45 +  Math.random() * 0.2;
+      const light = 0.08 +  Math.random() * 0.10;
+      color.setHSL(hue, sat, light);
+      this.mesh.setColorAt(i, color);
+    }
+
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+
+    this.scene.add(this.mesh);
+
+    // Запоминаем точки как spawnPoints для уток (по желанию)
+    this.spawnPoints = candidates.map(c => ({ x: c.x, z: c.z }));
+
+    console.log('Ёлки: посажено', candidates.length, 'штук');
+  }
+}
+
+// ============================================================
 // CLASS: Природа (деревья + кусты + камни + камыши)
 // ============================================================
 class Nature {
@@ -1526,6 +1699,9 @@ class Nature {
       // Пропускаем, если под водой или на крутом склоне
       if (this.isUnderwater(x, z, 1.0)) continue;
       if (this.isOnSlope(x, z, 0.55)) continue;
+
+      const h = terrain.getHeightAt(x, z);
+      if (h > 6) continue;   // ← порог совпадает с Conifers.minH
 
       const tree = this.createTree(x, z, 0.8 + Math.random()*0.6);
       this.scene.add(tree);
@@ -2592,6 +2768,19 @@ function getShell() {
 // ============================================================
 const sky = new Sky(scene);
 const nature = new Nature(scene);
+const conifers = new Conifers(scene, terrain, {
+  count: 140,       // сколько ёлок
+  minH: 6,          // ниже — не сажаем (там лиственные)
+  maxH: 45,         // выше — голый камень/снег
+  maxSlope: 0.6,
+  radius: 220,      // радиус от центра карты
+});
+
+// Утки могут спавниться и возле ёлок
+if (conifers.spawnPoints) {
+  nature.spawnPoints.push(...conifers.spawnPoints);
+}
+
 const gun = new Gun(camera, envMap);;
 const breathing = new Breathing(scene, camera, gun);
 const lodge = new Lodge(scene, 0, -12);  // ← координаты можно менять
