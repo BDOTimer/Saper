@@ -715,38 +715,47 @@ class Grass {
   constructor(scene, terrain, opts = {}) {
     this.scene = scene;
     this.terrain = terrain;
-    this.count = opts.count ?? 40000;       // количество травинок
-    this.radius = opts.radius ?? 240;        // радиус посадки (от центра карты)
+    this.count = opts.count ?? 40000;
+    this.radius = opts.radius ?? 90;
     this.time = 0;
+    this.mesh = null;            // ← пока не создан
+    this.positions = [];
+    this.originalScales = [];
+    this.lodTimer = 0;
+    
+    // Загружаем текстуру СИНХРОННО (не блокирует сцену, но build() завершится с готовой текстурой)
+    this.texLoader = new THREE.TextureLoader();
+    this.grassTex = this.texLoader.load('./res/grass-1.png', (tex) => {
+      // коллбэк после загрузки
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    });
+    
     this.build();
   }
 
-  // Крестовина из двух плоскостей — травинка видна со всех сторон
   createGrassBlade() {
-    const plane1 = new THREE.PlaneGeometry(0.25, 0.7, 1, 4);
-    plane1.translate(0, 0.35, 0);
+    const plane1 = new THREE.PlaneGeometry(2.0, 1.4, 1, 4);
+    plane1.translate(0, 0.7, 0);
 
     const plane2 = plane1.clone();
     plane2.rotateY(Math.PI / 2);
 
-    // Склеиваем вручную (без BufferGeometryUtils)
     const p1 = plane1.attributes.position.array;
     const p2 = plane2.attributes.position.array;
     const positions = new Float32Array(p1.length + p2.length);
-    positions.set(p1, 0);
-    positions.set(p2, p1.length);
+    positions.set(p1, 0); positions.set(p2, p1.length);
 
     const n1 = plane1.attributes.normal.array;
     const n2 = plane2.attributes.normal.array;
     const normals = new Float32Array(n1.length + n2.length);
-    normals.set(n1, 0);
-    normals.set(n2, n1.length);
+    normals.set(n1, 0); normals.set(n2, n1.length);
 
     const u1 = plane1.attributes.uv.array;
     const u2 = plane2.attributes.uv.array;
     const uvs = new Float32Array(u1.length + u2.length);
-    uvs.set(u1, 0);
-    uvs.set(u2, u1.length);
+    uvs.set(u1, 0); uvs.set(u2, u1.length);
 
     const i1 = plane1.index.array;
     const i2 = plane2.index.array;
@@ -768,20 +777,22 @@ class Grass {
   build() {
     const geo = this.createGrassBlade();
 
-    // Стандартный материал + инъекция кода в vertex shader
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x4a7a2a,
+      map: this.grassTex,        // ← даже если текстура ещё грузится, материал готов
+      color: 0xffffff,
       side: THREE.DoubleSide,
       roughness: 0.95,
       metalness: 0.0,
+      alphaTest: 0.4,            // жёсткий силуэт, без прозрачности
+      transparent: false,
+      depthWrite: true,
     });
 
     mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime         = { value: 0 };
-      shader.uniforms.uWindStrength = { value: 0.09 };
-      shader.uniforms.uWindFreq     = { value: 0.5 };
+      shader.uniforms.uTime = { value: 0 };
+      shader.uniforms.uWindStrength = { value: 0.18 };
+      shader.uniforms.uWindFreq = { value: 0.5 };
 
-      // Добавляем юниформы
       shader.vertexShader = shader.vertexShader.replace(
         '#include <common>',
         `#include <common>
@@ -790,7 +801,6 @@ class Grass {
          uniform float uWindFreq;`
       );
 
-      // Смещаем вершины ветром — корни (y≈0) остаются на месте
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
@@ -799,14 +809,9 @@ class Grass {
          #else
            vec4 wPos = modelMatrix * vec4(position, 1.0);
          #endif
-
-         // Ветер сильнее к верхушке (transformed.y — локальная высота)
-         float windFactor = smoothstep(0.0, 0.35, transformed.y);
-
-         // Две встречные волны — выглядит естественно
+         float windFactor = smoothstep(0.0, 0.7, transformed.y);
          float w1 = sin(uTime * 2.0 + wPos.x * uWindFreq + wPos.z * uWindFreq * 0.8);
          float w2 = cos(uTime * 1.3 + wPos.x * uWindFreq * 0.7 + wPos.z * uWindFreq);
-
          transformed.x += (w1 * 0.7 + w2 * 0.3) * uWindStrength * windFactor;
          transformed.z += (w2 * 0.5 - w1 * 0.2) * uWindStrength * windFactor * 0.6;`
       );
@@ -814,23 +819,19 @@ class Grass {
       mat.userData.shader = shader;
     };
 
-    // Собираем позиции для инстансов
+    // Собираем позиции
     const candidates = [];
     const attempts = this.count * 12;
     for (let i = 0; i < attempts && candidates.length < this.count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const r = Math.sqrt(Math.random()) * this.radius; // равномерно по кругу
+      const r = Math.sqrt(Math.random()) * this.radius;
       const x = Math.cos(angle) * r;
       const z = Math.sin(angle) * r;
 
       const h = this.terrain.getHeightAt(x, z);
-
-      // ❌ Не под водой
       if (h < WATER_LEVEL + 0.4) continue;
-      // ❌ Не высоко в горах (снег/скалы)
       if (h > 8) continue;
 
-      // ❌ Не на крутом склоне
       const eps = 0.6;
       const dx = (this.terrain.getHeightAt(x+eps,z) - this.terrain.getHeightAt(x-eps,z)) / (2*eps);
       const dz = (this.terrain.getHeightAt(x,z+eps) - this.terrain.getHeightAt(x,z-eps)) / (2*eps);
@@ -839,17 +840,20 @@ class Grass {
       candidates.push({ x, z, h });
     }
 
-    // Создаём InstancedMesh
     this.mesh = new THREE.InstancedMesh(geo, mat, candidates.length);
-    this.mesh.frustumCulled = false; // инстансинг уже эффективен, culling лишний
-    this.mesh.castShadow = false;    // трава не отбрасывает тени — большой буст FPS
+    this.mesh.frustumCulled = false;
+    this.mesh.castShadow = false;
     this.mesh.receiveShadow = true;
 
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
+    this.positions = [];
+    this.originalScales = [];
 
     for (let i = 0; i < candidates.length; i++) {
       const p = candidates[i];
+      this.positions.push(new THREE.Vector3(p.x, p.h, p.z));
+
       dummy.position.set(p.x, p.h, p.z);
       dummy.rotation.set(
         (Math.random() - 0.5) * 0.25,
@@ -860,8 +864,8 @@ class Grass {
       dummy.scale.set(s, s * (0.8 + Math.random() * 0.5), s);
       dummy.updateMatrix();
       this.mesh.setMatrixAt(i, dummy.matrix);
+      this.originalScales.push(dummy.scale.x);   // ← сохраняем
 
-      // Вариация цвета по высоте и шуму
       const hue = 0.26 + (Math.random() - 0.5) * 0.06;
       const sat = 0.45 + Math.random() * 0.35;
       const light = 0.28 + Math.random() * 0.22 + (p.h / 10) * 0.05;
@@ -873,12 +877,54 @@ class Grass {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
 
     this.scene.add(this.mesh);
+    console.log('Трава: посажено', candidates.length, 'травинок');
   }
 
-  update(dt) {
+  update(dt, camera) {
+    // 🔒 ЗАЩИТА №1: меш ещё не создан (асинхронная инициализация)
+    if (!this.mesh) return;
+
     this.time += dt;
-    const sh = this.mesh.material.userData.shader;
-    if (sh) sh.uniforms.uTime.value = this.time;
+
+    // 🔒 ЗАЩИТА №2: onBeforeCompile ещё не сработал (не было первого рендера)
+    const shader = this.mesh.material.userData.shader;
+    if (shader) {
+      shader.uniforms.uTime.value = this.time;
+    }
+
+    // LOD по дистанции (раз в 100 мс)
+    this.lodTimer += dt;
+    if (this.lodTimer < 0.1) return;
+    this.lodTimer = 0;
+
+    const camPos = camera.position;
+    const MAX_DIST = 40;
+    const MAX_DIST_SQ = MAX_DIST * MAX_DIST;
+    const dummy = new THREE.Object3D();
+
+    for (let i = 0; i < this.positions.length; i++) {
+      const p = this.positions[i];
+      const dx = p.x - camPos.x;
+      const dz = p.z - camPos.z;
+      const distSq = dx * dx + dz * dz;
+
+      this.mesh.getMatrixAt(i, dummy.matrix);
+      dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+
+      const isVisibleNow = dummy.scale.x > 0.01;
+      const shouldBeVisible = distSq < MAX_DIST_SQ;
+
+      if (isVisibleNow && !shouldBeVisible) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        this.mesh.setMatrixAt(i, dummy.matrix);
+      } else if (!isVisibleNow && shouldBeVisible) {
+        dummy.scale.setScalar(this.originalScales[i]);
+        dummy.updateMatrix();
+        this.mesh.setMatrixAt(i, dummy.matrix);
+      }
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
   }
 }
 
@@ -1033,17 +1079,20 @@ class Terrain {
   }
 }
 
+const SEED = 10000 * Math.random();
+console.log("SEED: ", SEED);
+
 const terrain = new Terrain(scene, {
   size: 600,
   segments: 200,
   height: 30,
   //seed: 12345
-  seed: 10000 * Math.random(),
+  seed: SEED,
 });
 
 const grass = new Grass(scene, terrain, {
-  count: 40000,   // начните с 40к, при необходимости до 80к
-  radius: 300
+  count: 60000,   // начните с 40к, при необходимости до 80к
+  radius: 400
 });
 
 // ============================================================
@@ -2741,7 +2790,7 @@ const playerVel = new THREE.Vector3();
 const playerPos = new THREE.Vector3(0, 1.7 + terrain.getHeightAt(0, 0), 0);
 
 function updatePlayer(dt) {
-  const speed = keys['ShiftLeft'] ? 14 : 8;
+  const speed = keys['ShiftLeft'] ? 4 : 2;
   const dir = new THREE.Vector3();
 
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -2853,7 +2902,7 @@ function animate() {
   gun.update(dt);
   lodge.update(dt);
   updatePlayer(dt);
-  grass.update(dt);
+  grass.update(dt, camera); 
 
   // В animate() после updatePlayer:
   // В animate() после updatePlayer:
