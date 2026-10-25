@@ -90,15 +90,7 @@ export class GunViewer {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.maxPolarAngle = Math.PI * 0.49;
-    this.controls.zoomSpeed = 0.0001;
-
-    this.canvas.addEventListener('wheel', () => {
-        this.controls.enableDamping = false;
-        clearTimeout(this._zoomTimer);
-        this._zoomTimer = setTimeout(() => {
-            this.controls.enableDamping = true;
-        }, 150);
-    }, { passive: true });
+    this.controls.zoomSpeed = 0.6;
 
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     this.scene.add(new THREE.HemisphereLight(0x00ffff, 0x440044, 0.8));
@@ -322,18 +314,12 @@ export class GunViewer {
         const dir = new THREE.Vector3(0.3, 0.5, 1).normalize();
         this.camera.position.copy(center).addScaledVector(dir, distance);
 
-        this.camera.near = 0.01;
-        this.camera.far = 1000;
+        this.camera.near = Math.max(distance / 1000, 0.01);
+        this.camera.far = distance * 50;
         this.camera.updateProjectionMatrix();
         this.camera.lookAt(center);
 
         this.controls.target.copy(center);
-
-        // Границы зума — пропорционально дистанции, а не абсолютные 0.05…100.
-        // Отношение max/min ≈ 50 — это плавно, без «телепорта» к границе.
-        this.controls.minDistance = distance * 0.15;
-        this.controls.maxDistance = distance * 8;
-
         this.controls.update();
 
         this.scene.fog.near = distance * 0.8;
