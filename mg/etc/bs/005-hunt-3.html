@@ -706,6 +706,182 @@ class Breathing {
   }
 }
 
+const WATER_LEVEL = -2.5;  // тот же, что и в Water
+
+// ============================================================
+// Трава
+// ============================================================
+class Grass {
+  constructor(scene, terrain, opts = {}) {
+    this.scene = scene;
+    this.terrain = terrain;
+    this.count = opts.count ?? 40000;       // количество травинок
+    this.radius = opts.radius ?? 90;        // радиус посадки (от центра карты)
+    this.time = 0;
+    this.build();
+  }
+
+  // Крестовина из двух плоскостей — травинка видна со всех сторон
+  createGrassBlade() {
+    const plane1 = new THREE.PlaneGeometry(0.25, 0.7, 1, 4);
+    plane1.translate(0, 0.35, 0);
+
+    const plane2 = plane1.clone();
+    plane2.rotateY(Math.PI / 2);
+
+    // Склеиваем вручную (без BufferGeometryUtils)
+    const p1 = plane1.attributes.position.array;
+    const p2 = plane2.attributes.position.array;
+    const positions = new Float32Array(p1.length + p2.length);
+    positions.set(p1, 0);
+    positions.set(p2, p1.length);
+
+    const n1 = plane1.attributes.normal.array;
+    const n2 = plane2.attributes.normal.array;
+    const normals = new Float32Array(n1.length + n2.length);
+    normals.set(n1, 0);
+    normals.set(n2, n1.length);
+
+    const u1 = plane1.attributes.uv.array;
+    const u2 = plane2.attributes.uv.array;
+    const uvs = new Float32Array(u1.length + u2.length);
+    uvs.set(u1, 0);
+    uvs.set(u2, u1.length);
+
+    const i1 = plane1.index.array;
+    const i2 = plane2.index.array;
+    const offset = p1.length / 3;
+    const indices = new Uint16Array(i1.length + i2.length);
+    indices.set(i1, 0);
+    for (let i = 0; i < i2.length; i++) indices[i1.length + i] = i2[i] + offset;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('normal',   new THREE.BufferAttribute(normals, 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+
+    plane1.dispose(); plane2.dispose();
+    return geo;
+  }
+
+  build() {
+    const geo = this.createGrassBlade();
+
+    // Стандартный материал + инъекция кода в vertex shader
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x4a7a2a,
+      side: THREE.DoubleSide,
+      roughness: 0.95,
+      metalness: 0.0,
+    });
+
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime         = { value: 0 };
+      shader.uniforms.uWindStrength = { value: 0.09 };
+      shader.uniforms.uWindFreq     = { value: 0.5 };
+
+      // Добавляем юниформы
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+         uniform float uTime;
+         uniform float uWindStrength;
+         uniform float uWindFreq;`
+      );
+
+      // Смещаем вершины ветром — корни (y≈0) остаются на месте
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+         #ifdef USE_INSTANCING
+           vec4 wPos = instanceMatrix * vec4(position, 1.0);
+         #else
+           vec4 wPos = modelMatrix * vec4(position, 1.0);
+         #endif
+
+         // Ветер сильнее к верхушке (transformed.y — локальная высота)
+         float windFactor = smoothstep(0.0, 0.35, transformed.y);
+
+         // Две встречные волны — выглядит естественно
+         float w1 = sin(uTime * 2.0 + wPos.x * uWindFreq + wPos.z * uWindFreq * 0.8);
+         float w2 = cos(uTime * 1.3 + wPos.x * uWindFreq * 0.7 + wPos.z * uWindFreq);
+
+         transformed.x += (w1 * 0.7 + w2 * 0.3) * uWindStrength * windFactor;
+         transformed.z += (w2 * 0.5 - w1 * 0.2) * uWindStrength * windFactor * 0.6;`
+      );
+
+      mat.userData.shader = shader;
+    };
+
+    // Собираем позиции для инстансов
+    const candidates = [];
+    const attempts = this.count * 12;
+    for (let i = 0; i < attempts && candidates.length < this.count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * this.radius; // равномерно по кругу
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+
+      const h = this.terrain.getHeightAt(x, z);
+
+      // ❌ Не под водой
+      if (h < WATER_LEVEL + 0.4) continue;
+      // ❌ Не высоко в горах (снег/скалы)
+      if (h > 8) continue;
+
+      // ❌ Не на крутом склоне
+      const eps = 0.6;
+      const dx = (this.terrain.getHeightAt(x+eps,z) - this.terrain.getHeightAt(x-eps,z)) / (2*eps);
+      const dz = (this.terrain.getHeightAt(x,z+eps) - this.terrain.getHeightAt(x,z-eps)) / (2*eps);
+      if (Math.sqrt(dx*dx + dz*dz) > 0.55) continue;
+
+      candidates.push({ x, z, h });
+    }
+
+    // Создаём InstancedMesh
+    this.mesh = new THREE.InstancedMesh(geo, mat, candidates.length);
+    this.mesh.frustumCulled = false; // инстансинг уже эффективен, culling лишний
+    this.mesh.castShadow = false;    // трава не отбрасывает тени — большой буст FPS
+    this.mesh.receiveShadow = true;
+
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+
+    for (let i = 0; i < candidates.length; i++) {
+      const p = candidates[i];
+      dummy.position.set(p.x, p.h, p.z);
+      dummy.rotation.set(
+        (Math.random() - 0.5) * 0.25,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.25
+      );
+      const s = 0.6 + Math.random() * 0.9;
+      dummy.scale.set(s, s * (0.8 + Math.random() * 0.5), s);
+      dummy.updateMatrix();
+      this.mesh.setMatrixAt(i, dummy.matrix);
+
+      // Вариация цвета по высоте и шуму
+      const hue = 0.26 + (Math.random() - 0.5) * 0.06;
+      const sat = 0.45 + Math.random() * 0.35;
+      const light = 0.28 + Math.random() * 0.22 + (p.h / 10) * 0.05;
+      color.setHSL(hue, sat, light);
+      this.mesh.setColorAt(i, color);
+    }
+
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+
+    this.scene.add(this.mesh);
+  }
+
+  update(dt) {
+    this.time += dt;
+    const sh = this.mesh.material.userData.shader;
+    if (sh) sh.uniforms.uTime.value = this.time;
+  }
+}
+
 // ============================================================
 // ЛАНДШАФТ — процедурный (более холмистый)
 // ============================================================
@@ -864,10 +1040,14 @@ const terrain = new Terrain(scene, {
   seed: 12345
 });
 
+const grass = new Grass(scene, terrain, {
+  count: 40000,   // начните с 40к, при необходимости до 80к
+  radius: 95
+});
+
 // ============================================================
 // CLASS: Вода (плоскость с анимированной рябью)
 // ============================================================
-const WATER_LEVEL = -2.5;  // тот же, что и в Water
 class Water {
   constructor(scene, opts = {}) {
     this.scene = scene;
@@ -2672,6 +2852,7 @@ function animate() {
   gun.update(dt);
   lodge.update(dt);
   updatePlayer(dt);
+  grass.update(dt);
 
   // В animate() после updatePlayer:
   // В animate() после updatePlayer:
