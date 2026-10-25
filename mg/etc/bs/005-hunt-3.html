@@ -2026,8 +2026,13 @@ class Gun {
 
   // Направление выброса гильзы
   getEjectDirection() {
-    const dir = new THREE.Vector3(1, 0.8, 0.2).normalize();
-    return dir.transformDirection(this.model.matrixWorld);
+    // Локальная скорость выброса в системе координат ружья:
+    //   X — вправо (от игрока)
+    //   Y — вверх
+    //   Z — чуть вперёд (к дулу)
+    const local = new THREE.Vector3(0.7, 8.1, -4.75).normalize();
+    // Переводим в мировые координаты через текущую ориентацию ружья
+    return local.transformDirection(this.model.matrixWorld);
   }
 
   fire() {
@@ -2165,7 +2170,7 @@ class Duck {
         this.velocity.z += (Math.random() - 0.5) * 4;
         this.velocity.y += Math.random() * 1;
       }
-      this.velocity.y -= dt * 1.5; 
+      this.velocity.y -= dt * 1.0; 
 
       this.group.position.addScaledVector(this.velocity, dt);
 
@@ -2485,13 +2490,19 @@ getBullet().fire(start, end);
 
 // Гильза
 const ejectPos = gun.getEjectPosition();
-const ejectDirWorld = gun.getEjectDirection();
-const ejectSpeed = 0.5 + Math.random();
+const ejectDirWorld = gun.getEjectDirection(); // уже нормализованный, в мире
+
+// Базовая скорость выброса (м/с) — подберите под масштаб сцены
+const ejectSpeed = 2.5 + Math.random() * 1.0;
+
+// Мировой вектор скорости
 const ejectVel = ejectDirWorld.multiplyScalar(ejectSpeed);
 
-ejectVel.x += (Math.random() - 0.5) * 0.8;
-ejectVel.y += 2.6 + (Math.random());
-ejectVel.z  = -1.6;
+// Небольшой случайный разброс (в локальных осях ружья, чтобы не «ломать» направление)
+// Проще — просто добавить маленький случайный мировой шум:
+ejectVel.x += (Math.random() - 0.5) * 0.6;
+ejectVel.y += (Math.random() - 0.5) * 0.4;
+ejectVel.z += (Math.random() - 0.5) * 0.6;
 
 getShell().fire(ejectPos, ejectVel);
 
