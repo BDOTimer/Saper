@@ -401,8 +401,8 @@ class Breathing {
   }
 }
 
-const PLAYER = {
-    Player,
+const PLAYER =
+{   Player,
     Breathing,
 };
 
