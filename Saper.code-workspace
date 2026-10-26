@@ -20,6 +20,15 @@
 				"path": "Saper\\mg\\Galaxy-J\\ui\\",
 				"color": "foldercustomization.AnsiColor22",
 				"badge": "💠"
+			},
+			{
+				"path": "Saper\\mg\\etc\\bs\\",
+				"color": "foldercustomization.AnsiColor70",
+				"badge": "📗"
+			},
+			{
+				"path": "Saper\\mg\\etc\\bs\\bs-js\\",
+				"badge": "🍄‍🟫"
 			}
 		]
 	}
