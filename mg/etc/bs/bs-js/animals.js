@@ -385,11 +385,11 @@ class Pig {
     this.fallRotSpeed = 0;
 
     // ✅ Лежание после смерти
-    this.landed        = false; // уже коснулась земли
-    this.lyingTime     = 0;     // сколько секунд лежит
-    this.lyingDuration = 60.0;  // 1 минута
-    this.sinkDepth     = 1.1;   // на сколько метров опустится
-    this._landedBaseY  = 0;     // Y, на котором легла (для плавного опускания)
+    this.landed        = false;  // уже коснулась земли
+    this.lyingTime     =     0;  // сколько секунд лежит
+    this.lyingDuration = 120.0;  // 1 минута
+    this.sinkDepth     =   1.2;  // на сколько метров опустится
+    this._landedBaseY  =     0;  // Y, на котором легла (для плавного опускания)
 
     // Анимация
     this.legPhase = 0;

@@ -385,6 +385,7 @@ canvas {
     import { HOUSES } from "src/lodge-1.js";
     import { GUN1   } from "src/gun-1.js";
     import { ANIMALS} from "src/animals.js";
+    import { MODELS } from "src/models.js";
     import { buildGun, dispose as disposeGun } from "src/gun.compile.js";
 
 // ============================================================
@@ -610,6 +611,38 @@ const lodge     = new HOUSES.Lodge    (scene, terrain, 0, 12);  // ← коор�
 const bulletPool = new GUN1.BulletPool(scene, 8);
 const shellPool  = new GUN1.ShellPool (scene, terrain, 12);
 
+let Px = -70;
+let Pz = -23;
+
+// Самая низкая точка — с шагом 2 м, не заходя в воду
+// const lowest = terrain.findLowestPoint({ step: 2, includeWater: false });
+// if (lowest) {
+//   console.log("Самая низкая сухая точка:", lowest);
+//   // → { x: -183, z: 47, y: -2.9 } (пример)
+//   Px = lowest.x;
+//   Pz = lowest.z;
+// }
+
+// ===== Модель sp-2ab (например, сарай/вышка/что угодно) =====
+const sp2ab = new MODELS.SceneModel({
+  scene,
+  terrain,
+  url: "res/sp-2ab.glb",
+  x: Px,
+  z: Pz,
+  yawDeg  :  -50.0,  // ← вокруг Y - рысканье
+  pitchDeg:  30.0,  // ← вокруг X (наклон вперёд/назад)
+  rollDeg :   0,  // ← вокруг Z (крен влево/вправо)
+  scale   : 100.0,
+  yOffset: 10,
+  alignToNormal: false,
+  onLoad: (m) => console.log("[sp-2ab] loaded", m),
+  onError: (e) => console.error("[sp-2ab] failed", e),
+});
+
+// Асинхронно — грузим и сажаем на землю
+sp2ab.load().catch(() => { /* ошибка уже залогирована */ });
+
 // --------------------------------------------------------
 // ПУЛЫ ДИЧИ 🔥🔥🔥 ...
 // --------------------------------------------------------
@@ -670,7 +703,7 @@ const player = new PLAYER.Player({
   isTouch,
   joyVector,
   controls ,
-  start: { x: -1.52, z: 24.69, yawDeg: -38.7, pitchDeg: 7.2 },
+  start: { x: -1.3, z: 21.6, yawDeg: 54.7, pitchDeg: 6.6 },
   eyeHeight: 1.7,
   mouseSensitivity: 0.0022,
   maxRadius: 200,
@@ -951,21 +984,21 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('blur', () => setCursorEnabled(false));
 
 // ===== F4 — отладка: позиция игрока + поворот камеры =====
-// window.addEventListener('keydown', (e) => {
-//   if (e.code !== 'F4') return;
-//   e.preventDefault();   // иначе браузер может открыть что-то своё
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'F4') return;
+  e.preventDefault();   // иначе браузер может открыть что-то своё
 
-//   // Позиция игрока (мировые координаты)
-//   const p = player.getDebugInfo();
-//   console.log(
-//     `%c[F4] Позиция: [ x=${p.x.toFixed(2)}  y=${p.y.toFixed(2)}  z=${p.z.toFixed(2)} ] ` +
-//     `| Поворот: [` +
-//     `yaw=${p.yawDeg.toFixed(1)}°  ` +
-//     `pitch=${p.pitchDeg.toFixed(1)}°  ` +
-//     `roll=${p.rollDeg.toFixed(1)}° ]`,
-//     'color:#0ff; font-weight:bold;'
-//   );
-// });
+  // Позиция игрока (мировые координаты)
+  const p = player.getDebugInfo();
+  console.log(
+    `%c[F4] Позиция: [ x=${p.x.toFixed(2)}  y=${p.y.toFixed(2)}  z=${p.z.toFixed(2)} ] ` +
+    `| Поворот: [` +
+    `yaw=${p.yawDeg.toFixed(1)}°  ` +
+    `pitch=${p.pitchDeg.toFixed(1)}°  ` +
+    `roll=${p.rollDeg.toFixed(1)}° ]`,
+    'color:#0ff; font-weight:bold;'
+  );
+});
 
 </script>
 </body>

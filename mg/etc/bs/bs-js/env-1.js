@@ -385,6 +385,48 @@ class Terrain {
   getHeightAt(x, z) {
     return this.heightAt(x, z);
   }
+
+    /**
+   * Найти самую низкую точку ландшафта.
+   *
+   * @param {Object} [opts]
+   * @param {number} [opts.step=1]        — шаг сканирования (м). Меньше — точнее, но дороже
+   * @param {number} [opts.margin=0]      — отступ от края карты (м). По умолчанию 30
+   * @param {boolean} [opts.includeWater=false] — если false, точки ниже WATER_LEVEL+0.5 пропускаются
+   * @returns {{x:number, z:number, y:number}|null}
+   */
+  findLowestPoint(opts = {}) {
+    const step         = opts.step         ??  1;
+    const margin       = opts.margin       ?? 30;
+    const includeWater = opts.includeWater ?? true;
+
+    const half   = this.size / 2 - margin;
+    const minX   = -half;
+    const maxX   =  half;
+    const minZ   = -half;
+    const maxZ   =  half;
+
+    let bestX = 0, bestZ = 0, bestY = Infinity;
+    let found = false;
+
+    for (let x = minX; x <= maxX; x += step) {
+      for (let z = minZ; z <= maxZ; z += step) {
+        const y = this.heightAt(x, z);
+
+        if (!includeWater && y < WATER_LEVEL + 0.5) continue;
+
+        if (y < bestY) {
+          bestY = y;
+          bestX = x;
+          bestZ = z;
+          found = true;
+        }
+      }
+    }
+
+    if (!found) return null;
+    return { x: bestX, z: bestZ, y: bestY };
+  }
 }
 
 // --------------------------------------------------------
