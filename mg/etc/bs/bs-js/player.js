@@ -38,6 +38,16 @@ class Player {
     this.walkSpeed        = opts.walkSpeed        ?? 2;
     this.runSpeed         = opts.runSpeed         ?? 5;
 
+    // Выносливость
+    this.stamina         = opts.stamina         ?? 100;  // текущая
+    this.staminaMax      = opts.staminaMax      ?? 100;
+    this.staminaDrain    = opts.staminaDrain    ?? 20;   // в секунду при беге
+    this.staminaRegen    = opts.staminaRegen    ?? 10;   // в секунду в покое
+    this.staminaRunMin   = opts.staminaRunMin   ?? 5;    // порог, ниже которого уже не бежим
+    this._staminaLocked  = false;
+    this.onStaminaChange = null;          // ← то же имя, что в update()
+    this._prevStamina    = this.stamina;
+
     const s = opts.start || {};
     this.startX      = s.x       ?? 0;
     this.startZ      = s.z       ?? 0;
@@ -139,7 +149,20 @@ class Player {
 
     // 1) Движение — по WASD/джойстику (yaw-плоскость)
     const keys = this.controls.keys;
-    const speed = keys['ShiftLeft'] ? this.runSpeed : this.walkSpeed;
+
+    // Определяем «хочет бежать»: Shift + есть направление
+    const wantsToRun = keys['ShiftLeft'] || keys['ShiftRight'];
+
+    // Считаем, есть ли куда идти (W/A/S/D или джойстик)
+    const hasInput =
+      keys['KeyW'] || keys['KeyS'] || keys['KeyD'] || keys['KeyA'] ||
+      (this.isTouch && (this.joyVector.x !== 0 || this.joyVector.y !== 0));
+
+    // Бежит, только если реально хочет + есть запас выносливости
+    const canRun = !this._staminaLocked && this.stamina > 0;
+    const isRunning = wantsToRun && hasInput && canRun;
+
+    const speed = isRunning ? this.runSpeed : this.walkSpeed;
 
     const forward = this._scratchForward.set(0, 0, -1)
       .applyQuaternion(this.camera.quaternion);
@@ -187,6 +210,37 @@ class Player {
     // cameraPivot.rotation.x/y всегда 0 — ими управляет мышь через camera.quaternion
     this.cameraPivot.rotation.x = 0;
     this.cameraPivot.rotation.y = 0;
+
+    // ===== Выносливость =====
+    if (isRunning) {
+      this.stamina -= this.staminaDrain * dt;
+      if (this.stamina <= 0) {
+        this.stamina = 0;
+        this._staminaLocked = true;    // «выдохся» — блокируем бег
+      }
+    } else {
+      // Восстанавливается только когда не бежим
+      this.stamina += this.staminaRegen * dt;
+      if (this.stamina > this.staminaMax) this.stamina = this.staminaMax;
+
+      // Снимаем блокировку, когда выносливости достаточно
+      if (this._staminaLocked && this.stamina >= this.staminaRunMin) {
+        this._staminaLocked = false;
+      }
+    }
+
+    // ===== Уведомить подписчика об изменении =====
+    if (this.onStaminaChange) {
+      const delta = this.stamina - this._prevStamina;
+      if (delta !== 0) {
+        this.onStaminaChange(this.stamina, this.staminaMax, delta);
+        this._prevStamina = this.stamina;
+      }
+    }
+  }
+
+  setOnStaminaChange(onStaminaChange)
+  {   this.onStaminaChange = onStaminaChange;
   }
 
   isMoving() {
