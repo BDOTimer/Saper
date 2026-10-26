@@ -36,15 +36,51 @@ canvas {
   left: 0;
   touch-action: none;
 }
-  #score {
-    position: fixed; top: 20px; left: 20px; color: #fff;
-    font-size: 24px; font-weight: bold;
-    text-shadow: 2px 2px 4px #000; z-index: 10;
-    background: rgba(0,0,0,0.4); padding: 10px 20px; border-radius: 8px;
-  }
+
+/* Контейнер для счётчиков */
+#scores {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+
+  display: grid;
+  grid-template-columns: max-content 4ch;   /* подпись — по ширине, число — 4 знака */
+  column-gap: 1px;
+  row-gap: 3px;
+
+  pointer-events: none;
+}
+
+.score-line {
+  display: contents;   /* чтобы label/value стали прямыми ячейками грида #scores */
+}
+
+.score-label,
+.score-value {
+  color: #fff;
+  font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 4px #000;
+
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 14px;
+  border-radius: 8px;
+
+  /* Ключевое: цифры одинаковой ширины */
+  font-variant-numeric: tabular-nums;
+}
+
+.score-value {
+  text-align: right;   /* число прижато к правому краю своей колонки */
+  min-width: 4ch;      /* гарантирует, что «0» и «100» не сдвинут колонку */
+}
+
   #crosshair {
     position: fixed; top: 50%; left: calc(50% + 10px); ; transform: translate(-50%, -50%);
-    color: #ff2200; font-size: 10px; font-weight: bold; z-index: 10;
+    color: #a2b90a; font-size: 10px; font-weight: bold; z-index: 10;
     text-shadow: 0 0 1px #000; pointer-events: none; user-select: none;
   }
   #info {
@@ -280,7 +316,17 @@ canvas {
     <span class="corner-arrow">🪜</span>
   </a>
 
-<div id="score">Утки: 0</div>
+<div id="scores">
+  <div class="score-line">
+    <span class="score-label">Утки</span>
+    <span class="score-value" id="score">0</span>
+  </div>
+  <div class="score-line">
+    <span class="score-label">Кабаны</span>
+    <span class="score-value" id="score-pig">0</span>
+  </div>
+</div>
+
 <div id="crosshair">✛</div>
 <div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
 <div id="flash"></div>
@@ -518,7 +564,7 @@ sunLight.shadow.camera.bottom = -150;
 scene.add(sunLight);
 
 // ============================================================
-// ENV
+// ENV 🔥🔥🔥 ...
 // ============================================================
 const SEED = 10000 * Math.random();
 console.log("SEED: ", SEED); 
@@ -564,7 +610,15 @@ const lodge     = new HOUSES.Lodge    (scene, terrain, 0, 12);  // ← коор�
 const bulletPool = new GUN1.BulletPool(scene, 8);
 const shellPool  = new GUN1.ShellPool (scene, terrain, 12);
 
-let score = 0;
+// --------------------------------------------------------
+// ПУЛЫ ДИЧИ 🔥🔥🔥 ...
+// --------------------------------------------------------
+// ===== Счётчики =====
+const scoreEl    = document.getElementById('score');       // Утки
+const scorePigEl = document.getElementById('score-pig');   // Кабаны
+
+let score    = 0;   // утки
+let scorePig = 0;   // кабаны
 
 // ===== Пул уток =====
 const duckPool = new ANIMALS.DuckPool(scene, terrain, {
@@ -576,33 +630,29 @@ const duckPool = new ANIMALS.DuckPool(scene, terrain, {
   waterLevel    : ENV.WATER_LEVEL,
 });
 
+duckPool.onKill = () => {
+  score++;
+  scoreEl.textContent = 'Утки  : ' + score;
+};
+
 // ===== Пул свиней =====
 const pigPool = new ANIMALS.PigPool(scene, terrain, {
-  spawnPoints   : nature.spawnPoints,   // можно свои точки, если есть
+  spawnPoints   : nature.spawnPoints,
   spawnInterval : 3.5,
-  maxAlive      : 4,
+  maxAlive      : 20,
   spawnRadiusMin: 25,
-  spawnRadiusMax: 60,
+  spawnRadiusMax: 70,
   waterLevel    : ENV.WATER_LEVEL,
 });
 
 pigPool.onKill = () => {
-  // счёт/очки — по желанию; например, свинья = +3 утки:
-  score += 3;
-  scoreEl.textContent = 'Утки: ' + score;
-};
-
-// Колбэк на убийство — обновляем счёт и UI здесь, а не в shoot()
-const scoreEl = document.getElementById('score');
-duckPool.onKill = () => {
-  score++;
-  scoreEl.textContent = 'Утки: ' + score;
+  scorePig++;
+  scorePigEl.textContent = 'Кабаны: ' + scorePig;
 };
 
 // --------------------------------------------------------
 // ИГРОК 🔥🔥🔥 ...
 // --------------------------------------------------------
-
 const keys = {};
 const controls = { keys };
 document.addEventListener('keydown', e => keys[e.code] = true);
@@ -623,9 +673,9 @@ const player = new PLAYER.Player({
   start: { x: -1.52, z: 24.69, yawDeg: -38.7, pitchDeg: 7.2 },
   eyeHeight: 1.7,
   mouseSensitivity: 0.0022,
-  maxRadius: 140,
+  maxRadius: 200,
   walkSpeed: 2,
-  runSpeed: 4,
+  runSpeed : 4.2,
 });
 
 // --------------------------------------------------------

@@ -102,7 +102,7 @@ class Duck {
     this.falling = true;
     this.fallSpeed = 2;
     this.fallRotSpeed = (Math.random() - 0.5) * 8;
-    if (window.SNDS && SNDS.death) SNDS.death.play();
+    const a = window.SNDS; if (a && a.death) a.death.play();
     return true;
   }
 
@@ -365,6 +365,11 @@ class Pig {
     this.falling  = false;
     this.removeMe = false;
 
+    // ✅ НОВОЕ: Механика ранения
+    this.hits          =  0;  // Счетчик попаданий (0, 1 или 2)
+    this.panicTimer    =  0;  // Время в секундах с момента первого ранения
+    this.panicDuration = 10;  // Время T, через которое свинья "забывает" ранение и сбрасывает счетчик
+
     // Движение
     this.mode = 'idle';                        // 'idle' | 'walk' | 'run'
     this.modeTimer = 0;
@@ -376,8 +381,15 @@ class Pig {
     this.runSpeed  = 5.0 + Math.random() * 2.0;
 
     // Физика падения
-    this.fallSpeed = 0;
+    this.fallSpeed    = 0;
     this.fallRotSpeed = 0;
+
+    // ✅ Лежание после смерти
+    this.landed        = false; // уже коснулась земли
+    this.lyingTime     = 0;     // сколько секунд лежит
+    this.lyingDuration = 60.0;  // 1 минута
+    this.sinkDepth     = 1.1;   // на сколько метров опустится
+    this._landedBaseY  = 0;     // Y, на котором легла (для плавного опускания)
 
     // Анимация
     this.legPhase = 0;
@@ -403,15 +415,15 @@ class Pig {
 
     // «Вперёд» в локальных осях — по +X (голова на +0.55)
     this.velocity = new THREE.Vector3();
-    this._tmpDir = new THREE.Vector3();
-    this._up     = new THREE.Vector3(0, 1, 0);
+    this._tmpDir  = new THREE.Vector3();
+    this._up      = new THREE.Vector3(0, 1, 0);
   }
 
   buildModel() {
     const bodyMat  = new THREE.MeshLambertMaterial({ color: 0xc98f80 });
     const snoutMat = new THREE.MeshLambertMaterial({ color: 0xe8b4a0 });
     const hoofMat  = new THREE.MeshLambertMaterial({ color: 0x3a2a20 });
-    const eyeMat   = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const eyeMat   = new THREE.MeshBasicMaterial  ({ color: 0x000000 });
     const earMat   = new THREE.MeshLambertMaterial({ color: 0xb87a6a });
 
     // --- Тело ---
@@ -447,7 +459,7 @@ class Pig {
     }
 
     // --- Глаза ---
-    for (const dz of [-0.12, 0.12]) {
+    for (const dz of [-0.22, 0.22]) {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), eyeMat);
       eye.position.set(0.68, 0.63, dz);
       this.group.add(eye);
@@ -455,7 +467,7 @@ class Pig {
 
     // --- 4 ноги ---
     this.legs = [];
-    const legGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.42, 6);
+    const legGeo = new THREE.CylinderGeometry(0.06, 0.03, 0.42, 6);
     legGeo.translate(0, -0.21, 0);   // вращение вокруг верхней точки
 
     const legPositions = [
@@ -488,7 +500,6 @@ class Pig {
     }
 
     this.group.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    // _baseGroupY больше НЕ нужен — высота считается от земли каждый кадр
   }
 
   getBoundingBox() {
@@ -497,12 +508,31 @@ class Pig {
 
   hit() {
     if (!this.alive) return false;
-    this.alive = false;
-    this.falling = true;
-    this.fallSpeed = 2;
-    this.fallRotSpeed = (Math.random() - 0.5) * 6;
-    if (window.SNDS && window.SNDS.death) window.SNDS.deathPig.play();
-    return true;
+
+    this.hits = (this.hits || 0) + 1;
+    this.panicTimer = 0; // Сбрасываем таймер при каждом новом попадании
+
+    if (this.hits >= 3) {
+      // ✅ 3-е попадание: СМЕРТЬ
+      this.alive = false;
+      this.falling = true;
+      this.landed = false;
+      this.lyingTime = 0;
+      this.fallSpeed = 2;
+      this.fallRotSpeed = (Math.random() - 0.5) * 6;
+      const a = window.SNDS; if (a && a.deathPig) a.deathPig.play();
+      return true; // Сообщаем пулу, что свинья убита
+    } else {
+      // ✅ 1-е или 2-е попадание: ПАНИКА И БЕГ
+      this.mode = 'run';
+      this.modeTimer = 0;
+      this.modeDuration = 999; // Блокируем случайную смену режима, пока действует таймер паники
+      
+      // Опционально: звук ранения (если есть, иначе можно игнорировать)
+      const a = window.SNDS; if (a && a.hurtPig) a.hurtPig.play();
+      
+      return false; // Сообщаем пулу, что свинья еще жива
+    }
   }
 
   // ---- Смена режима ----
@@ -531,15 +561,36 @@ class Pig {
       this._updateAlive(dt);
     } else if (this.falling) {
       this._updateFalling(dt);
+    } else if (this.landed) {
+      this._updateLying(dt);
     }
   }
 
   _updateAlive(dt) {
-    // --- Таймер режима ---
-    this.modeTimer += dt;
-    if (this.modeTimer >= this.modeDuration) {
-      this.modeTimer = 0;
-      this._pickMode();
+    // ✅ ЛОГИКА ПАНИКИ ПОСЛЕ РАНЕНИЯ
+    if (this.hits > 0 && this.hits < 3) {
+      this.panicTimer += dt;
+      this.mode = 'run'; // Принудительный бег
+      
+      // Небольшой случайный поворот во время паники, чтобы она не бежала строго по прямой в пропасть
+      if (Math.random() < 0.02) {
+        this.group.rotation.y += (Math.random() - 0.5) * 0.5;
+      }
+
+      // Если время вышло, свинья "успокаивается"
+      if (this.panicTimer >= this.panicDuration) {
+        this.hits = 0;
+        this.panicTimer = 0;
+        this.modeTimer = 0;
+        this._pickMode(); // Возвращаем нормальное поведение (idle/walk)
+      }
+    } else {
+      // --- Обычный таймер режима (если не ранена) ---
+      this.modeTimer += dt;
+      if (this.modeTimer >= this.modeDuration) {
+        this.modeTimer = 0;
+        this._pickMode();
+      }
     }
 
     // --- Движение по X/Z ---
@@ -548,7 +599,6 @@ class Pig {
       this.mode === 'walk' ? this.walkSpeed : 0;
 
     if (speed > 0) {
-      // «Вперёд» в мировых координатах: локальный +X, повёрнутый на rotation.y
       this._tmpDir.set(1, 0, 0).applyAxisAngle(this._up, this.group.rotation.y);
       this.group.position.addScaledVector(this._tmpDir, speed * dt);
     }
@@ -572,7 +622,7 @@ class Pig {
       leg.group.rotation.z = angle;
     }
 
-    // --- Покачивание тела + подъём по рельефу (ВСЕГДА, не только при движении) ---
+    // --- Покачивание тела + подъём по рельефу ---
     this.bodyBobPhase += dt * (this.mode === 'run' ? 14 : this.mode === 'walk' ? 7 : 1.5);
 
     const bobAmp =
@@ -614,8 +664,27 @@ class Pig {
 
     if (this.group.position.y <= groundY) {
       this.group.position.y = groundY;
-      this.falling = false;
-      setTimeout(() => { this.removeMe = true; }, 1200);
+      this.falling      = false;
+      this.landed       = true;
+      this.lyingTime    = 0;
+      this._landedBaseY = groundY;
+
+      // ✅ Исправление падения на бок (из предыдущего ответа)
+      this.group.rotation.order = 'YXZ';
+      const side = Math.random() < 0.5 ? 1 : -1;
+      this.group.rotation.set(side * Math.PI / 2, this.group.rotation.y, 0);
+    }
+  }
+
+  _updateLying(dt) {
+    this.lyingTime += dt;
+
+    const t = Math.min(1, this.lyingTime / this.lyingDuration);
+    const ease = t * t * (3 - 2 * t);
+    this.group.position.y = this._landedBaseY - ease * this.sinkDepth;
+
+    if (this.lyingTime >= this.lyingDuration) {
+      this.removeMe = true;
     }
   }
 
@@ -638,11 +707,11 @@ class PigPool {
     this.scene   = scene;
     this.terrain = terrain;
 
-    this.spawnInterval  = opts.spawnInterval  ?? 3.5;
-    this.maxAlive       = opts.maxAlive       ?? 4;
-    this.spawnRadiusMin = opts.spawnRadiusMin ?? 25;
-    this.spawnRadiusMax = opts.spawnRadiusMax ?? 60;
-    this.spawnPoints    = opts.spawnPoints    ?? [];
+    this.spawnInterval  = opts.spawnInterval  ??  3.5;
+    this.maxAlive       = opts.maxAlive       ??   20;
+    this.spawnRadiusMin = opts.spawnRadiusMin ??   25;
+    this.spawnRadiusMax = opts.spawnRadiusMax ??   75;
+    this.spawnPoints    = opts.spawnPoints    ??   [];
     this.waterLevel     = opts.waterLevel     ?? -2.5;
 
     this.pigs = [];
@@ -779,6 +848,7 @@ class PigPool {
   }
 
   kill(pig) {
+    // ✅ Теперь kill() сработает (и вызовет onKill) только когда hit() вернет true (после 3-го попадания)
     if (!pig || !pig.hit()) return false;
     if (typeof this.onKill === 'function') this.onKill(pig);
     return true;
@@ -793,6 +863,3 @@ const ANIMALS = {
 };
 
 export { ANIMALS };
-
-
-

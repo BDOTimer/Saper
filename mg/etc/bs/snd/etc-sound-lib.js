@@ -166,7 +166,8 @@ const Vol = 0.3; // Settings.volume;
 const kit = SND.createSoundKit({
     shoot   : { src: "./snd/shoot-1.mp3", volume: Vol, pool: 4 }, // Выстрел
     death   : { src: "./snd/death-1.mp3", volume: Vol, pool: 3 }, // Подбитая утка
-    deathPig: { src: "./snd/death-1.mp3", volume: Vol, pool: 3 }, // Свинья
+    deathPig: { src: "./snd/death-pig-1.mp3", volume: Vol, pool: 2 }, // Свинья
+    hurtPig : { src: "./snd/death-pig-2.mp3", volume: Vol, pool: 3 }, // Свинья
     damag   : { src: "./snd/damag-1.mp3", volume: Vol, pool: 3 }, // Дамаг
     dzin    : { src: "./snd/dzin-1.mp3" , volume: Vol, pool: 4 }, // Затвор ружья
 });

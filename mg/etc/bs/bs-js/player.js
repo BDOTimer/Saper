@@ -36,7 +36,7 @@ class Player {
     this.touchSensitivity = opts.touchSensitivity ?? 0.005;
     this.maxRadius        = opts.maxRadius        ?? 140;
     this.walkSpeed        = opts.walkSpeed        ?? 2;
-    this.runSpeed         = opts.runSpeed         ?? 4;
+    this.runSpeed         = opts.runSpeed         ?? 5;
 
     const s = opts.start || {};
     this.startX      = s.x       ?? 0;
