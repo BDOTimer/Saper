@@ -2,6 +2,8 @@
 //  class Gun;
 //  class Bullet;
 //  class Shell;
+//  class BulletPool;
+//  class ShellPool;
 
 import { buildGun } from "./gun.compile.js";
 
@@ -278,10 +280,102 @@ class Shell {
   }
 }
 
+// --------------------------------------------------------
+// CLASS: RoundRobinPool<T> — общий round-robin пул
+// --------------------------------------------------------
+class RoundRobinPool {
+  /**
+   * @param {number} size
+   * @param {() => any} factory   — создаёт новый элемент
+   */
+  constructor(size, factory) {
+    this.pool = new Array(size);
+    for (let i = 0; i < size; i++) {
+      this.pool[i] = factory();
+    }
+    this.index = 0;
+    this.size  = size;
+  }
+
+  get() {
+    const item = this.pool[this.index];
+    this.index = (this.index + 1) % this.size;
+    return item;
+  }
+
+  /** Обновить все элементы */
+  update(dt) {
+    for (let i = 0; i < this.pool.length; i++) {
+      this.pool[i].update(dt);
+    }
+  }
+
+  /** Переопределяется в наследнике; базовый — no-op */
+  reset() {
+    this.index = 0;
+  }
+}
+
+// --------------------------------------------------------
+// CLASS: BulletPool
+// --------------------------------------------------------
+class BulletPool extends RoundRobinPool {
+  constructor(scene, size = 8) {
+    super(size, () => new Bullet(scene));
+  }
+
+  fire(start, end) {
+    const b = this.get();
+    b.fire(start, end);
+    return b;
+  }
+
+  reset() {
+    super.reset();
+    for (let i = 0; i < this.pool.length; i++) {
+      const b = this.pool[i];
+      b.active = false;
+      b.life = 0;
+      b.mesh.visible = false;
+      b.head.visible = false;
+      b.spark.visible = false;
+    }
+  }
+}
+
+// --------------------------------------------------------
+// CLASS: ShellPool
+// --------------------------------------------------------
+class ShellPool extends RoundRobinPool {
+  constructor(scene, terrain, size = 12) {
+    super(size, () => new Shell(scene, terrain));
+  }
+
+  fire(startPos, startVel) {
+    const s = this.get();
+    s.fire(startPos, startVel);
+    return s;
+  }
+
+  reset() {
+    super.reset();
+    for (let i = 0; i < this.pool.length; i++) {
+      const s = this.pool[i];
+      s.active = false;
+      s.landed = false;
+      s.life = 0;
+      s.mesh.visible = false;
+      s.mesh.scale.set(1, 1, 1);
+    }
+  }
+}
+
 const GUN1 =
 {   Bullet,
+    BulletPool,
     Gun   ,
-    Shell
+    Shell ,
+    ShellPool
 };
 
 export { GUN1 };

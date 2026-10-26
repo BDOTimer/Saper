@@ -335,6 +335,7 @@ canvas {
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
     import { ENV    } from "src/env-1.js";
+    import { PLAYER } from "src/player.js";
     import { HOUSES } from "src/lodge-1.js";
     import { GUN1   } from "src/gun-1.js";
     import { ANIMALS} from "src/animals.js";
@@ -430,7 +431,6 @@ scene.background = new THREE.Color(0x87CEEB);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.05, 500);
 const cameraPivot = new THREE.Group();  // ← контейнер для дыхания
-cameraPivot.position.set(0, 1.7, 0);
 cameraPivot.add(camera);                // камера внутри пивота
 scene.add(cameraPivot);  
 
@@ -518,200 +518,6 @@ sunLight.shadow.camera.bottom = -150;
 scene.add(sunLight);
 
 // ============================================================
-// CLASS: Дыхание охотника (покачивание + пар изо рта)
-// ============================================================
-class Breathing {
-  constructor(scene, camera, gun) {
-    this.scene = scene;
-    this.camera = camera;
-    this.gun = gun;
-
-    this.time = 0;
-    this.breathPhase = 0;
-
-    // Параметры дыхания
-    this.breathSpeed = 1.4;       // «частота» дыхания (рад/сек)
-    this.breathAmp = 0.015;       // амплитуда покачивания ружья (рад)
-
-    // Параметры пара
-    this.steamInterval = 3.0;     // раз в 3 сек — облачко пара
-    this.steamTimer = 0;
-
-    // Пул частиц пара
-    this.steamPool = [];
-    this.steamActive = false;
-    for (let i = 0; i < 6; i++) {
-      this.steamPool.push(this.createSteamParticle());
-    }
-
-    // Лёгкое покачивание при ходьбе
-    this.walkBob = 0;
-    this.lastPos = new THREE.Vector3().copy(camera.position);
-
-        // Покачивание камеры (для применения в animate)
-    this.cameraBobY = 0;
-    this.cameraRoll = 0;
-    this.cameraYaw = 0;
-    this.cameraPitch = 0;
-
-    // Параметры дыхания камеры
-    this.camBreathAmp = 0.012;
-    this.camBreathBobAmp = 0.015;
-    this.camBreathPhase = Math.PI / 2;
-  }
-
-  createSteamParticle() {
-    const geo = new THREE.SphereGeometry(0.04, 6, 6);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      depthTest: false
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.visible = false;
-    mesh.renderOrder = 100;
-    // Крепим к камере, чтобы пар всегда был перед лицом
-    this.camera.add(mesh);
-    return {
-      mesh: mesh,
-      life: 0,
-      maxLife: 1.2,
-      velocity: new THREE.Vector3(),
-      active: false
-    };
-  }
-
-  // Выпустить пар изо рта (один выдох)
-  emitSteam() {
-    // Найти свободную частицу
-    let free = null;
-    for (let i = 0; i < this.steamPool.length; i++) {
-      if (!this.steamPool[i].active) {
-        free = this.steamPool[i];
-        break;
-      }
-    }
-    if (!free) return;
-
-    free.active = true;
-    free.life = 0;
-    // Позиция перед камерой (немного вниз и вперёд — как изо рта)
-    free.mesh.position.set(
-      (Math.random() - 0.5) * 0.05,
-      -0.12 + Math.random() * 0.03,
-      -0.35
-    );
-    free.mesh.scale.setScalar(1);
-    free.mesh.visible = true;
-    free.mesh.material.opacity = 0;
-    // Скорость: медленно вперёд и вниз
-    free.velocity.set(
-      (Math.random() - 0.5) * 0.1,
-      -0.05 - Math.random() * 0.05,
-      -0.15 - Math.random() * 0.1
-    );
-  }
-
-  update(dt, isMoving) {
-    this.time += dt;
-
-    // ==========================================
-    // 1. Покачивание ружья (дыхание + ходьба)
-    // ==========================================
-    this.breathPhase += dt * this.breathSpeed;
-
-    // Базовое покачивание от дыхания
-    let breathY = Math.sin(this.breathPhase) * this.breathAmp;
-    let breathX = Math.sin(this.breathPhase * 0.5) * this.breathAmp * 0.4;
-
-    // Дополнительное покачивание при ходьбе
-    if (isMoving) {
-      this.walkBob += dt * 10;
-      breathY += Math.sin(this.walkBob) * 0.01;
-      breathX += Math.cos(this.walkBob * 0.5) * 0.015;
-    } else {
-      // Плавно затухает
-      this.walkBob *= 0.95;
-    }
-
-    // Применяем только к модели ружья (не к камере, чтобы прицел не дёргался)
-    if (this.gun && this.gun.model) {
-      // Сохраняем базовую позицию ружья (из buildModel)
-      const baseY = -0.22;
-      const baseX = 0.24;
-
-      const recoilY = this.gun.recoil * 0.05;  // ← отдача тоже добавляет вверх
-      const recoilX = 0;
-      
-      // Небольшое смещение от дыхания
-      this.gun.model.position.y = baseY + breathY;
-      this.gun.model.position.x = baseX + breathX;
-      
-      // Лёгкий наклон от дыхания
-      this.gun.model.rotation.z = 0.02 + breathX * 2;
-    }
-
-    // ==========================================
-    // 1b. Покачивание КАМЕРЫ от дыхания
-    // ==========================================
-    this.camBreathPhase += dt * this.breathSpeed;
-
-    const camRoll  = Math.sin(this.camBreathPhase) * this.camBreathAmp;
-    const camBobY  = Math.sin(this.camBreathPhase * 0.8) * this.camBreathBobAmp;
-    const camYaw   = Math.sin(this.camBreathPhase * 0.5) * this.camBreathAmp * 0.6;
-    const camPitch = Math.sin(this.camBreathPhase * 0.7) * this.camBreathAmp * 0.4;
-
-    let walkRoll = 0, walkBobY = 0, walkPitch = 0;
-    if (isMoving) {
-      walkRoll  = Math.sin(this.walkBob * 1.0) * 0.004;
-      walkBobY  = Math.abs(Math.sin(this.walkBob)) * 0.008;
-      walkPitch = Math.sin(this.walkBob * 2) * 0.003;  // ← добавить
-    }
-
-    // Сохраняем для применения в animate()
-    this.cameraBobY  = camBobY + walkBobY;
-    this.cameraRoll  = camRoll + walkRoll;
-    this.cameraYaw   = camYaw;
-    this.cameraPitch = camPitch + walkPitch;
-
-    // ==========================================
-    // 2. Пар изо рта — раз в N секунд
-    // ==========================================
-    this.steamTimer += dt;
-    if (this.steamTimer > this.steamInterval) {
-      this.steamTimer = 0;
-      //this.emitSteam();
-    }
-
-    // Обновляем частицы пара
-    for (let i = 0; i < this.steamPool.length; i++) {
-      const p = this.steamPool[i];
-      if (!p.active) continue;
-
-      p.life += dt;
-      
-      // Движение
-      p.mesh.position.addScaledVector(p.velocity, dt);
-      
-      // Затухание и рост
-      const t = p.life / p.maxLife;
-      p.mesh.material.opacity = Math.sin(t * Math.PI) * 0.5; // плавное появление/исчезновение
-      p.mesh.scale.setScalar(1 + t * 3);
-      
-      // Немного «колыхания»
-      p.mesh.position.x += Math.sin(p.life * 4) * dt * 0.05;
-      
-      if (p.life >= p.maxLife) {
-        p.active = false;
-        p.mesh.visible = false;
-      }
-    }
-  }
-}
-
-// ============================================================
 // ENV
 // ============================================================
 const SEED = 10000 * Math.random();
@@ -735,22 +541,6 @@ const water = new ENV.Water(scene, {
   size: 600
 });
 
-// Пул гильз
-const shellPool = [];
-const SHELL_POOL_SIZE = 12;
-for (let i = 0; i < SHELL_POOL_SIZE; i++) {
-  shellPool.push(new GUN1.Shell(scene, terrain));
-}
-let shellIndex = 0;
-function getShell() {
-  const s = shellPool[shellIndex];
-  shellIndex = (shellIndex + 1) % SHELL_POOL_SIZE;
-  return s;
-}
-
-// ============================================================
-// ИГРОВАЯ ЛОГИКА
-// ============================================================
 const sky      = new ENV.Sky(scene);
 const nature   = new ENV.Nature(scene, terrain);
 const conifers = new ENV.Conifers(scene, terrain, {
@@ -766,148 +556,74 @@ if (conifers.spawnPoints) {
   nature.spawnPoints.push(...conifers.spawnPoints);
 }
 
-const gun       = new GUN1.Gun(camera, envMap);;
-const breathing = new Breathing(scene, camera, gun);
-const lodge     = new HOUSES.Lodge(scene, terrain, 0, 12);  // ← координаты можно менять
+const gun       = new GUN1  .Gun      (camera, envMap);
+const breathing = new PLAYER.Breathing(scene, camera, gun);
+const lodge     = new HOUSES.Lodge    (scene, terrain, 0, 12);  // ← координаты можно менять
 
-const ducks = [];
+// ===== Пулы пуль и гильз =====
+const bulletPool = new GUN1.BulletPool(scene, 8);
+const shellPool  = new GUN1.ShellPool (scene, terrain, 12);
+
 let score = 0;
-let timeSinceSpawn = 0;
-const spawnInterval = 1.6; 
 
-const bulletPool = [];
-const BULLET_POOL_SIZE = 8;
-for (let i = 0; i < BULLET_POOL_SIZE; i++) {
-  bulletPool.push(new GUN1.Bullet(scene));
-}
-let bulletIndex = 0;
-function getBullet() {
-  const b = bulletPool[bulletIndex];
-  bulletIndex = (bulletIndex + 1) % BULLET_POOL_SIZE;
-  return b;
-}
+// ===== Пул уток =====
+const duckPool = new ANIMALS.DuckPool(scene, terrain, {
+  spawnPoints   : nature.spawnPoints,
+  spawnInterval : 1.6,
+  maxAlive      : 8,
+  spawnRadiusMin: 15,
+  spawnRadiusMax: 35,
+  waterLevel    : ENV.WATER_LEVEL,
+});
 
-const playerVel = new THREE.Vector3();
+// Колбэк на убийство — обновляем счёт и UI здесь, а не в shoot()
+const scoreEl = document.getElementById('score');
+duckPool.onKill = () => {
+  score++;
+  scoreEl.textContent = 'Утки: ' + score;
+};
 
-const START_X   = -1.52;
-const START_Z   =  24.69;
-
-const playerPos = new THREE.Vector3(
-  START_X,
-  1.7 + terrain.getHeightAt(START_X, START_Z),
-  START_Z
-);
-
-const START_YAW_DEG   = -38.7;
-const START_PITCH_DEG =   7.2;
-
-const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-const mouseSensitivity = 0.0022;
-euler.y = THREE.MathUtils.degToRad(START_YAW_DEG);
-euler.x = THREE.MathUtils.degToRad(START_PITCH_DEG);
-euler.z = 0;   // roll на старте — 0
-camera.quaternion.setFromEuler(euler);
+// --------------------------------------------------------
+// ИГРОК 🔥🔥🔥 ...
+// --------------------------------------------------------
 
 const keys = {};
+const controls = { keys };
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup',   e => keys[e.code] = false);
+
+let joyId = null;
+let joyCenter = { x: 0, y: 0 };
+let joyVector = { x: 0, y: 0 };
+
+const player = new PLAYER.Player({
+  camera,
+  cameraPivot,
+  terrain,
+  domElement: renderer.domElement,
+  isTouch,
+  joyVector,
+  controls ,
+  start: { x: -1.52, z: 24.69, yawDeg: -38.7, pitchDeg: 7.2 },
+  eyeHeight: 1.7,
+  mouseSensitivity: 0.0022,
+  maxRadius: 140,
+  walkSpeed: 2,
+  runSpeed: 4,
+});
+
+// --------------------------------------------------------
+// ИГРОВАЯ ЛОГИКА
+// --------------------------------------------------------
 
 function getAimEndPoint() {
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-  const maxDist = 250;
-  let closestDist = Infinity;
-  let hitPoint = null;
-
-  ducks.forEach(duck => {
-    if (!duck.alive) return;
-    const box = duck.getBoundingBox();
-    const p = raycaster.ray.intersectBox(box, new THREE.Vector3());
-    if (p) {
-      const d = p.distanceTo(camera.position);
-      if (d < closestDist && d < maxDist) {
-        closestDist = d;
-        hitPoint = p;
-      }
-    }
-  });
-
-  if (!hitPoint) {
-    const hits = raycaster.intersectObject(terrain.mesh, false);
-    if (hits.length > 0 && hits[0].distance < maxDist) {
-      hitPoint = hits[0].point;
-    }
-  }
-
-  if (!hitPoint) {
-    hitPoint = raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, maxDist);
-  }
-
-  return hitPoint;
+  return duckPool.raycastPoint(raycaster, terrain.mesh, 250);
 }
 
 document.addEventListener('keydown', e => keys[e.code] = true);
 document.addEventListener('keyup', e => keys[e.code] = false);
-
-let touchLookId = null;
-let touchLookStart = { x: 0, y: 0 };
-
-document.addEventListener('mousemove', e => {
-  if (!isTouch && document.pointerLockElement === renderer.domElement) {
-    euler.y -= e.movementX * mouseSensitivity;
-    euler.x -= e.movementY * mouseSensitivity;
-    euler.x = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, euler.x));
-    camera.quaternion.setFromEuler(euler);
-  }
-});
-
-renderer.domElement.addEventListener('touchstart', e => {
-  for (let i = 0; i < e.changedTouches.length; i++) {
-    const t = e.changedTouches[i];
-    if (t.clientX > window.innerWidth * 0.35 && touchLookId === null) {
-      touchLookId = t.identifier;
-      touchLookStart.x = t.clientX;
-      touchLookStart.y = t.clientY;
-    }
-  }
-}, { passive: true });
-
-renderer.domElement.addEventListener('touchmove', e => {
-  for (let i = 0; i < e.changedTouches.length; i++) {
-    const t = e.changedTouches[i];
-    if (t.identifier === touchLookId) {
-      const dx = t.clientX - touchLookStart.x;
-      const dy = t.clientY - touchLookStart.y;
-      euler.y -= dx * 0.005;
-      euler.x -= dy * 0.005;
-      euler.x = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, euler.x));
-      camera.quaternion.setFromEuler(euler);
-      touchLookStart.x = t.clientX;
-      touchLookStart.y = t.clientY;
-    }
-  }
-}, { passive: true });
-
-renderer.domElement.addEventListener('touchend', e => {
-  for (let i = 0; i < e.changedTouches.length; i++) {
-    if (e.changedTouches[i].identifier === touchLookId) {
-      touchLookId = null;
-    }
-  }
-}, { passive: true });
-
-renderer.domElement.addEventListener('click', () => {
-  if (isTouch) return;
-
-  if (cursorEnabled) {
-    setCursorEnabled(false);
-  }
-
-  if (document.pointerLockElement !== renderer.domElement) {
-    renderer.domElement.requestPointerLock();
-  } else {
-    shoot();
-  }
-});
 
 const flashEl = document.getElementById('flash');
 let flashTimer = 0;
@@ -921,134 +637,41 @@ function shoot() {
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
-  let closestHit = null;
-  let closestDist = Infinity;
+  const closestHit = duckPool.raycast(raycaster, 120);
 
-  ducks.forEach(duck => {
-    if (!duck.alive) return;
-    const box = duck.getBoundingBox();
-    const hit = raycaster.ray.intersectBox(box, new THREE.Vector3());
-    if (hit) {
-      const dist = hit.distanceTo(camera.position);
-      if (dist < closestDist && dist < 120) {
-        closestDist = dist;
-        closestHit = duck;
-      }
-    }
-  });
+  // Трассер
+  const muzzleWorld = gun.getMuzzlePosition();
+  const start = muzzleWorld.clone(); 
+  const end = getAimEndPoint();
+  bulletPool.fire(start, end);
 
-// Трассер
-const muzzleWorld = gun.getMuzzlePosition();
-const start = muzzleWorld.clone().lerp(camera.position, 0.15);
-const end = getAimEndPoint();
-getBullet().fire(start, end);
+  // Гильза
+  const ejectPos = gun.getEjectPosition();
+  const ejectDirWorld = gun.getEjectDirection(); // уже нормализованный, в мире
 
-// Гильза
-const ejectPos = gun.getEjectPosition();
-const ejectDirWorld = gun.getEjectDirection(); // уже нормализованный, в мире
+  // Базовая скорость выброса (м/с) — подберите под масштаб сцены
+  const ejectSpeed = 2.5 + Math.random() * 1.0;
 
-// Базовая скорость выброса (м/с) — подберите под масштаб сцены
-const ejectSpeed = 2.5 + Math.random() * 1.0;
+  // Мировой вектор скорости
+  const ejectVel = ejectDirWorld.multiplyScalar(ejectSpeed);
 
-// Мировой вектор скорости
-const ejectVel = ejectDirWorld.multiplyScalar(ejectSpeed);
+  // Небольшой случайный разброс (в локальных осях ружья, чтобы не «ломать» направление)
+  // Проще — просто добавить маленький случайный мировой шум:
+  ejectVel.x += (Math.random() - 0.5) * 0.6;
+  ejectVel.y += (Math.random() - 0.5) * 0.4;
+  ejectVel.z += (Math.random() - 0.5) * 0.6;
 
-// Небольшой случайный разброс (в локальных осях ружья, чтобы не «ломать» направление)
-// Проще — просто добавить маленький случайный мировой шум:
-ejectVel.x += (Math.random() - 0.5) * 0.6;
-ejectVel.y += (Math.random() - 0.5) * 0.4;
-ejectVel.z += (Math.random() - 0.5) * 0.6;
-
-getShell().fire(ejectPos, ejectVel);
+  shellPool.fire(ejectPos, ejectVel);
 
   if (closestHit) {
-    closestHit.hit();
-    score++;
-    document.getElementById('score').textContent = 'Утки: ' + score;
+    duckPool.kill(closestHit);
   } else {
     if (window.SNDS && SNDS.damag) SNDS.damag.play();
   }
 }
 
-function spawnDuck() {
-  if (nature.spawnPoints.length === 0) return;
-
-  const SPAWN_RADIUS_MIN = 15;
-  const SPAWN_RADIUS_MAX = 35; 
-
-  const candidates = [];
-  for (let i = 0; i < nature.spawnPoints.length; i++) {
-    const sp = nature.spawnPoints[i];
-    const dx = sp.x - camera.position.x;
-    const dz = sp.z - camera.position.z;
-    const distSq = dx * dx + dz * dz;
-    
-    // Не спавним уток прямо в воде
-    const h = terrain.getHeightAt(sp.x, sp.z);
-    if (h < ENV.WATER_LEVEL + 0.5) continue;   // <-- добавить
-    
-    if (distSq >= SPAWN_RADIUS_MIN * SPAWN_RADIUS_MIN &&
-        distSq <= SPAWN_RADIUS_MAX * SPAWN_RADIUS_MAX) {
-      candidates.push(sp);
-    }
-  }
-
-  let spawnPos;
-  if (candidates.length > 0) {
-    const sp = candidates[Math.floor(Math.random() * candidates.length)];
-    spawnPos = new THREE.Vector3(sp.x, terrain.getHeightAt(sp.x, sp.z) + 1.5, sp.z);
-  } else {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = SPAWN_RADIUS_MIN + Math.random() * (SPAWN_RADIUS_MAX - SPAWN_RADIUS_MIN);
-    const px = camera.position.x + Math.cos(angle) * dist;
-    const pz = camera.position.z + Math.sin(angle) * dist;
-    spawnPos = new THREE.Vector3(px, terrain.getHeightAt(px, pz) + 1.5, pz);
-  }
-
-  const target = camera.position.clone();
-  ducks.push(new ANIMALS.Duck(scene, terrain, spawnPos, target));
-}
-
-function updatePlayer(dt) {
-  const speed = keys['ShiftLeft'] ? 4 : 2;
-  const dir = new THREE.Vector3();
-
-  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  forward.y = 0;
-  forward.normalize();
-  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0));
-
-  if (keys['KeyW']) dir.add(forward);
-  if (keys['KeyS']) dir.sub(forward);
-  if (keys['KeyD']) dir.add(right);
-  if (keys['KeyA']) dir.sub(right);
-
-  if (isTouch && (joyVector.x !== 0 || joyVector.y !== 0)) {
-    dir.add(forward.clone().multiplyScalar(-joyVector.y));
-    dir.add(right.clone().multiplyScalar(joyVector.x));
-  }
-
-  if (dir.lengthSq() > 0) dir.normalize().multiplyScalar(speed);
-
-  playerVel.lerp(dir, Math.min(1, dt * 12));
-  playerPos.addScaledVector(playerVel, dt);
-
-  const maxR = 140;
-  if (playerPos.length() > maxR) {
-    playerPos.setLength(maxR);
-  }
-
-  const groundY = terrain.getHeightAt(playerPos.x, playerPos.z);
-  playerPos.y = groundY + 1.7;
-
-  cameraPivot.position.copy(playerPos);
-}
-
 const joyZone = document.getElementById('joystick-zone');
 const joyKnob = document.getElementById('joystick-knob');
-let joyId = null;
-let joyCenter = { x: 0, y: 0 };
-let joyVector = { x: 0, y: 0 };
 
 if (isTouch && joyZone) {
   joyZone.addEventListener('touchstart', e => {
@@ -1118,45 +741,19 @@ function animate() {
 
   sky.update(dt);
   water.update(dt);
-  const isMoving = playerVel.lengthSq() > 0.5;
+
+  const isMoving = player.isMoving();
   breathing.update(dt, isMoving);
   gun.update(dt);
   lodge.update(dt);
-  updatePlayer(dt);
+  player.update(dt, breathing);
   grass.update(dt, camera);
- 
 
-  // В animate() после updatePlayer:
-  // В animate() после updatePlayer:
-  cameraPivot.position.y = playerPos.y + breathing.cameraBobY;
-  cameraPivot.rotation.z = breathing.cameraRoll;
-  cameraPivot.rotation.x = 0;   // сброс — мышь управляет camera.rotation.x
-  cameraPivot.rotation.y = 0;   // сброс — мышь управляет camera.rotation.y
+  duckPool.updateSpawner(dt, camera);
+  duckPool.update(dt);
 
-  timeSinceSpawn += dt;
-  if (timeSinceSpawn > spawnInterval) {
-    timeSinceSpawn = 0;
-    if (ducks.filter(d => d.alive).length < 8) {
-      spawnDuck();
-    }
-  }
-
-  for (let i = ducks.length - 1; i >= 0; i--) {
-    const d = ducks[i];
-    d.update(dt);
-    if (d.removeMe) {
-      d.dispose();
-      ducks.splice(i, 1);
-    }
-  }
-
-  for (let i = 0; i < bulletPool.length; i++) {
-    bulletPool[i].update(dt);
-  }
-
-  for (let i = 0; i < shellPool.length; i++) {
-    shellPool[i].update(dt);
-  }
+  bulletPool.update(dt);
+  shellPool.update (dt);
 
   if (flashTimer > 0) {
     flashTimer -= dt;
@@ -1201,9 +798,23 @@ animate();
 const neonCursor = document.getElementById('neon-cursor');
 const rootEl = document.documentElement;
 
-let cursorEnabled = false;   // по умолчанию — стандартный курсор
-let mouseX = window.innerWidth / 2;
+let cursorEnabled = false;      // по умолчанию — стандартный курсор
+let mouseX = window.innerWidth  / 2;
 let mouseY = window.innerHeight / 2;
+
+renderer.domElement.addEventListener('click', () => {
+  if (isTouch) return;
+
+  if (cursorEnabled) {
+    setCursorEnabled(false);
+  }
+
+  if (document.pointerLockElement !== renderer.domElement) {
+    renderer.domElement.requestPointerLock();
+  } else {
+    shoot();
+  }
+});
 
 function setCursorEnabled(on) {
   cursorEnabled = on;
@@ -1243,28 +854,19 @@ window.addEventListener('keyup', (e) => {
 // При потере фокуса окна — вернуть стандартный курсор (иначе Ctrl может «застрять»)
 window.addEventListener('blur', () => setCursorEnabled(false));
 
-// // ===== F4 — отладка: позиция игрока + поворот камеры =====
+// ===== F4 — отладка: позиция игрока + поворот камеры =====
 // window.addEventListener('keydown', (e) => {
 //   if (e.code !== 'F4') return;
 //   e.preventDefault();   // иначе браузер может открыть что-то своё
 
 //   // Позиция игрока (мировые координаты)
-//   const px = playerPos.x;
-//   const py = playerPos.y;
-//   const pz = playerPos.z;
-
-//   // Углы поворота камеры (Эйлер, порядок YXZ — как в коде)
-//   const eul = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
-//   const yawDeg   = THREE.MathUtils.radToDeg(eul.y);
-//   const pitchDeg = THREE.MathUtils.radToDeg(eul.x);
-//   const rollDeg  = THREE.MathUtils.radToDeg(eul.z);
-
+//   const p = player.getDebugInfo();
 //   console.log(
-//     `%c[F4] Позиция: [ x=${px.toFixed(2)}  y=${py.toFixed(2)}  z=${pz.toFixed(2)} ] ` +
+//     `%c[F4] Позиция: [ x=${p.x.toFixed(2)}  y=${p.y.toFixed(2)}  z=${p.z.toFixed(2)} ] ` +
 //     `| Поворот: [` +
-//     `yaw=${yawDeg.toFixed(1)}°  ` +
-//     `pitch=${pitchDeg.toFixed(1)}°  ` +
-//     `roll=${rollDeg.toFixed(1)}° ]`,
+//     `yaw=${p.yawDeg.toFixed(1)}°  ` +
+//     `pitch=${p.pitchDeg.toFixed(1)}°  ` +
+//     `roll=${p.rollDeg.toFixed(1)}° ]`,
 //     'color:#0ff; font-weight:bold;'
 //   );
 // });
