@@ -28,7 +28,11 @@
 			},
 			{
 				"path": "Saper\\mg\\etc\\bs\\bs-js\\",
-				"badge": "🍄‍🟫"
+				"badge": "🍏"
+			},
+			{
+				"path": "Saper\\mg\\etc\\bs\\bs-js\\ui\\",
+				"badge": "🔋"
 			}
 		]
 	}

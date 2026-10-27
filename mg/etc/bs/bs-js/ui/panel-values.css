@@ -1,0 +1,83 @@
+/*  panel-values.css
+    Стили для Panel1ColumnValues в неоновом стиле (как в neon.css). */
+
+.panel1col {
+  position: fixed;
+  z-index: 15;
+
+  display: grid;
+  /* Колонки: label + до 3 значений */
+  grid-template-columns: var(--panel-cols, max-content max-content);
+
+  /* ✅ ЗАЗОР 2 ПИКСЕЛЯ */
+  column-gap: var(--panel-col-gap, 2px);
+  row-gap:    var(--panel-row-gap, 2px);
+
+  /* Одинаковые отступы со всех сторон */
+  padding: 10px;
+  
+  /* Неоновый фон и рамка */
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid #0ff;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
+
+  font-family: var(--panel-font, "Courier New", ui-monospace, Menlo, Consolas, monospace);
+  font-size: var(--panel-fs, 10px);
+  color: var(--panel-text, #fff);
+
+  pointer-events: none;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.panel1col.is-hidden { display: none; }
+
+/* --- ячейки --- */
+
+.panel1col__label,
+.panel1col__value {
+  /* Плашки внутри */
+  background: rgba(5, 49, 90, 0.569); 
+  padding: 6px 12px; /* Уменьшили padding с 12 до 6 сверху/снизу */
+  border-radius: 6px;
+
+  font-family: inherit;
+  font-size: var(--value-fs, 16px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  
+  /* ✅ Убрали line-height: 0, ставим нормальную высоту строки */
+  line-height: 1;
+  
+  color: #0ff; 
+  text-shadow: 0 0 10px #0ff, 0 0 20px rgba(0, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Подпись */
+.panel1col__label {
+  color: #fff;
+  opacity: 0.9;
+  text-shadow: 0 0 5px #5d0909, 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Значения: выравнивание по правому краю */
+.panel1col__value {
+  text-align: right;
+  min-width: var(--value-min-w, 4ch);
+}
+
+/* модификаторы */
+.panel1col--align-left .panel1col__value { text-align: left; }
+.panel1col--compact {
+  padding: 6px;
+  --value-fs: 14px;
+}
+
+/* --- позиционирование по якорю --- */
+.panel1col--top-left     { top: 20px; left: 20px; }
+.panel1col--top-right    { top: 20px; right: 20px; }
+.panel1col--bottom-left  { bottom: 20px; left: 20px; }
+.panel1col--bottom-right { bottom: 20px; right: 20px; }

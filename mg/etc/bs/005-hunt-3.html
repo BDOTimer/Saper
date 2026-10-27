@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ОХОТА НА УТОК</title>
 <link rel="stylesheet" href="neon-bs.css" />
+<link rel="stylesheet" href="bs-js/ui/panel-values.css" />
 <link rel="icon" type="image/png" href="../../res/favicon-64.png" sizes="64x64">
 <style>
 html, body {
@@ -35,47 +36,6 @@ canvas {
   top: 0;
   left: 0;
   touch-action: none;
-}
-
-/* Контейнер для счётчиков */
-#scores {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 10;
-
-  display: grid;
-  grid-template-columns: max-content 4ch;   /* подпись — по ширине, число — 4 знака */
-  column-gap: 1px;
-  row-gap: 3px;
-
-  pointer-events: none;
-}
-
-.score-line {
-  display: contents;   /* чтобы label/value стали прямыми ячейками грида #scores */
-}
-
-.score-label,
-.score-value {
-  color: #fff;
-  font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
-  font-size: 22px;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-shadow: 2px 2px 4px #000;
-
-  background: rgba(0, 0, 0, 0.4);
-  padding: 6px 14px;
-  border-radius: 8px;
-
-  /* Ключевое: цифры одинаковой ширины */
-  font-variant-numeric: tabular-nums;
-}
-
-.score-value {
-  text-align: right;   /* число прижато к правому краю своей колонки */
-  min-width: 4ch;      /* гарантирует, что «0» и «100» не сдвинут колонку */
 }
 
   #crosshair {
@@ -381,17 +341,6 @@ canvas {
   </a>
 </div>
 
-<div id="scores">
-  <div class="score-line">
-    <span class="score-label">Утки</span>
-    <span class="score-value" id="score">0</span>
-  </div>
-  <div class="score-line">
-    <span class="score-label">Кабаны</span>
-    <span class="score-value" id="score-pig">0</span>
-  </div>
-</div>
-
 <div id="crosshair">✛</div>
 <div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
 <div id="flash"></div>
@@ -448,6 +397,7 @@ canvas {
     import { ANIMALS} from "src/animals.js";
     import { MODELS } from "src/models.js";
     import { HUD    } from "src/hud.js";
+    import { PANELVALUES } from "src/ui/panel-values.js";
     import { buildGun, dispose as disposeGun } from "src/gun.compile.js";
 
 // ============================================================
@@ -460,7 +410,8 @@ canvas {
   const statusEl = document.getElementById('gun-status');
 
   // ===== HUD: панель индикаторов =====
-  const hud = HUD.setup();
+  const hud         = HUD.setup();
+  const scoresPanel = PANELVALUES.setup();
   
   let viewer = null;
   let isOpen = false;
@@ -728,11 +679,6 @@ const duckPool = new ANIMALS.DuckPool(scene, terrain, {
   waterLevel    : ENV.WATER_LEVEL,
 });
 
-duckPool.onKill = () => {
-  score++;
-  scoreEl.textContent = 'Утки  : ' + score;
-};
-
 // ===== Пул свиней =====
 const pigPool = new ANIMALS.PigPool(scene, terrain, {
   spawnPoints   : nature.spawnPoints,
@@ -743,9 +689,14 @@ const pigPool = new ANIMALS.PigPool(scene, terrain, {
   waterLevel    : ENV.WATER_LEVEL,
 });
 
+duckPool.onKill = () => {
+  score++;
+  scoresPanel.setNumber("ducks", 0, score);
+};
+
 pigPool.onKill = () => {
   scorePig++;
-  scorePigEl.textContent = 'Кабаны: ' + scorePig;
+  scoresPanel.setNumber("pigs", 0, scorePig);
 };
 
 // --------------------------------------------------------
