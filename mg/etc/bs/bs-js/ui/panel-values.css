@@ -6,18 +6,18 @@
   z-index: 15;
 
   display: grid;
-  /* Колонки: label + до 3 значений */
   grid-template-columns: var(--panel-cols, max-content max-content);
 
-  /* ✅ ЗАЗОР 2 ПИКСЕЛЯ */
   column-gap: var(--panel-col-gap, 2px);
   row-gap:    var(--panel-row-gap, 2px);
 
-  /* Одинаковые отступы со всех сторон */
+  /* Вертикальное выравнивание ячеек по центру */
+  align-items: center;
+
   padding: 10px;
-  
-  /* Неоновый фон и рамка */
-  background: rgba(0, 255, 255, 0.08);
+  box-sizing: border-box;
+
+  background: rgba(0,0,0,0.45);
   border: 1px solid #0ff;
   border-radius: 12px;
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
@@ -29,7 +29,6 @@
 
   pointer-events: none;
   user-select: none;
-  box-sizing: border-box;
 }
 
 .panel1col.is-hidden { display: none; }
@@ -54,6 +53,9 @@
   color: #0ff; 
   text-shadow: 0 0 10px #0ff, 0 0 20px rgba(0, 255, 255, 0.5);
   font-variant-numeric: tabular-nums;
+
+  max-width: 100%; 
+  box-sizing: border-box;
 }
 
 /* Подпись */
@@ -81,3 +83,135 @@
 .panel1col--top-right    { top: 20px; right: 20px; }
 .panel1col--bottom-left  { bottom: 20px; left: 20px; }
 .panel1col--bottom-right { bottom: 20px; right: 20px; }
+
+/* ============================================================
+   Неоновые кнопки (панель Panel1ColumnValuesBtn)
+   ============================================================ */
+
+.panel1col__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;         /* ← кнопки по центру высоты контейнера */
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+/* Общая база для всех кнопок в панели */
+.panel1col__btn {
+  appearance: none;
+  box-sizing: border-box;
+  height: 30px;             /* Одинаковая высота для всех */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 2px #000, 0 0 4px rgba(0,0,0,0.5); /* Для читаемости */
+  
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  /* Основа «серебра» — непрозрачный градиент */
+  background: linear-gradient(
+    to bottom,
+    rgba(5, 31, 42, 1) 0%,      /* Тёмный верх */
+    rgba(19, 118, 134, 1) 15%,  /* Переход */
+    rgba(110, 218, 230, 1) 50%, /* Серебристый блик в центре */
+    rgba(19, 118, 134, 1) 85%,  /* Переход */
+    rgba(5, 31, 42, 1) 100%     /* Тёмный низ */
+  );
+  border: 1px solid #5dfeff; /* Светлый контур */
+  box-shadow: 
+    0 0 12px rgba(0, 255, 255, 0.5), 
+    inset 0 0 8px rgba(255, 255, 255, 0.4); /* Внутреннее свечение */
+}
+
+/* Эффект при наведении */
+.panel1col__btn:hover {
+  box-shadow: 
+    0 0 20px rgba(0, 255, 255, 0.8), 
+    inset 0 0 12px rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+/* Эффект при нажатии */
+.panel1col__btn:active {
+  transform: translateY(1px);
+  box-shadow: 
+    0 0 5px rgba(0, 255, 255, 0.5), 
+    inset 0 0 10px rgba(0, 0, 0, 0.5);
+  filter: brightness(0.9);
+}
+
+/* ============================================================
+   Специфичные кнопки (Ружье и Выход)
+   ============================================================ */
+
+/* Кнопка «ВЫХОД» (красный неон, но по тому же принципу) */
+.panel1col__btn.btn-exit {
+  background: linear-gradient(
+    to bottom,
+    rgba(42, 5, 15, 1) 0%, 
+    rgba(128, 20, 50, 1) 15%, 
+    rgba(255, 110, 150, 1) 50%, /* Светлый блик */
+    rgba(128, 20, 50, 1) 85%, 
+    rgba(42, 5, 15, 1) 100%
+  );
+  border: 1px solid #ff6ec4;
+  box-shadow: 
+    0 0 12px rgba(255, 45, 149, 0.5), 
+    inset 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+.panel1col__btn.btn-exit:hover {
+  box-shadow: 
+    0 0 20px rgba(255, 45, 149, 0.8), 
+    inset 0 0 12px rgba(255, 255, 255, 0.6);
+}
+
+.panel1col__btn.btn-exit {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Контейнер для кнопок */
+.panel1col__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+/* Кнопка РУЖЬЁ — занимает всё свободное место */
+.panel1col__btn.btn-gun {
+  flex: 1; /* Растягиваем на всю доступную ширину */
+  min-width: 0;
+}
+
+/* Кнопка ВЫХОД — фиксированная квадратная */
+.panel1col__btn.btn-exit {
+  width: 30px;  /* Ширина = высоте для квадрата */
+  height: 30px;
+  flex: 0 0 30px; /* Не сжимать и не растягивать */
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

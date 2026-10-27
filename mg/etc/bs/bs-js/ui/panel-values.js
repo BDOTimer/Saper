@@ -25,6 +25,7 @@ class Panel1ColumnValues {
     this.right    = opts.right;
     this.bottom   = opts.bottom;
     this.left     = opts.left;
+     this.width   = opts.width    ?? null;
     this.colGap   = opts.colGap   ?? 2;
     this.rowGap   = opts.rowGap   ?? 3;
     this.compact  = !!opts.compact;
@@ -51,6 +52,10 @@ class Panel1ColumnValues {
     // CSS-переменные для зазоров
     root.style.setProperty("--panel-col-gap", this.colGap + "px");
     root.style.setProperty("--panel-row-gap", this.rowGap + "px");
+
+    if (this.width !== null) {
+      root.style.width = this.width + "px";
+    }
 
     // Только позиционные переопределения (top/right/bottom/left) — они уникальны,
     // и их правда удобно задавать из JS, а не держать 4 класса.
@@ -297,7 +302,7 @@ class Panel1ColumnValues {
 //------------------------|
 // Реализация.            |
 //------------------------:
-function setup()
+function setup_1()
 {
     const panel = new Panel1ColumnValues({
         id      : "scores",
@@ -397,11 +402,154 @@ panel.setValues("stamina", [
 <link rel="stylesheet" href="bs-js/ui/panel-values.css" />
 */
 
+// --------------------------------------------------------
+// CLASS: Panel1ColumnValuesBtn — расширение с кнопками
+// --------------------------------------------------------
+class Panel1ColumnValuesBtn extends Panel1ColumnValues {
+  /**
+   * Добавить строку с кнопками-действиями.
+   * 
+   * @param {Object} cfg
+   * @param {string} cfg.id              — id строки
+   * @param {string} [cfg.label]         — подпись слева
+   * @param {Array<Object>} cfg.values   — значения (числа/строки), как в базовом классе
+   * @param {Array<Object>} [cfg.actions] — массив кнопок. Каждая:
+   *        {
+   *          id: "btn_use",         // id кнопки (для поиска)
+   *          text: "ИСПОЛЬЗОВАТЬ",  // текст на кнопке
+   *          onClick: () => { ... } // колбэк при клике
+   *        }
+   * 
+   * Кнопки будут добавлены в конец строки (справа).
+   * Вы можете комбинировать values и actions.
+   */
+
+  constructor(opts = {}) {
+    super(opts);
+    // Добавляем тот же неоновый стиль, что и у базовой панели
+    this.root.style.setProperty("--panel-cols", "minmax(0, 1fr)");
+  //this.root.classList.add("panel1col-btn");
+  }
+
+  addAction(cfg) {
+    if (!cfg || !cfg.id) throw new Error("cfg.id required");
+
+    const cells = [];
+
+    // 1. Метка — только если реально передана (без скрытого спайсера!)
+    if (cfg.label !== undefined && cfg.label !== null) {
+      cells.push({ kind: "label", el: this._makeLabel(cfg.label) });
+    }
+
+    // 2. Значения (если есть)
+    if (Array.isArray(cfg.values)) {
+      for (let i = 0; i < cfg.values.length; i++) {
+        cells.push({ kind: "value", el: this._makeValue(this._normalize(cfg.values[i])) });
+      }
+    }
+
+    // 3. Кнопки
+    if (cfg.actions && cfg.actions.length > 0) {
+      const actionCell = document.createElement("div");
+      actionCell.className = "panel1col__actions";
+
+      for (let i = 0; i < cfg.actions.length; i++) {
+        const act = cfg.actions[i];
+        const btn = document.createElement("button");
+        btn.className = "panel1col__btn " + (act.className || "");
+        btn.textContent = act.text || "OK";
+        btn.type = "button";
+        if (typeof act.onClick === "function") {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            act.onClick(e);
+          });
+        }
+        actionCell.appendChild(btn);
+      }
+      cells.push({ kind: "action", el: actionCell });
+    }
+
+    // 4. В DOM
+    for (const c of cells) this.root.appendChild(c.el);
+
+    // 5. Сохраняем
+    const row = {
+      id: cfg.id,
+      label: cfg.label ?? "",
+      cells,
+      values: cfg.values || [],
+    };
+    this._rows.set(cfg.id, row);
+
+    // 6. Одна колонка на всю ширину панели (если нет label/values)
+    const hasOnlyActions = cells.length === 1 && cells[0].kind === "action";
+    if (hasOnlyActions) {
+      this.root.style.setProperty("--panel-cols", "1fr");
+    } else {
+      this._ensureColumns();
+    }
+
+    return this;
+  }
+}
+
+//------------------------|
+// Реализация.            |
+//------------------------:
+function setup_2()
+{
+    // ===== Неоновая панель с кнопками =====
+    const topBarPanel = new PANELVALUES.Panel1ColumnValuesBtn({
+        id: "top-menu",
+        position: "top-right",
+        top: 16,
+        right: 20,
+        width: 220,  
+        // Делаем зазоры между кнопками чуть больше, чтобы они не слипались
+        colGap: 8, 
+    });
+
+    // Добавляем строку БЕЗ label и БЕЗ значений, только с кнопками
+    topBarPanel.addAction({
+        id: "menu-row",
+        actions: [
+            {
+                id: "gun-btn",
+                text: "РУЖЬЁ",
+                className: "btn-gun", // спец-класс для ширины
+                onClick: () => {
+                    // Вызываем функцию открытия панели ружья
+                    if (window.openGunPanel) window.openGunPanel(); 
+                }
+            },
+            {
+                id: "exit-btn",
+                text: "🪜",
+                className: "btn-exit", // спец-класс для квадратной формы
+                onClick: () => {
+                    // Переход назад
+                    window.location.href = "./i-bs.html";
+                }
+            }
+        ]
+    });
+}
+
+//------------------------|
+// Вся реализация.        |
+//------------------------:
+function setup  ()
+{        setup_1();
+         setup_2();
+}
+
 //------------------------|
 // Экспорт.               |
 //------------------------:
 const PANELVALUES =
 {   setup,
     Panel1ColumnValues,
+    Panel1ColumnValuesBtn,
 };
 export { PANELVALUES }; // import { PANELVALUES } from "src/ui/panel-values.js";

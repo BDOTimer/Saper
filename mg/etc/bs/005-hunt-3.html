@@ -104,73 +104,12 @@ canvas {
   .is-touch #crosshair { display: block; }
   .is-touch #info { display: none; }
 
-  /* ============================================================
-   Верхняя правая полоса — контейнер для кнопок «РУЖЬЁ» + «Выход»
-   ============================================================ */
-#top-right-bar {
-  position: fixed;
-  top: 16px;
-  right: 20px;
-  z-index: 30;
-
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  /* Клики пропускаем на canvas, кнопки ниже включат pointer-events сами */
-  pointer-events: none;
-}
-
-/* Любая «corner-кнопка» внутри полосы */
-#top-right-bar .corner-btn {
-  pointer-events: auto;
-  position: static;           /* отключаем возможный fixed из neon-bs.css */
-  top: auto;
-  left: auto;
-  right: auto;
-  transform: none;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  height: clamp(42px, 9vw, 52px);
-  box-sizing: border-box;
-  padding: 0 16px;
-
-  font-family: inherit;
-  font-size: clamp(13px, 3vw, 15px);
-  font-weight: 600;
-  letter-spacing: 1px;
-  line-height: 1;
-  white-space: nowrap;
-
-  color: #0ff;
-  background: rgba(0, 255, 255, 0.08);
-  border: 2px solid #0ff;
-  border-radius: 12px;
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
-  backdrop-filter: blur(4px);
-
-  cursor: pointer;
-  user-select: none;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  text-decoration: none;
-
-  transition:
-    background-color 0.2s ease,
-    box-shadow       0.2s ease,
-    color            0.2s ease,
-    transform        0.15s ease;
-}
-
-/* Кнопка «РУЖЬЁ» — не сжимается, минимум под иконку+текст */
+/* ============================================================
+  Кнопка «РУЖЬЁ» — не сжимается, минимум под иконку+текст
+  ============================================================ */
 #gun-btn {
   flex: 0 0 auto;
-  min-width: 120px;
+  min-width: 0;
   padding: 0 18px;
   white-space: nowrap;
   overflow: visible;
@@ -330,17 +269,6 @@ canvas {
 </head>
 <body>
 
-<!-- ===== Верхняя правая полоса: РУЖЬЁ + ВЫХОД ===== -->
-<div id="top-right-bar">
-  <button id="gun-btn" class="corner-btn" title="Посмотреть ружьё">
-    <span class="gun-icon">🔫</span>
-    <span class="gun-text">РУЖЬЁ</span>
-  </button>
-  <a href="./i-bs.html" class="corner-btn corner-btn--icon" aria-label="Назад">
-    <span class="corner-arrow">🪜</span>
-  </a>
-</div>
-
 <div id="crosshair">✛</div>
 <div id="info">Мышь — прицел | ЛКМ — выстрел | WASD — движение</div>
 <div id="flash"></div>
@@ -404,10 +332,11 @@ canvas {
   import { GunViewer } from 'src/gun-viewer-v2.js';
 
   const overlay  = document.getElementById('gun-overlay');
-  const openBtn  = document.getElementById('gun-btn');
   const closeBtn = document.getElementById('gun-close');
   const canvas   = document.getElementById('gun-canvas');
   const statusEl = document.getElementById('gun-status');
+
+  window.openGunPanel = openPanel;
 
   // ===== HUD: панель индикаторов =====
   const hud         = HUD.setup();
@@ -467,7 +396,6 @@ canvas {
     }
   }
 
-  openBtn.addEventListener ('click', openPanel);
   closeBtn.addEventListener('click', closePanel);
 
   // Клик по фону (вне панели) — закрыть

@@ -19,7 +19,7 @@ class IndicatorPanel {
     
     this.top    = opts.top;
     this.right  = opts.right;
-    //this.bottom = opts.bottom;
+  //this.bottom = opts.bottom;
     this.left   = opts.left;
     
     this.id            = opts.id            ?? "indicator-panel";
@@ -56,7 +56,7 @@ class IndicatorPanel {
       padding:          "10px",
       background:       this.background,
       border:           `1px solid ${this.borderColor}`,
-      borderRadius:     "10px",
+      borderRadius:     "12px",
       boxShadow:        `0 0 12px ${this.borderColor}55`,
       fontFamily:       this.fontFamily,
       fontSize:         "12px",
@@ -342,8 +342,8 @@ function setup()
     const hud = new IndicatorPanel({
         id: "hud-main",
         position: "top-right",  // или "bottom-left" и т.д.
-        top  : 72,              // ← отступ сверху — под кнопкой
-        width: 240,
+        top  : 80,              // ← отступ сверху — под кнопкой
+        width: 220,
         gap  : 8,
         showValue: true,
         animate: true,
