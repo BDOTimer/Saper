@@ -492,48 +492,127 @@ class Panel1ColumnValuesBtn extends Panel1ColumnValues {
 
     return this;
   }
+
+  /**
+   * Создать неоновую плашку справки по горячим клавишам.
+   * @param {Array<{key: string, desc: string}>} rows
+   * @returns {{overlay: HTMLElement, open: Function, close: Function, toggle: Function}}
+   */
+  createHelpOverlay(rows) {
+    const overlay = document.createElement("div");
+    overlay.className = "help-overlay";
+    overlay.hidden = true;
+
+    const panel = document.createElement("div");
+    panel.className = "help-panel";
+
+    const title = document.createElement("h2");
+    title.textContent = "Горячие клавиши";
+    panel.appendChild(title);
+
+    const list = document.createElement("div");
+    list.className = "help-panel__row";
+    for (const r of rows) {
+      const k = document.createElement("span");
+      k.className = "help-panel__key";
+      k.textContent = r.key;
+      const d = document.createElement("span");
+      d.className = "help-panel__desc";
+      d.textContent = r.desc;
+      list.appendChild(k);
+      list.appendChild(d);
+    }
+    panel.appendChild(list);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "help-panel__close";
+    closeBtn.type = "button";
+    closeBtn.textContent = "✕";
+    closeBtn.setAttribute("aria-label", "Закрыть");
+    panel.appendChild(closeBtn);
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    const open  = () => { overlay.hidden = false; };
+    const close = () => { overlay.hidden = true;  };
+    const toggle = () => { overlay.hidden = !overlay.hidden; };
+
+    closeBtn.addEventListener("click", close);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+
+    return { overlay, open, close, toggle };
+  }
 }
 
 //------------------------|
 // Реализация.            |
 //------------------------:
-function setup_2()
-{
-    // ===== Неоновая панель с кнопками =====
-    const topBarPanel = new PANELVALUES.Panel1ColumnValuesBtn({
-        id: "top-menu",
-        position: "top-right",
-        top: 16,
-        right: 20,
-        width: 220,  
-        // Делаем зазоры между кнопками чуть больше, чтобы они не слипались
-        colGap: 8, 
-    });
+function setup_2() {
+  const topBarPanel = new PANELVALUES.Panel1ColumnValuesBtn({
+    id: "top-menu",
+    position: "top-right",
+    top: 16,
+    right: 20,
+    width: 220,
+    colGap: 8,
+  });
 
-    // Добавляем строку БЕЗ label и БЕЗ значений, только с кнопками
-    topBarPanel.addAction({
-        id: "menu-row",
-        actions: [
-            {
-                id: "gun-btn",
-                text: "РУЖЬЁ",
-                className: "btn-gun", // спец-класс для ширины
-                onClick: () => {
-                    // Вызываем функцию открытия панели ружья
-                    if (window.openGunPanel) window.openGunPanel(); 
-                }
-            },
-            {
-                id: "exit-btn",
-                text: "🪜",
-                className: "btn-exit", // спец-класс для квадратной формы
-                onClick: () => {
-                    // Переход назад
-                    window.location.href = "./i-bs.html";
-                }
-            }
-        ]
-    });
+  // Плашка справки (создаём заранее, чтобы кнопка могла её дёргать)
+  const help = topBarPanel.createHelpOverlay([
+    { key: "W A S D",  desc: "Движение" },
+    { key: "Shift",    desc: "Бег" },
+    { key: "ЛКМ",      desc: "Выстрел" },
+    { key: "Ctrl",     desc: "Показать/скрыть курсор" },
+    { key: "F1",       desc: "Справка (эта плашка)" },
+    { key: "F4",       desc: "Отладка: позиция и поворот" },
+    { key: "Esc",      desc: "Закрыть панель ружья" },
+  ]);
+
+  topBarPanel.addAction({
+    id: "menu-row",
+    actions: [
+      {
+        id: "f1-btn",
+        text: "F1",
+        className: "btn-f1",
+        onClick: () => help.toggle(),
+      },
+      {
+        id: "gun-btn",
+        text: "🔫 РУЖЬЁ",
+        className: "btn-gun",
+        onClick: () => {
+          if (window.openGunPanel) window.openGunPanel();
+        },
+      },
+      {
+        id: "exit-btn",
+        text: "🪜",
+        className: "btn-exit",
+        onClick: () => {
+          window.location.href = "./i-bs.html";
+        },
+      },
+    ],
+  });
+  
+
+  // Клавиша F1 тоже открывает/закрывает справку
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "F1") {
+      e.preventDefault();
+      help.toggle();
+    }
+    else
+    if (e.code === "Escape" && !help.overlay.hidden) {
+      help.close();
+    }
+  });
+
+  return topBarPanel;
 }
 
 //------------------------|

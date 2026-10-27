@@ -215,3 +215,115 @@
   align-items: center;
   justify-content: center;
 }
+
+/* ============================================================
+   Кнопка F1 (маленькая, квадратная)
+   ============================================================ */
+.panel1col__btn.btn-f1 {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ============================================================
+   Плашка справки (неоновая)
+   ============================================================ */
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+.help-overlay[hidden] { display: none; }
+
+.help-panel {
+  position: relative;
+  min-width: 320px;
+  max-width: min(90vw, 520px);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 22px 26px 18px;
+
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid #0ff;
+  border-radius: 12px;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+
+  font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
+  color: #fff;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.help-panel h2 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0ff;
+  text-shadow: 0 0 10px #0ff, 0 0 20px rgba(0, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.help-panel__row {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 14px;
+  row-gap: 8px;
+  align-items: center;
+}
+
+.help-panel__key {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(5, 49, 90, 0.7);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  color: #0ff;
+  font-weight: 700;
+  font-size: 12px;
+  text-shadow: 0 0 8px #0ff;
+  white-space: nowrap;
+}
+
+.help-panel__desc {
+  color: #fff;
+  opacity: 0.9;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.4);
+}
+
+.help-panel__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #0ff;
+  background: rgba(0, 0, 0, 0.6);
+  color: #0ff;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+.help-panel__close:hover {
+  background: rgba(0, 255, 255, 0.25);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+}
