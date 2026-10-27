@@ -38,7 +38,7 @@
 .panel1col__label,
 .panel1col__value {
   /* Плашки внутри */
-  background: rgba(5, 49, 90, 0.569); 
+  background: rgba(21, 172, 202, 0.5); 
   padding: 6px 12px; /* Уменьшили padding с 12 до 6 сверху/снизу */
   border-radius: 6px;
 
