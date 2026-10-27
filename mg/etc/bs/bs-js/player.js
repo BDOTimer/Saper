@@ -162,7 +162,15 @@ class Player {
     const canRun = !this._staminaLocked && this.stamina > 0;
     const isRunning = wantsToRun && hasInput && canRun;
 
-    const speed = isRunning ? this.runSpeed : this.walkSpeed;
+    // ===== Скорость с учётом истощения =====
+    const EXHAUSTED_THRESHOLD = 10;   // ниже — «выдохся»
+    const EXHAUSTED_SPEED     = 1;    // м/с
+
+    let speed = isRunning ? this.runSpeed : this.walkSpeed;
+
+    if (this.stamina < EXHAUSTED_THRESHOLD) {
+      speed = EXHAUSTED_SPEED;
+    }
 
     const forward = this._scratchForward.set(0, 0, -1)
       .applyQuaternion(this.camera.quaternion);
