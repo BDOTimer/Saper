@@ -269,6 +269,18 @@ canvas {
 </head>
 <body>
 
+<!-- ===== Оверлей загрузки ===== -->
+<div id="loading-overlay">
+  <div id="loading-panel">
+    <div id="loading-title">ОХОТА НА УТОК</div>
+    <div id="loading-bar-track">
+      <div id="loading-bar-fill"></div>
+    </div>
+    <div id="loading-status">ИНИЦИАЛИЗАЦИЯ...</div>
+    <div id="loading-percent">0%</div>
+  </div>
+</div>
+
 <div id="crosshair">✛</div>
 <div id="info">F1 - Справка</div>
 <div id="flash"></div>
@@ -314,10 +326,14 @@ canvas {
 
 <script type="module">
 
+    import { LOADING } from "src/ui/loading.js";
+
+    LOADING.set(5, "ЗАГРУЗКА THREE.JS...");
     import { EffectComposer  } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass      } from "three/addons/postprocessing/RenderPass.js";
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+    LOADING.set(15, "СОЗДАНИЕ СЦЕНЫ...");
     import { ENV    } from "src/env-1.js";
     import { PLAYER } from "src/player.js";
     import { HOUSES } from "src/lodge-1.js";
@@ -329,7 +345,9 @@ canvas {
     import { buildGun, dispose as disposeGun } from "src/gun.compile.js";
 
 // ============================================================
-  import { GunViewer } from 'src/gun-viewer-v2.js';
+    import { GunViewer } from 'src/gun-viewer-v2.js';
+
+    LOADING.set(30, "ГЕНЕРАЦИЯ ENV MAP...");
 
   const overlay  = document.getElementById('gun-overlay');
   const closeBtn = document.getElementById('gun-close');
@@ -416,6 +434,8 @@ if (isTouch) document.body.classList.add('is-touch');
 // ============================================================
 // СЦЕНА
 // ============================================================
+LOADING.set(45, "ГЕНЕРАЦИЯ МИРА...");
+
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xa0c8e8, 20, 120);
 scene.background = new THREE.Color(0x87CEEB);
@@ -567,6 +587,7 @@ let Pz = -23;
 //   Pz = lowest.z;
 // }
 
+LOADING.set(60, "ЗАГРУЗКА МОДЕЛИ SP-2AB...");
 // ===== Модель sp-2ab (например, сарай/вышка/что угодно) =====
 const sp2ab = new MODELS.SceneModel({
   scene,
@@ -585,7 +606,7 @@ const sp2ab = new MODELS.SceneModel({
 });
 
 // Асинхронно — грузим и сажаем на землю
-sp2ab.load().catch(() => { /* ошибка уже залогирована */ });
+sp2ab.load().catch(() => { LOADING.error("sp-2ab.glb не загрузился"); });
 
 // --------------------------------------------------------
 // ПУЛЫ ДИЧИ 🔥🔥🔥 ...
@@ -878,7 +899,9 @@ if (window.visualViewport) {
     window.visualViewport.addEventListener('scroll', resizeRenderer);
 }
 
+LOADING.set(98, "ЗАПУСК...");
 animate();
+LOADING.finish();
 
 // ===== Кастомный неоновый курсор + Ctrl =====
 const neonCursor = document.getElementById('neon-cursor');
