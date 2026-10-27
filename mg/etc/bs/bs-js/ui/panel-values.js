@@ -582,7 +582,7 @@ function setup_2() {
       },
       {
         id: "gun-btn",
-        text: "🔫 РУЖЬЁ",
+        text: "💥 РУЖЬЁ",
         className: "btn-gun",
         onClick: () => {
           if (window.openGunPanel) window.openGunPanel();
