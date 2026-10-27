@@ -539,9 +539,10 @@ function setup_2()
 //------------------------|
 // Вся реализация.        |
 //------------------------:
-function setup  ()
-{        setup_1();
-         setup_2();
+function      setup  ()
+{   const r = setup_1();
+              setup_2();
+  return  r;
 }
 
 //------------------------|
