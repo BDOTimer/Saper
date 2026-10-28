@@ -6,7 +6,7 @@ export class WorldMapGeneratorConfig {
   constructor(overrides = {}) {
     this.height = 50;
     this.width  = 100;
-    this.citiesCount = 20;
+    this.citiesCount = 40;
     this.riversCount = 6;
     this.water  = 0.30;
     this.forest = 0.20;
@@ -26,8 +26,8 @@ export class WorldMapGeneratorConfig {
 
     this.height      = Math.max(40, Math.min(100, this.height|0));
     this.width       = Math.max(40, Math.min(200, this.width|0));
-    this.citiesCount = Math.max(3,  Math.min(50,  this.citiesCount|0));
-    this.riversCount = Math.max(0,  Math.min(20,  this.riversCount|0));
+    this.citiesCount = Math.max(30, Math.min(60,  this.citiesCount|0));
+    this.riversCount = Math.max( 0, Math.min(20,  this.riversCount|0));
   }
 }
 

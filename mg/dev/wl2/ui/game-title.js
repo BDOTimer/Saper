@@ -1,5 +1,5 @@
 /* ui/game-title.js */
-import './game-title.css';
+import './style-base.css';
 
 export class GameTitle {
   /**

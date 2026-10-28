@@ -130,17 +130,39 @@ class WordlMapGenerator
 /// 3. Структура проекта.
 ///----------------------------------------------------------------------------:
 /
-├── index.html              (bootstrap + HUD-разметка + CSS-инлайн)
+├── index.html                    (bootstrap, только #root)
+├── main.js                       (точка входа, роутер экранов)
 ├── core/
-│   ├── rng.js              (mulberry32, hash2, smoothNoise, fbm)
-│   ├── cell.js             (Cell, CellType, TYPE_META)
-│   ├── world-map.js        (WorldMap)
-│   └── generator.js        (WorldMapGeneratorConfig, WorldMapGenerator)
+│   ├── rng.js
+│   ├── cell.js
+│   ├── world-map.js
+│   └── generator.js
 ├── render/
-│   ├── renderer.js         (Renderer, TILE)
-│   └── map-view.js         (MapView)
-└── ui/
-    ├── generator-panel.js  (GeneratorPanel)
-    ├── generator-panel.css (стили панели)
-    └── ui.js               (UI: статус, лог, легенда, панель клетки)
+│   ├── renderer.js
+│   └── map-view.js
+├── ui/
+│   ├── style-base.css
+│   ├── menu.css                  (стили главного меню)
+│   ├── menu.js                   (MenuScreen)
+│   ├── about.css                 (стили оверлея описания)
+│   ├── about.js                  (AboutScreen — переделан из game-title)
+│   ├── game-title.css
+│   ├── game-title.js
+│   ├── generator-panel.css
+│   ├── generator-panel.js
+│   └── ui.js
+└── screens/
+    └── map-editor.js             (экран генератора карт — бывший index.html)
+
+
+///----------------------------------------------------------------------------|
+/// 4. Экран "Главное меню."
+///----------------------------------------------------------------------------:
+«Грань Империи»
+
+- В игру ...
+- Игроки <пока не активна>
+- Карта 
+- Настройки <пока не активна>
+- Описание
 

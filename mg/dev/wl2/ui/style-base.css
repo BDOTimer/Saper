@@ -74,3 +74,163 @@
   color: #8899a6;
   font-variant-numeric: tabular-nums;
 }
+
+/*-----------------------------------------------
+ *  Экран "Главное меню"
+ *-----------------------------------------------*/
+.menu-screen {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(46,139,255,.10), transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(127,212,127,.06), transparent 55%),
+    rgba(10, 14, 20, .92);
+  backdrop-filter: blur(2px);
+  font-family: inherit;
+  z-index: 100;
+}
+
+.menu-card {
+  width: min(420px, calc(100% - 32px));
+  padding: 32px 28px 24px;
+  background: rgba(20, 26, 34, .94);
+  border: 1px solid #2a3441;
+  border-radius: 14px;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, .55),
+    0 0 0 1px rgba(127, 212, 127, .04) inset;
+  backdrop-filter: blur(6px);
+  animation: menuFadeIn .45s ease-out;
+}
+
+@keyframes menuFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/*--- Заголовок «Грань Империи» ----------------------------------*/
+.menu-logo {
+  text-align: center;
+  margin: 0 0 4px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1.1;
+  color: #e6edf3;
+  text-shadow:
+    0 0 18px rgba(127, 212, 127, .22),
+    0 2px 10px rgba(0, 0, 0, .7);
+}
+
+.menu-logo .accent {
+  color: #7fd47f;
+  text-shadow:
+    0 0 22px rgba(127, 212, 127, .45),
+    0 0 6px rgba(127, 212, 127, .35);
+}
+
+.menu-tagline {
+  text-align: center;
+  margin: 0 0 26px;
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: #7fa6c9;
+  opacity: .9;
+}
+
+.menu-divider {
+  height: 1px;
+  margin: 0 0 18px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    #2a3441 20%,
+    #2a3441 80%,
+    transparent
+  );
+}
+
+/*--- Кнопки меню ------------------------------------------------*/
+.menu-nav {
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.menu-btn {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(20, 26, 34, .6);
+  border: 1px solid #2a3441;
+  border-radius: 8px;
+  color: #e6edf3;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: .02em;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .12s, color .15s;
+}
+
+.menu-btn::before {
+  content: "";
+  width: 3px; height: 18px;
+  border-radius: 2px;
+  background: #2e8bff;
+  opacity: .35;
+  transition: opacity .15s, background .15s, box-shadow .15s;
+  flex: 0 0 auto;
+}
+
+.menu-btn:hover:not(:disabled) {
+  background: rgba(46, 139, 255, .10);
+  border-color: #3b5470;
+  transform: translateX(2px);
+}
+
+.menu-btn:hover:not(:disabled)::before {
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(46, 139, 255, .55);
+}
+
+.menu-btn:active:not(:disabled) {
+  transform: translateX(2px) scale(.99);
+}
+
+.menu-btn:focus-visible {
+  outline: none;
+  border-color: #2e8bff;
+  box-shadow: 0 0 0 3px rgba(46, 139, 255, .22);
+}
+
+.menu-btn__label { flex: 1; }
+
+.menu-btn__hint {
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #8899a6;
+}
+
+.menu-btn:disabled {
+  color: #6b7785;
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.menu-btn:disabled::before {
+  background: #6b7785;
+  opacity: .25;
+}
+
+/*--- Нижняя подпись ---------------------------------------------*/
+.menu-footer {
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: #6b7785;
+}
+
+.menu-footer .accent { color: #7fa6c9; }
