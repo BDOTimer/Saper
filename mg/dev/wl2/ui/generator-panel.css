@@ -1,0 +1,27 @@
+/* ui/generator-panel.css */
+#genPanel {
+  position: absolute; top: 12px; left: 12px; width: 300px;
+  max-height: calc(100% - 24px); overflow-y: auto;
+  background: rgba(20,26,34,.94); padding: 12px; border-radius: 10px;
+  border: 1px solid #2a3441; font-size: 12px; line-height: 1.4;
+  backdrop-filter: blur(6px);
+}
+#genPanel h3 { margin: 0 0 8px; font-size: 13px; color: #9ab8d6; }
+#genPanel h4 { margin: 12px 0 6px; font-size: 12px; color: #7fa6c9;
+  border-bottom: 1px solid #2a3441; padding-bottom: 4px; }
+
+.slider-row { margin: 6px 0; }
+.slider-row .label {
+  display: flex; justify-content: space-between; margin-bottom: 2px;
+  font-size: 11px; color: #b8c4cf;
+}
+.slider-row .label .val { color: #7fd47f; font-variant-numeric: tabular-nums; }
+.slider-row input[type=range] { width: 100%; accent-color: #2e8bff; height: 18px; }
+
+.norm-row { font-size: 10px; color: #8899a6; margin-top: 4px; }
+
+.seed-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.seed-row input[type=number] {
+  flex: 1; background: #141a22; color: #e6edf3; border: 1px solid #34495e;
+  border-radius: 6px; padding: 5px 8px; font-size: 12px;
+}

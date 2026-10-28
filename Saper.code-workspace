@@ -33,6 +33,11 @@
 			{
 				"path": "Saper\\mg\\etc\\bs\\bs-js\\ui\\",
 				"badge": "🔋"
+			},
+			{
+				"path": "Saper\\mg\\dev\\wl2\\",
+				"color": "foldercustomization.AnsiColor52",
+				"badge": "🍀"
 			}
 		]
 	}

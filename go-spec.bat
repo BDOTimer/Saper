@@ -41,7 +41,8 @@ REM Создаём временный сервер с запретом кэши�
 
 REM Открыть браузер через 1 секунду (сервер успеет подняться)
 :start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/mg/etc/tools/t-01/test/test-viewer.html"
- start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/mg/WL2/wl2/index.html"
+:start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/mg/WL2/wl2/index.html"
+ start "" cmd /c "timeout /t 1 >nul & start http://localhost:8000/mg/dev/wl2/test-gen.html"
 
 REM Запустить сервер без кэша (Ctrl+C — остановить)
 python "%~dp0_no_cache_server.py"
