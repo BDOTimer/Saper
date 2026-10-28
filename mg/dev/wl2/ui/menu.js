@@ -17,11 +17,11 @@ const GAME_NAME   = 'Грань Империи';
 const GAME_ACCENT = 'Империи';
 
 const MENU_ITEMS = [
-  { id: 'new-game',  label: 'В игру',     hint: 'Новая партия', enabled: true  },
-  { id: 'players',   label: 'Игроки',     hint: 'Скоро',        enabled: false },
-  { id: 'map',       label: 'Карта',      hint: 'Выбор мира',   enabled: true  },
-  { id: 'settings',  label: 'Настройки',  hint: 'Скоро',        enabled: false },
-  { id: 'about',     label: 'Описание',   hint: 'Об игре',      enabled: true  },
+  { id: 'new-game',  label: 'В игру',     hint: 'Скоро',      enabled: false },
+  { id: 'players',   label: 'Игроки',     hint: 'Скоро',      enabled: false },
+  { id: 'map',       label: 'Карта',      hint: 'Выбор мира', enabled: true  },
+  { id: 'settings',  label: 'Настройки',  hint: 'Скоро',      enabled: false },
+  { id: 'about',     label: 'Описание',   hint: 'Об игре',    enabled: true  },
 ];
 
 /**
