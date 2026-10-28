@@ -13,6 +13,8 @@
 : 3
 :REM  Билд: -->
 :bun run dev
+:bun run build
+:bun run start
 :Локльный сервер(запустить как только отработал 'bun run dev'): http://localhost:3000
 
 : 4
