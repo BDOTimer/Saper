@@ -69,13 +69,13 @@ export class MapView {
   _worldZ(y) { return (y - (this.world.h - 1) / 2) * TILE; }
   _worldY(cell) {
     let h = 0;
-    if (cell.type === 'mount') h = 0.35 + cell.elevation * 0.4;
+    if      (cell.type === 'mount') h = 0.35 + cell.elevation * 0.4;
     else if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
     return h + 0.15;
   }
 
   // плавно фокусируемся на клетке
-  _focusOnTile(tile, duration = 450) {
+  _focusOnTile(tile, duration = 1500) {
     this.renderer.focusOnPoint(
       this._worldX(tile.x),
       this._worldY(tile) * 0.5, // чуть ниже верхушки — центр экрана «смотрит» в клетку
@@ -235,11 +235,41 @@ export class MapView {
     window.addEventListener('wheel', (e) => {
       if (this.renderer.mode !== 'top') return;
       e.preventDefault();
-      const factor = e.deltaY > 0 ? 1.1 : 0.9;
+
       const cam = this.renderer.cameraTop;
-      cam.left *= factor; cam.right *= factor;
-      cam.top *= factor; cam.bottom *= factor;
+
+      // базовый «полный» размер фрустума — по всей карте (эталон)
+      const baseW = this.world.w * TILE * 1.1;
+      const baseH = this.world.h * TILE * 1.1;
+
+      // текущий размер фрустума
+      const curW = cam.right - cam.left;
+      const curH = cam.top - cam.bottom;
+
+      const factor = e.deltaY > 0 ? 1.1 : 0.9;
+      const nextW = curW * factor;
+      const nextH = curH * factor;
+
+      // границы зума: от 14% обзора (макс. приближение) до 210% обзора (макс. отдаление)
+      const minW = baseW * 0.04;
+      const maxW = baseW * 2.1;
+      const minH = baseH * 0.04;
+      const maxH = baseH * 2.1;
+
+      const finalW = Math.max(minW, Math.min(maxW, nextW));
+      const finalH = Math.max(minH, Math.min(maxH, nextH));
+
+      cam.left   = -finalW / 2;
+      cam.right  =  finalW / 2;
+      cam.top    =  finalH / 2;
+      cam.bottom = -finalH / 2;
       cam.updateProjectionMatrix();
+
+      // после зума нужно и позицию clamp'нуть — фрустум изменился
+      const cl = this._clampTopXZ(cam.position.x, cam.position.z);
+      cam.position.x = cl.x;
+      cam.position.z = cl.z;
+      cam.lookAt(cam.position.x, 0, cam.position.z);
     }, { passive: false });
 
     window.addEventListener('keydown', (e) => { this._keys[e.code] = true; });
@@ -305,10 +335,13 @@ export class MapView {
       if (!this.renderer._focusAnim) {
         const speed = 0.6 * (cam.right - cam.left) * 0.02;
         let dx = 0, dz = 0;
-        if (this._keys['KeyW']) dz -= speed;
-        if (this._keys['KeyS']) dz += speed;
-        if (this._keys['KeyA']) dx -= speed;
-        if (this._keys['KeyD']) dx += speed;
+
+        const a = this._mapBounds();
+
+        if (this._keys['KeyW'] && cam.position.z > a.minZ) dz -= speed;
+        if (this._keys['KeyS'] && cam.position.z < a.maxZ) dz += speed;
+        if (this._keys['KeyA'] && cam.position.x > a.minX) dx -= speed;
+        if (this._keys['KeyD'] && cam.position.x < a.maxX) dx += speed;
         if (dx || dz) {
           cam.position.x += dx;
           cam.position.z += dz;
@@ -320,6 +353,38 @@ export class MapView {
     }
 
     this.renderer.render(dt);
+  }
+
+  // границы карты в мировых координатах (карта центрирована в нуле)
+  _mapBounds() {
+    const w = (this.world.w * TILE) / 2;
+    const h = (this.world.h * TILE) / 2;
+    return {
+      minX: -w, maxX: w,
+      minZ: -h, maxZ: h,
+    };
+  }
+
+  // клампит точку-центр так, чтобы обзор не выходил за карту
+  _clampTopXZ(x, z) {
+    const cam = this.renderer.cameraTop;
+    const halfW = (cam.right - cam.left) / 2;
+    const halfH = (cam.top - cam.bottom) / 2;
+    const b = this._mapBounds();
+    const cx = (b.maxX - b.minX) <= halfW * 2
+      ? (b.minX + b.maxX) / 2                       // обзор шире карты — центрируем
+      : THREE.MathUtils.clamp(x, b.minX + halfW, b.maxX - halfW);
+    const cz = (b.maxZ - b.minZ) <= halfH * 2
+      ? (b.minZ + b.maxZ) / 2
+      : THREE.MathUtils.clamp(z, b.minZ + halfH, b.maxZ - halfH);
+    return { x: cx, z: cz };
+  }
+
+  _clampTopCamera() {
+    const cam = this.renderer.cameraTop;
+    const p = this._clampTopXZ(cam.position.x, cam.position.z);
+    cam.position.x = p.x; cam.position.z = p.z;
+    cam.lookAt(p.x, 0, p.z);
   }
 
   destroy() {
