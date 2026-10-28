@@ -1,6 +1,6 @@
 // render/map-view.js
 import * as THREE from 'three';
-import { TILE } from './renderer.js';
+import { Renderer, TILE } from './renderer.js';
 import { hash2 } from '../core/rng.js';
 
 export class MapView {
@@ -15,6 +15,7 @@ export class MapView {
     this._mouse = new THREE.Vector2();
     this._onTileClick = null;
     this._keys = {};
+    this._lastT = performance.now();
 
     this._buildBoard();
     this._buildOverlays();
@@ -26,7 +27,6 @@ export class MapView {
     requestAnimationFrame((t) => this._animate(t));
   }
 
-  /* ---------- API ---------- */
   rebuild(world) {
     this.world = world;
     this._disposeMesh('tileMesh');
@@ -40,6 +40,7 @@ export class MapView {
     }
     if (this.selRing) this.selRing.visible = false;
     if (this.hoverRing) this.hoverRing.visible = false;
+    this.renderer._focusAnim = null;
 
     this._buildBoard();
     this._buildOverlays();
@@ -64,9 +65,24 @@ export class MapView {
     this[name] = null;
   }
 
-  /* ---------- геометрия ---------- */
   _worldX(x) { return (x - (this.world.w - 1) / 2) * TILE; }
   _worldZ(y) { return (y - (this.world.h - 1) / 2) * TILE; }
+  _worldY(cell) {
+    let h = 0;
+    if (cell.type === 'mount') h = 0.35 + cell.elevation * 0.4;
+    else if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
+    return h + 0.15;
+  }
+
+  // плавно фокусируемся на клетке
+  _focusOnTile(tile, duration = 450) {
+    this.renderer.focusOnPoint(
+      this._worldX(tile.x),
+      this._worldY(tile) * 0.5, // чуть ниже верхушки — центр экрана «смотрит» в клетку
+      this._worldZ(tile.y),
+      duration,
+    );
+  }
 
   _buildBoard() {
     const world = this.world;
@@ -77,9 +93,6 @@ export class MapView {
     const mat = new THREE.MeshStandardMaterial({ roughness: 1 });
     const inst = new THREE.InstancedMesh(geo, mat, count);
     inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    inst.receiveShadow = false;
-    inst.castShadow = false;
-
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
     const pickable = new THREE.InstancedMesh(
@@ -89,10 +102,7 @@ export class MapView {
     world.cells.forEach((cell, i) => {
       if (!cell) return;
       const meta = cell.meta;
-      let h = 0;
-      if (cell.type === 'mount') h = 0.35 + cell.elevation * 0.4;
-      else if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
-      dummy.position.set(this._worldX(cell.x), h + 0.15, this._worldZ(cell.y));
+      dummy.position.set(this._worldX(cell.x), this._worldY(cell), this._worldZ(cell.y));
       dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
@@ -125,7 +135,7 @@ export class MapView {
       const inst = new THREE.InstancedMesh(g, m, roadCells.length);
       const d = new THREE.Object3D();
       roadCells.forEach((c, i) => {
-        d.position.set(this._worldX(c.x), 0.36, this._worldZ(c.y));
+        d.position.set(this._worldX(c.x), this._worldY(c) + 0.06, this._worldZ(c.y));
         d.rotation.y = Math.PI / 4;
         d.updateMatrix();
         inst.setMatrixAt(i, d.matrix);
@@ -143,7 +153,7 @@ export class MapView {
       const inst = new THREE.InstancedMesh(g, m, riverCells.length);
       const d = new THREE.Object3D();
       riverCells.forEach((c, i) => {
-        d.position.set(this._worldX(c.x), 0.34, this._worldZ(c.y));
+        d.position.set(this._worldX(c.x), this._worldY(c) + 0.08, this._worldZ(c.y));
         d.updateMatrix();
         inst.setMatrixAt(i, d.matrix);
       });
@@ -163,25 +173,28 @@ export class MapView {
 
     for (const city of this.world.cities) {
       const g = new THREE.Group();
+      const cell = this.world.get(city.x, city.y);
+      const baseY = cell ? this._worldY(cell) : 0.15;
+
       const base = new THREE.Mesh(
         new THREE.CylinderGeometry(TILE * 0.32, TILE * 0.38, 0.25, 12),
         new THREE.MeshStandardMaterial({ color: 0x8f6d4a, roughness: 0.8 })
       );
-      base.position.y = 0.45;
+      base.position.y = baseY + 0.30;
       g.add(base);
 
       const tower = new THREE.Mesh(
         new THREE.BoxGeometry(TILE * 0.35, TILE * 0.5, TILE * 0.35),
         new THREE.MeshStandardMaterial({ color: 0xe6dbb8, roughness: 0.9 })
       );
-      tower.position.y = 0.9;
+      tower.position.y = baseY + 0.75;
       g.add(tower);
 
       const roof = new THREE.Mesh(
         new THREE.ConeGeometry(TILE * 0.28, TILE * 0.35, 4),
         new THREE.MeshStandardMaterial({ color: 0xd64545, roughness: 0.6 })
       );
-      roof.position.y = 1.35;
+      roof.position.y = baseY + 1.20;
       roof.rotation.y = Math.PI / 4;
       g.add(roof);
 
@@ -189,7 +202,7 @@ export class MapView {
         new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
         new THREE.MeshBasicMaterial({ color: 0xffd166, side: THREE.DoubleSide })
       );
-      flag.position.set(TILE * 0.25, 1.55, 0);
+      flag.position.set(TILE * 0.25, baseY + 1.40, 0);
       g.add(flag);
 
       g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
@@ -212,7 +225,6 @@ export class MapView {
     this.scene.add(this.selRing);
   }
 
-  /* ---------- ввод ---------- */
   _bindEvents() {
     const dom = this.renderer.domElement;
     dom.addEventListener('contextmenu', e => e.preventDefault());
@@ -255,6 +267,7 @@ export class MapView {
       this.hoverRing.visible = true;
       this.hoverRing.position.x = this._worldX(tile.x);
       this.hoverRing.position.z = this._worldZ(tile.y);
+      this.hoverRing.position.y = this._worldY(tile) + 0.2;
       this.renderer.domElement.style.cursor = 'pointer';
     } else {
       this.hoverRing.visible = false;
@@ -267,36 +280,45 @@ export class MapView {
     this._updateMouse(e);
     const tile = this._pickTile();
     if (!tile) return;
+
+    // кольцо выбора
     this.selRing.visible = true;
     this.selRing.position.x = this._worldX(tile.x);
     this.selRing.position.z = this._worldZ(tile.y);
+    this.selRing.position.y = this._worldY(tile) + 0.22;
+
+    // плавно центрируем на клетке (в орбите это ещё и смена pivot)
+    this._focusOnTile(tile);
+
+    // внешний обработчик
     this._onTileClick?.(tile);
   }
 
-  /* ---------- цикл ---------- */
   _animate(t) {
     requestAnimationFrame((tt) => this._animate(tt));
+    const dt = Math.max(0, t - this._lastT);
+    this._lastT = t;
 
     if (this.renderer.mode === 'top') {
       const cam = this.renderer.cameraTop;
-      const speed = 0.6 * (cam.right - cam.left) * 0.02;
-      let dx = 0, dz = 0;
-      if (this._keys['KeyW']) dz -= speed;
-      if (this._keys['KeyS']) dz += speed;
-      if (this._keys['KeyA']) dx -= speed;
-      if (this._keys['KeyD']) dx += speed;
-      if (dx || dz) {
-        cam.position.x += dx;
-        cam.position.z += dz;
-        cam.lookAt(cam.position.x, 0, cam.position.z);
+      // если идёт анимация фокуса — WASD не мешаем ей
+      if (!this.renderer._focusAnim) {
+        const speed = 0.6 * (cam.right - cam.left) * 0.02;
+        let dx = 0, dz = 0;
+        if (this._keys['KeyW']) dz -= speed;
+        if (this._keys['KeyS']) dz += speed;
+        if (this._keys['KeyA']) dx -= speed;
+        if (this._keys['KeyD']) dx += speed;
+        if (dx || dz) {
+          cam.position.x += dx;
+          cam.position.z += dz;
+          cam.lookAt(cam.position.x, 0, cam.position.z);
+        }
       }
     } else {
       this.renderer.controls.update();
     }
 
-    this.renderer.render();
+    this.renderer.render(dt);
   }
 }
-
-// импорт внизу, чтобы не ломать порядок при перестройке файлов
-import { Renderer } from './renderer.js';

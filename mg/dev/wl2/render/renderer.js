@@ -4,6 +4,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 export const TILE = 1.0;
 
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
 export class Renderer {
   constructor(container) {
     this.container = container;
@@ -21,7 +23,6 @@ export class Renderer {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = false;
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.cameraOrbit, this.renderer.domElement);
@@ -29,7 +30,7 @@ export class Renderer {
     this.controls.dampingFactor = 0.1;
     this.controls.minPolarAngle = THREE.MathUtils.degToRad(15);
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
-    this.controls.minDistance = 8;
+    this.controls.minDistance = 4;
     this.controls.maxDistance = 400;
     this.controls.mouseButtons = {
       LEFT: THREE.MOUSE.PAN,
@@ -38,6 +39,9 @@ export class Renderer {
     };
 
     this.mode = 'orbit';
+
+    // состояние анимации фокуса
+    this._focusAnim = null;
 
     this._buildLights();
   }
@@ -52,6 +56,8 @@ export class Renderer {
   setCameraMode(mode) {
     this.mode = mode;
     this.controls.enabled = mode === 'orbit';
+    // прерываем активную анимацию фокуса при смене камеры
+    this._focusAnim = null;
   }
 
   _frameOrbit(span) {
@@ -76,6 +82,61 @@ export class Renderer {
     cam.updateProjectionMatrix();
   }
 
+  /**
+   * Плавно фокусируется на мировой точке (wx, wy, wz).
+   * - В orbit-режиме сдвигает controls.target и камеру так, чтобы точка
+   *   оказалась в центре; дистанция и углы сохраняются.
+   * - В top-режиме центрирует ортокамеру на этой точке.
+   */
+  focusOnPoint(wx, wy, wz, duration = 450) {
+    if (this.mode === 'orbit') {
+      const targetFrom = this.controls.target.clone();
+      const camFrom = this.cameraOrbit.position.clone();
+      const targetTo = new THREE.Vector3(wx, wy, wz);
+      const delta = targetTo.clone().sub(targetFrom);
+      const camTo = camFrom.clone().add(delta);
+
+      this._focusAnim = {
+        fromT: targetFrom, toT: targetTo,
+        fromC: camFrom,    toC: camTo,
+        t: 0, dur: duration,
+      };
+      return;
+    }
+
+    // top-камера: центрируем по (wx, wz)
+    const cam = this.cameraTop;
+    const from = cam.position.clone();
+    const to = new THREE.Vector3(wx, cam.position.y, wz);
+    this._focusAnim = {
+      topFrom: from, topTo: to,
+      t: 0, dur: duration,
+    };
+  }
+
+  _stepFocusAnim(dtMs) {
+    const a = this._focusAnim;
+    if (!a) return;
+
+    a.t += dtMs;
+    const k = Math.min(1, a.t / a.dur);
+    const e = easeOutCubic(k);
+
+    if (a.topFrom) {
+      // top-камера
+      const cam = this.cameraTop;
+      cam.position.lerpVectors(a.topFrom, a.topTo, e);
+      cam.lookAt(cam.position.x, 0, cam.position.z);
+    } else {
+      // orbit-камера
+      this.controls.target.lerpVectors(a.fromT, a.toT, e);
+      this.cameraOrbit.position.lerpVectors(a.fromC, a.toC, e);
+      this.controls.update();
+    }
+
+    if (k >= 1) this._focusAnim = null;
+  }
+
   onResize(worldW, worldH) {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h);
@@ -84,7 +145,8 @@ export class Renderer {
     if (worldW && worldH) this._fitTopCamera(worldW, worldH);
   }
 
-  render() {
+  render(dtMs = 0) {
+    this._stepFocusAnim(dtMs);
     const cam = this.mode === 'top' ? this.cameraTop : this.cameraOrbit;
     this.renderer.render(this.scene, cam);
   }

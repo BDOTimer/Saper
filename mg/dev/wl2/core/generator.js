@@ -268,7 +268,7 @@ export class WorldMapGenerator {
       for (const nb of world.neighbors4(cur.x, cur.y)) {
         const nk = key(nb.x, nb.y);
         if (visited.has(nk)) continue;
-        if (nb.type === 'water' || nb.type === 'mount') continue;
+        // все клетки проходимы; горы/вода просто дороже
         const cost = nb.staminaCost;
         const ng = cur.g + cost;
         if (!best.has(nk) || ng < best.get(nk)) {
