@@ -1,184 +1,29 @@
-<!-- wl2.html «Грань Империи»-->
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
-<title>«Грань Империи» — World Map</title>
-<link rel="icon" type="image/png" href="../../res/favicon-64.png" sizes="64x64">
+<title>Грань Империи</title>
 <link rel="stylesheet" href="./ui/style-base.css" />
+<link rel="stylesheet" href="./ui/about.css" />
+<link rel="stylesheet" href="./ui/hud.css" />
 <style>
-  * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14;
     font-family: system-ui, sans-serif; color: #e6edf3; user-select: none; }
-  #app { position: fixed; inset: 0; }
-  #hud { position: fixed; inset: 0; pointer-events: none; }
-  #hud > * { pointer-events: auto; }
-
-  #topbar {
-    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 8px; align-items: center;
-    background: rgba(20,26,34,.88); padding: 8px 12px; border-radius: 10px;
-    border: 1px solid #2a3441; backdrop-filter: blur(6px); z-index: 10;
-  }
-  #topbar .status { font-weight: 600; min-width: 220px; text-align: center; font-size: 13px; }
-  button {
-    background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
-    padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 12px;
-  }
-  button:hover:not(:disabled) { background: #2a3a4d; }
-  button:disabled { opacity: .45; cursor: default; }
-  button.primary { background: #2e7d4f; border-color: #3fa86a; }
-  button.primary:hover:not(:disabled) { background: #369a5f; }
-  button.active { background: #2e8bff; border-color: #4aa3ff; }
-
-  #panel {
-    position: absolute; bottom: 12px; left: 12px; min-width: 240px;
-    background: rgba(20,26,34,.92); padding: 10px 12px; border-radius: 10px;
-    border: 1px solid #2a3441; font-size: 12px; line-height: 1.5;
-    max-width: 340px;
-  }
-  #panel h3 { margin: 0 0 6px; font-size: 13px; }
-  #panel .muted { color: #8899a6; }
-  #panel .swatch { display: inline-block; width: 10px; height: 10px;
-    border-radius: 2px; vertical-align: middle; margin-right: 6px; }
-
-  #log {
-    position: absolute; bottom: 12px; right: 12px; width: 280px; max-height: 200px;
-    overflow: auto; background: rgba(20,26,34,.92); padding: 8px 10px;
-    border-radius: 10px; border: 1px solid #2a3441; font-size: 11px;
-  }
-  #log div { margin-bottom: 3px; color: #b8c4cf; }
-  #log div.hl { color: #ffd166; }
-
-  #legend {
-    position: absolute; top: 12px; right: 12px; background: rgba(20,26,34,.92);
-    padding: 8px 12px; border-radius: 10px; border: 1px solid #2a3441;
-    font-size: 11px; line-height: 1.6; min-width: 150px;
-  }
-  #legend .item { display: flex; align-items: center; gap: 6px; }
-  #legend .sw { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #00000040; }
-
-  #genBusy {
-    position: absolute; inset: 0; display: none;
-    background: rgba(0,0,0,.55); align-items: center; justify-content: center;
-    z-index: 100; pointer-events: none; font-size: 14px; color: #ffd166;
-  }
+  #root { position: fixed; inset: 0; }
 </style>
 </head>
 <body>
-<div id="app"></div>
-<div id="hud">
+  <div id="root"></div>
 
-  <div id="topbar">
-    <button id="btnGen" class="primary">Сгенерировать</button>
-    <div class="status" id="statusLabel">—</div>
-    <button id="btnCamOrbit" class="active">Орбита</button>
-    <button id="btnCamTop">Сверху</button>
-  </div>
-
-  <div id="genPanel">
-    <h3>Генератор карты</h3>
-    <h4>Размер</h4>
-    <div id="sizeSliders"></div>
-    <h4>Города / реки</h4>
-    <div id="countSliders"></div>
-    <h4>Веса типов (0..1)</h4>
-    <div id="typeSliders"></div>
-    <h4>Seed</h4>
-    <div class="seed-row">
-      <input type="number" id="seedInput" value="1337" min="0" step="1" />
-      <button id="btnRandomSeed">🎲</button>
-    </div>
-  </div>
-
-  <div id="legend">
-    <div style="color:#9ab8d6; margin-bottom:4px;">Легенда</div>
-    <div id="legendItems"></div>
-  </div>
-
-  <div id="panel">
-    <h3>Карта</h3>
-    <div class="muted">Кликни по карте для выбора клетки</div>
-  </div>
-
-  <div id="log"></div>
-  <div id="genBusy">Генерация...</div>
-</div>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
   }
-}
-</script>
-
-<script type="module">
-import { WorldMap }        from './core/world-map.js';
-import { Cell, CellType }  from './core/cell.js';
-import { WorldMapGeneratorConfig, WorldMapGenerator } from './core/generator.js';
-import { MapView }         from './render/map-view.js';
-import { GeneratorPanel }  from './ui/generator-panel.js';
-import { UI }              from './ui/ui.js';
-
-function boot() {
-  const ui = new UI();
-
-  const config = new WorldMapGeneratorConfig();
-  let world = new WorldMap(config.width, config.height, 1337);
-  // заполняем пустыми клетками, чтобы MapView работал до первой генерации
-  for (let y = 0; y < config.height; y++)
-    for (let x = 0; x < config.width; x++)
-      world.set(x, y, new Cell(x, y, CellType.PLAIN));
-
-  const mapView = new MapView(world, document.getElementById('app'));
-  mapView._onTileClick = (tile) => ui.showCell(tile);
-
-  new GeneratorPanel(config, {
-    onGenerate: (seed) => {
-      ui.setStatus('Генерация...');
-      document.getElementById('genBusy').style.display = 'flex';
-      setTimeout(() => {
-        const t0 = performance.now();
-        world = new WorldMap(config.width, config.height, seed);
-        const gen = new WorldMapGenerator(world, config);
-        gen.generate(seed);
-        const dt = performance.now() - t0;
-
-        mapView.world = world;
-        mapView.rebuild(world);
-
-        document.getElementById('seedInput').value = world.seed;
-        ui.setStatus(`Seed ${world.seed} · ${config.width}×${config.height} · ${dt.toFixed(0)} мс`);
-        ui.log(`Сгенерировано: ${world.cells.length} клеток, ${world.cities.length} городов, ${world.rivers.length} рек (${dt.toFixed(0)} мс)`, true);
-        for (const m of gen.logs) ui.log(m);
-
-        document.getElementById('genBusy').style.display = 'none';
-      }, 30);
-    },
-  });
-
-  const btnOrbit = document.getElementById('btnCamOrbit');
-  const btnTop   = document.getElementById('btnCamTop');
-  btnOrbit.addEventListener('click', () => {
-    btnOrbit.classList.add('active'); btnTop.classList.remove('active');
-    mapView.setCameraMode('orbit');
-  });
-  btnTop.addEventListener('click', () => {
-    btnTop.classList.add('active'); btnOrbit.classList.remove('active');
-    mapView.setCameraMode('top');
-  });
-
-  document.getElementById('btnGen').click();
-
-  window.__world    = world;
-  window.__config   = config;
-  window.__mapView  = mapView;
-  window.__ui       = ui;
-}
-
-boot();
-</script>
+  </script>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>

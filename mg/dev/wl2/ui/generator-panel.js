@@ -1,4 +1,5 @@
 // ui/generator-panel.js
+
 export class GeneratorPanel {
   constructor(config, { onGenerate }) {
     this.config = config;
@@ -65,7 +66,7 @@ export class GeneratorPanel {
   _buildCountSliders() {
     const c = document.getElementById('countSliders');
     this._slider(c, {
-      label: 'Городов', value: this.config.citiesCount, min: 3, max: 50, step: 1, integer: true,
+      label: 'Городов', value: this.config.citiesCount, min: 30, max: 60, step: 1, integer: true,
       onChange: v => this.config.citiesCount = v,
     });
     this._slider(c, {
@@ -101,4 +102,6 @@ export class GeneratorPanel {
     }
     refreshNorm();
   }
+
+  destroy() { /* listeners на кнопках умрут вместе с DOM */ }
 }

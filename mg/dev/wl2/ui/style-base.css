@@ -31,10 +31,10 @@
 }
 
 /*----------------------------------------------- 
- *  Панель описание игры 
+ *  Панель заголовка игры 
  *-----------------------------------------------*/
 .game-title {
-  position: absolute; top: 12px; left: 12px;
+  position: relative ; top: 12px; left: 12px;
   padding: 14px 18px;
   background: rgba(20, 26, 34, .94);
   border: 1px solid #2a3441;
@@ -75,8 +75,63 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Оверлей ── */
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 24px;
+  padding: 48px 20px;
+  overflow-y: auto;
+  background: rgba(8, 6, 18, 0.72);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.about-overlay.open { opacity: 1; }
+
+/* ── Заголовок: по центру, с аурой ── */
+.about-header {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+  /* мягкое сияние-ореол вокруг заголовка */
+  filter:
+    drop-shadow(0 0 6px rgba(255, 224, 130, 0.65))
+    drop-shadow(0 0 22px rgba(255, 180, 60, 0.45))
+    drop-shadow(0 0 48px rgba(255, 140, 40, 0.25));
+  animation: about-header-glow 3.2s ease-in-out infinite alternate;
+}
+
+/* лёгкая пульсация аурой */
+@keyframes about-header-glow {
+  from {
+    filter:
+      drop-shadow(0 0 5px rgba(255, 224, 130, 0.55))
+      drop-shadow(0 0 18px rgba(255, 180, 60, 0.38))
+      drop-shadow(0 0 40px rgba(255, 140, 40, 0.20));
+  }
+  to {
+    filter:
+      drop-shadow(0 0 8px rgba(255, 235, 170, 0.85))
+      drop-shadow(0 0 28px rgba(255, 190, 80, 0.60))
+      drop-shadow(0 0 60px rgba(255, 150, 50, 0.38));
+  }
+}
+
+/* уважаем настройки доступности */
+@media (prefers-reduced-motion: reduce) {
+  .about-header { animation: none; }
+}
+
 /*-----------------------------------------------
- *  Экран "Главное меню"
+ *  Экран "Главное меню" menu.js
  *-----------------------------------------------*/
 .menu-screen {
   position: absolute; inset: 0;
@@ -234,3 +289,4 @@
 }
 
 .menu-footer .accent { color: #7fa6c9; }
+

@@ -1,0 +1,72 @@
+/* ui/about.css */
+.about-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(6, 10, 14, 0);
+  backdrop-filter: blur(0);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s ease, backdrop-filter .18s ease;
+  padding: 24px;
+  
+}
+.about-overlay.open {
+  background: rgba(6, 10, 14, .72);
+  backdrop-filter: blur(6px);
+}
+.about-card {
+  max-width: 756px; width: 100%; max-height: 90vh; overflow-y: auto;
+  background: #141a22; border: 1px solid #2a3441; border-radius: 14px;
+  padding: 32px 36px;
+  transform: translateY(12px) scale(.98); opacity: 0;
+  transition: transform .18s ease, opacity .18s ease;
+  scrollbar-gutter: stable; /* современные браузеры */
+}
+.about-overlay.open .about-card {
+  transform: none; opacity: 1;
+}
+.about-body { margin-top: 20px; font-size: 14px; line-height: 1.65; color: #c8d2dc; }
+.about-body h3 { margin: 20px 0 6px; font-size: 14px; color: #9ab8d6; }
+.about-body p { margin: 0 0 12px; }
+.about-body ul { margin: 6px 0 12px; padding-left: 20px; }
+.about-body li { margin: 2px 0; }
+.about-body b { color: #e6edf3; }
+.about-body .accent { color: #7fd47f; }
+
+.about-close {
+  margin-top: 20px;
+  background: #2e7d4f; border: 1px solid #3fa86a; color: #e6edf3;
+  padding: 10px 18px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+}
+.about-close:hover { background: #369a5f; }
+
+.about-header {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  /* ── ширина как у описания ── */
+  width: 100%;
+  max-width: 756;   /* та же, что у .about-card */
+  padding: 0 36px; 
+
+  filter:
+    drop-shadow(0 0 6px rgba(255, 224, 130, 0.65))
+    drop-shadow(0 0 22px rgba(255, 180, 60, 0.45))
+    drop-shadow(0 0 48px rgba(255, 140, 40, 0.25));
+  animation: about-header-glow 3.2s ease-in-out infinite alternate;
+}
+
+.about-title-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+}
+
+/* и сам корень GameTitle — на всю ширину обёртки, по центру */
+.about-title-wrap > * {
+  margin-left: auto;
+  margin-right: auto;
+}

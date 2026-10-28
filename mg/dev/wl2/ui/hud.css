@@ -1,0 +1,57 @@
+/* ui/hud.css */
+.map-editor { position: absolute; inset: 0; }
+.map-editor #app { position: fixed; inset: 0; }
+.map-editor #hud { position: fixed; inset: 0; pointer-events: none; }
+.map-editor #hud > * { pointer-events: auto; }
+
+.map-editor #topbar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(20,26,34,.88); padding: 8px 12px; border-radius: 10px;
+  border: 1px solid #2a3441; backdrop-filter: blur(6px); z-index: 10;
+}
+.map-editor #topbar .status { font-weight: 600; min-width: 220px; text-align: center; font-size: 13px; }
+
+.map-editor button {
+  background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
+  padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 12px;
+}
+.map-editor button:hover:not(:disabled) { background: #2a3a4d; }
+.map-editor button:disabled { opacity: .45; cursor: default; }
+.map-editor button.primary { background: #2e7d4f; border-color: #3fa86a; }
+.map-editor button.primary:hover:not(:disabled) { background: #369a5f; }
+.map-editor button.active { background: #2e8bff; border-color: #4aa3ff; }
+
+.map-editor #panel {
+  position: absolute; bottom: 12px; left: 12px; min-width: 240px;
+  background: rgba(20,26,34,.92); padding: 10px 12px; border-radius: 10px;
+  border: 1px solid #2a3441; font-size: 12px; line-height: 1.5; max-width: 340px;
+}
+.map-editor #panel h3 { margin: 0 0 6px; font-size: 13px; }
+.map-editor #panel .muted { color: #8899a6; }
+.map-editor #panel .swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px; vertical-align: middle; margin-right: 6px;
+}
+
+.map-editor #log {
+  position: absolute; bottom: 12px; right: 12px; width: 280px; max-height: 200px;
+  overflow: auto; background: rgba(20,26,34,.92); padding: 8px 10px;
+  border-radius: 10px; border: 1px solid #2a3441; font-size: 11px;
+}
+.map-editor #log div { margin-bottom: 3px; color: #b8c4cf; }
+.map-editor #log div.hl { color: #ffd166; }
+
+.map-editor #legend {
+  position: absolute; top: 12px; right: 12px; background: rgba(20,26,34,.92);
+  padding: 8px 12px; border-radius: 10px; border: 1px solid #2a3441;
+  font-size: 11px; line-height: 1.6; min-width: 150px;
+}
+.map-editor #legend .item { display: flex; align-items: center; gap: 6px; }
+.map-editor #legend .sw { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #00000040; }
+
+.map-editor #genBusy {
+  position: absolute; inset: 0; display: none;
+  background: rgba(0,0,0,.55); align-items: center; justify-content: center;
+  z-index: 100; pointer-events: none; font-size: 14px; color: #ffd166;
+}

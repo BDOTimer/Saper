@@ -321,4 +321,12 @@ export class MapView {
 
     this.renderer.render(dt);
   }
+
+  destroy() {
+    this.renderer?.controls?.dispose?.();
+    this.renderer?.renderer?.dispose?.();
+    this.renderer?.domElement?.remove?.();
+    this.scene?.clear?.();
+    // вешатели на window остаются — если хочешь чисто, вынеси их в _unbind
+    }
 }
