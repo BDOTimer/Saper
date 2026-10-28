@@ -1,4 +1,50 @@
 /* ui/about.css */
+
+/*--- Заголовок «Грань Империи» ----------------------------------*/
+.menu-logo {
+  text-align: center;
+  margin: 0 0 4px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1.1;
+  color: #e6edf3;
+  text-shadow:
+    0 0 18px rgba(127, 212, 127, .22),
+    0 2px 10px rgba(0, 0, 0, .7);
+}
+
+.menu-logo .accent {
+  color: #7fd47f;
+  text-shadow:
+    0 0 22px rgba(127, 212, 127, .45),
+    0 0 6px rgba(127, 212, 127, .35);
+}
+
+.menu-tagline {
+  text-align: center;
+  margin: 0 0 26px;
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: #7fa6c9;
+  opacity: .9;
+}
+
+.menu-divider {
+  height: 1px;
+  margin: 0 0 18px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    #2a3441 20%,
+    #2a3441 80%,
+    transparent
+  );
+}
+
+
+/*--- about ----------------------------------*/
 .about-overlay {
   position: fixed;
   inset: 0;
