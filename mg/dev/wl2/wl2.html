@@ -4,16 +4,38 @@
 <head>
 <meta charset="UTF-8" />
 <title>Грань Империи</title>
+<link rel="icon" type="image/png" href="../../res/favicon-64.png" sizes="64x64">
 <link rel="stylesheet" href="./ui/style-base.css" />
 <link rel="stylesheet" href="./ui/about.css" />
 <link rel="stylesheet" href="./ui/hud.css" />
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14;
-    font-family: system-ui, sans-serif; color: #e6edf3; user-select: none; }
-  #root { position: fixed; inset: 0; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #0b0f14;
+    font-family: system-ui, sans-serif;
+    color: #e6edf3;
+    user-select: none;
+  }
+
+  /* ── Фоновая подложка с логотипом ── */
+  #bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(8, 6, 18, 0.55), rgba(8, 6, 18, 0.80)),
+      url("./res/img/logo-1.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    pointer-events: none;
+  }
+
+  #root { position: fixed; inset: 0; z-index: 1; }
 </style>
 </head>
 <body>
+  <div id="bg"></div>
   <div id="root"></div>
 
   <script type="importmap">

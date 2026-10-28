@@ -4,10 +4,10 @@
 ///----------------------------------------------------------------------------:
 
 // MenuScreen (главное меню)
-//    ├── "В игру"  →  MapEditorScreen
-//    ├── "Карта"   →  MapEditorScreen
-//    ├── "Описание"→  AboutOverlay (поверх меню)
-//    ├── "Игроки"  — disabled
+//    ├── "В игру"  →   disabled
+//    ├── "Карта"   →   MapEditorScreen
+//    ├── "Описание"→   AboutOverlay (поверх меню)
+//    ├── "Игроки"    — disabled
 //    └── "Настройки" — disabled
 
 // MapEditorScreen

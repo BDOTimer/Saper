@@ -139,7 +139,7 @@
   background:
     radial-gradient(ellipse at 50% 30%, rgba(46,139,255,.10), transparent 60%),
     radial-gradient(ellipse at 50% 100%, rgba(127,212,127,.06), transparent 55%),
-    rgba(10, 14, 20, .92);
+    rgba(10, 14, 20, .0);   /* было .92 — теперь логотип просвечивает */
   backdrop-filter: blur(2px);
   font-family: inherit;
   z-index: 100;
