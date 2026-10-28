@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Warlords II — MVP Prototype</title>
+<meta name="description" content="Пошаговая фэнтезийная стратегия: процедурная карта, 2 фракции, бои отрядов, захват городов. Автономная версия на Three.js.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#191410;color:#fef3c7;font-family:system-ui,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{position:fixed;inset:0}
+#scene{position:absolute;inset:0}
+#scene canvas{display:block;cursor:pointer;touch-action:none}
+#hp-overlay{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.hidden{display:none!important}
+.dim{color:rgba(253,230,138,.55);font-size:12px}
+
+/* ---------- Верхняя панель ---------- */
+#topbar{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:linear-gradient(to bottom,rgba(0,0,0,.88),rgba(0,0,0,.62));border-bottom:1px solid rgba(146,64,14,.5);backdrop-filter:blur(4px)}
+.brand{font-weight:900;font-size:17px;color:#fbbf24;letter-spacing:.5px;margin-right:4px;white-space:nowrap}
+.brand small{font-size:11px;color:rgba(253,230,138,.55);font-weight:600;margin-left:3px}
+.chip{background:rgba(0,0,0,.5);padding:4px 10px;border-radius:6px;font-size:13px;white-space:nowrap}
+.chip b{color:#fef3c7}
+#turn-owner{padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600;white-space:nowrap}
+#score{font-size:12px;color:rgba(254,243,199,.75);display:flex;gap:2px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.btn{border:1px solid rgba(146,64,14,.7);border-radius:8px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;color:#fef3c7;background:rgba(0,0,0,.4);font-family:inherit}
+.btn:hover:not(:disabled){background:rgba(0,0,0,.62)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:#d97706;color:#000;border-color:#d97706}
+.btn.primary:hover:not(:disabled){background:#f59e0b}
+
+/* ---------- Панели ---------- */
+.panel{position:absolute;z-index:20;background:rgba(0,0,0,.72);border:1px solid rgba(146,64,14,.5);border-radius:10px;padding:10px;backdrop-filter:blur(4px)}
+.panel-title{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#fbbf24}
+.row{display:flex;gap:6px}
+.row .btn{flex:1;font-size:12px;padding:5px 8px}
+#party-panel{left:12px;top:64px;width:196px;display:flex;flex-direction:column;gap:6px}
+#seed-input{width:100%;height:28px;border-radius:6px;border:1px solid rgba(146,64,14,.6);background:rgba(0,0,0,.6);color:#fef3c7;padding:0 8px;font-size:12px;outline:none}
+#seed-input::placeholder{color:rgba(253,230,138,.35)}
+#seed-label{font-size:10px;color:rgba(253,230,138,.5)}
+
+#side{position:absolute;right:12px;top:64px;z-index:20;width:252px;display:flex;flex-direction:column;gap:8px}
+.card{background:rgba(0,0,0,.75);border:1px solid rgba(146,64,14,.5);border-radius:10px;padding:12px;backdrop-filter:blur(4px)}
+.u-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hpbar-outer{height:8px;border-radius:4px;background:rgba(0,0,0,.6);overflow:hidden;margin-top:6px}
+.hpbar-inner{height:100%;border-radius:4px;background:#69b34c;transition:width .2s}
+.stat-line{font-size:12px;color:rgba(254,243,199,.85);margin-top:4px}
+.note{margin-top:6px;border-radius:6px;padding:4px 8px;font-size:11px}
+.note.red{background:rgba(127,29,29,.4);color:#fecaca}
+.note.green{background:rgba(6,78,59,.4);color:#a7f3d0}
+
+#log-card{padding:10px}
+#log-list{max-height:176px;overflow-y:auto;font-size:11px;line-height:1.45;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:#5a4a2a transparent}
+.log-info{color:rgba(254,243,199,.72)}
+.log-combat{color:#fca5a5}
+.log-city{color:#fcd34d}
+.log-system{color:#6ee7b7}
+.log-turn{color:rgba(253,230,138,.4);margin-right:3px}
+
+#minimap-card{left:12px;bottom:12px;z-index:20}
+#minimap{border:1px solid rgba(146,64,14,.4);border-radius:6px;cursor:pointer;image-rendering:pixelated;display:block}
+#legend{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:10px;color:rgba(254,243,199,.7);margin-top:6px}
+.legend-swatch{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+
+#controls-hint{right:12px;bottom:12px;z-index:20;max-width:232px;font-size:10px;line-height:1.55;color:rgba(254,243,199,.6)}
+#controls-hint b{color:#fcd34d}
+
+#banner{position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:25;background:rgba(0,0,0,.82);border:1px solid rgba(245,158,11,.4);color:#fcd34d;font-weight:800;font-size:17px;padding:8px 24px;border-radius:10px;backdrop-filter:blur(4px);pointer-events:none;white-space:nowrap}
+
+/* ---------- Оверлеи ---------- */
+.overlay{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px}
+.dialog{max-width:500px;border-radius:16px;border:2px solid rgba(217,119,6,.6);background:linear-gradient(#2a2015,#191410);padding:32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);max-height:90vh;overflow-y:auto}
+.dialog .big-icon{font-size:48px}
+.dialog h2{font-size:30px;font-weight:900;margin-top:8px}
+.dialog p{margin-top:8px;font-size:14px;color:rgba(254,243,199,.85)}
+.dialog .row{margin-top:20px;justify-content:center}
+.dialog .row .btn{flex:0 0 auto;padding:8px 18px;font-size:14px}
+.win-title{color:#fbbf24}
+.lose-title{color:#f87171}
+#help .dialog{text-align:left;max-width:540px;padding:24px}
+#help h3{color:#fbbf24;font-size:18px;margin-bottom:4px}
+#help ul{margin:10px 0 0 18px;font-size:13px;color:rgba(254,243,199,.9);display:flex;flex-direction:column;gap:7px;line-height:1.45}
+
+/* ---------- Мобильная версия ---------- */
+@media (max-width:640px){
+  #log-card,#minimap-card,#controls-hint{display:none}
+  #party-panel{width:150px}
+  #side{width:196px}
+  #score{display:none}
+  .brand{font-size:15px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="scene"></div>
+  <div id="hp-overlay"></div>
+  <div id="banner" class="hidden"></div>
+
+  <header id="topbar">
+    <div class="brand">⚔ WARLORDS II<small>MVP</small></div>
+    <div class="chip">Ход <b id="turn-num">-</b></div>
+    <div id="turn-owner"></div>
+    <div id="score"></div>
+    <div class="spacer"></div>
+    <button id="btn-end" class="btn primary">Завершить ход</button>
+    <button id="btn-cancel" class="btn">Отменить</button>
+    <button id="btn-cap" class="btn" title="К столице">🏰</button>
+    <button id="btn-sound" class="btn" title="Звук">🔊</button>
+    <button id="btn-music" class="btn" title="Музыка">🎵</button>
+    <button id="btn-help" class="btn" title="Как играть">?</button>
+  </header>
+
+  <div id="party-panel" class="panel">
+    <div class="panel-title">Партия</div>
+    <div class="row">
+      <button id="btn-new" class="btn primary">Новая</button>
+      <button id="btn-save" class="btn">Сохр.</button>
+      <button id="btn-load" class="btn">Загр.</button>
+    </div>
+    <div class="row">
+      <input id="seed-input" placeholder="Seed карты" inputmode="numeric">
+      <button id="seed-go" class="btn" style="flex:0 0 auto">▶</button>
+    </div>
+    <div id="seed-label"></div>
+  </div>
+
+  <aside id="side">
+    <div id="unit-card" class="card hidden"></div>
+    <div id="city-card" class="card hidden"></div>
+    <div id="log-card" class="card">
+      <div class="panel-title" style="margin-bottom:4px">Журнал</div>
+      <div id="log-list"></div>
+    </div>
+  </aside>
+
+  <div id="minimap-card" class="panel">
+    <canvas id="minimap" width="150" height="150"></canvas>
+    <div id="legend"></div>
+  </div>
+
+  <div id="controls-hint" class="panel">
+    <b>Управление:</b> ЛКМ — выбрать/идти/атаковать · ПКМ или WASD — камера · колесо — зум · Esc — отмена · пробел — конец хода
+  </div>
+
+  <div id="end-screen" class="overlay hidden">
+    <div class="dialog">
+      <div class="big-icon" id="end-icon">👑</div>
+      <h2 id="end-title" class="win-title">ПОБЕДА!</h2>
+      <p id="end-text"></p>
+      <div class="row">
+        <button id="end-new" class="btn primary">Новая партия</button>
+        <button id="end-load" class="btn">Загрузить сейв</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help" class="overlay hidden">
+    <div class="dialog">
+      <h3>Как играть</h3>
+      <ul>
+        <li>Цель — захватить <b>все города</b> на карте.</li>
+        <li>ЛКМ по отряду — выбор; белые клетки — куда можно дойти (лес 2 очка, горы 3, равнина 1).</li>
+        <li>ЛКМ по врагу рядом — атака. После атаки ход отряда заканчивается. Враг может контратаковать.</li>
+        <li>ЛКМ по своему городу — панель найма. Город лечит свои отряды (+4 HP/ход) и даёт +25% защиты.</li>
+        <li>Захват: войдите отрядом в город без защитников.</li>
+        <li>Местность даёт защиту: лес +25%, горы +50%. Слабые отряды (HP&lt;30%) лучше отводить в города.</li>
+        <li>Завершите ход — ход сделает противник. Партия автосохраняется каждый раунд.</li>
+      </ul>
+      <div class="row"><button id="help-close" class="btn primary">Понятно</button></div>
+    </div>
+  </div>
+</div>
+<script>/*__BUNDLE__*/</script>
+</body>
+</html>

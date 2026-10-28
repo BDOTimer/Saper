@@ -1,0 +1,41 @@
+# Node/Bun модули
+# Node/Bun модули
+node_modules/
+bun_modules/
+
+# Лок‑файлы (выбирай тот, который у тебя)
+bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Next.js билд и кэш
+.next/
+out/
+next-env.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Prisma
+prisma/dev.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Логи и временные файлы
+*.log
+.DS_Store
+Thumbs.db
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+!.env.example
+
+

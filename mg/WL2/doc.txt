@@ -1,0 +1,8 @@
+/// Для Windows + PowerShell
+
+iex (irm https://bun.sh/install.ps1)
+
+// перезапустить PS
+
+bun --version
+
