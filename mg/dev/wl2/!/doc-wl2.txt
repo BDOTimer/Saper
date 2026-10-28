@@ -136,23 +136,19 @@ class WordlMapGenerator
 │   ├── rng.js
 │   ├── cell.js
 │   ├── world-map.js
+│   ├── map-editor.js             (экран генератора карт — бывший index.html)
 │   └── generator.js
 ├── render/
 │   ├── renderer.js
 │   └── map-view.js
 ├── ui/
 │   ├── style-base.css
-│   ├── menu.css                  (стили главного меню)
 │   ├── menu.js                   (MenuScreen)
 │   ├── about.css                 (стили оверлея описания)
 │   ├── about.js                  (AboutScreen — переделан из game-title)
-│   ├── game-title.css
-│   ├── game-title.js
-│   ├── generator-panel.css
 │   ├── generator-panel.js
 │   └── ui.js
 └── screens/
-    └── map-editor.js             (экран генератора карт — бывший index.html)
 
 
 ///----------------------------------------------------------------------------|

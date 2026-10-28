@@ -1,6 +1,6 @@
 // core/generator.js
 import { mulberry32, fbm } from './rng.js';
-import { Cell, CellType }  from './cell.js';
+import { Cell, CellType, OVERLAY }  from './cell.js';
 
 export class WorldMapGeneratorConfig {
   constructor(overrides = {}) {
@@ -64,7 +64,7 @@ export class WorldMapGenerator {
     this._log(`Города: ${this.world.cities.length}`);
 
     this._buildRoads();
-    const roadCells = this.world.cells.filter(c => c.overlay === 'road').length;
+    const roadCells = this.world.cells.filter(c => c.hasRoad).length;
     this._log(`Дороги: ${roadCells} клеток`);
 
     return this.world;
@@ -159,7 +159,7 @@ export class WorldMapGenerator {
         if (!here) break;
         if (here.type === 'water') { path.push([x, y]); break; }
         path.push([x, y]);
-        if (here.overlay !== 'road') here.overlay = here.overlay || 'river';
+        if (here.overlay !== 'road') here.addOverlay(OVERLAY.RIVER);
 
         let best = null, bestE = here.elevation;
         for (const nb of world.neighbors4(x, y)) {
@@ -206,7 +206,7 @@ export class WorldMapGenerator {
     }
   }
 
-  _buildRoads() {
+  _buildRoads() { 
     const cities = this.world.cities;
     if (cities.length < 2) return;
 
@@ -239,8 +239,7 @@ export class WorldMapGenerator {
         const c = this.world.get(x, y);
         if (!c) continue;
         if (c.city >= 0) continue;
-        if (c.overlay === 'river') continue;
-        c.overlay = 'road';
+        c.addOverlay(OVERLAY.ROAD);
       }
     }
   }

@@ -19,18 +19,38 @@ export const TYPE_META = {
   water:  { name: 'Вода',  color: 0x2a5a8c, stamina: 6, isWater: true,  isMountain: false },
 };
 
+export const OVERLAY = Object.freeze({
+  NONE:  0,
+  ROAD:  1 << 0,   // 1
+  RIVER: 1 << 1,   // 2
+});
+
 export class Cell {
   constructor(x, y, type = CellType.PLAIN) {
     this.x = x; this.y = y;
     this.type = type;
-    this.overlay = null;
+    this.overlay = OVERLAY.NONE;   // ← число, не строка
     this.city = -1;
     this.meshId = -1;
     this.texId = 0;
     this.elevation = 0;
   }
   get meta() { return TYPE_META[this.type]; }
-  get staminaCost() { return this.overlay === 'road' ? 1 : this.meta.stamina; }
-  // сохранили как алиас, теперь всегда true — для обратной совместимости с UI
-  get walkable() { return true; }
+
+  get hasRoad()  { return (this.overlay & OVERLAY.ROAD)  !== 0; }
+  get hasRiver() { return (this.overlay & OVERLAY.RIVER) !== 0; }
+
+  addOverlay(flag)   { this.overlay |= flag; }
+  removeOverlay(flag){ this.overlay &= ~flag; }
+
+  get staminaCost() { return this.hasRoad ? 1 : this.meta.stamina; }
+
+  // для UI / отладки
+  get overlayName() {
+    if (!this.overlay) return '—';
+    const parts = [];
+    if (this.hasRoad)  parts.push('road');
+    if (this.hasRiver) parts.push('river');
+    return parts.join('+');
+  }
 }

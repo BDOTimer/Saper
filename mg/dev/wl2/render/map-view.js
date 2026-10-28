@@ -126,8 +126,8 @@ export class MapView {
 
   _buildOverlays() {
     const world = this.world;
-    const roadCells  = world.cells.filter(c => c?.overlay === 'road');
-    const riverCells = world.cells.filter(c => c?.overlay === 'river');
+    const roadCells  = world.cells.filter(c => c?.hasRoad);
+    const riverCells = world.cells.filter(c => c?.hasRiver);
 
     if (roadCells.length) {
       const g = new THREE.BoxGeometry(TILE * 0.6, 0.06, TILE * 0.6);
@@ -135,7 +135,7 @@ export class MapView {
       const inst = new THREE.InstancedMesh(g, m, roadCells.length);
       const d = new THREE.Object3D();
       roadCells.forEach((c, i) => {
-        d.position.set(this._worldX(c.x), this._worldY(c) + 0.06, this._worldZ(c.y));
+        d.position.set(this._worldX(c.x), this._worldY(c) + 0.20, this._worldZ(c.y));
         d.rotation.y = Math.PI / 4;
         d.updateMatrix();
         inst.setMatrixAt(i, d.matrix);
@@ -153,7 +153,7 @@ export class MapView {
       const inst = new THREE.InstancedMesh(g, m, riverCells.length);
       const d = new THREE.Object3D();
       riverCells.forEach((c, i) => {
-        d.position.set(this._worldX(c.x), this._worldY(c) + 0.08, this._worldZ(c.y));
+        d.position.set(this._worldX(c.x), this._worldY(c) + 0.16, this._worldZ(c.y));
         d.updateMatrix();
         inst.setMatrixAt(i, d.matrix);
       });
