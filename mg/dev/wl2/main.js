@@ -1,14 +1,16 @@
 // main.js
 
-import { MenuScreen }  from './ui/menu.js';
-import { AboutOverlay } from './ui/about.js';
-import { MapEditorScreen } from './core/map-editor.js';
+import { MenuScreen            } from './ui/menu.js';
+import { AboutOverlay          } from './ui/about.js';
+import { MapEditorScreen       } from './core/map-editor.js';
+import { PanelPlayers, Players } from './core/players.js';
 
 class App {
   constructor(root) {
-    this.root = root;
-    this.screen = null;          // текущий активный экран (menu | map-editor)
-    this.about = null;           // оверлей описания (живёт поверх)
+    this.root    = root;
+    this.screen  = null;  // текущий активный экран (menu | map-editor)
+    this.about   = null;  // оверлей описания (живёт поверх)
+    this.players = new Players(8);
 
     this._showMenu();
   }
@@ -48,6 +50,9 @@ class App {
       case 'about':
         this._showAbout();
         break;
+      case 'players':
+        this._showPlayers();
+        break;
       // players/settings — disabled, сюда не долетает
     }
   }
@@ -62,8 +67,26 @@ class App {
       },
     });
   }
+
+  _showPlayers() {
+    if (this.playersPanel) return;
+    this.playersPanel = new PanelPlayers({
+      players: this.players,
+      parent: document.body,
+      onConfirm: (players) => {
+        this.playersPanel?.destroy();
+        this.playersPanel = null;
+        // дальше можно передать players в Judge / Game
+        console.log('Игроки:', players.list.map(p => p.snapshot()));
+      },
+      onCancel: () => {
+        this.playersPanel?.destroy();
+        this.playersPanel = null;
+      },
+    });
+  }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('DOMContentLoaded', () => {
   window.__app = new App(document.getElementById('root'));
 });

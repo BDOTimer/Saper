@@ -17,11 +17,11 @@ const GAME_NAME   = 'Грань Империи';
 const GAME_ACCENT = 'Империи';
 
 const MENU_ITEMS = [
-  { id: 'new-game',  label: 'В игру',     hint: 'Скоро',      enabled: false },
-  { id: 'players',   label: 'Игроки',     hint: 'Скоро',      enabled: false },
-  { id: 'map',       label: 'Карта',      hint: 'Выбор мира', enabled: true  },
-  { id: 'settings',  label: 'Настройки',  hint: 'Скоро',      enabled: false },
-  { id: 'about',     label: 'Описание',   hint: 'Об игре',    enabled: true  },
+  { id: 'new-game',  label: 'В игру',    hint: 'Скоро',      enabled: false },
+  { id: 'players',   label: 'Игроки',    hint: 'Кто в игре?',enabled: true  },
+  { id: 'map',       label: 'Карта',     hint: 'Выбор мира', enabled: true  },
+  { id: 'settings',  label: 'Настройки', hint: 'Скоро',      enabled: false },
+  { id: 'about',     label: 'Описание',  hint: 'Об игре',    enabled: true  },
 ];
 
 /**
@@ -35,7 +35,7 @@ const MENU_ITEMS = [
 export class MenuScreen {
   constructor(opts = {}) {
     this.onSelect = opts.onSelect ?? (() => {});
-    this.version = opts.version ?? 'v0.1.0';
+    this.version = opts.version ?? 'v0.0.2';
     this.parent = opts.parent ?? document.body;
 
     this.el = this.#render();
