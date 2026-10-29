@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hex islands on sphere</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#05070f;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas:active{cursor:grabbing}
+  #ui{position:fixed;top:12px;left:12px;color:#cfe3ff;background:rgba(10,16,32,.6);
+      backdrop-filter:blur(6px);padding:10px 14px;border-radius:10px;font-size:13px;user-select:none}
+  #ui b{color:#fff}
+  #ui label{display:flex;align-items:center;gap:8px;margin-top:6px}
+  #ui input[type=range]{width:140px}
+  #ui span{min-width:38px;display:inline-block;text-align:right;font-variant-numeric:tabular-nums}
+  #hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:#7f93b8;font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <b>Hex islands on sphere</b>
+  <label>Островов: <input id="islands" type="range" min="3" max="20" value="8"><span id="islandsVal"></span></label>
+  <label>Гексов (среднее): <input id="hexes" type="range" min="20" max="250" value="80"><span id="hexesVal"></span></label>
+  <label>Размер гексов: <input id="hexSize" type="range" min="5" max="40" value="16"><span id="hexSizeVal"></span></label>
+  <label>Зазор: <input id="gap" type="range" min="0" max="40" value="5"><span id="gapVal"></span></label>
+  <label>Random seed: <input id="seed" type="number" min="0" max="9999" value="2024" style="width:60px"></label>
+</div>
+<div id="hint">Drag — rotate · Wheel — zoom</div>
+<script>
+'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W=0,H=0,DPR=1;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+// ---------- звёзды ----------
+let stars=[];
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function makeStars(){const rnd=mulberry(20261029);stars=[];
+  const n=Math.round(W*H/9000);
+  for(let i=0;i<n;i++)stars.push({x:rnd()*W,y:rnd()*H,r:rnd()*1.3+0.3,p:rnd()*6.28,s:0.5+rnd()*1.5});}
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+  canvas.width=W*DPR;canvas.height=H*DPR;makeStars();}
+addEventListener('resize',resize);resize();
+
+// ---------- параметры ----------
+let numIslands=8;
+let avgHexesPerIsland=167;
+let hexSizeScale=0.05;
+let gapSize=0.08;                    // ← было 0.20, теперь 5% по умолчанию
+let randomSeed=2024;
+
+let islands=[];
+let cullZ=-0.05;
+const ISLAND_RADIUS = 0.62;
+
+function fib(n){
+  const pts=[],ga=Math.PI*(3-Math.sqrt(5));
+  for(let i=0;i<n;i++){
+    const y=1-2*(i+0.5)/n,r=Math.sqrt(Math.max(0,1-y*y)),t=ga*i;
+    pts.push([r*Math.cos(t),y,r*Math.sin(t)]);
+  }
+  return pts;
+}
+
+function localFrame(n){
+  const x=n[0],z=n[2],l=Math.hypot(x,z);
+  const e1=l<1e-8?[1,0,0]:[z/l,0,-x/l];
+  const e2=[n[1]*e1[2]-n[2]*e1[1], n[2]*e1[0]-n[0]*e1[2], n[0]*e1[1]-n[1]*e1[0]];
+  return [e1,e2];
+}
+
+function hexGrid(center, maxRadius, hexSize, gap, rng, targetHexes){
+  const [e1,e2]=localFrame(center);
+
+  const spacing = hexSize * (1 + gap);
+  const colStep = spacing * Math.sqrt(3);
+  const rowStep = spacing * 1.5;
+
+  const hexes=[];
+  const cols=Math.ceil(maxRadius/colStep)+1;
+  const rows=Math.ceil(maxRadius/rowStep)+1;
+
+  for(let row=-rows;row<=rows;row++){
+    for(let col=-cols;col<=cols;col++){
+      const px = col*colStep + ((row&1) ? colStep*0.5 : 0);
+      const py = row*rowStep;
+      const dist = Math.hypot(px,py);
+      if(dist > maxRadius) continue;
+
+      const sx = center[0] + px*e1[0] + py*e2[0];
+      const sy = center[1] + px*e1[1] + py*e2[1];
+      const sz = center[2] + px*e1[2] + py*e2[2];
+      const il = 1/Math.hypot(sx,sy,sz);
+      hexes.push({ n:[sx*il,sy*il,sz*il], dist });
+    }
+  }
+
+  const numAngles=14, radii=[];
+  for(let i=0;i<numAngles;i++) radii.push(maxRadius*(0.55+rng()*0.45));
+
+  const filtered=[];
+  for(const h of hexes){
+    const [ex1,ey2]=localFrame(center);
+    const dx=h.n[0]-center[0], dy=h.n[1]-center[1], dz=h.n[2]-center[2];
+    const ux=dx*ex1[0]+dy*ex1[1]+dz*ex1[2];
+    const uy=dx*ey2[0]+dy*ey2[1]+dz*ey2[2];
+    const ang=Math.atan2(uy,ux);
+    const na=(ang+Math.PI)/(2*Math.PI);
+    const i0=Math.floor(na*numAngles)%numAngles;
+    const i1=(i0+1)%numAngles;
+    const t=na*numAngles-Math.floor(na*numAngles);
+    const rR=radii[i0]+(radii[i1]-radii[i0])*t;
+    if(h.dist<=rR) filtered.push(h);
+  }
+
+  filtered.sort((a,b)=>a.dist-b.dist);
+  return filtered.slice(0, targetHexes);
+}
+
+function hexRing(n, alpha){
+  const [e1,e2]=localFrame(n);
+  const out=[];
+  for(let k=0;k<6;k++){
+    const b=k*Math.PI/3+Math.PI/6;
+    const cb=Math.cos(b), sb=Math.sin(b);
+    const px=alpha*cb, py=alpha*sb;
+    let vx=n[0]+px*e1[0]+py*e2[0];
+    let vy=n[1]+px*e1[1]+py*e2[1];
+    let vz=n[2]+px*e1[2]+py*e2[2];
+    const il=1/Math.hypot(vx,vy,vz);
+    out.push([vx*il,vy*il,vz*il]);
+  }
+  return out;
+}
+
+function subdivide(ring,m){
+  const out=[];
+  for(let k=0;k<6;k++){
+    const a=ring[k],b=ring[(k+1)%6];
+    for(let s=0;s<m;s++){
+      const t=s/m;
+      let x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t,z=a[2]+(b[2]-a[2])*t;
+      const il=1/Math.hypot(x,y,z);
+      out.push([x*il,y*il,z*il]);
+    }
+  }
+  return out;
+}
+
+const frac=x=>x-Math.floor(x);
+
+function rebuild(){
+  const rng=mulberry(randomSeed);
+  const islandCenters=fib(numIslands);
+  islands=[];
+
+  // Итоговый радиус отрисовки гекса: hexSize * (1 - gap)
+  //   gap = 0    → гексы плотно касаются (без зазора)
+  //   gap = 0.05 → тонкий заметный зазор (5% радиуса)
+  //   gap = 0.40 → крупные просветы
+  const drawR = hexSizeScale * (1 - gapSize);
+
+  for(let i=0;i<numIslands;i++){
+    const center=islandCenters[i];
+
+    const variation=0.6 + rng()*0.8;
+    const targetHexes=Math.max(1, Math.round(avgHexesPerIsland*variation));
+
+    const centers = hexGrid(center, ISLAND_RADIUS, hexSizeScale, gapSize, rng, targetHexes);
+
+    const r1=frac(i*0.61803+rng()*0.1),r2=frac(i*0.75487+rng()*0.1),r3=frac(i*0.38196+rng()*0.1);
+    const sandy=rng()<0.18;
+    const col=sandy
+      ? {iH:50+r1*14, iS:30+r3*10, iL:56}
+      : {iH:92+r1*58, iS:32+r3*20, iL:33+r2*13};
+
+    const islandHexes=[];
+    for(const hc of centers){
+      islandHexes.push({
+        n:hc.n,
+        po:subdivide(hexRing(hc.n, drawR),3),
+        col
+      });
+    }
+    islands.push(islandHexes);
+  }
+}
+
+// ---------- камера ----------
+let yaw=0.7,pitch=0.32,zoom=1,dragging=false,px=0,py=0,velY=0,velP=0,pinchD=0;
+let lastAct=performance.now();
+let CA=1,SA=0,CB=1,SB=0;
+function updRot(){CA=Math.cos(yaw);SA=Math.sin(yaw);CB=Math.cos(pitch);SB=Math.sin(pitch);}
+function rot(p,out){
+  const x1=p[0]*CA+p[2]*SA, z1=-p[0]*SA+p[2]*CA, y1=p[1];
+  out[0]=x1;out[1]=y1*CB-z1*SB;out[2]=y1*SB+z1*CB;return out;
+}
+const L=(()=>{
+  const v=[-0.45,0.62,0.64],l=Math.hypot(v[0],v[1],v[2]);
+  return [v[0]/l,v[1]/l,v[2]/l];
+})();
+const tmp=[0,0,0],tmp2=[0,0,0];
+
+function trace(poly,cx,cy,R){
+  ctx.beginPath();
+  for(let i=0;i<poly.length;i++){
+    const p=rot(poly[i],tmp2);
+    const sx=cx+p[0]*R, sy=cy-p[1]*R;
+    i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy);
+  }
+  ctx.closePath();
+}
+
+function render(t){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#05070f');bg.addColorStop(1,'#0a1220');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#cdd8ff';
+  for(const s of stars){
+    ctx.globalAlpha=0.25+0.45*(0.5+0.5*Math.sin(t*s.s+s.p));
+    ctx.fillRect(s.x,s.y,s.r,s.r);
+  }
+  ctx.globalAlpha=1;
+
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.36*zoom;
+
+  let g=ctx.createRadialGradient(cx,cy,R*0.9,cx,cy,R*1.3);
+  g.addColorStop(0,'rgba(70,130,255,0)');g.addColorStop(0.45,'rgba(70,130,255,0.12)');
+  g.addColorStop(1,'rgba(70,130,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R*1.3,0,6.2832);ctx.fill();
+
+  g=ctx.createRadialGradient(cx-R*0.3,cy-R*0.35,R*0.1,cx,cy,R);
+  g.addColorStop(0,'#1d5c8f');g.addColorStop(0.45,'#144067');
+  g.addColorStop(0.8,'#0b2544');g.addColorStop(1,'#071a30');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+
+  const drawList=[];
+  for(const island of islands){
+    for(const il of island){
+      const nv=rot(il.n,tmp);
+      if(nv[2]<cullZ)continue;
+      drawList.push({il, z:nv[2], d:Math.max(0,nv[0]*L[0]+nv[1]*L[1]+nv[2]*L[2])});
+    }
+  }
+  drawList.sort((a,b)=>a.z-b.z);
+
+  // одна заливка на гекс — без обводки, чтобы зазор был "чистым"
+  for(const item of drawList){
+    const il=item.il;
+    const sh=0.30+0.70*item.d;
+    trace(il.po,cx,cy,R);
+    const c=il.col;
+    ctx.fillStyle=`hsl(${c.iH},${c.iS}%,${(c.iL*sh).toFixed(1)}%)`;
+    ctx.fill();
+  }
+
+  g=ctx.createRadialGradient(cx-R*0.35,cy-R*0.42,0,cx-R*0.35,cy-R*0.42,R*0.7);
+  g.addColorStop(0,'rgba(255,255,255,0.10)');g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+  g=ctx.createRadialGradient(cx,cy,R*0.8,cx,cy,R);
+  g.addColorStop(0,'rgba(2,8,20,0)');g.addColorStop(1,'rgba(2,8,20,0.5)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+}
+
+let last=performance.now(),needRebuild=false;
+function animLoop(now){
+  requestAnimationFrame(animLoop);
+  const dt=Math.min(50,now-last)/1000;last=now;
+  if(needRebuild){rebuild();needRebuild=false;}
+  if(!dragging){
+    yaw+=velY;pitch=clamp(pitch+velP,-1.45,1.45);
+    velY*=0.94;velP*=0.94;
+    if(now-lastAct>2500)yaw+=dt*0.07;
+  }
+  updRot();
+  render(now/1000);
+}
+
+// ---------- управление ----------
+const active=new Map();
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===1){dragging=true;px=e.clientX;py=e.clientY;}
+  lastAct=performance.now();
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!active.has(e.pointerId))return;
+  active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===2){
+    const a=[...active.values()];
+    const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+    if(pinchD>0)zoom=clamp(zoom*d/pinchD,0.35,4);
+    pinchD=d;lastAct=performance.now();return;
+  }
+  if(dragging){
+    const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;
+    const k=0.0052;
+    yaw+=dx*k;pitch=clamp(pitch+dy*k,-1.45,1.45);
+    velY=dx*k*0.6;velP=dy*k*0.6;
+    lastAct=performance.now();
+  }
+});
+function endP(e){
+  active.delete(e.pointerId);
+  if(active.size<2)pinchD=0;
+  if(active.size===1){const p=[...active.values()][0];px=p[0];py=p[1];dragging=true;}
+  else if(active.size===0)dragging=false;
+  lastAct=performance.now();
+}
+canvas.addEventListener('pointerup',endP);
+canvas.addEventListener('pointercancel',endP);
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  zoom=clamp(zoom*Math.exp(-e.deltaY*0.0012),0.35,4);
+  lastAct=performance.now();
+},{passive:false});
+
+// ---------- UI ----------
+const elI=document.getElementById('islands'),elH=document.getElementById('hexes');
+const elHS=document.getElementById('hexSize'),elG=document.getElementById('gap'),elS=document.getElementById('seed');
+const elIV=document.getElementById('islandsVal'),elHV=document.getElementById('hexesVal');
+const elHSV=document.getElementById('hexSizeVal'),elGV=document.getElementById('gapVal');
+function syncLabels(){
+  elIV.textContent=numIslands;
+  elHV.textContent=avgHexesPerIsland;
+  elHSV.textContent=Math.round(hexSizeScale*100);
+  elGV.textContent=Math.round(gapSize*100)+'%';
+}
+elI.addEventListener('input',()=>{numIslands=+elI.value;needRebuild=true;syncLabels();});
+elH.addEventListener('input',()=>{avgHexesPerIsland=+elH.value;needRebuild=true;syncLabels();});
+elHS.addEventListener('input',()=>{hexSizeScale=+elHS.value/100;needRebuild=true;syncLabels();});
+elG.addEventListener('input',()=>{gapSize=+elG.value/100;needRebuild=true;syncLabels();});
+elS.addEventListener('input',()=>{randomSeed=+elS.value;needRebuild=true;syncLabels();});
+
+syncLabels();needRebuild=true;requestAnimationFrame(animLoop);
+</script>
+</body>
+</html>
