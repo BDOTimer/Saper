@@ -24,7 +24,7 @@ class App {
   _showMenu() {
     this._clearScreen();
     this.screen = new MenuScreen({
-      version: 'v0.1.0',
+      version: 'v0.0.2',
       parent: this.root,
       onSelect: (id) => this._onMenuSelect(id),
     });
