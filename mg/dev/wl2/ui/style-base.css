@@ -1,5 +1,43 @@
 /* ui/style-base.css */
 
+/* ============ Заголовок меню ============ */
+.menu-logo {
+text-align: center;
+margin: 0 0 4px;
+font-size: 34px;
+font-weight: 800;
+letter-spacing: .06em;
+line-height: 1.1;
+background: linear-gradient(180deg,
+  #fff6dc 0%, #f3d795 38%, #b8862f 50%, #ffe9b4 62%, #a9762a 100%);
+-webkit-background-clip: text;
+background-clip: text;
+-webkit-text-fill-color: transparent;
+color: transparent;
+filter:
+  drop-shadow(0 0 6px rgba(255,224,130,.65))
+  drop-shadow(0 0 22px rgba(255,180,60,.45))
+  drop-shadow(0 0 48px rgba(255,140,40,.25));
+animation: menu-logo-glow 3.2s ease-in-out infinite alternate;
+}
+.menu-logo .accent {
+color: inherit;
+}
+@keyframes menu-logo-glow {
+from {
+  filter:
+    drop-shadow(0 0 5px rgba(255,224,130,.55))
+    drop-shadow(0 0 18px rgba(255,180,60,.38))
+    drop-shadow(0 0 40px rgba(255,140,40,.20));
+}
+to {
+  filter:
+    drop-shadow(0 0 9px rgba(255,235,170,.90))
+    drop-shadow(0 0 30px rgba(255,190,80,.65))
+    drop-shadow(0 0 64px rgba(255,150,50,.40));
+}
+}
+
 /*----------------------------------------------- 
  *  Панель генератора
  *-----------------------------------------------*/
@@ -163,77 +201,174 @@
   to   { opacity: 1; transform: none; }
 }
 
-/*--- Кнопки меню ------------------------------------------------*/
+/*--- Кнопки меню (выпуклые, блестящие) ----------------------------*/
 .menu-nav {
-  display: flex; flex-direction: column; gap: 8px;
+display: flex; flex-direction: column; gap: 10px;
 }
-
 .menu-btn {
-  position: relative;
-  display: flex; align-items: center; gap: 12px;
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(20, 26, 34, .6);
-  border: 1px solid #2a3441;
-  border-radius: 8px;
-  color: #e6edf3;
-  font: inherit;
-  font-size: 14px;
-  letter-spacing: .02em;
-  text-align: left;
-  cursor: pointer;
-  transition: background .15s, border-color .15s, transform .12s, color .15s;
+position: relative;
+display: flex; align-items: center; gap: 12px;
+width: 100%;
+padding: 14px 18px;
+background: linear-gradient(180deg, 
+  #1a2530 0%, 
+  #2a3a4d 45%, 
+  #3a4f66 50%, 
+  #2a3a4d 55%, 
+  #1a2530 100%
+);
+border: 1px solid #3a4a5e;
+border-radius: 10px;
+color: #e6edf3;
+font: inherit;
+font-size: 14px;
+letter-spacing: .02em;
+text-align: left;
+cursor: pointer;
+overflow: hidden;
+transition: all .25s ease;
+box-shadow:
+  0 4px 12px rgba(0, 0, 0, .4),
+  0 2px 4px rgba(0, 0, 0, .3),
+  inset 0 1px 0 rgba(255, 255, 255, .12),
+  inset 0 -1px 0 rgba(0, 0, 0, .3);
 }
-
 .menu-btn::before {
-  content: "";
-  width: 3px; height: 18px;
-  border-radius: 2px;
-  background: #2e8bff;
-  opacity: .35;
-  transition: opacity .15s, background .15s, box-shadow .15s;
-  flex: 0 0 auto;
+content: "";
+width: 4px; height: 20px;
+border-radius: 2px;
+background: linear-gradient(180deg, #4fa3ff 0%, #2e8bff 100%);
+opacity: .6;
+transition: all .25s ease;
+flex: 0 0 auto;
+box-shadow: 0 0 8px rgba(46, 139, 255, .5);
 }
-
+.menu-btn::after {
+content: "";
+position: absolute;
+top: 0; left: -150%;
+width: 150%; height: 100%;
+background: linear-gradient(
+  90deg,
+  transparent 0%,
+  rgba(255, 255, 255, 0) 20%,
+  rgba(255, 255, 255, .15) 50%,
+  rgba(255, 255, 255, 0) 80%,
+  transparent 100%
+);
+transform: skewX(-25deg);
+pointer-events: none;
+}
 .menu-btn:hover:not(:disabled) {
-  background: rgba(46, 139, 255, .10);
-  border-color: #3b5470;
-  transform: translateX(2px);
+background: linear-gradient(180deg, 
+  #1e2d3d 0%, 
+  #324a63 45%, 
+  #4a6a8a 50%, 
+  #324a63 55%, 
+  #1e2d3d 100%
+);
+border-color: #5a7a9a;
+transform: translateY(-2px);
+box-shadow:
+  0 8px 24px rgba(46, 139, 255, .35),
+  0 4px 8px rgba(0, 0, 0, .4),
+  inset 0 1px 0 rgba(255, 255, 255, .18),
+  inset 0 -1px 0 rgba(0, 0, 0, .4);
+animation: buttonShine 1.5s ease-in-out infinite;
 }
-
 .menu-btn:hover:not(:disabled)::before {
-  opacity: 1;
-  box-shadow: 0 0 10px rgba(46, 139, 255, .55);
+opacity: 1;
+box-shadow: 0 0 16px rgba(46, 139, 255, .8);
 }
-
+.menu-btn:hover:not(:disabled)::after {
+animation: shineSlide 1.8s ease-in-out infinite;
+}
+@keyframes shineSlide {
+0% { left: -150%; }
+50% { left: 150%; }
+100% { left: 150%; }
+}
+@keyframes buttonShine {
+0%, 100% {
+  box-shadow:
+    0 8px 24px rgba(46, 139, 255, .35),
+    0 4px 8px rgba(0, 0, 0, .4),
+    inset 0 1px 0 rgba(255, 255, 255, .18),
+    inset 0 -1px 0 rgba(0, 0, 0, .4);
+}
+50% {
+  box-shadow:
+    0 8px 28px rgba(46, 139, 255, .45),
+    0 4px 10px rgba(0, 0, 0, .4),
+    inset 0 1px 0 rgba(255, 255, 255, .25),
+    inset 0 -1px 0 rgba(0, 0, 0, .4);
+}
+}
 .menu-btn:active:not(:disabled) {
-  transform: translateX(2px) scale(.99);
+background: linear-gradient(180deg, 
+  #141e28 0%, 
+  #1e2d3d 45%, 
+  #2a3a4d 50%, 
+  #1e2d3d 55%, 
+  #141e28 100%
+);
+transform: translateY(1px);
+box-shadow:
+  0 2px 8px rgba(0, 0, 0, .5),
+  0 1px 3px rgba(0, 0, 0, .4),
+  inset 0 2px 4px rgba(0, 0, 0, .3),
+  inset 0 -1px 0 rgba(255, 255, 255, .05);
+animation: buttonPress .15s ease-out;
 }
-
+.menu-btn:active:not(:disabled)::before {
+background: linear-gradient(180deg, #7fbfff 0%, #4fa3ff 100%);
+box-shadow: 0 0 20px rgba(46, 139, 255, 1);
+}
+@keyframes buttonPress {
+0% {
+  transform: translateY(1px) scale(1);
+}
+50% {
+  transform: translateY(1px) scale(.98);
+}
+100% {
+  transform: translateY(1px) scale(1);
+}
+}
 .menu-btn:focus-visible {
-  outline: none;
-  border-color: #2e8bff;
-  box-shadow: 0 0 0 3px rgba(46, 139, 255, .22);
+outline: none;
+border-color: #2e8bff;
+box-shadow:
+  0 0 0 3px rgba(46, 139, 255, .3),
+  0 4px 12px rgba(0, 0, 0, .4),
+  inset 0 1px 0 rgba(255, 255, 255, .12);
 }
-
 .menu-btn__label { flex: 1; }
-
 .menu-btn__hint {
-  font-size: 10px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: #8899a6;
+font-size: 10px;
+letter-spacing: .14em;
+text-transform: uppercase;
+color: #8899a6;
 }
-
 .menu-btn:disabled {
-  color: #6b7785;
-  cursor: not-allowed;
-  opacity: .55;
+color: #6b7785;
+cursor: not-allowed;
+opacity: .55;
+background: linear-gradient(180deg, 
+  #141a22 0%, 
+  #1a2028 45%, 
+  #202830 50%, 
+  #1a2028 55%, 
+  #141a22 100%
+);
+box-shadow:
+  0 2px 6px rgba(0, 0, 0, .3),
+  inset 0 1px 0 rgba(255, 255, 255, .03);
 }
-
 .menu-btn:disabled::before {
-  background: #6b7785;
-  opacity: .25;
+background: linear-gradient(180deg, #4a5568 0%, #3a4558 100%);
+opacity: .3;
+box-shadow: none;
 }
 
 /*--- Нижняя подпись ---------------------------------------------*/
@@ -248,129 +383,368 @@
 .menu-footer .accent { color: #7fa6c9; }
 
 
-/*----------------------------------------------- 
- *  ui/players.js
- *-----------------------------------------------*/
+/*-----------------------------------------------
+ui/players.js  —  в стиле главного меню
+-----------------------------------------------*/
 .players-overlay {
   position: fixed; inset: 0; z-index: 1000;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
-  background: rgba(6, 10, 14, 0);
-  backdrop-filter: blur(0);
-  transition: background .18s ease, backdrop-filter .18s ease;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(232,195,122,.08), transparent 55%),
+    rgba(6,10,14,.55);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity .22s ease, backdrop-filter .22s ease;
 }
 .players-overlay.open {
-  background: rgba(6, 10, 14, .72);
-  backdrop-filter: blur(6px);
+  opacity: 1;
 }
 
+/* --- Карточка: тот же «имперский металл», что и .about-card / .menu-card --- */
 .players-card {
-  width: 100%; max-width: 760px; max-height: 90vh; overflow-y: auto;
-  background: var(--panel, #141a22);
-  border: 1px solid var(--border, #2a3441);
-  border-radius: 14px;
-  padding: 28px 32px;
-  transform: translateY(12px) scale(.98); opacity: 0;
-  transition: transform .18s ease, opacity .18s ease;
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px 36px;
+  scrollbar-gutter: stable;
+
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, #18222e 0%, #2a394b 46%, #1e2a38 54%, #10171f 100%) padding-box,
+    linear-gradient(110deg, #39465a, #8a652c, #fff0c6, #b98b3e, #39465a, #8a652c) border-box;
+  background-size: 100% 100%, 300% 100%;
+  animation: playersRimFlow 10s linear infinite;
+
+  box-shadow:
+    0 30px 90px rgba(0,0,0,.7),
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -2px 0 rgba(0,0,0,.6),
+    inset 0 0 70px rgba(0,0,0,.35);
+
+  transform: translateY(12px) scale(.98);
+  opacity: 0;
+  transition: transform .22s ease, opacity .22s ease;
 }
 .players-overlay.open .players-card {
-  transform: none; opacity: 1;
+  transform: none;
+  opacity: 1;
 }
 
+/* Световой проход по панели */
+.players-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg,
+    transparent 35%,
+    rgba(255,255,255,.07) 48%,
+    rgba(232,195,122,.10) 52%,
+    transparent 65%);
+  background-size: 300% 100%;
+  animation: playersPanelSweep 8s ease-in-out infinite;
+}
+.players-card > * { position: relative; z-index: 1; }
+
+@keyframes playersRimFlow  { to { background-position: 0 0, -200% 0; } }
+@keyframes playersPanelSweep {
+  0%, 15%   { background-position: 150% 0; }
+  60%, 100% { background-position: -150% 0; }
+}
+
+/* --- Заголовок: золотой градиент + свечение, как .menu-logo --- */
 .players-title {
   margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text, #e6edf3);
+  text-align: center;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1.1;
+  background: linear-gradient(180deg,
+    #fff6dc 0%, #f3d795 38%, #b8862f 50%, #ffe9b4 62%, #a9762a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter:
+    drop-shadow(0 0 6px rgba(255,224,130,.65))
+    drop-shadow(0 0 22px rgba(255,180,60,.45))
+    drop-shadow(0 0 48px rgba(255,140,40,.25));
+  animation: playersTitleGlow 3.2s ease-in-out infinite alternate;
 }
-.players-title .accent { color: var(--accent, #7fd47f); }
+.players-title .accent { color: inherit; }
+
+@keyframes playersTitleGlow {
+  from {
+    filter:
+      drop-shadow(0 0 5px rgba(255,224,130,.55))
+      drop-shadow(0 0 18px rgba(255,180,60,.38))
+      drop-shadow(0 0 40px rgba(255,140,40,.20));
+  }
+  to {
+    filter:
+      drop-shadow(0 0 9px rgba(255,235,170,.90))
+      drop-shadow(0 0 30px rgba(255,190,80,.65))
+      drop-shadow(0 0 64px rgba(255,150,50,.40));
+  }
+}
 
 .players-subtitle {
-  margin: 0 0 20px;
-  color: var(--muted, #8899a6);
-  font-size: 13px;
+  margin: 0 0 24px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: #c9ab72;
+  opacity: .9;
 }
 
+/* --- Золотой разделитель под подзаголовком (как .menu-divider) --- */
+.players-subtitle::after {
+  content: "";
+  display: block;
+  position: relative;
+  height: 1px;
+  margin: 18px auto 0;
+  max-width: 100%;
+  background: linear-gradient(to right,
+    transparent, #8a652c 20%, #e8c37a 50%, #8a652c 80%, transparent);
+}
+
+/* --- Список строк игроков --- */
 .players-list {
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 8px;
   margin-bottom: 20px;
 }
 
+/* Строка игрока — выпуклая, с тонкой кромкой */
 .player-row {
   display: grid;
   grid-template-columns: 16px 90px 1fr 130px 1fr;
-  gap: 10px; align-items: center;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid transparent;
-  border-radius: 8px;
-  transition: border-color .15s ease, background .15s ease;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+
+  background: linear-gradient(180deg,
+    #1a2530 0%, #2a3a4d 46%, #344a62 50%, #223142 54%, #121b24 100%);
+  border: 1px solid #3a4a5e;
+  border-radius: 10px;
+
+  box-shadow:
+    0 3px 8px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.35);
+
+  transition: border-color .2s ease, box-shadow .25s ease, transform .18s ease;
+}
+.player-row:hover {
+  border-color: #5a7a9a;
+  box-shadow:
+    0 5px 14px rgba(46,139,255,.18),
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -1px 0 rgba(0,0,0,.4);
 }
 .player-row:has(input[type=checkbox]:checked) {
-  background: rgba(46, 139, 255, 0.06);
-  border-color: rgba(46, 139, 255, 0.25);
+  background: linear-gradient(180deg,
+    #1e2d3d 0%, #324a63 46%, #3f5a78 50%, #2a3f55 54%, #142131 100%);
+  border-color: #b98b3e;
+  box-shadow:
+    0 5px 18px rgba(232,195,122,.22),
+    0 0 0 1px rgba(232,195,122,.12) inset,
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -1px 0 rgba(0,0,0,.45);
 }
 
 .player-swatch {
   width: 16px; height: 16px; border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, .3);
+  border: 1px solid rgba(0,0,0,.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    0 0 6px rgba(0,0,0,.5);
 }
 
 .player-toggle {
   display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: var(--muted, #8899a6);
+  font-size: 12px;
+  color: #c8d2dc;
   cursor: pointer;
 }
 .player-toggle input[type=checkbox] {
-  accent-color: var(--accent, #2e8bff);
+  accent-color: #e8c37a;
   width: 16px; height: 16px; cursor: pointer;
 }
 
-.player-name {
-  background: var(--input-bg, #0f141b);
-  color: var(--text, #e6edf3);
-  border: 1px solid var(--border, #34495e);
-  border-radius: 6px; padding: 6px 10px;
-  font-size: 13px;
-  width: 100%;
-}
-.player-name:disabled { opacity: .45; }
-
-.player-type, .player-level {
-  background: var(--input-bg, #0f141b);
-  color: var(--text, #e6edf3);
-  border: 1px solid var(--border, #34495e);
-  border-radius: 6px; padding: 6px 8px;
+.player-name,
+.player-type,
+.player-level {
+  background: linear-gradient(180deg, #0f141b 0%, #1a222b 100%);
+  color: #e6edf3;
+  border: 1px solid #34495e;
+  border-radius: 6px;
+  padding: 6px 10px;
   font-size: 12px;
   width: 100%;
-  cursor: pointer;
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.45),
+    inset 0 -1px 0 rgba(255,255,255,.04);
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.player-type:disabled, .player-level:disabled { opacity: .45; cursor: not-allowed; }
+.player-name:focus,
+.player-type:focus,
+.player-level:focus {
+  outline: none;
+  border-color: #e8c37a;
+  box-shadow:
+    0 0 0 2px rgba(232,195,122,.25),
+    inset 0 1px 2px rgba(0,0,0,.45);
+}
+.player-name:disabled,
+.player-type:disabled,
+.player-level:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
 
+/* --- Футер с разделителем --- */
 .players-footer {
   display: flex; align-items: center; gap: 10px;
-  margin-top: 4px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border, #2a3441);
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid transparent;
+  background:
+    linear-gradient(to right, transparent, #8a652c 20%, #e8c37a 50%, #8a652c 80%, transparent) top / 100% 1px no-repeat;
 }
+
 .players-count {
   flex: 1;
-  font-size: 12px;
-  color: var(--muted, #8899a6);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #c9ab72;
+  opacity: .9;
 }
-.players-count.warn { color: #ff8a8a; }
+.players-count.warn { color: #ff8a8a; opacity: 1; }
 
+/* --- Базовая кнопка: как .menu-btn (выпуклая, блестящая) --- */
 .players-btn {
-  background: var(--btn-bg, #1f2b38);
-  color: var(--text, #e6edf3);
-  border: 1px solid var(--border, #34495e);
-  padding: 8px 16px; border-radius: 8px;
-  font-size: 13px; cursor: pointer;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+
+  padding: 12px 22px;
+  border: 1px solid #3a4a5e;
+  border-radius: 10px;
+
+  background: linear-gradient(180deg,
+    #1a2530 0%, #2a3a4d 46%, #344a62 50%, #223142 54%, #121b24 100%);
+  color: #e6edf3;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  box-shadow:
+    0 4px 12px rgba(0,0,0,.45),
+    0 2px 4px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -1px 0 rgba(0,0,0,.4);
+  transition: transform .18s ease, border-color .2s ease, box-shadow .25s ease, filter .25s ease;
 }
-.players-btn:hover { background: var(--btn-hover, #2a3a4d); }
+/* Бегущий блик */
+.players-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(110deg,
+    transparent 40%,
+    rgba(255,255,255,.18) 50%,
+    transparent 60%);
+  background-size: 250% 100%;
+  background-position: -150% 0;
+}
+.players-btn:hover {
+  transform: translateY(-2px);
+  border-color: #5a7a9a;
+  filter: brightness(1.1);
+  box-shadow:
+    0 8px 22px rgba(46,139,255,.25),
+    0 4px 8px rgba(0,0,0,.45),
+    inset 0 1px 0 rgba(255,255,255,.22),
+    inset 0 -1px 0 rgba(0,0,0,.45);
+}
+.players-btn:hover::after {
+  animation: playersBtnSheen 1.6s ease-in-out infinite;
+}
+@keyframes playersBtnSheen {
+  0%   { background-position: -150% 0; }
+  60%,
+  100% { background-position:  150% 0; }
+}
+.players-btn:active {
+  transform: translateY(1px) scale(.985);
+  animation: none;
+  box-shadow:
+    inset 0 3px 8px rgba(0,0,0,.6),
+    inset 0 -1px 0 rgba(255,255,255,.08);
+}
+
+/* --- Акцентная кнопка «Готово»: золотая, как .about-close --- */
 .players-btn.primary {
-  background: var(--accent-bg, #2e7d4f);
-  border-color: var(--accent-border, #3fa86a);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, #1a2530 0%, #3c5169 46%, #4a637e 50%, #243445 55%, #121b24 100%) padding-box,
+    linear-gradient(180deg, #fff0c6, #8a652c) border-box;
+  color: #f6e7c4;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 0 -2px 0 rgba(0,0,0,.5);
 }
-.players-btn.primary:hover { background: var(--accent-hover, #369a5f); }
+.players-btn.primary:hover {
+  filter: brightness(1.14);
+  box-shadow:
+    0 10px 28px rgba(232,195,122,.28),
+    0 4px 10px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.35);
+}
+.players-btn.primary:active {
+  transform: translateY(1px) scale(.985);
+  box-shadow:
+    inset 0 3px 8px rgba(0,0,0,.55),
+    inset 0 -1px 0 rgba(255,255,255,.08);
+}
+
+/* --- Скроллбар в тон панели --- */
+.players-card::-webkit-scrollbar { width: 10px; height: 10px; }
+.players-card::-webkit-scrollbar-track { background: #0b0f14; border-radius: 8px; }
+.players-card::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3a4658, #1b222b);
+  border: 2px solid #0b0f14;
+  border-radius: 8px;
+}
+.players-card::-webkit-scrollbar-thumb:hover { background: #46536a; }
+.players-card::-webkit-scrollbar-corner { background: #0b0f14; }
+.players-card {
+  scrollbar-color: #2a3441 #0b0f14;
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .players-card,
+  .players-card::before,
+  .players-title { animation: none; }
+}
+
+
 

@@ -1,6 +1,25 @@
 /* ui/about.css */
 
-/*--- Заголовок «Грань Империи» ----------------------------------*/
+/* ============ Палитра «имперский металл» ============ */
+:root {
+  --panel-w: 756px;
+  --panel-pad: 36px;
+
+  --metal-top: #121a23;
+  --metal-hi:  #33465b;
+  --metal-mid: #3d546c;
+  --metal-low: #1b2632;
+  --metal-bot: #0d141c;
+
+  --gold:      #e8c37a;
+  --gold-hi:   #fff0c6;
+  --gold-lo:   #8a652c;
+
+  --text:  #e6edf3;
+  --muted: #8ea3b8;
+}
+
+/* ============ Заголовок меню ============ */
 .menu-logo {
   text-align: center;
   margin: 0 0 4px;
@@ -9,42 +28,39 @@
   letter-spacing: .06em;
   line-height: 1.1;
   color: #e6edf3;
-  text-shadow:
-    0 0 18px rgba(127, 212, 127, .22),
-    0 2px 10px rgba(0, 0, 0, .7);
+  text-shadow: 0 0 18px rgba(127,212,127,.22), 0 2px 10px rgba(0,0,0,.7);
 }
-
 .menu-logo .accent {
   color: #7fd47f;
-  text-shadow:
-    0 0 22px rgba(127, 212, 127, .45),
-    0 0 6px rgba(127, 212, 127, .35);
+  text-shadow: 0 0 22px rgba(127,212,127,.45), 0 0 6px rgba(127,212,127,.35);
 }
-
 .menu-tagline {
   text-align: center;
   margin: 0 0 26px;
   font-size: 11px;
   letter-spacing: .22em;
   text-transform: uppercase;
-  color: #7fa6c9;
+  color: #c9ab72;
   opacity: .9;
 }
-
 .menu-divider {
+  position: relative;
   height: 1px;
   margin: 0 0 18px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    #2a3441 20%,
-    #2a3441 80%,
-    transparent
-  );
+  background: linear-gradient(to right,
+    transparent, #8a652c 20%, #e8c37a 50%, #8a652c 80%, transparent);
+}
+.menu-divider::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 6px; height: 6px;
+  transform: translate(-50%,-50%) rotate(45deg);
+  background: #e8c37a;
+  box-shadow: 0 0 10px rgba(232,195,122,.8);
 }
 
-
-/*--- about ----------------------------------*/
+/* ============ Оверлей ============ */
 .about-overlay {
   position: fixed;
   inset: 0;
@@ -56,61 +72,104 @@
   gap: 24px;
   padding: 48px 20px;
   overflow-y: auto;
-  background: rgba(8, 6, 18, 0.15);   /* было 0.72 */
-  backdrop-filter: blur(6px);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(232,195,122,.10), transparent 55%),
+    rgba(6,10,14,.55);
+  backdrop-filter: blur(8px);
   opacity: 0;
-  transition: opacity 0.18s ease;
+  transition: opacity .22s ease;
 }
-.about-overlay.open {
-  background: rgba(6, 10, 14, .15);
-  backdrop-filter: blur(6px);
-}
+.about-overlay.open { opacity: 1; }
+
+/* ============ Карточка ============ */
 .about-card {
-  max-width: 756px; width: 100%; max-height: 90vh; overflow-y: auto;
-  background: #141a22; border: 1px solid #2a3441; border-radius: 14px;
-  padding: 32px 36px;
-  transform: translateY(12px) scale(.98); opacity: 0;
-  transition: transform .18s ease, opacity .18s ease;
-  scrollbar-gutter: stable; /* современные браузеры */
-}
-.about-overlay.open .about-card {
-  transform: none; opacity: 1;
-}
-.about-body { margin-top: 20px; font-size: 14px; line-height: 1.65; color: #c8d2dc; }
-.about-body h3 { margin: 20px 0 6px; font-size: 14px; color: #9ab8d6; }
-.about-body p { margin: 0 0 12px; }
-.about-body ul { margin: 6px 0 12px; padding-left: 20px; }
-.about-body li { margin: 2px 0; }
-.about-body b { color: #e6edf3; }
-.about-body .accent { color: #7fd47f; }
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
 
-.about-close {
-  display: block;
-  margin: 20px 0 0 auto;      /* сверху 20, справа/слева 0, слева auto → прижимает вправо */
-  background: #2e7d4f; border: 1px solid #3fa86a; color: #e6edf3;
-  padding: 10px 18px; border-radius: 8px; cursor: pointer;
-  font-size: 13px; font-weight: 600;
-}
-.about-close:hover { background: #369a5f; }
+  width: 100%;
+  max-width: var(--panel-w);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px var(--panel-pad);
+  scrollbar-gutter: stable;
 
+  /* Живая металлическая кромка + выпуклое тело */
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, #18222e 0%, #2a394b 46%, #1e2a38 54%, #10171f 100%) padding-box,
+    linear-gradient(110deg, #39465a, #8a652c, #fff0c6, #b98b3e, #39465a, #8a652c) border-box;
+  background-size: 100% 100%, 300% 100%;
+  animation: rimFlow 10s linear infinite;
+
+  box-shadow:
+    0 30px 90px rgba(0,0,0,.7),
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -2px 0 rgba(0,0,0,.6),
+    inset 0 0 70px rgba(0,0,0,.35);
+
+  transform: translateY(12px) scale(.98);
+  opacity: 0;
+  transition: transform .22s ease, opacity .22s ease;
+}
+.about-overlay.open .about-card { transform: none; opacity: 1; }
+
+/* Медленный световой проход по панели */
+.about-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg,
+    transparent 35%,
+    rgba(255,255,255,.07) 48%,
+    rgba(232,195,122,.10) 52%,
+    transparent 65%);
+  background-size: 300% 100%;
+  animation: panelSweep 8s ease-in-out infinite;
+}
+.about-card > * { position: relative; z-index: 1; }
+
+@keyframes rimFlow { to { background-position: 0 0, -200% 0; } }
+@keyframes panelSweep {
+  0%, 15%   { background-position: 150% 0; }
+  60%, 100% { background-position: -150% 0; }
+}
+
+/* ============ Шапка: та же ширина, что и описание ============ */
 .about-header {
   position: relative;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
   align-items: center;
-
-  /* ── ширина как у описания ── */
   width: 100%;
-  max-width: 756;   /* та же, что у .about-card */
-  padding: 0 36px; 
+  max-width: var(--panel-w);
+
+  /* +1px с каждой стороны компенсирует border у .about-card:
+     внутренняя ширина шапки === внутренняя ширина текста */
+  padding: 0 calc(var(--panel-pad) + 1px);
 
   filter:
-    drop-shadow(0 0 6px rgba(255, 224, 130, 0.65))
-    drop-shadow(0 0 22px rgba(255, 180, 60, 0.45))
-    drop-shadow(0 0 48px rgba(255, 140, 40, 0.25));
+    drop-shadow(0 0 6px rgba(255,224,130,.65))
+    drop-shadow(0 0 22px rgba(255,180,60,.45))
+    drop-shadow(0 0 48px rgba(255,140,40,.25));
   animation: about-header-glow 3.2s ease-in-out infinite alternate;
 }
-
+@keyframes about-header-glow {
+  from {
+    filter: drop-shadow(0 0 5px rgba(255,224,130,.55))
+            drop-shadow(0 0 18px rgba(255,180,60,.38))
+            drop-shadow(0 0 40px rgba(255,140,40,.20));
+  }
+  to {
+    filter: drop-shadow(0 0 9px rgba(255,235,170,.90))
+            drop-shadow(0 0 30px rgba(255,190,80,.65))
+            drop-shadow(0 0 64px rgba(255,150,50,.40));
+  }
+}
 .about-title-wrap {
   display: flex;
   justify-content: center;
@@ -119,64 +178,131 @@
   text-align: center;
 }
 
-/* и сам корень GameTitle — на всю ширину обёртки, по центру */
-.about-title-wrap > * {
-  margin-left: auto;
-  margin-right: auto;
+/* Сбрасываем «панельный» вид GameTitle внутри шапки */
+.about-title-wrap .game-title {
+  position: static;
+  top: auto; left: auto;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+.about-title-wrap .game-title__name {
+  margin: 0;
+  font-size: clamp(26px, 4.6vw, 38px);
+  font-weight: 800;
+  letter-spacing: .05em;
+  background: linear-gradient(180deg,
+    #fff6dc 0%, #f3d795 38%, #b8862f 50%, #ffe9b4 62%, #a9762a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.about-title-wrap .game-title__name .accent { color: inherit; }
+.about-title-wrap .game-title__subtitle {
+  margin: 8px 0 0;
+  font-size: 11px;
+  letter-spacing: .26em;
+  color: #d8bd85;
+}
+.about-title-wrap .game-title__version { color: var(--muted); }
+
+/* ============ Текст ============ */
+.about-body { margin-top: 20px; font-size: 14px; line-height: 1.65; color: #c8d2dc; }
+.about-body h3 {
+  margin: 22px 0 8px;
+  font-size: 14px;
+  color: #e8c37a;
+  letter-spacing: .04em;
+}
+.about-body p { margin: 0 0 12px; }
+.about-body ul { margin: 6px 0 12px; padding-left: 20px; }
+.about-body li { margin: 2px 0; }
+.about-body b { color: #f1e3c2; }
+.about-body .accent { color: #7fd47f; }
+
+/* ============ Кнопка «Закрыть» ============ */
+.about-close {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: block;
+  margin: 24px 0 0 auto;
+  padding: 12px 28px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, #1a2530 0%, #3c5169 46%, #4a637e 50%, #243445 55%, #121b24 100%) padding-box,
+    linear-gradient(180deg, var(--gold-hi), var(--gold-lo)) border-box;
+  color: #f6e7c4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 0 -2px 0 rgba(0,0,0,.5);
+  transition: transform .18s ease, box-shadow .25s ease, filter .25s ease;
+}
+.about-close::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(120px circle at var(--mx,50%) var(--my,50%),
+    rgba(255,240,198,.28), transparent 65%);
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.about-close:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+  box-shadow:
+    0 10px 28px rgba(232,195,122,.25),
+    0 4px 10px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.35);
+}
+.about-close:hover::after { opacity: 1; }
+.about-close:active {
+  transform: translateY(1px) scale(.985);
+  box-shadow:
+    inset 0 3px 8px rgba(0,0,0,.55),
+    inset 0 -1px 0 rgba(255,255,255,.08);
 }
 
-/* скролл-бар */
-/* ── Чёрный скроллбар (WebKit: Chrome, Edge, Safari) ── */
-.about-overlay,
-.about-card,
-#genPanel {
-  /* Firefox (см. ниже) */
-  scrollbar-color: #1b222b #0b0f14;   /* thumb track */
+/* ============ Скроллбар ============ */
+.about-overlay, .about-card, #genPanel {
+  scrollbar-color: #2a3441 #0b0f14;
   scrollbar-width: thin;
-
-  /* WebKit */
-  scrollbar-width: auto;              /* сброс для WebKit, чтобы работали ниже */
 }
-
 .about-overlay::-webkit-scrollbar,
 .about-card::-webkit-scrollbar,
-#genPanel::-webkit-scrollbar {
-  width: 10px;                        /* вертикальный */
-  height: 10px;                       /* горизонтальный */
-}
-
+#genPanel::-webkit-scrollbar { width: 10px; height: 10px; }
 .about-overlay::-webkit-scrollbar-track,
 .about-card::-webkit-scrollbar-track,
-#genPanel::-webkit-scrollbar-track {
-  background: #0b0f14;                /* почти чёрный жёлоб */
-  border-radius: 8px;
-}
-
+#genPanel::-webkit-scrollbar-track { background: #0b0f14; border-radius: 8px; }
 .about-overlay::-webkit-scrollbar-thumb,
 .about-card::-webkit-scrollbar-thumb,
 #genPanel::-webkit-scrollbar-thumb {
-  background: #1b222b;                /* тёмно-графитовый ползунок */
+  background: linear-gradient(180deg, #3a4658, #1b222b);
+  border: 2px solid #0b0f14;
   border-radius: 8px;
-  border: 2px solid #0b0f14;          /* «воздух» вокруг, как у macOS */
 }
-
 .about-overlay::-webkit-scrollbar-thumb:hover,
 .about-card::-webkit-scrollbar-thumb:hover,
-#genPanel::-webkit-scrollbar-thumb:hover {
-  background: #2a3441;                /* чуть светлее на hover */
-}
-
-/* Уголок между вертикальным и горизонтальным скроллбаром */
+#genPanel::-webkit-scrollbar-thumb:hover { background: #46536a; }
 .about-overlay::-webkit-scrollbar-corner,
 .about-card::-webkit-scrollbar-corner,
-#genPanel::-webkit-scrollbar-corner {
-  background: #0b0f14;
-}
+#genPanel::-webkit-scrollbar-corner { background: #0b0f14; }
 
-/* Firefox */
-.about-overlay,
-.about-card,
-#genPanel {
-  scrollbar-color: #1b222b #0b0f14;   /* thumb track */
-  scrollbar-width: thin;
+@media (prefers-reduced-motion: reduce) {
+  .about-header, .about-card, .about-card::before { animation: none; }
 }
