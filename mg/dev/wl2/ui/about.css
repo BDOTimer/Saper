@@ -213,7 +213,7 @@
 .about-title-wrap .game-title__version { color: var(--muted); }
 
 /* ============ Текст ============ */
-.about-body { margin-top: 20px; font-size: 14px; line-height: 1.65; color: #c8d2dc; }
+.about-body { margin-top: 20px; font-size: 24px; line-height: 1.65; color: #c8d2dc; }
 .about-body h3 {
   margin: 22px 0 8px;
   font-size: 14px;
