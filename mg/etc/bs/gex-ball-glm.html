@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hex islands on sphere</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#05070f;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas:active{cursor:grabbing}
+  #ui{position:fixed;top:12px;left:12px;color:#cfe3ff;background:rgba(10,16,32,.6);
+      backdrop-filter:blur(6px);padding:10px 14px;border-radius:10px;font-size:13px;user-select:none}
+  #ui b{color:#fff}
+  #ui label{display:flex;align-items:center;gap:8px;margin-top:6px}
+  #ui input[type=range]{width:140px}
+  #ui span{min-width:38px;display:inline-block;text-align:right;font-variant-numeric:tabular-nums}
+  #stat{margin-top:7px;color:#8fb3e8}
+  #hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:#7f93b8;font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <b>Hex islands on sphere</b>
+  <label title="Целевое количество гексов">Гексов: <input id="count" type="range" min="60" max="1200" step="10" value="420"><span id="countVal"></span></label>
+  <label title="Больше размер — меньше зазор">Размер: <input id="scale" type="range" min="30" max="100" value="88"><span id="scaleVal"></span></label>
+  <div id="stat">Островов: <span id="islVal">0</span> · Зазор: <span id="gapVal">0</span></div>
+</div>
+<div id="hint">Drag — rotate · Wheel — zoom</div>
+<script>
+'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W=0,H=0,DPR=1;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const frac=x=>x-Math.floor(x);
+
+// ---------- звёзды фона ----------
+let stars=[];
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function makeStars(){const rnd=mulberry(20261029);stars=[];
+  const n=Math.round(W*H/9000);
+  for(let i=0;i<n;i++)stars.push({x:rnd()*W,y:rnd()*H,r:rnd()*1.3+0.3,p:rnd()*6.28,s:0.5+rnd()*1.5});}
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+  canvas.width=W*DPR;canvas.height=H*DPR;makeStars();}
+addEventListener('resize',resize);resize();
+
+//<MODEL>
+// ---------- модель: архипелаг из плотно упакованных гексов ----------
+// Каждый остров — кусок общей гексовой решётки с шагом s, спроецированный
+// на сферу с компенсацией кривизны. Размер всех гексов одинаковый
+// (угловой радиус aBase = s*scaleK/sqrt(3)), поэтому зазор между любыми
+// соседями равен s - 2*апотема = s*(1-scaleK) — постоянная величина.
+let N=420, scaleK=0.88, needRebuild=false;
+let islands=[], cullZ=0.1, maxA=0.1;
+let totalHexes=0, islandCount=0;
+
+// равномерные точки на сфере (спираль Фибоначчи)
+function fib(n){const pts=[],ga=Math.PI*(3-Math.sqrt(5));
+  for(let i=0;i<n;i++){const y=1-2*(i+0.5)/n,r=Math.sqrt(Math.max(0,1-y*y)),t=ga*i;
+    pts.push([r*Math.cos(t),y,r*Math.sin(t)]);}
+  return pts;}
+
+// угловое расстояние до ближайшего соседа для каждой точки
+function nearestAngles(pts){
+  const n=pts.length,best=new Float64Array(n).fill(-2);
+  for(let i=0;i<n;i++){const a=pts[i],ax=a[0],ay=a[1],az=a[2];
+    for(let j=i+1;j<n;j++){const b=pts[j];
+      const d=ax*b[0]+ay*b[1]+az*b[2];
+      if(d>best[i])best[i]=d; if(d>best[j])best[j]=d;}}
+  for(let i=0;i<n;i++)best[i]=Math.acos(Math.min(1,best[i]));
+  return best;}
+
+// локальный базис в точке сферы
+function localFrame(n){
+  const x=n[0],z=n[2],l=Math.hypot(x,z);
+  const e1=l<1e-8?[1,0,0]:[z/l,0,-x/l];
+  const e2=[n[1]*e1[2]-n[2]*e1[1], n[2]*e1[0]-n[0]*e1[2], n[0]*e1[1]-n[1]*e1[0]];
+  return [e1,e2];}
+
+// перенос направления dir из касательной плоскости острова в точку p
+// (проекция на касательную плоскость в p = параллельный перенос вдоль радиальной геодезической)
+function transport(p,dir){
+  const d=dir[0]*p[0]+dir[1]*p[1]+dir[2]*p[2];
+  let x=dir[0]-d*p[0],y=dir[1]-d*p[1],z=dir[2]-d*p[2];
+  const l=Math.hypot(x,y,z)||1;
+  const e1=[x/l,y/l,z/l];
+  const e2=[p[1]*e1[2]-p[2]*e1[1],p[2]*e1[0]-p[0]*e1[2],p[0]*e1[1]-p[1]*e1[0]];
+  return [e1,e2];}
+
+// правильный шестиугольник: центр n, базис e1/e2, угловой радиус alpha.
+// Вершины на phase+k*60°, чтобы РЁБРА смотрели на соседей решётки (0°,60°,...)
+function hexRing(n,e1,e2,alpha,phase){
+  const t=Math.tan(alpha),out=[];
+  for(let k=0;k<6;k++){
+    const b=phase+k*Math.PI/3,cb=Math.cos(b),sb=Math.sin(b);
+    let vx=n[0]+t*(cb*e1[0]+sb*e2[0]),
+        vy=n[1]+t*(cb*e1[1]+sb*e2[1]),
+        vz=n[2]+t*(cb*e1[2]+sb*e2[2]);
+    const il=1/Math.hypot(vx,vy,vz);
+    out.push([vx*il,vy*il,vz*il]);}
+  return out;}
+
+// строит архипелаг: K центров островов, шаг решётки s (в радианах)
+function buildArchipelago(K,s){
+  const centers=fib(K), dn=nearestAngles(centers);
+  const aBase=s*scaleK/Math.sqrt(3);      // угловой радиус гекса — один для всех
+  const touchCos=Math.cos(2*aBase*1.02);  // порог «гексы разных островов столкнулись»
+  const flat=[];
+  let islSeq=0;
+  for(let i=0;i<K;i++){
+    const c=centers[i];
+    const r1=frac(i*0.61803),r2=frac(i*0.75487),r3=frac(i*0.38196);
+    let m=1.5+r1*0.9+(r2<0.12?0.5:0);     // радиус острова в шагах решётки (~1.5..2.9)
+    m=Math.min(m,0.38*dn[i]/s);           // остров не залезает на соседний
+    if(m<0.9)continue;                    // слишком тесно — здесь будет океан
+    const [e1,e2]=localFrame(c);
+    const p1=r2*6.28318,p2=r3*6.28318;
+    const A1=0.08+0.08*r3,A2=0.04+0.06*r1;// неровная «береговая линия»
+    const sandy=r2<0.16;
+    const landH=sandy?38+r1*10:92+r1*58,
+          landS=sandy?26+r3*12:32+r3*20,
+          landL=sandy?46:33+r2*13;
+    const sandH=44+r3*8,sandS=46+r1*16,sandL=62+r2*6;
+    const rows=Math.ceil(m*1.35)+1, isl=islSeq++, idx0=flat.length;
+    for(let row=-rows;row<=rows;row++){
+      const v=row*s*0.8660254;
+      for(let q=-rows;q<=rows;q++){
+        const u=(q+row*0.5)*s;            // осевые координаты гексовой решётки
+        const rp=Math.hypot(u,v);
+        const th=Math.atan2(v,u);
+        const bl=1+A1*Math.cos(th+p1)+A2*Math.cos(2*th+p2);
+        if(rp>m*s*bl)continue;            // вне острова
+        const chi=rp,cw=Math.cos(chi),sw=Math.sin(chi),
+              ct=Math.cos(th),st=Math.sin(th);
+        const n=[cw*c[0]+sw*(ct*e1[0]+st*e2[0]),
+                 cw*c[1]+sw*(ct*e1[1]+st*e2[1]),
+                 cw*c[2]+sw*(ct*e1[2]+st*e2[2])];
+        const lam=chi>1e-6?Math.sin(chi)/chi:1; // компенсация кривизны -> ровный зазор
+        const a=aBase*lam;
+        const [e1h,e2h]=transport(n,e1);
+        const h=frac(Math.sin(i*127.1+q*311.7+row*74.7)*43758.5453);
+        const h2=frac(Math.sin(i*269.5+q*183.3+row*246.1)*28001.8384);
+        flat.push({isl,n,a,
+          po:hexRing(n,e1h,e2h,a,Math.PI/6),
+          pi:hexRing(n,e1h,e2h,a*0.76,Math.PI/6),
+          sH:sandH+(h-0.5)*8,sS:sandS,sL:sandL+(h2-0.5)*6,
+          lH:landH+(h2-0.5)*10,lS:landS,lL:landL+(h-0.5)*9});
+      }
+    }
+    if(flat.length===idx0)islSeq--;
+  }
+  // эрозия: если гексы двух разных островов всё же соприкасаются — убираем один
+  const keep=new Uint8Array(flat.length).fill(1);
+  for(let i=0;i<flat.length;i++){
+    if(!keep[i])continue;
+    const ni=flat[i].n,isi=flat[i].isl;
+    for(let j=i+1;j<flat.length;j++){
+      if(!keep[j]||flat[j].isl===isi)continue;
+      const d=ni[0]*flat[j].n[0]+ni[1]*flat[j].n[1]+ni[2]*flat[j].n[2];
+      if(d>touchCos)keep[j]=0;
+    }
+  }
+  const islArr=[];
+  for(let k=0;k<islSeq;k++)islArr.push([]);
+  for(let i=0;i<flat.length;i++)if(keep[i])islArr[flat[i].isl].push(flat[i]);
+  return islArr.filter(a=>a.length>0);
+}
+
+function rebuild(){
+  // шаг решётки: гексы заполняют ~40% сферы; ограничиваем угловой размер гекса
+  const s=Math.min(Math.sqrt(8*Math.PI*0.40/(Math.sqrt(3)*N)),0.146);
+  let K=clamp(Math.round(N/14),4,110);
+  const cnt=arr=>{let t=0;for(const a of arr)t+=a.length;return t;};
+  let isl=buildArchipelago(K,s),M=cnt(isl);
+  for(let g=0;g<4;g++){
+    if(M<N*0.88&&K<110){isl=buildArchipelago(++K,s);M=cnt(isl);}
+    else if(M>N*1.15&&K>4){isl=buildArchipelago(--K,s);M=cnt(isl);}
+    else break;
+  }
+  islands=isl;islandCount=isl.length;totalHexes=M;
+  maxA=s*scaleK/Math.sqrt(3);
+  cullZ=Math.min(0.5,Math.sin(maxA)+0.02);
+}
+//</MODEL>
+
+// ---------- камера ----------
+let yaw=0.7,pitch=0.32,zoom=1,dragging=false,px=0,py=0,velY=0,velP=0,pinchD=0;
+let lastAct=performance.now();
+let CA=1,SA=0,CB=1,SB=0;
+function updRot(){CA=Math.cos(yaw);SA=Math.sin(yaw);CB=Math.cos(pitch);SB=Math.sin(pitch);}
+function rot(p,out){const x1=p[0]*CA+p[2]*SA, z1=-p[0]*SA+p[2]*CA, y1=p[1];
+  out[0]=x1;out[1]=y1*CB-z1*SB;out[2]=y1*SB+z1*CB;return out;}
+const L=(()=>{const v=[-0.45,0.62,0.64],l=Math.hypot(v[0],v[1],v[2]);
+  return [v[0]/l,v[1]/l,v[2]/l];})();
+const tmp=[0,0,0],tmp2=[0,0,0];
+
+function trace(poly,cx,cy,R){
+  ctx.beginPath();
+  for(let i=0;i<poly.length;i++){
+    const p=rot(poly[i],tmp2);
+    const sx=cx+p[0]*R, sy=cy-p[1]*R;
+    i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy);}
+  ctx.closePath();}
+
+function render(t){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#05070f');bg.addColorStop(1,'#0a1220');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#cdd8ff';
+  for(const s of stars){ctx.globalAlpha=0.25+0.45*(0.5+0.5*Math.sin(t*s.s+s.p));
+    ctx.fillRect(s.x,s.y,s.r,s.r);}
+  ctx.globalAlpha=1;
+
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.36*zoom;
+
+  let g=ctx.createRadialGradient(cx,cy,R*0.9,cx,cy,R*1.3);
+  g.addColorStop(0,'rgba(70,130,255,0)');g.addColorStop(0.45,'rgba(70,130,255,0.12)');
+  g.addColorStop(1,'rgba(70,130,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R*1.3,0,6.2832);ctx.fill();
+
+  g=ctx.createRadialGradient(cx-R*0.3,cy-R*0.35,R*0.1,cx,cy,R);
+  g.addColorStop(0,'#1d5c8f');g.addColorStop(0.45,'#144067');
+  g.addColorStop(0.8,'#0b2544');g.addColorStop(1,'#071a30');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+
+  for(const isl of islands){
+    for(const h of isl){
+      const nv=rot(h.n,tmp);
+      if(nv[2]<cullZ)continue;
+      const d=Math.max(0,nv[0]*L[0]+nv[1]*L[1]+nv[2]*L[2]);
+      const sh=0.30+0.70*d;
+      trace(h.po,cx,cy,R);
+      ctx.fillStyle=`hsl(${h.sH.toFixed(1)},${h.sS}%,${(h.sL*sh).toFixed(1)}%)`;
+      ctx.fill();
+      ctx.strokeStyle='rgba(3,14,28,0.55)';ctx.lineWidth=1;ctx.stroke();
+      trace(h.pi,cx,cy,R);
+      ctx.fillStyle=`hsl(${h.lH.toFixed(1)},${h.lS}%,${(h.lL*sh).toFixed(1)}%)`;
+      ctx.fill();
+    }
+  }
+
+  g=ctx.createRadialGradient(cx-R*0.35,cy-R*0.42,0,cx-R*0.35,cy-R*0.42,R*0.7);
+  g.addColorStop(0,'rgba(255,255,255,0.10)');g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+  g=ctx.createRadialGradient(cx,cy,R*0.8,cx,cy,R);
+  g.addColorStop(0,'rgba(2,8,20,0)');g.addColorStop(1,'rgba(2,8,20,0.5)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+}
+
+let last=performance.now();
+function animLoop(now){
+  requestAnimationFrame(animLoop);
+  const dt=Math.min(50,now-last)/1000;last=now;
+  if(needRebuild){rebuild();needRebuild=false;syncLabels();}
+  if(!dragging){
+    yaw+=velY;pitch=clamp(pitch+velP,-1.45,1.45);
+    velY*=0.94;velP*=0.94;
+    if(now-lastAct>2500)yaw+=dt*0.07;
+  }
+  updRot();
+  render(now/1000);
+}
+
+// ---------- управление ----------
+const active=new Map();
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===1){dragging=true;px=e.clientX;py=e.clientY;}
+  lastAct=performance.now();});
+canvas.addEventListener('pointermove',e=>{
+  if(!active.has(e.pointerId))return;
+  active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===2){
+    const a=[...active.values()];
+    const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+    if(pinchD>0)zoom=clamp(zoom*d/pinchD,0.35,4);
+    pinchD=d;lastAct=performance.now();return;}
+  if(dragging){
+    const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;
+    const k=0.0052;
+    yaw+=dx*k;pitch=clamp(pitch+dy*k,-1.45,1.45);
+    velY=dx*k*0.6;velP=dy*k*0.6;
+    lastAct=performance.now();}});
+function endP(e){active.delete(e.pointerId);
+  if(active.size<2)pinchD=0;
+  if(active.size===1){const p=[...active.values()][0];px=p[0];py=p[1];dragging=true;}
+  else if(active.size===0)dragging=false;
+  lastAct=performance.now();}
+canvas.addEventListener('pointerup',endP);
+canvas.addEventListener('pointercancel',endP);
+canvas.addEventListener('wheel',e=>{e.preventDefault();
+  zoom=clamp(zoom*Math.exp(-e.deltaY*0.0012),0.35,4);
+  lastAct=performance.now();},{passive:false});
+
+// ---------- UI ----------
+const elC=document.getElementById('count'),elS=document.getElementById('scale');
+const elCV=document.getElementById('countVal'),elSV=document.getElementById('scaleVal');
+const elIL=document.getElementById('islVal'),elGV=document.getElementById('gapVal');
+function syncLabels(){
+  elCV.textContent=totalHexes;
+  elSV.textContent=Math.round(scaleK*100)+'%';
+  elIL.textContent=islandCount;
+  elGV.textContent=Math.round((1-scaleK)*100)+'%';}
+elC.addEventListener('input',()=>{N=+elC.value;needRebuild=true;});
+elS.addEventListener('input',()=>{scaleK=+elS.value/100;needRebuild=true;});
+
+rebuild();syncLabels();requestAnimationFrame(animLoop);
+</script>
+</body>
+</html>

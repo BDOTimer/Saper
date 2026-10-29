@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hex islands on sphere</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#05070f;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas:active{cursor:grabbing}
+  #ui{position:fixed;top:12px;left:12px;color:#cfe3ff;background:rgba(10,16,32,.6);
+      backdrop-filter:blur(6px);padding:10px 14px;border-radius:10px;font-size:13px;user-select:none}
+  #ui b{color:#fff}
+  #ui label{display:flex;align-items:center;gap:8px;margin-top:6px}
+  #ui input[type=range]{width:140px}
+  #ui span{min-width:38px;display:inline-block;text-align:right;font-variant-numeric:tabular-nums}
+  #stat{margin-top:7px;color:#8fb3e8}
+  #hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:#7f93b8;font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <b>Hex islands on sphere</b>
+  <label title="Целевое количество гексов">Гексов: <input id="count" type="range" min="60" max="1200" step="10" value="420"><span id="countVal"></span></label>
+  <label title="Больше размер — меньше зазор">Размер: <input id="scale" type="range" min="30" max="100" value="88"><span id="scaleVal"></span></label>
+  <div id="stat">Островов: <span id="islVal">0</span> · Зазор: <span id="gapVal">0</span></div>
+</div>
+<div id="hint">Drag — rotate · Wheel — zoom</div>
+<script>
+'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W=0,H=0,DPR=1;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const frac=x=>x-Math.floor(x);
+
+// ---------- звёзды ----------
+let stars=[];
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function makeStars(){const rnd=mulberry(20261029);stars=[];
+  const n=Math.round(W*H/9000);
+  for(let i=0;i<n;i++)stars.push({x:rnd()*W,y:rnd()*H,r:rnd()*1.3+0.3,p:rnd()*6.28,s:0.5+rnd()*1.5});}
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+  canvas.width=W*DPR;canvas.height=H*DPR;makeStars();buildSphereTexture();}
+addEventListener('resize',resize);
+
+// ---------- ТЕКСТУРА ШАРА (одна надпись, развёрнутая на 180°) ----------
+let sphereTexCanvas=null;
+function buildSphereTexture(){
+  const TW=2048, TH=1024;
+  if(!sphereTexCanvas){
+    sphereTexCanvas=document.createElement('canvas');
+    sphereTexCanvas.width=TW;
+    sphereTexCanvas.height=TH;
+  }
+  const tc=sphereTexCanvas.getContext('2d');
+  tc.setTransform(1,0,0,1,0,0);
+
+  // тёмно-синий градиент
+  const bg=tc.createLinearGradient(0,0,0,TH);
+  bg.addColorStop(0,'#0a1530');
+  bg.addColorStop(0.5,'#0b1a3a');
+  bg.addColorStop(1,'#060e22');
+  tc.fillStyle=bg; tc.fillRect(0,0,TW,TH);
+
+  // полосы
+  tc.globalAlpha=0.06;
+  for(let i=0;i<40;i++){
+    tc.fillStyle = i%2 ? '#1a3a6e' : '#0a1a3a';
+    const y=Math.random()*TH;
+    tc.fillRect(0,y,TW,1+Math.random()*2);
+  }
+  tc.globalAlpha=1;
+
+  // шум
+  const img=tc.getImageData(0,0,TW,TH), d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const n=(Math.random()-0.5)*8;
+    d[i]  =clamp(d[i]  +n,0,255);
+    d[i+1]=clamp(d[i+1]+n,0,255);
+    d[i+2]=clamp(d[i+2]+n,0,255);
+  }
+  tc.putImageData(img,0,0);
+
+  // ---- одна надпись по центру, развёрнутая на 180° ----
+  // В UV-развёртке сферы v идёт от полюса к полюсу, и текст на экваторе
+  // (u=0.5, v=0.5) при натяжке оказывается "вверх ногами" в экранных координатах.
+  // Поворачиваем на π и центрируем вокруг (TW*0.5, TH*0.5).
+  tc.save();
+  tc.translate(TW*0.5, TH*0.5);
+  tc.rotate(Math.PI);
+  tc.textAlign='center';
+  tc.textBaseline='middle';
+
+  // тёмная подложка под текст
+  const fontSize=Math.round(TW*0.055);   // ~112px при TW=2048
+  tc.font=`bold ${fontSize}px system-ui, "Segoe UI", Arial, sans-serif`;
+  const tw=tc.measureText('Для Бондерсана').width;
+  tc.shadowColor='rgba(0,0,0,0)'; tc.shadowBlur=0;
+  tc.fillStyle='rgba(2,8,20,0.45)';
+  tc.beginPath();
+  tc.roundRect(-tw/2-fontSize*0.35, -fontSize*0.75,
+               tw+fontSize*0.7,      fontSize*1.5, fontSize*0.2);
+  tc.fill();
+
+  // свечение
+  tc.shadowColor='rgba(140,200,255,0.75)'; tc.shadowBlur=fontSize*0.35;
+  tc.fillStyle='rgba(220,240,255,0.98)';
+  tc.fillText('Для Бондерсана', 0, 0);
+
+  // чёткая обводка сверху
+  tc.shadowBlur=0;
+  tc.strokeStyle='rgba(90,150,230,0.55)';
+  tc.lineWidth=Math.max(2, fontSize*0.025);
+  tc.strokeText('Для Бондерсана', 0, 0);
+
+  tc.restore();
+
+  // затемнение к полюсам
+  const vg=tc.createLinearGradient(0,0,0,TH);
+  vg.addColorStop(0,'rgba(2,6,16,0.6)');
+  vg.addColorStop(0.35,'rgba(2,6,16,0)');
+  vg.addColorStop(0.65,'rgba(2,6,16,0)');
+  vg.addColorStop(1,'rgba(2,6,16,0.6)');
+  tc.fillStyle=vg; tc.fillRect(0,0,TW,TH);
+}
+
+//<MODEL>
+// ---------- модель: архипелаг из плотно упакованных гексов ----------
+let N=420, scaleK=0.88, needRebuild=false;
+let islands=[], cullZ=0.1, maxA=0.1;
+let totalHexes=0, islandCount=0;
+
+function fib(n){const pts=[],ga=Math.PI*(3-Math.sqrt(5));
+  for(let i=0;i<n;i++){const y=1-2*(i+0.5)/n,r=Math.sqrt(Math.max(0,1-y*y)),t=ga*i;
+    pts.push([r*Math.cos(t),y,r*Math.sin(t)]);}
+  return pts;}
+
+function nearestAngles(pts){
+  const n=pts.length,best=new Float64Array(n).fill(-2);
+  for(let i=0;i<n;i++){const a=pts[i],ax=a[0],ay=a[1],az=a[2];
+    for(let j=i+1;j<n;j++){const b=pts[j];
+      const d=ax*b[0]+ay*b[1]+az*b[2];
+      if(d>best[i])best[i]=d; if(d>best[j])best[j]=d;}}
+  for(let i=0;i<n;i++)best[i]=Math.acos(Math.min(1,best[i]));
+  return best;}
+
+function localFrame(n){
+  const x=n[0],z=n[2],l=Math.hypot(x,z);
+  const e1=l<1e-8?[1,0,0]:[z/l,0,-x/l];
+  const e2=[n[1]*e1[2]-n[2]*e1[1], n[2]*e1[0]-n[0]*e1[2], n[0]*e1[1]-n[1]*e1[0]];
+  return [e1,e2];}
+
+function transport(p,dir){
+  const d=dir[0]*p[0]+dir[1]*p[1]+dir[2]*p[2];
+  let x=dir[0]-d*p[0],y=dir[1]-d*p[1],z=dir[2]-d*p[2];
+  const l=Math.hypot(x,y,z)||1;
+  const e1=[x/l,y/l,z/l];
+  const e2=[p[1]*e1[2]-p[2]*e1[1],p[2]*e1[0]-p[0]*e1[2],p[0]*e1[1]-p[1]*e1[0]];
+  return [e1,e2];}
+
+function hexRing(n,e1,e2,alpha,phase){
+  const t=Math.tan(alpha),out=[];
+  for(let k=0;k<6;k++){
+    const b=phase+k*Math.PI/3,cb=Math.cos(b),sb=Math.sin(b);
+    let vx=n[0]+t*(cb*e1[0]+sb*e2[0]),
+        vy=n[1]+t*(cb*e1[1]+sb*e2[1]),
+        vz=n[2]+t*(cb*e1[2]+sb*e2[2]);
+    const il=1/Math.hypot(vx,vy,vz);
+    out.push([vx*il,vy*il,vz*il]);}
+  return out;}
+
+function buildArchipelago(K,s){
+  const centers=fib(K), dn=nearestAngles(centers);
+  const aBase=s*scaleK/Math.sqrt(3);
+  const touchCos=Math.cos(2*aBase*1.02);
+  const flat=[];
+  let islSeq=0;
+  for(let i=0;i<K;i++){
+    const c=centers[i];
+    const r1=frac(i*0.61803),r2=frac(i*0.75487),r3=frac(i*0.38196);
+    let m=1.5+r1*0.9+(r2<0.12?0.5:0);
+    m=Math.min(m,0.38*dn[i]/s);
+    if(m<0.9)continue;
+    const [e1,e2]=localFrame(c);
+    const p1=r2*6.28318,p2=r3*6.28318;
+    const A1=0.08+0.08*r3,A2=0.04+0.06*r1;
+    const sandy=r2<0.16;
+    const landH=sandy?38+r1*10:92+r1*58,
+          landS=sandy?26+r3*12:32+r3*20,
+          landL=sandy?46:33+r2*13;
+    const sandH=44+r3*8,sandS=46+r1*16,sandL=62+r2*6;
+    const rows=Math.ceil(m*1.35)+1, isl=islSeq++, idx0=flat.length;
+    for(let row=-rows;row<=rows;row++){
+      const v=row*s*0.8660254;
+      for(let q=-rows;q<=rows;q++){
+        const u=(q+row*0.5)*s;
+        const rp=Math.hypot(u,v);
+        const th=Math.atan2(v,u);
+        const bl=1+A1*Math.cos(th+p1)+A2*Math.cos(2*th+p2);
+        if(rp>m*s*bl)continue;
+        const chi=rp,cw=Math.cos(chi),sw=Math.sin(chi),
+              ct=Math.cos(th),st=Math.sin(th);
+        const n=[cw*c[0]+sw*(ct*e1[0]+st*e2[0]),
+                 cw*c[1]+sw*(ct*e1[1]+st*e2[1]),
+                 cw*c[2]+sw*(ct*e1[2]+st*e2[2])];
+        const lam=chi>1e-6?Math.sin(chi)/chi:1;
+        const a=aBase*lam;
+        const [e1h,e2h]=transport(n,e1);
+        const h=frac(Math.sin(i*127.1+q*311.7+row*74.7)*43758.5453);
+        const h2=frac(Math.sin(i*269.5+q*183.3+row*246.1)*28001.8384);
+        flat.push({isl,n,a,
+          po:hexRing(n,e1h,e2h,a,Math.PI/6),
+          pi:hexRing(n,e1h,e2h,a*0.76,Math.PI/6),
+          sH:sandH+(h-0.5)*8,sS:sandS,sL:sandL+(h2-0.5)*6,
+          lH:landH+(h2-0.5)*10,lS:landS,lL:landL+(h-0.5)*9});
+      }
+    }
+    if(flat.length===idx0)islSeq--;
+  }
+  const keep=new Uint8Array(flat.length).fill(1);
+  for(let i=0;i<flat.length;i++){
+    if(!keep[i])continue;
+    const ni=flat[i].n,isi=flat[i].isl;
+    for(let j=i+1;j<flat.length;j++){
+      if(!keep[j]||flat[j].isl===isi)continue;
+      const d=ni[0]*flat[j].n[0]+ni[1]*flat[j].n[1]+ni[2]*flat[j].n[2];
+      if(d>touchCos)keep[j]=0;
+    }
+  }
+  const islArr=[];
+  for(let k=0;k<islSeq;k++)islArr.push([]);
+  for(let i=0;i<flat.length;i++)if(keep[i])islArr[flat[i].isl].push(flat[i]);
+  return islArr.filter(a=>a.length>0);
+}
+
+function rebuild(){
+  const s=Math.min(Math.sqrt(8*Math.PI*0.40/(Math.sqrt(3)*N)),0.146);
+  let K=clamp(Math.round(N/14),4,110);
+  const cnt=arr=>{let t=0;for(const a of arr)t+=a.length;return t;};
+  let isl=buildArchipelago(K,s),M=cnt(isl);
+  for(let g=0;g<4;g++){
+    if(M<N*0.88&&K<110){isl=buildArchipelago(++K,s);M=cnt(isl);}
+    else if(M>N*1.15&&K>4){isl=buildArchipelago(--K,s);M=cnt(isl);}
+    else break;
+  }
+  islands=isl;islandCount=isl.length;totalHexes=M;
+  maxA=s*scaleK/Math.sqrt(3);
+  cullZ=Math.min(0.5,Math.sin(maxA)+0.02);
+}
+//</MODEL>
+
+// ---------- камера ----------
+let yaw=0.7,pitch=0.32,zoom=1,dragging=false,px=0,py=0,velY=0,velP=0,pinchD=0;
+let lastAct=performance.now();
+let CA=1,SA=0,CB=1,SB=0;
+function updRot(){CA=Math.cos(yaw);SA=Math.sin(yaw);CB=Math.cos(pitch);SB=Math.sin(pitch);}
+function rot(p,out){const x1=p[0]*CA+p[2]*SA, z1=-p[0]*SA+p[2]*CA, y1=p[1];
+  out[0]=x1;out[1]=y1*CB-z1*SB;out[2]=y1*SB+z1*CB;return out;}
+const L=(()=>{const v=[-0.45,0.62,0.64],l=Math.hypot(v[0],v[1],v[2]);
+  return [v[0]/l,v[1]/l,v[2]/l];})();
+const tmp=[0,0,0],tmp2=[0,0,0];
+
+function trace(poly,cx,cy,R){
+  ctx.beginPath();
+  for(let i=0;i<poly.length;i++){
+    const p=rot(poly[i],tmp2);
+    const sx=cx+p[0]*R, sy=cy-p[1]*R;
+    i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy);}
+  ctx.closePath();}
+
+// ---------- отрисовка текстурной сферы ----------
+function drawTexturedSphere(cx,cy,R){
+  const SEG_LON=96, SEG_LAT=48;
+  const TW=sphereTexCanvas.width, TH=sphereTexCanvas.height;
+
+  const quads=[];
+  for(let iLat=0;iLat<SEG_LAT;iLat++){
+    const v0=iLat/SEG_LAT, v1=(iLat+1)/SEG_LAT;
+    const th0=(v0-0.5)*Math.PI, th1=(v1-0.5)*Math.PI;
+    const y0=Math.sin(th0), y1=Math.sin(th1);
+    const r0=Math.cos(th0), r1=Math.cos(th1);
+    for(let iLon=0;iLon<SEG_LON;iLon++){
+      const u0=iLon/SEG_LON, u1=(iLon+1)/SEG_LON;
+      const ph0=u0*Math.PI*2, ph1=u1*Math.PI*2;
+
+      const p00=[r0*Math.cos(ph0), y0, r0*Math.sin(ph0)];
+      const p10=[r0*Math.cos(ph1), y0, r0*Math.sin(ph1)];
+      const p11=[r1*Math.cos(ph1), y1, r1*Math.sin(ph1)];
+      const p01=[r1*Math.cos(ph0), y1, r1*Math.sin(ph0)];
+
+      const q00=rot(p00,[0,0,0]), q10=rot(p10,[0,0,0]);
+      const q11=rot(p11,[0,0,0]), q01=rot(p01,[0,0,0]);
+
+      const zAvg=(q00[2]+q10[2]+q11[2]+q01[2])/4;
+      if(zAvg<0.02) continue;
+
+      const s00=[cx+q00[0]*R, cy-q00[1]*R];
+      const s10=[cx+q10[0]*R, cy-q10[1]*R];
+      const s11=[cx+q11[0]*R, cy-q11[1]*R];
+      const s01=[cx+q01[0]*R, cy-q01[1]*R];
+
+      quads.push({z:zAvg, s00,s10,s11,s01,
+        tx0:u0*TW, tx1:u1*TW, ty0:v0*TH, ty1:v1*TH});
+    }
+  }
+  quads.sort((a,b)=>a.z-b.z);
+  for(const q of quads){
+    drawTexTri(sphereTexCanvas, q.s00, q.s10, q.s11, q.tx0,q.ty0, q.tx1,q.ty0, q.tx1,q.ty1);
+    drawTexTri(sphereTexCanvas, q.s00, q.s11, q.s01, q.tx0,q.ty0, q.tx1,q.ty1, q.tx0,q.ty1);
+  }
+}
+
+function drawTexTri(tex, p0,p1,p2, tx0,ty0, tx1,ty1, tx2,ty2){
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]);
+  ctx.closePath(); ctx.clip();
+
+  const x0=tx0, y0=ty0, x1=tx1, y1=ty1, x2=tx2, y2=ty2;
+  const det=(x1-x0)*(y2-y0)-(x2-x0)*(y1-y0);
+  if(Math.abs(det)<1e-6){ctx.restore();return;}
+  const a=((p1[0]-p0[0])*(y2-y0)-(p2[0]-p0[0])*(y1-y0))/det;
+  const c=((p2[0]-p0[0])*(x1-x0)-(p1[0]-p0[0])*(x2-x0))/det;
+  const b=((p1[1]-p0[1])*(y2-y0)-(p2[1]-p0[1])*(y1-y0))/det;
+  const d=((p2[1]-p0[1])*(x1-x0)-(p1[1]-p0[1])*(x2-x0))/det;
+  const e=p0[0]-a*x0-c*y0;
+  const f=p0[1]-b*x0-d*y0;
+
+  ctx.setTransform(a,b,c,d,e,f);
+  ctx.drawImage(tex,0,0,tex.width,tex.height);
+  ctx.restore();
+}
+
+function render(t){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#05070f');bg.addColorStop(1,'#0a1220');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#cdd8ff';
+  for(const s of stars){ctx.globalAlpha=0.25+0.45*(0.5+0.5*Math.sin(t*s.s+s.p));
+    ctx.fillRect(s.x,s.y,s.r,s.r);}
+  ctx.globalAlpha=1;
+
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.36*zoom;
+
+  // атмосфера
+  let g=ctx.createRadialGradient(cx,cy,R*0.9,cx,cy,R*1.3);
+  g.addColorStop(0,'rgba(70,130,255,0)');g.addColorStop(0.45,'rgba(70,130,255,0.12)');
+  g.addColorStop(1,'rgba(70,130,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R*1.3,0,6.2832);ctx.fill();
+
+  // шар с текстурой
+  drawTexturedSphere(cx,cy,R);
+
+  // гексы
+  for(const isl of islands){
+    for(const h of isl){
+      const nv=rot(h.n,tmp);
+      if(nv[2]<cullZ)continue;
+      const d=Math.max(0,nv[0]*L[0]+nv[1]*L[1]+nv[2]*L[2]);
+      const sh=0.30+0.70*d;
+      trace(h.po,cx,cy,R);
+      ctx.fillStyle=`hsl(${h.sH.toFixed(1)},${h.sS}%,${(h.sL*sh).toFixed(1)}%)`;
+      ctx.fill();
+      ctx.strokeStyle='rgba(3,14,28,0.55)';ctx.lineWidth=1;ctx.stroke();
+      trace(h.pi,cx,cy,R);
+      ctx.fillStyle=`hsl(${h.lH.toFixed(1)},${h.lS}%,${(h.lL*sh).toFixed(1)}%)`;
+      ctx.fill();
+    }
+  }
+
+  // блеск и виньетка — ослаблены, чтобы не глушить надпись
+  g=ctx.createRadialGradient(cx-R*0.35,cy-R*0.42,0,cx-R*0.35,cy-R*0.42,R*0.7);
+  g.addColorStop(0,'rgba(255,255,255,0.06)');g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+  g=ctx.createRadialGradient(cx,cy,R*0.85,cx,cy,R);
+  g.addColorStop(0,'rgba(2,8,20,0)');g.addColorStop(1,'rgba(2,8,20,0.35)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,6.2832);ctx.fill();
+}
+
+let last=performance.now();
+function animLoop(now){
+  requestAnimationFrame(animLoop);
+  const dt=Math.min(50,now-last)/1000;last=now;
+  if(needRebuild){rebuild();needRebuild=false;syncLabels();}
+  if(!dragging){
+    yaw+=velY;pitch=clamp(pitch+velP,-1.45,1.45);
+    velY*=0.94;velP*=0.94;
+    if(now-lastAct>2500)yaw+=dt*0.07;
+  }
+  updRot();
+  render(now/1000);
+}
+
+// ---------- управление ----------
+const active=new Map();
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===1){dragging=true;px=e.clientX;py=e.clientY;}
+  lastAct=performance.now();});
+canvas.addEventListener('pointermove',e=>{
+  if(!active.has(e.pointerId))return;
+  active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===2){
+    const a=[...active.values()];
+    const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+    if(pinchD>0)zoom=clamp(zoom*d/pinchD,0.35,4);
+    pinchD=d;lastAct=performance.now();return;}
+  if(dragging){
+    const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;
+    const k=0.0052;
+    yaw+=dx*k;pitch=clamp(pitch+dy*k,-1.45,1.45);
+    velY=dx*k*0.6;velP=dy*k*0.6;
+    lastAct=performance.now();}});
+function endP(e){active.delete(e.pointerId);
+  if(active.size<2)pinchD=0;
+  if(active.size===1){const p=[...active.values()][0];px=p[0];py=p[1];dragging=true;}
+  else if(active.size===0)dragging=false;
+  lastAct=performance.now();}
+canvas.addEventListener('pointerup',endP);
+canvas.addEventListener('pointercancel',endP);
+canvas.addEventListener('wheel',e=>{e.preventDefault();
+  zoom=clamp(zoom*Math.exp(-e.deltaY*0.0012),0.35,4);
+  lastAct=performance.now();},{passive:false});
+
+// ---------- UI ----------
+const elC=document.getElementById('count'),elS=document.getElementById('scale');
+const elCV=document.getElementById('countVal'),elSV=document.getElementById('scaleVal');
+const elIL=document.getElementById('islVal'),elGV=document.getElementById('gapVal');
+function syncLabels(){
+  elCV.textContent=totalHexes;
+  elSV.textContent=Math.round(scaleK*100)+'%';
+  elIL.textContent=islandCount;
+  elGV.textContent=Math.round((1-scaleK)*100)+'%';}
+elC.addEventListener('input',()=>{N=+elC.value;needRebuild=true;});
+elS.addEventListener('input',()=>{scaleK=+elS.value/100;needRebuild=true;});
+
+resize();                     // инициализирует текстуру
+rebuild();syncLabels();
+requestAnimationFrame(animLoop);
+</script>
+</body>
+</html>
