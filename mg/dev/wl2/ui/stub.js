@@ -225,3 +225,26 @@
   // ---------- экспорт ----------
   window.Stub = { open, close, toggle, isOpen: () => isOpen, bind };
 })();
+
+/*
+// на любую «мёртвую» кнопку
+Stub.bind(document.querySelector("#btnShop"));
+
+// с кастомным текстом
+Stub.bind(document.querySelector("#btnMultiplayer"), {
+  title: "МУЛЬТИПЛЕЕР",
+  sub:   "СКОРО",
+  text:  ["Сетевой режим появится в следующем обновлении.",
+          "Следите за новостями."],
+  button: "ПОНЯТНО",
+});
+
+// вручную
+Stub.open({ title: "СЕКТОР", text: "Карта сектора в разработке." });
+Stub.close();
+Stub.isOpen(); // true/false
+
+// снять обработчик
+const off = Stub.bind(el);
+off();
+*/
