@@ -7,9 +7,9 @@
 ///  -  players.js отображает всех
 
 import { mulberry32, fbm } from './rng.js';
-import { MapView } from '../render/map-view.js';
+import { MapView } from '../render/r-map-view.js';
 import { Judge }   from './g-judge.js';
-import { WorldMap } from './world-map.js';
+import { WorldMap } from './world.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ

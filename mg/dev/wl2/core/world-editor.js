@@ -1,8 +1,8 @@
 // core/map-editor.js
-import { WorldMap }                from '../core/world-map.js';
-import { Cell, CellType }          from '../core/cell.js';
-import { WorldMapGeneratorConfig, WorldMapGenerator } from '../core/generator.js';
-import { MapView }                 from '../render/map-view.js';
+import { WorldMap }                from './world.js';
+import { Cell, CellType }          from './cell.js';
+import { WorldMapGeneratorConfig, WorldMapGenerator } from './generator.js';
+import { MapView }                 from '../render/r-map-view.js';
 import { GeneratorPanel }          from '../ui/generator-panel.js';
 import { UI }                      from '../ui/ui.js';
 

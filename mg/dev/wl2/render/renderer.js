@@ -19,7 +19,7 @@ export class Renderer {
     this.cameraTop = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2000);
     this.cameraTop.position.set(0, 100, 0);
     this.cameraTop.up.set(0, 0, -1);
-    this.cameraTop.lookAt(0, 0, 0);
+    this.cameraTop.lookAt(0, 0,  0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -30,12 +30,12 @@ export class Renderer {
     this.controls.dampingFactor = 0.1;
     this.controls.minPolarAngle = THREE.MathUtils.degToRad(15);
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
-    this.controls.minDistance = 4;
-    this.controls.maxDistance = 400;
-    this.controls.mouseButtons = {
-      LEFT: THREE.MOUSE.PAN,
+    this.controls.minDistance   = 4;
+    this.controls.maxDistance   = 400;
+    this.controls.mouseButtons  = {
+      LEFT  : THREE.MOUSE.PAN,
       MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.ROTATE,
+      RIGHT : THREE.MOUSE.ROTATE,
     };
 
     this.mode = 'orbit';

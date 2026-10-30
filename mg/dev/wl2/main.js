@@ -2,7 +2,7 @@
 
 import { MenuScreen            } from './ui/menu.js';
 import { AboutOverlay          } from './ui/about.js';
-import { MapEditorScreen       } from './core/map-editor.js';
+import { MapEditorScreen       } from './core/world-editor.js';
 import { PanelPlayers, Players } from './core/players.js';
 import { Game                  } from './core/g-game.js';
 

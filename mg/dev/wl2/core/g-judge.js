@@ -2,7 +2,7 @@
 /// core/g-judge.js
 import { mulberry32, fbm } from './rng.js';
 import { Players         } from './players.js';
-import { WorldMap        } from './world-map.js';
+import { WorldMap        } from './world.js';
 
 ///----------------------------------------------------------------------------|
 /// Судья знающий правила игры...

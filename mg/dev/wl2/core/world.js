@@ -279,7 +279,7 @@ export class WorldMap {
    * Детерминированно: результат зависит только от world.seed и набора городов.
    * Порядок городов в world.cities не важен.
    *
-   * @param {import('./world-map.js').WorldMap} world
+   * @param {import('./world.js').WorldMap} world
    * @param {import('./players.js').Players|import('./players.js').Player[]} players
    *        — объект Players или массив Player. Берутся только active === true.
    * @param {object} [opts]

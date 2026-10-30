@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Renderer, TILE } from './renderer.js';
 import { hash2 } from '../core/rng.js';
-import { CITY_TYPE } from '../core/world-map.js';
+import { CITY_TYPE } from '../core/world.js';
 
 export class MapView {
   constructor(world, container, players = null) {
