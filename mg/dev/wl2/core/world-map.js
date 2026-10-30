@@ -38,4 +38,8 @@ export class WorldMap {
     }
     return m;
   }
+
+  update()
+  {
+  }
 }

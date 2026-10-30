@@ -310,35 +310,3 @@ export class PanelPlayers {
     this.el.remove();
   }
 }
-
-///----------------------------------------------------------------------------|
-/// Судья знающий правила игры...
-///----------------------------------------------------------------------------:
-class Judge
-{
-    constructor(worldMap, panelPlayers)
-    {
-        this.worldMap = worldMap;
-
-        this.players = [];
-
-        this.players = panelPlayers.active();  // массив Player[]
-        this.humanCount = this.players.filter(p => p.isHuman).length;
-        this.aiCount    = this.players.length - this.humanCount;
-    }
-
-    /// ...
-}
-
-///----------------------------------------------------------------------------|
-/// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
-///----------------------------------------------------------------------------:
-class Game
-{
-    constructor(Judge)
-    {
-        // массив из 8 игроков
-    }
-
-    /// ...
-}

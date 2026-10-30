@@ -1,0 +1,52 @@
+/* ui/game.css */
+.game-screen { position: fixed; inset: 0; }
+.game-screen #app { position: absolute; inset: 0; }
+
+.game-screen #hud {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  color: #e6edf3;
+}
+.game-screen #hud > * { pointer-events: auto; }
+
+.game-screen #gameTopbar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(20,26,34,.88); padding: 8px 12px; border-radius: 10px;
+  border: 1px solid #2a3441; backdrop-filter: blur(6px); z-index: 10;
+  font-size: 13px;
+}
+.game-screen #gameTopbar .turn-label {
+  min-width: 260px; text-align: center; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.game-screen #gameTopbar .turn-label .dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+}
+
+.game-screen button {
+  background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
+  padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 12px;
+}
+.game-screen button:hover:not(:disabled) { background: #2a3a4d; }
+.game-screen button:disabled { opacity: .45; cursor: default; }
+.game-screen button.primary { background: #2e7d4f; border-color: #3fa86a; }
+.game-screen button.primary:hover:not(:disabled) { background: #369a5f; }
+.game-screen button.active { background: #2e8bff; border-color: #4aa3ff; }
+
+.game-screen #gameSidePanel {
+  position: absolute; top: 90px; left: 12px; width: 260px;
+  background: rgba(20,26,34,.92); padding: 10px 12px; border-radius: 10px;
+  border: 1px solid #2a3441; font-size: 12px; line-height: 1.5;
+}
+.game-screen #gameSidePanel h3 { margin: 0 0 6px; font-size: 13px; }
+.game-screen #gameSidePanel .muted { color: #8899a6; }
+
+.game-screen #gameLog {
+  position: absolute; bottom: 12px; right: 12px; width: 300px; max-height: 220px;
+  overflow: auto; background: rgba(20,26,34,.92); padding: 10px 12px;
+  border-radius: 10px; border: 1px solid #2a3441; font-size: 12px;
+}
+.game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
+.game-screen #gameLog div.hl { color: #ffd166; }

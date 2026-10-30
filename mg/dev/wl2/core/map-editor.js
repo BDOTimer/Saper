@@ -7,9 +7,10 @@ import { GeneratorPanel }          from '../ui/generator-panel.js';
 import { UI }                      from '../ui/ui.js';
 
 export class MapEditorScreen {
-  constructor({ parent, onExit = () => {} }) {
+  constructor({ parent, onExit = () => {}, onWorldGenerated = () => {} }) {
     this.parent = parent;
     this.onExit = onExit;
+    this.onWorldGenerated = onWorldGenerated;
 
     this.el = this._render();
     parent.appendChild(this.el);
@@ -78,6 +79,8 @@ export class MapEditorScreen {
       for (const m of gen.logs) ui.log(m);
 
       this.el.querySelector('#genBusy').style.display = 'none';
+
+      this.onWorldGenerated(this.world);/// +
 
       window.__world = this.world;
       window.__mapView = this.mapView;

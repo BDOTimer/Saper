@@ -7,7 +7,7 @@ export class WorldMapGeneratorConfig {
     this.height = 50;
     this.width  = 100;
     this.citiesCount = 40;
-    this.riversCount = 6;
+    this.riversCount =  6;
     this.water  = 0.30;
     this.forest = 0.20;
     this.plain  = 0.28;
@@ -38,7 +38,7 @@ export class WorldMapGenerator {
     this.rng = null;
     this.logs = [];
   }
-  _log(s) { this.logs.push(s); console.log('[gen]', s); }
+  _log(s) { this.logs.push(s); /* console.log('[gen]', s); */ }
 
   generate(seed = -1) {
     const cfg = this.config;
