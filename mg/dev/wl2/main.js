@@ -53,6 +53,7 @@ class App {
       return;
     }
     this._clearScreen();
+    //this.world.lowerAllFlags();
     this.screen = new Game(this.world, this.players, {
       parent: this.root,
       onExit: () => this._showMenu(),

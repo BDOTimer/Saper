@@ -36,6 +36,7 @@ export class Game {
     // карта — вся техника управления живёт в MapView
     this.mapView = new MapView(worldMap, this.el.querySelector('#app'));
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
+    this.mapView.lowerAllFlags(600); // Опустить все флаги...
 
     this.selected = null;
     this._bindUI();

@@ -17,6 +17,9 @@ export class MapView {
     this._keys = {};
     this._lastT = performance.now();
 
+    this._raisedFlags = new Set();
+    this._flagAnims = new Map();
+
     this._buildBoard();
     this._buildOverlays();
     this._buildCities();
@@ -41,6 +44,9 @@ export class MapView {
     if (this.selRing) this.selRing.visible = false;
     if (this.hoverRing) this.hoverRing.visible = false;
     this.renderer._focusAnim = null;
+
+    this._raisedFlags = new Set();
+    this._flagAnims?.clear();
 
     this._buildBoard();
     this._buildOverlays();
@@ -171,10 +177,13 @@ export class MapView {
     this.cityGroup = new THREE.Group();
     this.scene.add(this.cityGroup);
 
-    for (const city of this.world.cities) {
+    this.world.cities.forEach((city, cityIndex) => {
       const g = new THREE.Group();
       const cell = this.world.get(city.x, city.y);
       const baseY = cell ? this._worldY(cell) : 0.15;
+
+      const raisedY   = baseY + 1.40; // Флаг поднят
+      const loweredY  = baseY + 0.55;
 
       const base = new THREE.Mesh(
         new THREE.CylinderGeometry(TILE * 0.32, TILE * 0.38, 0.25, 12),
@@ -202,13 +211,16 @@ export class MapView {
         new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
         new THREE.MeshBasicMaterial({ color: 0xffd166, side: THREE.DoubleSide })
       );
-      flag.position.set(TILE * 0.25, baseY + 1.40, 0);
+      flag.position.set(TILE * 0.25, raisedY, 0);
+      flag.userData = { raisedY, loweredY, cityIndex, raised: true };
       g.add(flag);
 
       g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
-      g.userData = { type: 'city', city };
+      g.userData = { type: 'city', city, flag, cityIndex };
       this.cityGroup.add(g);
-    }
+
+      this._raisedFlags.add(cityIndex);
+    });
   }
 
   _buildRings() {
@@ -352,6 +364,7 @@ export class MapView {
       this.renderer.controls.update();
     }
 
+    this._stepFlagAnims (dt);
     this.renderer.render(dt);
   }
 
@@ -393,5 +406,95 @@ export class MapView {
     this.renderer?.domElement?.remove?.();
     this.scene?.clear?.();
     // вешатели на window остаются — если хочешь чисто, вынеси их в _unbind
+  }
+
+    setCityFlag(cityOrIndex, raised = true, duration = 600) {
+      const idx = this._resolveCityIndex(cityOrIndex);
+      if (idx < 0) return false;
+
+      const flag = this.cityGroup?.children[idx]?.userData?.flag;
+      if (!flag) return false;
+      if (flag.userData.raised === raised) return true;
+
+      const targetY = raised ? flag.userData.raisedY : flag.userData.loweredY;
+      flag.userData.raised = raised;
+      raised ? this._raisedFlags.add(idx) : this._raisedFlags.delete(idx);
+
+      if (raised) flag.visible = true;
+
+      if (duration <= 0) {
+        this._flagAnims.delete(flag);
+        flag.position.y = targetY;
+        flag.visible = raised;
+        return true;
+      }
+      
+      this._flagAnims.set(flag, {
+        fromY: flag.position.y,
+        toY: targetY,
+        t: 0,
+        dur: duration,
+        hideAtEnd: !raised,   // ⬅️ опускаем — прятать после анимации
+      });
+      return true;
     }
+
+    _resolveCityIndex(v) {
+      const cities = this.world.cities;
+      if (typeof v === 'number') return (v >= 0 && v < cities.length) ? v : -1;
+      if (!v || typeof v !== 'object') return -1;
+      const byRef = cities.indexOf(v);
+      if (byRef >= 0) return byRef;
+      return cities.findIndex(c => c.x === v.x && c.y === v.y);
+    }
+
+    _stepFlagAnims(dt) {
+      if (!this._flagAnims || this._flagAnims.size === 0) return;
+      for (const [flag, a] of this._flagAnims) {
+        a.t += dt;
+        const k = Math.min(1, a.t / a.dur);
+        const e = 1 - Math.pow(1 - k, 3);
+        flag.position.y = a.fromY + (a.toY - a.fromY) * e;
+        if (k >= 1) {
+          if (a.hideAtEnd) flag.visible = false;   // ⬅️ спрятать в конце опускания
+          this._flagAnims.delete(flag);
+        }
+      }
+    }
+
+  /**
+   * Опустить флаги у всех городов.
+   * @param {number} duration — длительность анимации в мс (0 = мгновенно)
+   * @returns {number} количество флагов, у которых состояние реально изменилось
+   */
+  lowerAllFlags(duration = 600) {
+    if (!this.cityGroup) return 0;
+    let changed = 0;
+
+    this.cityGroup.children.forEach((g, idx) => {
+      const flag = g?.userData?.flag;
+      if (!flag || flag.userData.raised === false) return; // уже опущен — пропускаем
+
+      const targetY = flag.userData.loweredY;
+      flag.userData.raised = false;
+      this._raisedFlags.delete(idx);
+      changed++;
+
+      if (duration <= 0) {
+        this._flagAnims.delete(flag);
+        flag.position.y = targetY;
+        flag.visible = false;
+        return;
+      }
+      this._flagAnims.set(flag, {
+        fromY: flag.position.y,
+        toY: targetY,
+        t: 0,
+        dur: duration,
+        hideAtEnd: true, 
+      });
+    });
+
+    return changed;
+  }
 }
