@@ -99,10 +99,7 @@ export class WorldMap {
 
   /** Назначить/снять владельца. ownerId = null — «ничей». */
   setCityOwner(cityOrCoord, ownerId) {
-    const city = this._resolveCity(cityOrCoord);
-    if (!city) return false;
-    city.ownerId = ownerId ?? null;
-    return true;
+    return this.setCityOwnerById(cityOrCoord, ownerId, { strict: false });
   }
 
   /** Все города указанного типа. */
@@ -145,8 +142,248 @@ export class WorldMap {
     return this.cities.find(c => c.name === name) || null;
   }
 
+    // ─────────────────────────────────────────────────────────────
+  //  ВЛАДЕЛЬЦЫ ГОРОДОВ
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Установить владельца города.
+   *
+   * @param {number|object|string} cityRef
+   *   - number  — индекс в this.cities
+   *   - object  — ссылка на объект города или {x, y}
+   *   - string  — имя города
+   * @param {number|string|null} ownerId  — id игрока (Player.index) или null (нейтрал)
+   * @param {object} [opts]
+   * @param {boolean} [opts.makeCapital=false] — заодно поставить type = 'capital'
+   * @param {boolean} [opts.strict=true]       — true: вернуть false, если город не найден;
+   *                                             false: молча игнорировать
+   * @returns {boolean} true, если изменение применено
+   * 
+   * 1. Назначить владельца по индексу города
+   * world.setCityOwnerById(3, 0);                    // Player.index = 0
+   * // 2. По координатам
+   * world.setCityOwnerById({ x: 10, y: 12 }, 1);
+   * // 3. По имени
+   * world.setCityOwnerById('Стольноград', 2, { makeCapital: true });
+   * 
+   */
+  setCityOwnerById(cityRef, ownerId, opts = {}) {
+    const { makeCapital = false, strict = true } = opts;
+    const city = this._resolveCityRef(cityRef);
+    if (!city) return strict ? false : true;
+
+    city.ownerId = (ownerId === undefined) ? null : ownerId;
+    if (makeCapital) city.type = CITY_TYPE.CAPITAL;
+    return true;
+  }
+
+  /**
+   * Снять владельца (сделать нейтральным). Синоним setCityOwnerById(ref, null).
+   * @returns {boolean}
+   */
+  clearCityOwner(cityRef) {
+    return this.setCityOwnerById(cityRef, null);
+  }
+
+  /**
+   * Установить владельца сразу для набора городов.
+   * Полезно после distributeTerritoriesAndCapitals, если нужно
+   * «присвоить» всю зону влияния игроку.
+   *
+   * @param {Array<number|object|string>} cityRefs
+   * @param {number|string|null} ownerId
+   * @param {object} [opts] — те же, что у setCityOwnerById
+   * @returns {number} сколько городов реально обновлено
+   */
+  setCitiesOwner(cityRefs, ownerId, opts = {}) {
+    if (!Array.isArray(cityRefs)) return 0;
+    let changed = 0;
+    for (const ref of cityRefs) {
+      if (this.setCityOwnerById(ref, ownerId, opts)) changed++;
+    }
+    return changed;
+  }
+
+  /**
+   * Все города указанного владельца.
+   * (Дублирует getCitiesByOwner, но с явной нормализацией null.)
+   */
+  getCitiesOfOwner(ownerId) {
+    const target = (ownerId === undefined) ? null : ownerId;
+    return this.cities.filter(c => (c.ownerId ?? null) === target);
+  }
+
+  /**
+   * Проверить, владеет ли игрок городом.
+   * @returns {boolean}
+   */
+  cityBelongsTo(cityRef, ownerId) {
+    const city = this._resolveCityRef(cityRef);
+    if (!city) return false;
+    return (city.ownerId ?? null) === (ownerId ?? null);
+  }
+
+  /**
+   * Снять владельцев у всех городов (все нейтральны).
+   * @param {object} [opts]
+   * @param {boolean} [opts.keepCapitals=false] — true: не трогать города с type === 'capital'
+   * @returns {number} сколько городов изменено
+   */
+  clearAllOwners(opts = {}) {
+    const { keepCapitals = false } = opts;
+    let changed = 0;
+    for (const c of this.cities) {
+      if (keepCapitals && c.type === CITY_TYPE.CAPITAL) continue;
+      if (c.ownerId !== null) {
+        c.ownerId = null;
+        changed++;
+      }
+    }
+    return changed;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Внутреннее: единый резолвер ссылки на город
+  // ─────────────────────────────────────────────────────────────
+  /**
+   * Приводит ссылку к объекту города или null.
+   * Поддерживает: number (индекс), object (ссылка или {x,y}), string (имя).
+   */
+  _resolveCityRef(ref) {
+    if (ref == null) return null;
+    if (typeof ref === 'number') {
+      return this.cities[ref] || null;
+    }
+    if (typeof ref === 'string') {
+      return this.getCityByName(ref);
+    }
+    if (typeof ref === 'object') {
+      if (this.cities.includes(ref)) return ref;
+      if ('x' in ref && 'y' in ref) return this.getCityAt(ref.x, ref.y);
+    }
+    return null;
+  }
+
   update() {
     // пока пусто
+  }
+
+  /**
+   * Разделить города на равные «территории» (зоны влияния) по числу
+   * активных игроков и выбрать по одной столице на игрока.
+   *
+   * ВАЖНО: собственность НЕ раздаётся. Все города остаются нейтральными
+   * (ownerId = null), кроме столиц — у каждой столицы ownerId = player.index.
+   *
+   * Детерминированно: результат зависит только от world.seed и набора городов.
+   * Порядок городов в world.cities не важен.
+   *
+   * @param {import('./world-map.js').WorldMap} world
+   * @param {import('./players.js').Players|import('./players.js').Player[]} players
+   *        — объект Players или массив Player. Берутся только active === true.
+   * @param {object} [opts]
+   * @param {boolean} [opts.keepTypes=false] — true: не трогать тип не-столиц
+   * @param {boolean} [opts.allowEmpty=false] — true: разрешить «лишним» игрокам
+   *        (когда городов меньше, чем игроков) остаться без столицы.
+   * @returns {{
+   *   players: Array<{
+   *     player: object,
+   *     ownerId: number,
+   *     capital: object|null,
+   *     cities: object[],   // зона влияния (включая столицу)
+   *   }>,
+   *   capitals: object[],
+   *   byOwner: Record<number, object[]>,  // зоны влияния по ownerId
+   * }}
+   */
+  static distributeTerritoriesAndCapitals(world, players, opts = {}) {
+    if (!world || !Array.isArray(world.cities) || world.cities.length === 0) {
+      return { players: [], capitals: [], byOwner: {} };
+    }
+
+    // ── 0. Активные игроки ─────────────────────────────────────────
+    const list = Array.isArray(players)
+      ? players
+      : (players?.list ?? []);
+    const active = list.filter(p => p && p.active);
+
+    if (active.length === 0) {
+      throw new Error('distributeTerritoriesAndCapitals: нет активных игроков');
+    }
+
+    const cities = world.cities;
+    const n = cities.length;
+    const playerCount = active.length;
+
+    if (n < playerCount && !opts.allowEmpty) {
+      throw new Error(
+        `distributeTerritoriesAndCapitals: городов (${n}) меньше, чем ` +
+        `активных игроков (${playerCount}). Добавь opts.allowEmpty = true, ` +
+        `если это допустимо.`
+      );
+    }
+
+    // ── 1. Детерминированный порядок городов ───────────────────────
+    const seed = (world.seed | 0);
+    const order = cities.map((c, i) => i);
+    order.sort((a, b) => {
+      const ha = hashIdx(a, seed);
+      const hb = hashIdx(b, seed);
+      if (ha !== hb) return ha - hb;
+      return a - b;
+    });
+
+    // ── 2. Равные части ────────────────────────────────────────────
+    const base = Math.floor(n / playerCount);
+    const rem  = n % playerCount;
+
+    // ── 3. Сброс собственности и типов ─────────────────────────────
+    // Все нейтральны, тип — провинциальный (если не keepTypes).
+    for (const c of cities) {
+      c.ownerId = null;
+      if (!opts.keepTypes) c.type = 'provincial';
+    }
+
+    // ── 4. Столицы и зоны влияния ──────────────────────────────────
+    const resultPlayers = [];
+    const capitals = [];
+    const byOwner = {};
+
+    let cursor = 0;
+    for (let i = 0; i < playerCount; i++) {
+      const player = active[i];
+      const ownerId = player.index;
+      const size = base + (i < rem ? 1 : 0);
+      const idxs = order.slice(cursor, cursor + size);
+      cursor += size;
+
+      const playerCities = idxs.map(idx => cities[idx]);
+
+      // Столица — первый в детерминированном порядке.
+      // Только у столицы есть владелец.
+      let capital = null;
+      if (playerCities.length > 0) {
+        capital = playerCities[0];
+        capital.type = 'capital';   // CITY_TYPE.CAPITAL
+        capital.ownerId = ownerId;  // ⬅️ владелец только у столицы
+        capitals.push(capital);
+      }
+
+      // Остальные города в зоне — нейтральны (ownerId уже null после шага 3).
+      byOwner[ownerId] = playerCities;
+      resultPlayers.push({ player, ownerId, capital, cities: playerCities });
+    }
+
+    // ── 5. Города вне зон ──────────────────────────────────────────
+    // По математике cursor === n, но на всякий случай:
+    if (cursor < n) {
+      for (let i = cursor; i < n; i++) {
+        cities[order[i]].ownerId = null;
+      }
+    }
+
+    return { players: resultPlayers, capitals, byOwner };
   }
 }
 
@@ -168,6 +405,38 @@ world.setCityType({ x: 10, y: 12 }, CITY_TYPE.CAPITAL);
 world.setCityOwner('Ironhold', 'blue');    // можно по имени? — нет, только по ref/координатам.
                                            // для «по имени» используй find:
 // world.setCityOwner(world.cities.find(c => c.name === 'Ironhold'), 'blue');
+*/
+
+/* Использование Выбора Столиц для игроков
+import { WorldMap } from './core/world-map.js';
+import { Players } from './players.js';
+
+const world = new WorldMap(50, 50, 12345);
+// ... генерация клеток и добавление городов ...
+
+const players = new Players(8);
+players.setActive(0, true);
+players.setActive(1, true);
+players.setActive(3, true);
+// players.activeCount === 3
+
+const result = WorldMap.distributeTerritoriesAndCapitals(world, players);
+
+console.log(result.players);
+// [
+//   { player: Player(0), ownerId: 0, capital: {...}, cities: [c0, c1, c2] },
+//   { player: Player(1), ownerId: 1, capital: {...}, cities: [c3, c4, c5] },
+//   { player: Player(3), ownerId: 3, capital: {...}, cities: [c6, c7, c8] },
+// ]
+
+// Столицы:
+result.capitals.forEach(c => {
+  console.log(`Игрок ${c.ownerId}: столица ${c.name} (${c.x},${c.y})`);
+});
+
+// Города по владельцу:
+result.byOwner[0]; // города игрока 0
+result.byOwner[3]; // города игрока 3
 */
 
 
@@ -373,3 +642,4 @@ const cities = names.many(10, 'city').map((name, i) => ({
   x: i * 4 + 2, y: i * 3 + 2, name,
 }));
 */
+

@@ -9,6 +9,7 @@
 import { mulberry32, fbm } from './rng.js';
 import { MapView } from '../render/map-view.js';
 import { Judge }   from './g-judge.js';
+import { WorldMap } from './world-map.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -29,12 +30,20 @@ export class Game {
 
     this.judge = new Judge(worldMap, playersModel);
 
+    this.territories = WorldMap.distributeTerritoriesAndCapitals(
+      this.worldMap,
+      this.playersModel,
+      { allowEmpty: true }
+    );
+
     // DOM
     this.el = this._render();
     this.parent.appendChild(this.el);
 
     // карта — вся техника управления живёт в MapView
-    this.mapView = new MapView(worldMap, this.el.querySelector('#app'));
+    this.mapView = new MapView(
+      worldMap, this.el.querySelector('#app'), playersModel);
+      
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
     this.mapView.lowerAllFlags(600); // Опустить все флаги...
 

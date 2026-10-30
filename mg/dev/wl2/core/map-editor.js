@@ -48,6 +48,10 @@ export class MapEditorScreen {
       btnTop.classList.add('active'); btnOrbit.classList.remove('active');
       this.mapView.setCameraMode('top');
     });
+    this.el.querySelector('#btnPlay').addEventListener('click', () => {
+      this.onWorldGenerated(this.world);   // гарантируем актуальный мир
+      this.onExit?.('play');               // ← сообщаем App, что хотим в игру
+    });
 
     // первая генерация
     this.el.querySelector('#btnGen').click();
@@ -96,6 +100,7 @@ export class MapEditorScreen {
         <div id="topbar">
           <button id="btnExit">← В меню</button>
           <button id="btnGen" class="primary">Сгенерировать</button>
+          <button id="btnPlay" class="primary">Играть</button>
           <div class="status" id="statusLabel">—</div>
           <button id="btnCamOrbit" class="active">Орбита</button>
           <button id="btnCamTop">Сверху</button>

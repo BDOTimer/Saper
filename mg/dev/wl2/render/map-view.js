@@ -2,11 +2,13 @@
 import * as THREE from 'three';
 import { Renderer, TILE } from './renderer.js';
 import { hash2 } from '../core/rng.js';
+import { CITY_TYPE } from '../core/world-map.js';
 
 export class MapView {
-  constructor(world, container) {
-    this.world = world;
+  constructor(world, container, players = null) {
+    this.world     = world;
     this.container = container;
+    this.players   = players; 
 
     this.renderer = new Renderer(container);
     this.scene = this.renderer.scene;
@@ -30,8 +32,9 @@ export class MapView {
     requestAnimationFrame((t) => this._animate(t));
   }
 
-  rebuild(world) {
-    this.world = world;
+  rebuild(world, players = this.players) {
+    this.world   = world;
+    this.players = players;
     this._disposeMesh('tileMesh');
     this._disposeMesh('pickMesh');
     this._disposeMesh('roadMesh');
@@ -207,15 +210,23 @@ export class MapView {
       roof.rotation.y = Math.PI / 4;
       g.add(roof);
 
+      const flagColor = this._ownerColor(city.ownerId);
+
       const flag = new THREE.Mesh(
         new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
-        new THREE.MeshBasicMaterial({ color: 0xffd166, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ color: flagColor, side: THREE.DoubleSide })
       );
       flag.position.set(TILE * 0.25, raisedY, 0);
       flag.userData = { raisedY, loweredY, cityIndex, raised: true };
       g.add(flag);
 
       g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
+      flag.userData = {
+        raisedY, loweredY, cityIndex, raised: true,
+        // сохраняем «текущий» ownerId, чтобы уметь детектить изменения
+        ownerId: city.ownerId ?? null,
+      };
+
       g.userData = { type: 'city', city, flag, cityIndex };
       this.cityGroup.add(g);
 
@@ -408,36 +419,42 @@ export class MapView {
     // вешатели на window остаются — если хочешь чисто, вынеси их в _unbind
   }
 
-    setCityFlag(cityOrIndex, raised = true, duration = 600) {
-      const idx = this._resolveCityIndex(cityOrIndex);
-      if (idx < 0) return false;
+  setCityFlag(cityOrIndex, raised = true, duration = 600) {
+    const idx = this._resolveCityIndex(cityOrIndex);
+    if (idx < 0) return false;
 
-      const flag = this.cityGroup?.children[idx]?.userData?.flag;
-      if (!flag) return false;
-      if (flag.userData.raised === raised) return true;
+    const group = this.cityGroup?.children[idx];
+    const flag = group?.userData?.flag;
+    if (!flag) return false;
 
-      const targetY = raised ? flag.userData.raisedY : flag.userData.loweredY;
-      flag.userData.raised = raised;
-      raised ? this._raisedFlags.add(idx) : this._raisedFlags.delete(idx);
+    // ⬅️ столицу опускать нельзя
+    const type = group.userData?.city?.type;
+    if (!raised && type === CITY_TYPE.CAPITAL) return false;
 
-      if (raised) flag.visible = true;
+    if (flag.userData.raised === raised) return true;
 
-      if (duration <= 0) {
-        this._flagAnims.delete(flag);
-        flag.position.y = targetY;
-        flag.visible = raised;
-        return true;
-      }
-      
-      this._flagAnims.set(flag, {
-        fromY: flag.position.y,
-        toY: targetY,
-        t: 0,
-        dur: duration,
-        hideAtEnd: !raised,   // ⬅️ опускаем — прятать после анимации
-      });
+    const targetY = raised ? flag.userData.raisedY : flag.userData.loweredY;
+    flag.userData.raised = raised;
+    raised ? this._raisedFlags.add(idx) : this._raisedFlags.delete(idx);
+
+    if (raised) flag.visible = true;
+
+    if (duration <= 0) {
+      this._flagAnims.delete(flag);
+      flag.position.y = targetY;
+      flag.visible = raised;
       return true;
     }
+
+    this._flagAnims.set(flag, {
+      fromY: flag.position.y,
+      toY: targetY,
+      t: 0,
+      dur: duration,
+      hideAtEnd: !raised,
+    });
+    return true;
+  }
 
     _resolveCityIndex(v) {
       const cities = this.world.cities;
@@ -473,7 +490,8 @@ export class MapView {
 
     this.cityGroup.children.forEach((g, idx) => {
       const flag = g?.userData?.flag;
-      if (!flag || flag.userData.raised === false) return; // уже опущен — пропускаем
+      if (!flag || flag.userData.raised === false) return;      // уже опущен
+      if (g.userData?.city?.type === CITY_TYPE.CAPITAL) return; // ⬅️ столицу не трогаем
 
       const targetY = flag.userData.loweredY;
       flag.userData.raised = false;
@@ -491,10 +509,33 @@ export class MapView {
         toY: targetY,
         t: 0,
         dur: duration,
-        hideAtEnd: true, 
+        hideAtEnd: true,
       });
     });
 
     return changed;
+  }
+
+  /** Палитра-фолбэк, если players не передан или у игрока нет color. */
+  static DEFAULT_OWNER_PALETTE = [
+    0x2e8bff, 0xd64545, 0x5bbf6a, 0xf0c040,
+    0xa46bff, 0x22b8cf, 0xff8c42, 0xb0b8c0,
+  ];
+
+  /** Цвет флага для ownerId (null → нейтральный). */
+  _ownerColor(ownerId) {
+    if (ownerId === null || ownerId === undefined) {
+      return 0; // 0xd9c9a3; // нейтральный (тёплый песочный)
+    }
+    // 1) взять из Players по index
+    const pl = this.players?.get?.(ownerId)
+            ?? this.players?.list?.[ownerId]
+            ?? null;
+    if (pl && typeof pl.color === 'number') return pl.color;
+
+    // 2) фолбэк по палитре
+    // const P = MapView.DEFAULT_OWNER_PALETTE;
+    // return P[ownerId % P.length];
+    return 0;
   }
 }
