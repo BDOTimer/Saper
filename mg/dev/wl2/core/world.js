@@ -1,7 +1,7 @@
 // core/world-map.js
 
 import { NAME } from './gen-name.js';
-import { NAME_STYLES, hashIdx } from './gen-name.js';
+import { NAME_STYLES, NameGenerator, hashIdx } from './gen-name.js';
 
 //-----------------------------------------------------------------------------|
 // City
@@ -537,12 +537,30 @@ export class WorldMap {
    * @param {WorldMap} world
    * @param {object|Array} players
    * @param {object} [opts]
+`  * @param {boolean} [opts.nameCities=false]  — раздать имена
+   * @param {boolean} [opts.renameAll=false]   — перезаписывать уже существующие имена
+   * @param {NameGenerator}   [opts.nameGen]   — свой генератор (иначе создаётся по seed)
+   * @param {number}   [opts.nameStartIdx=0]   — с какого индекса начинать имена`
    * @returns {{
    *   players: Array<{ player: object, ownerId: number, capital: object|null, cities: object[] }>,
    *   capitals: object[],
    *   byOwner: Record<number, object[]>,
    * }}
+   * 
+    const result = WorldMap.distributeTerritoriesAndCapitals(world, players, {
+      nameCities: true,
+      renameAll: true,
+    });
+
+    import { NameGenerator } from './gen-name.js';
+
+    const gen = new NameGenerator({ seed: 999 });
+    WorldMap.distributeTerritoriesAndCapitals(world, players, {
+      nameCities: true,
+      nameGen: gen,
+    });
    */
+
   static distributeTerritoriesAndCapitals(world, players, opts = {}) {
     if (!world || !Array.isArray(world.cities) || world.cities.length === 0) {
       return { players: [], capitals: [], byOwner: {} };
@@ -615,6 +633,27 @@ export class WorldMap {
 
       byOwner[ownerId] = playerCities;
       resultPlayers.push({ player, ownerId, capital, cities: playerCities });
+    }
+
+    // ── 4.5. Имена городам (опционально) ───────────────────────────
+    // Если явно попросили — раздаём детерминированные имена.
+    if (opts.nameCities) {
+      const gen = opts.nameGen instanceof NameGenerator
+        ? opts.nameGen
+        : new NameGenerator({ seed: world.seed });
+      const startIdx = opts.nameStartIdx | 0;
+
+      for (let k = 0; k < n; k++) {
+        const city = cities[order[k]];
+        if (city.name && !opts.renameAll) continue;
+
+        const style =
+          city.type === 'capital'   ? 'capital'   :
+          city.type === 'fortress'  ? 'fortress'  :
+          city.type === 'backwater' ? 'backwater' :
+                                      'city';
+        city.name = gen.name(startIdx + k, style);
+      }
     }
 
     // ── 5. Города вне зон ──────────────────────────────────────────

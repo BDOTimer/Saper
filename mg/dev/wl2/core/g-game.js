@@ -7,8 +7,8 @@
 ///  -  players.js отображает всех
 
 import { mulberry32, fbm } from './rng.js';
-import { MapView } from '../render/r-map-view.js';
-import { Judge }   from './g-judge.js';
+import { MapView  } from '../render/r-map-view.js';
+import { Judge    } from './g-judge.js';
 import { WorldMap } from './world.js';
 
 ///----------------------------------------------------------------------------|
@@ -141,21 +141,44 @@ export class Game {
   _onTileClick(tile) {
     this.selected = tile;
 
-    // раскрашиваем панель
     const info = this.el.querySelector('#selInfo');
     const meta = tile.meta;
     const owner = tile.ownerIndex != null
       ? this.judge.playerByIndex(tile.ownerIndex)
       : null;
+
+    // ⬅️ город на этой клетке (через WorldMap)
+    const city = this.worldMap.getCityAt(tile.x, tile.y);
+
+    const cityTypeLabel = city
+      ? ({
+          provincial: 'провинциальный',
+          capital:    'столица',
+          fortress:   'крепость',
+          backwater:  'захолустье',
+        }[city.type] ?? city.type)
+      : '';
+
+    const cityOwner = city && city.ownerId != null
+      ? this.judge.playerByIndex(city.ownerId)
+      : null;
+
+    // ⬅️ ИМЯ ГОРОДА — отдельным блоком сверху, если город есть
+    const cityBlock = city
+      ? `<div class="city-name" style="font-size:16px;font-weight:700;margin:6px 0 2px;">
+           🏙 ${city.name}
+         </div>
+         <div class="muted" style="margin-bottom:6px;">${cityTypeLabel}</div>`
+      : '';
+
     info.innerHTML = `
+      ${cityBlock}
       <div>Клетка (${tile.x}, ${tile.y})</div>
       <div>${meta.name} · stamina ${tile.staminaCost}</div>
       <div>${tile.hasRoad ? 'Дорога ' : ''}${tile.hasRiver ? 'Река' : ''}</div>
-      ${owner ? `<div>Владелец: <b>${owner.name}</b></div>` : ''}
+      ${owner ? `<div>Владелец клетки: <b>${owner.name}</b></div>` : ''}
+      ${cityOwner ? `<div>Владелец города: <b>${cityOwner.name}</b></div>` : ''}
     `;
-
-    // TODO: здесь будет логика «выбранный юнит → идти / атаковать / захватить»
-    // Пока — просто фокус камеры (это уже делает MapView._focusOnTile).
   }
 
   _clearSelection() {
