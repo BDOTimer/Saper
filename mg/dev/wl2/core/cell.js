@@ -28,12 +28,13 @@ export const OVERLAY = Object.freeze({
 export class Cell {
   constructor(x, y, type = CellType.PLAIN) {
     this.x = x; this.y = y;
-    this.type = type;
-    this.overlay = OVERLAY.NONE;   // ← число, не строка
-    this.city = -1;
-    this.meshId = -1;
-    this.texId = 0;
-    this.elevation = 0;
+    this.type      = type;
+    this.overlay   = OVERLAY.NONE;   // ← число, не строка
+    this.city      = -1;
+    this.meshId    = -1;
+    this.texId     =  0;
+    this.elevation =  0;
+    this.army      = []; // Каждая клетка имеет массив для армий.
   }
   get meta() { return TYPE_META[this.type]; }
 
