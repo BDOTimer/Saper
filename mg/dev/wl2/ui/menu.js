@@ -104,6 +104,29 @@ export class MenuScreen {
 
     card.appendChild(nav);
 
+    // Прозрачность панели
+    const opacity = document.createElement('label');
+    opacity.className = 'menu-opacity';
+
+    // const opacityLabel = document.createElement('span');
+    // opacityLabel.className = 'menu-opacity__label';
+    // opacityLabel.textContent = 'Прозрачность';
+
+    // const opacityRange = document.createElement('input');
+    // opacityRange.type = 'range';
+    // opacityRange.className = 'menu-opacity__range';
+    // opacityRange.min = '0';
+    // opacityRange.max = '100';
+    // opacityRange.step = '1';
+    // opacityRange.value = '20';
+    // opacityRange.addEventListener('input', () => {
+    //   card.style.setProperty(
+    //     '--menu-alpha', (opacityRange.value / 100).toFixed(2));
+    // });
+
+    // opacity.append(opacityLabel, opacityRange);
+    // card.appendChild(opacity);
+
     // Подпись
     const footer = document.createElement('p');
     footer.className = 'menu-footer';

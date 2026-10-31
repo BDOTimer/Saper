@@ -216,7 +216,7 @@ to {
 .menu-card {
   width: min(420px, calc(100% - 32px));
   padding: 32px 28px 24px;
-  background: rgba(20, 26, 34, .94);
+  background: rgba(20, 26, 34, var(--menu-alpha, .26)); /*прозрачность панели*/
   border: 1px solid #2a3441;
   border-radius: 14px;
   box-shadow:
@@ -234,6 +234,21 @@ to {
 /*--- Кнопки меню (выпуклые, блестящие) ----------------------------*/
 .menu-nav {
 display: flex; flex-direction: column; gap: 10px;
+}
+
+/*--- Прозрачность панели ------------------------------------------*/
+.menu-opacity {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 16px;
+  font-size: 16px;
+  letter-spacing: .08em;
+  color: #8899a6;
+}
+.menu-opacity__label { flex: 0 0 auto; }
+.menu-opacity__range {
+  flex: 1;
+  accent-color: #2e8bff;
+  cursor: pointer;
 }
 .menu-btn {
 position: relative;
