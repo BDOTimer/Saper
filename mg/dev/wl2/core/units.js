@@ -242,3 +242,177 @@ export class Army {
     };
   }
 }
+
+// ./core/units.js  (продолжение файла)
+
+/* =========================================================
+   КОЛЛЕКЦИЯ АРМИЙ ИГРОКА
+   ========================================================= */
+export const MAX_ARMIES_PER_PLAYER = 1000;
+
+export class ArmyArray {
+  /**
+   * @param {number} idOwner — владелец всех армий в контейнере
+   */
+  constructor(idOwner) {
+    this.idOwner = idOwner;
+
+    /** @type {Array<Army>} — порядок добавления (стабильный, для рендера/сети) */
+    this.armies = [];
+
+    /** @type {Map<number, Army>} — быстрый доступ по id */
+    this._byId = new Map();
+  }
+
+  /* ---------- размер / состояние ---------- */
+  get length()   { return this.armies.length; }
+  get isFull()   { return this.armies.length >= MAX_ARMIES_PER_PLAYER; }
+  get isEmpty()  { return this.armies.length === 0; }
+
+  /** Общее число живых юнитов во всех армиях */
+  get totalUnits() {
+    let n = 0;
+    for (const a of this.armies) n += a.count;
+    return n;
+  }
+
+  /** Суммарная боевая мощь всех армий */
+  get totalStrength() {
+    let s = 0;
+    for (const a of this.armies) s += a.totalStrength;
+    return s;
+  }
+
+  /* ---------- доступ ---------- */
+  has(id) { return this._byId.has(id); }
+
+  get(id) { return this._byId.get(id) ?? null; }
+
+  /** Перебор в порядке добавления */
+  [Symbol.iterator]() { return this.armies[Symbol.iterator](); }
+
+  forEach(fn) { this.armies.forEach(fn); }
+
+  map(fn) { return this.armies.map(fn); }
+
+  filter(fn) { return this.armies.filter(fn); }
+
+  /* ---------- добавление / удаление ---------- */
+  /**
+   * Добавить армию. Владелец армии и всех её юнитов приводится к idOwner.
+   * @returns {boolean} false, если достигнут лимит или id уже занят
+   */
+  add(army) {
+    if (!(army instanceof Army)) {
+      throw new TypeError('ArmyArray.add ожидает Army');
+    }
+    if (this.isFull) return false;
+    if (this._byId.has(army.id)) return false;
+
+    army.idOwner = this.idOwner;
+    for (const u of army.units) u.idOwner = this.idOwner;
+
+    this.armies.push(army);
+    this._byId.set(army.id, army);
+    return true;
+  }
+
+  /** Удалить по id (или по объекту). Возвращает удалённую армию или null. */
+  remove(idOrArmy) {
+    const id = typeof idOrArmy === 'number' ? idOrArmy : idOrArmy?.id;
+    const army = this._byId.get(id);
+    if (!army) return null;
+
+    const i = this.armies.indexOf(army);
+    if (i >= 0) this.armies.splice(i, 1);
+    this._byId.delete(id);
+    return army;
+  }
+
+  clear() {
+    this.armies.length = 0;
+    this._byId.clear();
+  }
+
+  /* ---------- поиск ---------- */
+  /** Все армии в клетке (x, y) */
+  at(x, y) {
+    return this.armies.filter(a => a.x === x && a.y === y);
+  }
+
+  /** Первая армия в клетке, либо null */
+  firstAt(x, y) {
+    for (const a of this.armies) {
+      if (a.x === x && a.y === y) return a;
+    }
+    return null;
+  }
+
+  /** Ближайшая армия к (x, y) по манхэттенскому расстоянию (для ИИ/выбора) */
+  nearestTo(x, y, filterFn = null) {
+    let best = null;
+    let bestD = Infinity;
+    for (const a of this.armies) {
+      if (filterFn && !filterFn(a)) continue;
+      const d = Math.abs(a.x - x) + Math.abs(a.y - y);
+      if (d < bestD) { bestD = d; best = a; }
+    }
+    return best;
+  }
+
+  /** Армии, содержащие хотя бы одного живого юнита */
+  aliveArmies() {
+    return this.armies.filter(a => a.alive);
+  }
+
+  /* ---------- игровой цикл ---------- */
+  /** Сброс хода всем армиям (очки движения, состояния юнитов) */
+  resetTurn() {
+    for (const a of this.armies) a.resetTurn();
+  }
+
+  /** Убрать павших юнитов во всех армиях; пустые армии — удалить */
+  purgeDead() {
+    const removed = [];
+    for (let i = this.armies.length - 1; i >= 0; i--) {
+      const a = this.armies[i];
+      a.removeDead();
+      if (!a.alive) {
+        removed.push(a);
+        this.armies.splice(i, 1);
+        this._byId.delete(a.id);
+      }
+    }
+    return removed;
+  }
+
+  /* ---------- слияние (удобно при перегруппировке) ---------- */
+  /**
+   * Слить src в dst (dst должен иметь место).
+   * Возвращает true, если src опустел и был удалён.
+   */
+  merge(srcId, dstId) {
+    if (srcId === dstId) return false;
+    const src = this._byId.get(srcId);
+    const dst = this._byId.get(dstId);
+    if (!src || !dst) return false;
+    if (src.x !== dst.x || src.y !== dst.y) return false;
+
+    for (const u of src.units.slice()) {
+      if (!dst.addUnit(u)) break;
+      src.removeUnit(u.id);
+    }
+
+    if (!src.alive) this.remove(src);
+    return true;
+  }
+
+  /* ---------- сериализация ---------- */
+  snapshot() {
+    return {
+      idOwner: this.idOwner,
+      count: this.armies.length,
+      armies: this.armies.map(a => a.snapshot()),
+    };
+  }
+}
