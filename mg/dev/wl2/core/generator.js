@@ -2,6 +2,9 @@
 import { mulberry32, fbm } from './rng.js';
 import { Cell, CellType, OVERLAY }  from './cell.js';
 
+//-----------------------------------------------------------------------------|
+// WorldMapGeneratorConfig
+//--------------------------------------------------------------------------- ⭐
 export class WorldMapGeneratorConfig {
   constructor(overrides = {}) {
     this.height = 50;
@@ -31,6 +34,9 @@ export class WorldMapGeneratorConfig {
   }
 }
 
+//-----------------------------------------------------------------------------|
+// WorldMapGenerator
+//-------------------------------------------------------------------------- ⭐
 export class WorldMapGenerator {
   constructor(worldMap, config) {
     this.world = worldMap;

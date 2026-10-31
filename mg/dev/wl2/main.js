@@ -66,15 +66,15 @@ class App {
       case 'new-game': {
         // запускаем игру: если карты ещё нет — идём в редактор
         if (!this.world)
-        {    musFon.start('calm');
+        {    this._playMusic();
              this._showMapEditor();
         }
         else this._showGame();
         break;
       }
       case 'map':
+        this._playMusic();
         this._showMapEditor();
-        musFon.start('calm');
         break;
       case 'players':
         this._showPlayers();
@@ -83,8 +83,8 @@ class App {
         Stub.open({ title: "Настройки", text: "Настройки в разработке." });
         break;
       case 'about':
+        this._playMusic();
         this._showAbout();
-        musFon.start('calm');
         break;
     }
   }
@@ -112,6 +112,12 @@ class App {
         this.playersPanel = null;
       },
     });
+  }
+
+  _playMusic()
+  {
+    // 
+    musFon.start('calm');
   }
 }
 
