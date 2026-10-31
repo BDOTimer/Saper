@@ -4,5 +4,23 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"folder-customization.folders": [
+			{
+				"path": "wl2\\core\\",
+				"badge": "💎",
+				"color": "foldercustomization.AnsiColor20"
+			},
+			{
+				"path": "wl2\\render\\",
+				"color": "foldercustomization.AnsiColor88",
+				"badge": "📙"
+			},
+			{
+				"path": "wl2\\ui\\",
+				"color": "foldercustomization.AnsiColor64",
+				"badge": "📗"
+			}
+		]
+	}
 }

@@ -3,6 +3,8 @@
 /// Экран "Главное меню."
 ///----------------------------------------------------------------------------:
 
+const VERSION = 'v-0.0.3.1';
+
 // MenuScreen (главное меню)
 //    ├── "В игру"  →   disabled
 //    ├── "Карта"   →   MapEditorScreen
@@ -35,7 +37,7 @@ const MENU_ITEMS = [
 export class MenuScreen {
   constructor(opts = {}) {
     this.onSelect = opts.onSelect ?? (() => {});
-    this.version = opts.version ?? 'v0.0.2';
+    this.version = opts.version ?? VERSION;
     this.parent = opts.parent ?? document.body;
 
     this.el = this.#render();

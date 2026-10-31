@@ -2,10 +2,11 @@
 
 /* ==========================================
    Подключение локального шрифта
+   src: url('../res/fonts/gothic-7B.ttf') format('truetype');
    ========================================== */
 @font-face {
   font-family: 'Gothic1'; /* Имя, которое вы будете использовать в коде */
-  src: url('../res/fonts/gothic-7B.ttf') format('truetype');
+  src: url('../res/fonts/gothic-2.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap; /* Показывает текст сразу, даже если шрифт ещё грузится */

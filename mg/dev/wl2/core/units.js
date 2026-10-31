@@ -54,9 +54,9 @@ export const UNIT_TYPES = {
    ========================================================= */
 export class Unit {
   /**
-   * @param {Object} opts
-   * @param {number} opts.id          — уникальный id экземпляра
-   * @param {number} opts.idOwner     — индекс игрока-владельца (из Players)
+   * @param {Object}  opts
+   * @param {number}  opts.id         — уникальный id экземпляра
+   * @param {number}  opts.idOwner    — индекс игрока-владельца (из Players)
    * @param {string} [opts.typeKey]   — ключ из UNIT_TYPES (по умолчанию LIGHT_INF)
    * @param {Object} [opts.overrides] — переопределение полей типа
    */

@@ -6,6 +6,8 @@ import { MapEditorScreen       } from './core/world-editor.js';
 import { PanelPlayers, Players } from './core/players.js';
 import { Game                  } from './core/g-game.js';
 
+import { musFon } from "./res/snd/--mus-fon.js";
+
 class App {
   constructor(root) {
     this.root    = root;
@@ -28,7 +30,6 @@ class App {
   _showMenu() {
     this._clearScreen();
     this.screen = new MenuScreen({
-      version: 'v0.0.3',
       parent: this.root,
       onSelect: (id) => this._onMenuSelect(id),
     });
@@ -65,13 +66,15 @@ class App {
       case 'new-game': {
         // запускаем игру: если карты ещё нет — идём в редактор
         if (!this.world)
-        {    this._showMapEditor();
+        {    musFon.start('calm');
+             this._showMapEditor();
         }
         else this._showGame();
         break;
       }
       case 'map':
         this._showMapEditor();
+        musFon.start('calm');
         break;
       case 'players':
         this._showPlayers();
@@ -81,6 +84,7 @@ class App {
         break;
       case 'about':
         this._showAbout();
+        musFon.start('calm');
         break;
     }
   }
