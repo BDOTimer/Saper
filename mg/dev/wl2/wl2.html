@@ -42,21 +42,23 @@
 
   <!--
   https://github.com/mrdoob/three.js/releases#release-r182
-  "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
-  "three": "./_libs/161/three.module.min.js",
   -->
 
+  <!-- <script type="importmap">
+  { "imports": {
+      "three": "./_libs/182/three.module.min.js",
+      "three/addons/": "https://unpkg.com/three@0.182.0/examples/jsm/"
+    }
+  }
+  </script> -->
+
   <script type="importmap">
-  {
-    "imports": {
-      "three":         "./_libs/182/three.module.min.js",
+  { "imports": {
+      "three": "https://unpkg.com/three@0.182.0/build/three.module.min.js",
       "three/addons/": "https://unpkg.com/three@0.182.0/examples/jsm/"
     }
   }
   </script>
-  <!--
-  <script type="module" src="./res/snd/--mus-fon.js.js"></script>
-  -->
   <script src="./ui/stub.js"></script>
   <script type="module" src="./main.js"></script>
   <script type="module">
