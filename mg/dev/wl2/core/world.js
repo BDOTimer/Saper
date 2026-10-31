@@ -537,28 +537,17 @@ export class WorldMap {
    * @param {WorldMap} world
    * @param {object|Array} players
    * @param {object} [opts]
-`  * @param {boolean} [opts.nameCities=false]  — раздать имена
+   * @param {boolean} [opts.keepTypes=false]
+   * @param {boolean} [opts.allowEmpty=false]
+   * @param {boolean} [opts.nameCities=false]  — раздать имена
    * @param {boolean} [opts.renameAll=false]   — перезаписывать уже существующие имена
-   * @param {NameGenerator}   [opts.nameGen]   — свой генератор (иначе создаётся по seed)
-   * @param {number}   [opts.nameStartIdx=0]   — с какого индекса начинать имена`
+   * @param {NameGenerator} [opts.nameGen]     — свой генератор (иначе создаётся по seed)
+   * @param {number} [opts.nameStartIdx=0]     — с какого индекса начинать имена
    * @returns {{
    *   players: Array<{ player: object, ownerId: number, capital: object|null, cities: object[] }>,
    *   capitals: object[],
    *   byOwner: Record<number, object[]>,
    * }}
-   * 
-    const result = WorldMap.distributeTerritoriesAndCapitals(world, players, {
-      nameCities: true,
-      renameAll: true,
-    });
-
-    import { NameGenerator } from './gen-name.js';
-
-    const gen = new NameGenerator({ seed: 999 });
-    WorldMap.distributeTerritoriesAndCapitals(world, players, {
-      nameCities: true,
-      nameGen: gen,
-    });
    */
 
   static distributeTerritoriesAndCapitals(world, players, opts = {}) {

@@ -33,7 +33,7 @@ export class Game {
     this.territories = WorldMap.distributeTerritoriesAndCapitals(
       this.worldMap,
       this.playersModel,
-      { allowEmpty: true }
+      { allowEmpty: true, nameCities: true, renameAll: true }
     );
 
     // DOM
