@@ -523,7 +523,7 @@ export class WorldMap {
     return this.cityList._resolveRef(ref);
   }
 
-  update() {
+  update(dt) {
     // пока пусто
   }
 
