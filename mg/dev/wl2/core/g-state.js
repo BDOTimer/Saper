@@ -15,6 +15,9 @@ export class GameState {
     this.phase   = 'idle';          // idle|map|game|gameover
     this.flags   = {};
     this.meta    = {};
+
+    this._turnTimer = 0;
+    this._TURN_INTERVAL = 0.5; // полсекунды
   }
   get currentPlayer() {
     return this.players?.active()[this.currentPlayerIndex] ?? null;
@@ -34,6 +37,87 @@ export class GameState {
   reset(opts = {}) { this._init(opts); this._emit(); }   // вместо new GameState
   toJSON() { /* снимок без _listeners */ }
   fromJSON(d) { /* Object.assign + _emit */ }
+
+  getTick(dt)
+  {
+    if (this._turnTimer >= this._TURN_INTERVAL) {
+        this._turnTimer -= this._TURN_INTERVAL;
+        return true;
+    }
+    return false;
+  }
 }
 
 export const STATE = new GameState();
+
+/**
+ * Таймер для периодических событий (например, авто-завершение хода каждые 0.5 сек)
+ */
+export class TurnTimer {
+
+  #isTick = false;
+
+  constructor(intervalSeconds = 0.5) {
+    this._accumulator = 0;
+    this._interval = intervalSeconds;
+    this._isPaused = false;
+  }
+
+  /**
+   * Обновляет таймер прошедшим временем (deltaTime).
+   * Возвращает true, если интервал истёк и нужно выполнить действие.
+   */
+  update(dt) {
+    if (this._isPaused || dt <= 0) return false;
+
+    this._accumulator += dt;
+
+    // Проверяем, сколько полных интервалов прошло (защита от накопления ошибок)
+    const ticks = Math.floor(this._accumulator / this._interval);
+    
+    if (ticks > 0) {
+      // Вычитаем только полные прошедшие интервалы
+      this._accumulator -= ticks * this._interval;
+      this.#isTick = true;
+    }
+    this.#isTick = false;
+  }
+
+  get isTick() { return this.#isTick ; }
+  clearIsTick(){ this.#isTick = false; }
+
+  get interval() {
+    return this._interval;
+  }
+
+  set interval(seconds) {
+    if (seconds <= 0) {
+      throw new Error('Интервал должен быть больше 0');
+    }
+    this._interval = seconds;
+    // При смене интервала можно сбросить аккумулятор, чтобы не было резких скачков
+    this._accumulator = 0;
+  }
+
+  get isPaused() {
+    return this._isPaused;
+  }
+
+  set isPaused(value) {
+    this._isPaused = Boolean(value);
+  }
+
+  reset() {
+    this._accumulator = 0;
+  }
+
+  stop() {
+    this._isPaused = true;
+    this._accumulator = 0;
+  }
+}
+
+export const TICK = new TurnTimer();
+
+
+

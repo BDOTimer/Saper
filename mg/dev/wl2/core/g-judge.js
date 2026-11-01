@@ -3,7 +3,7 @@
 import { mulberry32, fbm } from './rng.js';
 import { Players         } from './players.js';
 import { WorldMap        } from './world.js';
-import { STATE           } from './g-state.js';
+import { STATE, TICK     } from './g-state.js';
 
 ///----------------------------------------------------------------------------|
 /// Судья знающий правила игры...
@@ -37,4 +37,16 @@ export class Judge {
 
   /** Найти Player по индексу */
   playerByIndex(i) { return this._byIndex.get(i) ?? null; }
+  playerGo     (i) { playerByIndex(i).isTurn = true; };
+
+  update(dt) {
+    
+    const player = currentPlayer();
+
+    if(player.isTurn)
+    {   const nextId = this.endTurn();
+        this.playerGo(nextId);
+    }
+
+  }
 }

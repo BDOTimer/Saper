@@ -17,6 +17,8 @@
 ///   gameLoop.setScreen(game);   // при старте партии
 ///   gameLoop.setScreen(null);   // при выходе в меню
 
+import { TICK } from './g-state.js';
+
 const MAX_DT = 100; // мс — потолок, чтобы не прыгать после сворачивания вкладки
 
 export class GameLoop {
@@ -81,6 +83,8 @@ export class GameLoop {
   _tick(t) {
     if (!this._running) return;
 
+    TICK.update(t);
+
     // планируем следующий кадр сразу — чтобы ошибка в update/render не убила цикл
     this._rafId = requestAnimationFrame(this._tick);
 
@@ -104,6 +108,8 @@ export class GameLoop {
       try { s.render(dt); }
       catch (e) { console.error('[GameLoop] render():', e); }
     }
+
+    TICK.clearIsTick();
   }
 }
 

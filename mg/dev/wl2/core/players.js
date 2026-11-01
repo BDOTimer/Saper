@@ -40,6 +40,9 @@ export const HUMAN = -1;
    Player
    ========================================================= */
 export class Player {
+
+    #isTurn = false; // Игрок в процессе хода?
+
   constructor(index, overrides = {}) {
     this.index = index;
     this.name = overrides.name ?? `Игрок ${index + 1}`;
@@ -48,9 +51,11 @@ export class Player {
     this.color = overrides.color ?? defaultColor(index);
   }
 
+  set isTurn (b){        this.#isTurn = b; }
+  get isTurn () { return this.#isTurn; }
   get isHuman() { return this.aiLevel === HUMAN; }
-  get isAI()    { return this.aiLevel !== HUMAN; }
-  get aiMeta()  { return this.isHuman ? null : AI_LEVELS[this.aiLevel]; }
+  get isAI   () { return this.aiLevel !== HUMAN; }
+  get aiMeta () { return this.isHuman ? null : AI_LEVELS[this.aiLevel]; }
 
   /** Публичный снимок для Judge */
   snapshot() {

@@ -7,10 +7,10 @@
 ///  -  players.js отображает всех
 
 import { mulberry32, fbm } from './rng.js';
-import { MapView  } from '../render/r-map-view.js';
-import { Judge    } from './g-judge.js';
-import { WorldMap } from './world.js';
-import { STATE    } from './g-state.js';
+import { MapView     } from '../render/r-map-view.js';
+import { Judge       } from './g-judge.js';
+import { WorldMap    } from './world.js';
+import { STATE, TICK } from './g-state.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -224,10 +224,12 @@ export class Game {
   // Обновление Логики.        |
   //---------------------------:
   update(dt) {
-    // пусто — сюда придёт:
-    //  - тик таймера «ИИ думает»
-    //  - движение юнитов
-    //  - любые игровые таймеры
+
+    if(TICK.isTick)
+    {
+      this.judge.update(dt);
+    }
+    
   }
 
   //---------------------------|

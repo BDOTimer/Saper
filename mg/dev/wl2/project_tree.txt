@@ -9,10 +9,10 @@
 │ 
 ├── core/
 │   ├── cell.js
-│   ├── g-game.js             /// 2
-│   ├── g-judge.js
-│   ├── g-loop.js             /// 1
-│   ├── g-state.js
+│   ├── g-game.js             /// 3: Тут логика игры ...
+│   ├── g-judge.js            /// 4: Тут судья применяет правила игры ...
+│   ├── g-loop.js             /// 1: Тут крутится вся игра ...
+│   ├── g-state.js            /// 0: Тут глобальное состояние ...
 │   ├── gen-name.js
 │   ├── generator.js
 │   ├── players.js
@@ -26,7 +26,7 @@
 │   ├── hud.css
 │   └── style-base.css
 ├── render/
-│   ├── r-map-view.js         /// 3
+│   ├── r-map-view.js         /// 2: Тут визуал игры ...
 │   ├── r-units-view.js
 │   └── renderer.js
 ├── res/
