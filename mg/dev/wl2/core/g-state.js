@@ -16,8 +16,7 @@ export class GameState {
     this.flags   = {};
     this.meta    = {};
 
-    this._turnTimer = 0;
-    this._TURN_INTERVAL = 0.5; // полсекунды
+    this.isTurnCircle = true; // Конец ходов круга.
   }
   get currentPlayer() {
     return this.players?.active()[this.currentPlayerIndex] ?? null;
@@ -38,14 +37,7 @@ export class GameState {
   toJSON() { /* снимок без _listeners */ }
   fromJSON(d) { /* Object.assign + _emit */ }
 
-  getTick(dt)
-  {
-    if (this._turnTimer >= this._TURN_INTERVAL) {
-        this._turnTimer -= this._TURN_INTERVAL;
-        return true;
-    }
-    return false;
-  }
+
 }
 
 export const STATE = new GameState();

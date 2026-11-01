@@ -49,6 +49,62 @@ export class Player {
     this.active = overrides.active ?? (index < 2);  // первые два по умолчанию в игре
     this.aiLevel = overrides.aiLevel ?? 2;          // по умолчанию «Рыцарь»
     this.color = overrides.color ?? defaultColor(index);
+
+    this.army = [];
+  }
+
+  /**
+   * Добавить армию.
+   * Гарантирует уникальность по ID и сохраняет порядок.
+   */
+  addArmy(army) {
+    if (!army || typeof army.id === 'undefined') {
+      throw new Error('Армия должна иметь уникальный id');
+    }
+
+    // Если уже есть — можно либо игнорировать, либо обновить (выбери нужное)
+    if (this._armyMap.has(army.id)) {
+      // Вариант 1: просто игнорируем дубликат
+      return; 
+      
+      // Вариант 2 (раскомментируй, если нужно заменять):
+      // const existingIndex = this.army.findIndex(a => a.id === army.id);
+      // if (existingIndex >= 0) this.army[existingIndex] = army;
+      // else this.army.push(army);
+      // this._armyMap.set(army.id, army);
+      // return;
+    }
+
+    this.army.push(army);
+    this._armyMap.set(army.id, army);
+  }
+
+  /**
+   * Удалить армию.
+   * Работает по ссылке или по ID — удобно, если объект армии изменился.
+   */
+  delArmy(army) {
+    let id;
+
+    if (typeof army === 'object' && typeof army.id !== 'undefined') {
+      id = army.id;
+    } else if (typeof army === 'string' || typeof army === 'number') {
+      id = army;
+    } else {
+      throw new Error('delArmy ожидает армию или её id');
+    }
+
+    const existing = this._armyMap.get(id);
+    if (!existing) return; // Армии нет — ничего не делаем
+
+    // Удаляем из массива (сохраняем порядок остальных)
+    const index = this.army.indexOf(existing);
+    if (index >= 0) {
+      this.army.splice(index, 1);
+    }
+
+    // Удаляем из карты
+    this._armyMap.delete(id);
   }
 
   set isTurn (b){        this.#isTurn = b; }

@@ -49,6 +49,8 @@ export const UNIT_TYPES = {
   HERO:        { id: 11, name: 'Герой', strength: 3, move: 5, cost: 100, build: 0, isHero: true },
 };
 
+let IdCountUnit = 0;
+
 /* =========================================================
    ЮНИТ
    ========================================================= */
@@ -82,6 +84,12 @@ export class Unit {
 
     // движение в этом ходу
     this.moveLeft = this.move;
+  }
+
+  /* ---------- спавн ---------- */
+  static spawn(idOwner, x, y, typeKey)
+  { const id = IdCountUnit++;
+    return new Army(id, idOwner, units);
   }
 
   get alive() { return this.hp > 0; }
@@ -124,6 +132,8 @@ export class Unit {
    ========================================================= */
 export const MAX_ARMY_SIZE = 20;
 
+let IdCountArmy = 0;
+
 export class Army {
   /**
    * @param {Object} opts
@@ -143,6 +153,12 @@ export class Army {
     this.units = units.slice(0, MAX_ARMY_SIZE);
     // выставляем владельца всем юнитам
     for (const u of this.units) u.idOwner = idOwner;
+  }
+
+  /* ---------- спавн ---------- */
+  static spawn(idOwner, x, y, units = [])
+  { const id = IdCountArmy++;
+    return new Army(id, idOwner, units);
   }
 
   /* ---------- состояние ---------- */
