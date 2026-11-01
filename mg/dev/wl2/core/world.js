@@ -1,6 +1,7 @@
 // core/world-map.js
 
-import { NAME } from './gen-name.js';
+import { STATE } from './g-state.js';
+import { NAME  } from './gen-name.js';
 import { NAME_STYLES, NameGenerator, hashIdx } from './gen-name.js';
 
 //-----------------------------------------------------------------------------|

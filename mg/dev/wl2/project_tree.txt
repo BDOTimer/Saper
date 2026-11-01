@@ -1,0 +1,42 @@
+📁 wl2/ (фильтр: .js, .css)
+==================================================
+📊 Статистика: 31 файлов, 12 папок
+==================================================
+├── !/
+├── libs/
+│   ├── ...
+│   ...
+│ 
+├── core/
+│   ├── cell.js
+│   ├── g-game.js
+│   ├── g-judge.js
+│   ├── g-state.js
+│   ├── gen-name.js
+│   ├── generator.js
+│   ├── players.js
+│   ├── rng.js
+│   ├── units.js
+│   ├── world-editor.js
+│   └── world.js
+├── css/
+│   ├── about.css
+│   ├── game.css
+│   ├── hud.css
+│   └── style-base.css
+├── render/
+│   ├── r-map-view.js
+│   ├── r-units-view.js
+│   └── renderer.js
+├── res/
+│   ├── fonts/
+│   ├── img/
+│   └── snd/
+│       └── --mus-fon.js
+├── ui/
+│   ├── about.js
+│   ├── generator-panel.js
+│   ├── menu.js
+│   ├── stub.js
+│   └── ui.js
+└── main.js

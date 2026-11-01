@@ -1,8 +1,8 @@
 // g-state.js
-// import { state } from '../core/g-state.js';
+// import { STATE } from '../core/g-state.js';
 
 export class GameState {
-  constructor(opts = {}) {
+  constructor(opts  = {}) {
     this._listeners = new Set();
     this._init(opts);
   }
@@ -36,4 +36,4 @@ export class GameState {
   fromJSON(d) { /* Object.assign + _emit */ }
 }
 
-export const state = new GameState();
+export const STATE = new GameState();

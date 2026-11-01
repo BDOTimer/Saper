@@ -10,6 +10,7 @@ import { mulberry32, fbm } from './rng.js';
 import { MapView  } from '../render/r-map-view.js';
 import { Judge    } from './g-judge.js';
 import { WorldMap } from './world.js';
+import { STATE    } from './g-state.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ

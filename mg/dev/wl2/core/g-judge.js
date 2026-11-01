@@ -3,6 +3,7 @@
 import { mulberry32, fbm } from './rng.js';
 import { Players         } from './players.js';
 import { WorldMap        } from './world.js';
+import { STATE           } from './g-state.js';
 
 ///----------------------------------------------------------------------------|
 /// Судья знающий правила игры...

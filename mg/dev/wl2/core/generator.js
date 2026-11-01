@@ -1,6 +1,7 @@
 // core/generator.js
 import { mulberry32, fbm } from './rng.js';
 import { Cell, CellType, OVERLAY }  from './cell.js';
+import { STATE } from './g-state.js';
 
 //-----------------------------------------------------------------------------|
 // WorldMapGeneratorConfig
