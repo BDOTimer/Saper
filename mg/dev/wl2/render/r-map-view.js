@@ -17,7 +17,6 @@ export class MapView {
     this._mouse = new THREE.Vector2();
     this._onTileClick = null;
     this._keys = {};
-    this._lastT = performance.now();
 
     this._raisedFlags = new Set();
     this._flagAnims = new Map();
@@ -28,8 +27,6 @@ export class MapView {
     this._buildRings();
     this._bindEvents();
     this.renderer.onResize(this.world.w, this.world.h);
-
-    requestAnimationFrame((t) => this._animate(t));
   }
 
   rebuild(world, players = this.players) {
@@ -347,20 +344,13 @@ export class MapView {
     this._onTileClick?.(tile);
   }
 
-  _animate(t) {
-    requestAnimationFrame((tt) => this._animate(tt));
-    const dt = Math.max(0, t - this._lastT);
-    this._lastT = t;
-
+  update(dt) {
     if (this.renderer.mode === 'top') {
       const cam = this.renderer.cameraTop;
-      // если идёт анимация фокуса — WASD не мешаем ей
       if (!this.renderer._focusAnim) {
         const speed = 0.6 * (cam.right - cam.left) * 0.02;
         let dx = 0, dz = 0;
-
         const a = this._mapBounds();
-
         if (this._keys['KeyW'] && cam.position.z > a.minZ) dz -= speed;
         if (this._keys['KeyS'] && cam.position.z < a.maxZ) dz += speed;
         if (this._keys['KeyA'] && cam.position.x > a.minX) dx -= speed;
@@ -375,7 +365,10 @@ export class MapView {
       this.renderer.controls.update();
     }
 
-    this._stepFlagAnims (dt);
+    this._stepFlagAnims(dt);
+  }
+
+  render(dt) {
     this.renderer.render(dt);
   }
 

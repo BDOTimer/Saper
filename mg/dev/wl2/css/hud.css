@@ -55,3 +55,93 @@
   background: rgba(0,0,0,.55); align-items: center; justify-content: center;
   z-index: 100; pointer-events: none; font-size: 16px; color: #ffd166;
 }
+
+/* ---- game screen ---- */
+.game-screen { position: fixed; inset: 0; }
+.game-screen #app { position: absolute; inset: 0; }
+
+.game-screen #hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.game-screen #hud > * { pointer-events: auto; }
+
+/* ТОПБАР — на всю ширину, прибит к верху */
+.game-screen #gameTopbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;              /* ← ключ: left:0 + right:0 = вся ширина */
+  width: 100%; 
+  box-sizing: border-box;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 0;             /* ← сбрасываем любые внешние отступы */
+  background: rgba(20, 26, 34, .88);
+  border-bottom: 1px solid #2a3441;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+}
+
+/* Левый край — «В меню», центр — turn-label, правая группа — кнопки */
+.game-screen #gameTopbar .turn-label {
+  flex: 1 1 auto;
+  text-align: center;
+  font-weight: 600;
+}
+.game-screen #gameTopbar .turn-label .dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Кнопки — тот же стиль, что в редакторе */
+.game-screen button {
+  background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
+  padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 16px;
+}
+.game-screen button:hover:not(:disabled) { background: #2a3a4d; }
+.game-screen button:disabled { opacity: .45; cursor: default; }
+.game-screen button.primary { background: #2e7d4f; border-color: #3fa86a; }
+.game-screen button.primary:hover:not(:disabled) { background: #369a5f; }
+.game-screen button.active { background: #2e8bff; border-color: #4aa3ff; }
+
+/* Боковая панель — слева, под топбаром */
+.game-screen #gameSidePanel {
+  position: absolute;
+  top: 56px;               /* высота топбара + отступ */
+  left: 12px;
+  min-width: 240px;
+  max-width: 340px;
+  background: rgba(20, 26, 34, .92);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a3441;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.game-screen #gameSidePanel h3 { margin: 0 0 6px; font-size: 16px; }
+.game-screen #gameSidePanel .muted { color: #8899a6; }
+.game-screen #gameSidePanel .city-name { color: #ffd166; }
+
+/* Лог — справа снизу, как в редакторе */
+.game-screen #gameLog {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 280px;
+  max-height: 200px;
+  overflow: auto;
+  background: rgba(20, 26, 34, .92);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #2a3441;
+  font-size: 16px;
+}
+.game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
+.game-screen #gameLog div.hl { color: #ffd166; }

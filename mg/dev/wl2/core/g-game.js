@@ -18,14 +18,16 @@ import { STATE    } from './g-state.js';
 export class Game {
   /**
    * @param {WorldMap} worldMap
-   * @param {Players}  playersModel  — модель с составом (после PanelPlayers.onConfirm)
-   * @param {Object}   [opts]
+   * @param {Players } playersModel  — модель с составом (после PanelPlayers.onConfirm)
+   * @param {Object  }    [opts]
    * @param {HTMLElement} [opts.parent]  — куда монтировать
-   * @param {Function}    [opts.onExit]  — выход в меню
+   * @param {Function   } [opts.onExit]  — выход в меню
    */
   constructor(worldMap, playersModel, opts = {}) {
-    this.worldMap = worldMap;
+
+    this.worldMap     = worldMap;
     this.playersModel = playersModel;
+
     this.parent = opts.parent ?? document.body;
     this.onExit = opts.onExit ?? (() => {});
 
@@ -51,7 +53,8 @@ export class Game {
     this.selected = null;
     this._bindUI();
     this._refreshHud();
-    this._log(`Партия начата. Игроков: ${this.judge.players.length}. Ход ${this.judge.turn}.`);
+    this._log(
+`Партия начата. Игроков: ${this.judge.players.length}. Ход ${this.judge.turn}.`);
 
     // первая камера
     this.mapView.setCameraMode('orbit');
@@ -64,17 +67,18 @@ export class Game {
     root.innerHTML = `
       <div id="app"></div>
       <div id="hud">
+
+        <div id="gameSidePanel">
+          <h3>Выбрано</h3>
+          <div class="muted" id="selInfo">Кликни по клетке</div>
+        </div>
+
         <div id="gameTopbar">
           <button id="btnExitGame">← В меню</button>
           <div class="turn-label" id="turnLabel">—</div>
           <button id="btnEndTurn" class="primary">Завершить ход</button>
           <button id="btnCamOrbit" class="active">Орбита</button>
           <button id="btnCamTop">Сверху</button>
-        </div>
-
-        <div id="gameSidePanel">
-          <h3>Выбрано</h3>
-          <div class="muted" id="selInfo">Кликни по клетке</div>
         </div>
 
         <div id="gameLog"></div>
@@ -216,10 +220,35 @@ export class Game {
     }, 600);
   }
 
+  //---------------------------|
+  // Обновление Логики.        |
+  //---------------------------:
+  update(dt) {
+    // пусто — сюда придёт:
+    //  - тик таймера «ИИ думает»
+    //  - движение юнитов
+    //  - любые игровые таймеры
+  }
+
+  //---------------------------|
+  // Визуализация.             |
+  //---------------------------:
+  render(dt) {
+    // пусто — сюда придёт:
+    //  - this.mapView.update(dt)
+    //  - this.mapView.render(dt)
+    // (пока MapView крутит свой rAF — оставь пусто, см. ниже)
+    this.mapView.update(dt);
+    this.mapView.render(dt);
+  }
+
   /* ---------------- API ---------------- */
   destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
     window.removeEventListener('keydown', this._onKey);
     this.mapView?.destroy?.();
     this.el.remove();
   }
+
 }

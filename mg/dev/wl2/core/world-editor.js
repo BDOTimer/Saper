@@ -138,6 +138,15 @@ export class MapEditorScreen {
     return root;
   }
 
+  update(dt) {
+    // логика редактора во времени пока не нужна — пусто
+  }
+
+  render(dt) {
+    this.mapView.update(dt);
+    this.mapView.render(dt);
+  }
+
   destroy() {
     this.panel?.destroy?.();
     this.mapView?.destroy?.();

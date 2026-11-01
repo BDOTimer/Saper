@@ -9,8 +9,9 @@
 │ 
 ├── core/
 │   ├── cell.js
-│   ├── g-game.js
+│   ├── g-game.js             /// 1
 │   ├── g-judge.js
+│   ├── g-loop.js
 │   ├── g-state.js
 │   ├── gen-name.js
 │   ├── generator.js

@@ -5,6 +5,8 @@ import { AboutOverlay          } from './ui/about.js';
 import { MapEditorScreen       } from './core/world-editor.js';
 import { PanelPlayers, Players } from './core/players.js';
 import { Game                  } from './core/g-game.js';
+import { gameLoop              } from './core/g-loop.js';
+
 
 import { musFon } from "./res/snd/--mus-fon.js";
 
@@ -22,7 +24,7 @@ class App {
   }
 
   _clearScreen() {
-    if (this.screen?.destroy) this.screen.destroy();
+    gameLoop.setScreen(null);
     this.screen = null;
     this.root.replaceChildren();
   }
@@ -45,20 +47,20 @@ class App {
       },
       onWorldGenerated: (world) => { this.world = world; },
     });
+    gameLoop.setScreen(this.screen);
+    gameLoop.start();
   }
 
   _showGame() {
-    if (!this.world) {
-      // нет карты — отправим в редактор
-      this._showMapEditor();
-      return;
-    }
+    if (!this.world) { this._showMapEditor(); return; }
+
     this._clearScreen();
-    //this.world.lowerAllFlags();
     this.screen = new Game(this.world, this.players, {
       parent: this.root,
       onExit: () => this._showMenu(),
     });
+    gameLoop.setScreen(this.screen);
+    gameLoop.start();
   }
 
   _onMenuSelect(id) {
