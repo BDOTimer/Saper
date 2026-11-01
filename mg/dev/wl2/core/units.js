@@ -87,9 +87,9 @@ export class Unit {
   }
 
   /* ---------- спавн ---------- */
-  static spawn(idOwner, x, y, typeKey)
+  static spawn(idOwner, typeKey = 'LIGHT_INF')
   { const id = IdCountUnit++;
-    return new Army(id, idOwner, units);
+    return new Unit({ id, idOwner, typeKey });
   }
 
   get alive() { return this.hp > 0; }
@@ -158,7 +158,7 @@ export class Army {
   /* ---------- спавн ---------- */
   static spawn(idOwner, x, y, units = [])
   { const id = IdCountArmy++;
-    return new Army(id, idOwner, units);
+    return new Army({ id, idOwner, x, y, units });
   }
 
   /* ---------- состояние ---------- */

@@ -31,13 +31,13 @@ export class Game {
     this.parent = opts.parent ?? document.body;
     this.onExit = opts.onExit ?? (() => {});
 
-    this.judge = new Judge(worldMap, playersModel);
-
     this.territories = WorldMap.distributeTerritoriesAndCapitals(
       this.worldMap,
       this.playersModel,
       { allowEmpty: true, nameCities: true, renameAll: true }
     );
+
+    this.judge = new Judge(worldMap, playersModel);
 
     // DOM
     this.el = this._render();

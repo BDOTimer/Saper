@@ -51,6 +51,7 @@ export class Player {
     this.color = overrides.color ?? defaultColor(index);
 
     this.army = [];
+    this._armyMap = new Map();
   }
 
   /**

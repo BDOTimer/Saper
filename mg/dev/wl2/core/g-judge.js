@@ -25,7 +25,7 @@ export class Judge {
 
     this.turn = 1;
 
-    _citiesStart();
+    this._citiesStart();
   }
 
   get currentPlayer() { return this.players[this.currentIndex] ?? null; }
@@ -69,11 +69,24 @@ export class Judge {
   _citiesStart()
   {
     const cities = this.world.cities;
-    const player = currentPlayer();
 
-    const army = Army.spawn(player.index,  0, 0,);
-    const unit = Army.spawn(player.index, 'HERO');
+    for (const city of cities) {
+      if (city.type !== 'capital') continue;
+      if (city.ownerId == null)    continue;
 
-    /// TODO: ...
+      const owner = this.playerByIndex(city.ownerId);
+      if ( !owner ) continue;
+      
+      const army = this._createHero(city, owner);
+
+      owner.addArmy(army);
+    }
+  }
+
+  _createHero(city, owner)
+  {   const hero  = Unit.spawn(owner.index, 'HERO');
+      const army  = Army.spawn(owner.index, city.x, city.y, [hero]);
+      console.log("🔍 ", city.name, ": Была создана армия с героем ...")
+      return army;
   }
 }
