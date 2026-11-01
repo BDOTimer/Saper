@@ -116,21 +116,19 @@ export class Game {
     window.addEventListener('keydown', this._onKey);
   }
 
-  _refreshHud() {
-    const j = this.judge;
-    const p = j.currentPlayer;
-    if (!p) return;
-    const role = p.isHuman ? 'Человек' : `ИИ (${p.aiMeta?.name ?? '—'})`;
-    const color = '#' + p.color.toString(16).padStart(6, '0');
+_refreshHud() {
+  const j = this.judge;
+  const p = j.currentPlayer;
+  if (!p) return;
+  const role = p.isHuman ? 'Человек' : `ИИ (${p.aiMeta?.name ?? '—'})`;
 
-    this.el.querySelector('#turnLabel').innerHTML =
-      `<span class="dot" style="background:${color}"></span>
-       Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}`;
+  this.el.querySelector('#turnLabel').innerHTML =
+    `${this._playerDot(p, 10)}
+     Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}`;
 
-    // кнопка «Завершить ход» активна только на ходу человека
-    const btn = this.el.querySelector('#btnEndTurn');
-    btn.disabled = !p.isHuman;
-  }
+  const btn = this.el.querySelector('#btnEndTurn');
+  btn.disabled = !p.isHuman;
+}
 
   _log(msg, hl = false) {
     const box = this.el.querySelector('#gameLog');
@@ -152,7 +150,6 @@ export class Game {
       ? this.judge.playerByIndex(tile.ownerIndex)
       : null;
 
-    // ⬅️ город на этой клетке (через WorldMap)
     const city = this.worldMap.getCityAt(tile.x, tile.y);
 
     const cityTypeLabel = city
@@ -168,12 +165,25 @@ export class Game {
       ? this.judge.playerByIndex(city.ownerId)
       : null;
 
-    // ⬅️ ИМЯ ГОРОДА — отдельным блоком сверху, если город есть
+    // ── шапка с именем города (если есть) ────────────────────────
+    // Кружочек владельца города — прямо в шапке рядом с названием.
     const cityBlock = city
-      ? `<div class="city-name" style="font-size:16px;font-weight:700;margin:6px 0 2px;">
-           🏙 ${city.name}
-         </div>
-         <div class="muted" style="margin-bottom:6px;">${cityTypeLabel}</div>`
+      ? `<div class="city-name"
+              style="font-size:16px;font-weight:700;margin:6px 0 2px;">
+          🏙 ${city.name}
+          ${cityOwner ? this._playerDot(cityOwner, 12) : ''}
+        </div>
+        <div class="muted" style="margin-bottom:6px;">${cityTypeLabel}</div>`
+      : '';
+
+    // ── строка «владелец города» с кружочком ─────────────────────
+    const cityOwnerLine = cityOwner
+      ? `<div>${this._playerDot(cityOwner)}Владелец города: <b>${cityOwner.name}</b></div>`
+      : '';
+
+    // ── строка «владелец клетки» с кружочком ─────────────────────
+    const cellOwnerLine = owner
+      ? `<div>${this._playerDot(owner)}Владелец клетки: <b>${owner.name}</b></div>`
       : '';
 
     info.innerHTML = `
@@ -181,8 +191,8 @@ export class Game {
       <div>Клетка (${tile.x}, ${tile.y})</div>
       <div>${meta.name} · stamina ${tile.staminaCost}</div>
       <div>${tile.hasRoad ? 'Дорога ' : ''}${tile.hasRiver ? 'Река' : ''}</div>
-      ${owner ? `<div>Владелец клетки: <b>${owner.name}</b></div>` : ''}
-      ${cityOwner ? `<div>Владелец города: <b>${cityOwner.name}</b></div>` : ''}
+      ${cellOwnerLine}
+      ${cityOwnerLine}
     `;
   }
 
@@ -218,6 +228,23 @@ export class Game {
       this._refreshHud();
       if (next.isAI) this._runAiTurn(next);
     }, 600);
+  }
+
+  _playerColorHex(player) {
+    if (!player || player.color == null) return '#9aa4ad';
+    const c = player.color;
+    if (typeof c === 'string') return c;                       // уже '#rrggbb'
+    if (typeof c === 'number') return '#' + (c >>> 0).toString(16).padStart(6, '0');
+    return '#9aa4ad';
+  }
+
+  _playerDot(player, size = 12) {
+    const color = this._playerColorHex(player);
+    return `<span class="player-dot"
+                  style="display:inline-block;width:${size}px;height:${size}px;
+                        border-radius:50%;background:${color};
+                        border:1px solid rgba(0,0,0,.35);
+                        vertical-align:middle;margin-right:6px;"></span>`;
   }
 
   //---------------------------|

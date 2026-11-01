@@ -45,10 +45,10 @@ export class Player {
 
   constructor(index, overrides = {}) {
     this.index = index;
-    this.name = overrides.name ?? `Игрок ${index + 1}`;
     this.active = overrides.active ?? (index < 2);  // первые два по умолчанию в игре
     this.aiLevel = overrides.aiLevel ?? 2;          // по умолчанию «Рыцарь»
     this.color = overrides.color ?? defaultColor(index);
+    this.name  = overrides.name ?? `Игрок-${index + 1}: ${AI_LEVELS[this.aiLevel].name}`;
 
     this.army = [];
     this._armyMap = new Map();
