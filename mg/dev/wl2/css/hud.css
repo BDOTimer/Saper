@@ -1,14 +1,45 @@
 /* ui/hud.css */
+
+/*----------------------------------------------- 
+ *  Панель генератора
+ *-----------------------------------------------*/
+#genPanel {
+  position: absolute; top: 10px; left: 5px; width: 300px;
+  max-height: calc(100% - 24px); overflow-y: auto;
+  background: rgba(20,26,34,.94); padding: 12px; border-radius: 10px;
+  border: 1px solid #3162a2; font-size: 22px; line-height: 1.4;
+  backdrop-filter: blur(6px);
+}
+#genPanel h3 { margin: 0 0 8px; font-size: 18px; color: #9ab8d6; }
+#genPanel h4 { margin: 12px 0 6px; font-size: 18px; color: #7fa6c9;
+  border-bottom: 1px solid #3162a2; padding-bottom: 4px; }
+
+.slider-row { margin: 6px 0; }
+.slider-row .label {
+  display: flex; justify-content: space-between; margin-bottom: 2px;
+  font-size: 22px; color: #b8c4cf;
+}
+.slider-row .label .val { color: #7fd47f; font-variant-numeric: tabular-nums; }
+.slider-row input[type=range] { width: 100%; accent-color: #2e8bff; height: 18px; }
+
+.norm-row { font-size: 18px; color: #8899a6; margin-top: 4px; }
+
+.seed-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.seed-row input[type=number] {
+  flex: 1; background: #141a22; color: #e6edf3; border: 1px solid #34495e;
+  border-radius: 6px; padding: 5px 8px; font-size: 18px;
+}
+
 .map-editor { position: absolute; inset: 0; }
 .map-editor #app { position: fixed; inset: 0; }
 .map-editor #hud { position: fixed; inset: 0; pointer-events: none; }
 .map-editor #hud > * { pointer-events: auto; }
 
 .map-editor #topbar {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 8px; align-items: center;
   background: rgba(20,26,34,.88); padding: 8px 12px; border-radius: 10px;
-  border: 1px solid #2a3441; backdrop-filter: blur(6px); z-index: 10;
+  border: 1px solid #3162a2; backdrop-filter: blur(6px); z-index: 10;
 }
 .map-editor #topbar .status { font-weight: 600; min-width: 220px; text-align: center; font-size: 16px; }
 
@@ -22,10 +53,23 @@
 .map-editor button.primary:hover:not(:disabled) { background: #369a5f; }
 .map-editor button.active { background: #2e8bff; border-color: #4aa3ff; }
 
+/* Родительская панель левого нижнего угла: на ней лежат #panel и #log,
+   #genBusy тоже находится в DOM внутри неё. Сам dock прижат к углу. */
+.map-editor #bottomPanel {
+  position: absolute; bottom: 10px; right: 10px;
+  display: flex;
+  flex-direction: column;      /* вертикальное направление */
+  flex-wrap: nowrap;           /* при колонке перенос обычно не нужен */
+  align-items: flex-end;       /* выравнивание по правому краю */
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+}
+
+/* #panel — карточка «Карта» внутри #bottomPanel (своё позиционирование убрано) */
 .map-editor #panel {
-  position: absolute; bottom: 12px; left: 12px; min-width: 240px;
+  min-width: 200px; max-width: 280px; box-sizing: border-box;
   background: rgba(20,26,34,.92); padding: 10px 12px; border-radius: 10px;
-  border: 1px solid #2a3441; font-size: 16px; line-height: 1.5; max-width: 340px;
+  border: 1px solid #3162a2; font-size: 16px; line-height: 1.5;
 }
 .map-editor #panel h3 { margin: 0 0 6px; font-size: 16px; }
 .map-editor #panel .muted { color: #8899a6; }
@@ -34,24 +78,27 @@
   border-radius: 2px; vertical-align: middle; margin-right: 6px;
 }
 
+/* #log — карточка лога рядом с #panel на той же родительской панели */
 .map-editor #log {
-  position: absolute; bottom: 12px; right: 12px; width: 280px; max-height: 200px;
+  width: 280px; max-height: 200px;
   overflow: auto; background: rgba(20,26,34,.92); padding: 8px 10px;
-  border-radius: 10px; border: 1px solid #2a3441; font-size: 16px;
+  border-radius: 10px; border: 1px solid #3162a2; font-size: 16px;
 }
 .map-editor #log div { margin-bottom: 3px; color: #b8c4cf; }
 .map-editor #log div.hl { color: #ffd166; }
 
 .map-editor #legend {
   position: absolute; top: 12px; right: 12px; background: rgba(20,26,34,.92);
-  padding: 8px 12px; border-radius: 10px; border: 1px solid #2a3441;
+  padding: 8px 12px; border-radius: 10px; border: 1px solid #3162a2;
   font-size: 16px; line-height: 1.6; min-width: 150px;
 }
 .map-editor #legend .item { display: flex; align-items: center; gap: 6px; }
 .map-editor #legend .sw { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #00000040; }
 
+/* #genBusy лежит в DOM внутри #bottomPanel, но это оверлей на весь экран:
+   position: fixed привязывает его к вьюпорту, а не к родительской панели */
 .map-editor #genBusy {
-  position: absolute; inset: 0; display: none;
+  position: fixed; inset: 0; display: none;
   background: rgba(0,0,0,.55); align-items: center; justify-content: center;
   z-index: 100; pointer-events: none; font-size: 16px; color: #ffd166;
 }
@@ -70,6 +117,31 @@
   pointer-events: none;
 }
 .game-screen #hud > * { pointer-events: auto; }
+
+/* ТОПБАР — во всю ширину экрана, отступы по 10px слева и справа.
+   Селектор .game-screen #hud #gameTopbar (специфичность 2 ID + класс),
+   чтобы победить любые одиночные #gameTopbar / #topbar правила из других css. */
+.game-screen #hud #gameTopbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  width: calc(100% - 20px);  /* явная ширина: экран минус два отступа по 10px */
+  max-width: none;           /* гасим чужие max-width */
+  margin: 0;                 /* гасим чужие margin / auto-центрирование */
+  transform: none;           /* гасим translateX(-50%) от старого «островка» */
+  box-sizing: border-box;
+  height: 50px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(20, 26, 34, .88);
+  border: 1px solid #2a3441;
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+}
 
 /* turn-label — по центру, тянется */
 .game-screen #gameTopbar .turn-label {
@@ -96,11 +168,15 @@
 .game-screen button.primary:hover:not(:disabled) { background: #369a5f; }
 .game-screen button.active { background: #2e8bff; border-color: #4aa3ff; }
 
-/* Боковая панель — тот же отступ 10px слева, сразу под топбаром */
-.game-screen #gameSidePanel {
+/* БОКОВАЯ ПАНЕЛЬ — слева экрана, отступ 10px, сразу под топбаром */
+.game-screen #hud #gameSidePanel {
   position: absolute;
-  top: 70px;               /* 10 (top) + 50 (topbar) + 10 (зазор) */
+  top: 70px;                 /* 10 (отступ) + 50 (топбар) + 10 (зазор) */
   left: 10px;
+  right: auto;
+  margin: 0;
+  transform: none;
+  box-sizing: border-box;
   min-width: 240px;
   max-width: 340px;
   background: rgba(20, 26, 34, .92);
@@ -130,20 +206,3 @@
 }
 .game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
 .game-screen #gameLog div.hl { color: #ffd166; }
-
-/* ТОПБАР — во всю ширину экрана, отступы по 10px */
-.game-screen #hud #gameTopbar {      /* специфичность 2×ID + класс — бьёт одиночные #gameTopbar */
-  position: absolute;
-  top: 10px; left: 10px; right: 10px;
-  width: calc(100% - 20px);   /* явная ширина, а не auto по содержимому */
-  max-width: none; margin: 0; transform: none;  /* гасим чужие max-width/margin/translateX(-50%) */
-  box-sizing: border-box; height: 50px; display: flex; /* …остальное как было */
-}
-
-/* ПАНЕЛЬ — слева, отступ 10px, сразу под топбаром */
-.game-screen #hud #gameSidePanel {
-  position: absolute;
-  top: 70px;   /* 10 + 50 (топбар) + 10 зазор */
-  left: 10px; right: auto; margin: 0; transform: none;
-  min-width: 240px; max-width: 340px; box-sizing: border-box; /* …остальное как было */
-}

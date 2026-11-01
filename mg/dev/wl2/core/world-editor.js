@@ -126,13 +126,16 @@ export class MapEditorScreen {
           <div id="legendItems"></div>
         </div>
 
-        <div id="panel">
-          <h3>Карта</h3>
-          <div class="muted">Кликни по карте для выбора клетки</div>
-        </div>
+        <!-- Родительская панель левого нижнего угла: #panel, #log и #genBusy лежат на ней -->
+        <div id="bottomPanel">
+          <div id="panel">
+            <h3>Карта</h3>
+            <div class="muted">Кликни по карте для выбора клетки</div>
+          </div>
 
-        <div id="log"></div>
-        <div id="genBusy">Генерация...</div>
+          <div id="log"></div>
+          <div id="genBusy">Генерация...</div>
+        </div>
       </div>
     `;
     return root;
