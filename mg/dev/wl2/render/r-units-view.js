@@ -325,12 +325,26 @@ export class UnitsView {
     const wz = this.mapView._worldZ(y);
     const cell = this.mapView.world.get(x, y);
     const wy = cell ? this.mapView._worldY(cell) : 0.15;
-    root.position.set(wx, wy, wz);
 
-    // бейдж чуть выше модели юнита
+    // ---- сдвиг, если на клетке город ----
+    let ox = 0, oz = 0;
+    const city = this.mapView.world.getCityAt?.(x, y);
+    if (city) {
+      // сдвигаем к «дальнему» углу клетки.
+      // 0.32 * TILE — гарантированно вне башни (башня ~0.35*TILE в ширину),
+      // но внутри клетки.
+      const d = TILE * 0.32;
+      ox = +d;   // +X — «восточный» угол
+      oz = +d;   // +Z — «южный» угол
+    }
+
+    root.position.set(wx + ox, wy, wz + oz);
+
+    // бейдж — чуть выше модели юнита (без учёта сдвига, он локальный)
     const badge = root.children.find(c => c.isSprite);
     if (badge) badge.position.y = 1.35;
-    // кольцо — на уровне земли
+
+    // кольцо выбора — на уровне земли, но тоже под сдвиг (в локальных координатах 0)
     const ring = root.children.find(c => c.isMesh && c.geometry?.type === 'RingGeometry');
     if (ring) ring.position.y = 0.05;
   }

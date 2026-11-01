@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Renderer, TILE } from './renderer.js';
 import { hash2 } from '../core/rng.js';
 import { CITY_TYPE } from '../core/world.js';
+import { UnitsView } from './r-units-view.js';
 
 export class MapView {
   constructor(world, container, players = null) {
@@ -21,12 +22,34 @@ export class MapView {
     this._raisedFlags = new Set();
     this._flagAnims = new Map();
 
+    this.unitsView = new UnitsView(this, { /// +
+      getArmies:  () => this._collectArmies(),
+      getPlayers: () => this.players,
+    });
+    this.unitsView.rebuild();
+
     this._buildBoard();
     this._buildOverlays();
     this._buildCities();
+
+
+
     this._buildRings();
     this._bindEvents();
     this.renderer.onResize(this.world.w, this.world.h);
+  }
+
+  _collectArmies() {
+    const out = [];
+    const players = this.players;
+    if (players?.list) {
+      for (const p of players.list) {
+        if (!p?.active) continue;
+        for (const a of p.army ?? []) out.push(a);
+      }
+    }
+    // если есть нейтральные армии — добавить сюда
+    return out;
   }
 
   rebuild(world, players = this.players) {
@@ -55,6 +78,14 @@ export class MapView {
 
     const span = Math.max(world.w, world.h) * TILE;
     this.renderer._frameOrbit(span);
+
+    /// +
+    this.unitsView?.destroy();
+    this.unitsView = new UnitsView(this, {
+      getArmies:  () => this._collectArmies(),
+      getPlayers: () => this.players,
+    });
+    this.unitsView.rebuild();
   }
 
   setCameraMode(mode) {
@@ -366,6 +397,9 @@ export class MapView {
     }
 
     this._stepFlagAnims(dt);
+
+    // если армии двигаются — обновляем позиции узлов
+    // (можно вызывать точечно из логики движения, см. ниже)
   }
 
   render(dt) {

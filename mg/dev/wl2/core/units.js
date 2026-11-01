@@ -175,9 +175,9 @@ export class Army {
   }
 
   /* ---------- состояние ---------- */
-  get alive()   { return this.units.some(u => u.alive); }
-  get count()   { return this.units.filter(u => u.alive).length; }
-  get isFull()  { return this.units.length >= MAX_ARMY_SIZE; }
+  get alive () { return this.units.some  (u => u.alive); }
+  get count () { return this.units.filter(u => u.alive).length; }
+  get isFull() { return this.units.length >= MAX_ARMY_SIZE; }
 
   /** Сила стека для боя: сумма с учётом порядка? В Warlords II бой 1-на-1
    *  по порядку, но для ИИ удобно знать «суммарную мощь». */
@@ -270,9 +270,18 @@ export class Army {
       movePoints: this.movePoints,
     };
   }
-}
 
-// ./core/units.js  (продолжение файла)
+  get strongest() {
+    if (!this.units?.length) return null;
+    return this.units.reduce((a, b) =>
+      (b.power ?? b.strength ?? 0) > (a.power ?? a.strength ?? 0) ? b : a
+    );
+  }
+  get count() { return this.units?.length ?? 0; }
+  get totalStrength() {
+    return (this.units ?? []).reduce((s, u) => s + (u.power ?? u.strength ?? 0), 0);
+  }
+}
 
 /* =========================================================
    КОЛЛЕКЦИЯ АРМИЙ ИГРОКА

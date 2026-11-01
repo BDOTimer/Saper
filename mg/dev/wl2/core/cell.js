@@ -76,4 +76,10 @@ export class Cell {
 
     return true;
   }
+
+  removeArmy(army) {
+    const i = this.army.indexOf(army);
+    if (i >= 0) { this.army.splice(i, 1); return true; }
+    return false;
+  }
 }

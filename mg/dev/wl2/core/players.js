@@ -1,4 +1,4 @@
-// "players.js"
+// "./core/players.js"
 // class Player;       // класс 1 игрока
 // class Players;      // все игроки тут
 // class PanelPlayers; // определяем состав игроков тут

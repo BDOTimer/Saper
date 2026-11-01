@@ -532,6 +532,15 @@ export class WorldMap {
     return this.cityList._resolveRef(ref);
   }
 
+  moveArmy(army, nx, ny) {
+    const from = this.get(army.x, army.y);
+    const to   = this.get(nx, ny);
+    if (!to) return false;
+    from?.removeArmy?.(army);
+    to.addArmy(army);            // внутри обновит army.x/army.y
+    return true;
+  }
+
   update(dt) {
     // пока пусто
   }
