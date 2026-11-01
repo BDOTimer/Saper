@@ -1,4 +1,7 @@
 // core/world-map.js
+// class City;
+// class CitiesAll;
+// class WorldMap;
 
 import { STATE } from './g-state.js';
 import { NAME  } from './gen-name.js';
@@ -476,6 +479,11 @@ export class WorldMap {
 
   getCityByName(name) {
     return this.cityList.getByName(name);
+  }
+
+  addArmy(army)
+  { const cell = this.get(army.x, army.y);
+    cell.addArmy(army);
   }
 
   // ─────────────────────────────────────────────────────────────

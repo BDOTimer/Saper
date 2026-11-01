@@ -54,4 +54,26 @@ export class Cell {
     if (this.hasRiver) parts.push('river');
     return parts.join('+');
   }
+
+  /**
+   * Положить армию в клетку.
+   *
+   * @param {object} army — объект армии (ожидаются поля x, y; при наличии — cell).
+   * @returns {boolean} true, если армия добавлена в клетку.
+   */
+  addArmy(army) {
+    if (!army || typeof army !== 'object') return false;
+    if (this.army.includes(army)) return false; // не дублируем одну и ту же армию
+
+    this.army.push(army);
+
+    // обратная ссылка: армия знает свою клетку и координаты
+    army.x = this.x;
+    army.y = this.y;
+
+    // console.log("army.x: ", army.x);
+    // console.log("army.y: ", army.y);
+
+    return true;
+  }
 }

@@ -63,7 +63,6 @@ export class Judge {
   {
     const cities = this.world.cities;
     const player = currentPlayer();
-
   }
 
   // В столицах спавнить героев...
@@ -81,6 +80,7 @@ export class Judge {
       const army = this._createHero(city, owner);
 
       owner.addArmy(army);
+      this.world.addArmy(army);
     }
   }
 
