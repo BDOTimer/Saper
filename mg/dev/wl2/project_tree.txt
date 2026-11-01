@@ -9,9 +9,9 @@
 │ 
 ├── core/
 │   ├── cell.js
-│   ├── g-game.js             /// 1
+│   ├── g-game.js             /// 2
 │   ├── g-judge.js
-│   ├── g-loop.js
+│   ├── g-loop.js             /// 1
 │   ├── g-state.js
 │   ├── gen-name.js
 │   ├── generator.js
@@ -26,7 +26,7 @@
 │   ├── hud.css
 │   └── style-base.css
 ├── render/
-│   ├── r-map-view.js
+│   ├── r-map-view.js         /// 3
 │   ├── r-units-view.js
 │   └── renderer.js
 ├── res/

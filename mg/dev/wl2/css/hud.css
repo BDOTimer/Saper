@@ -56,8 +56,12 @@
   z-index: 100; pointer-events: none; font-size: 16px; color: #ffd166;
 }
 
-/* ---- game screen ---- */
-.game-screen { position: fixed; inset: 0; }
+
+/* ---- game screen --------------------------------------------------------- */
+.game-screen {
+  position: fixed;
+  inset: 0;
+}
 .game-screen #app { position: absolute; inset: 0; }
 
 .game-screen #hud {
@@ -67,26 +71,7 @@
 }
 .game-screen #hud > * { pointer-events: auto; }
 
-/* ТОПБАР — на всю ширину, прибит к верху */
-.game-screen #gameTopbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;              /* ← ключ: left:0 + right:0 = вся ширина */
-  width: 100%; 
-  box-sizing: border-box;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 12px;
-  margin: 0;             /* ← сбрасываем любые внешние отступы */
-  background: rgba(20, 26, 34, .88);
-  border-bottom: 1px solid #2a3441;
-  backdrop-filter: blur(6px);
-  z-index: 10;
-}
-
-/* Левый край — «В меню», центр — turn-label, правая группа — кнопки */
+/* turn-label — по центру, тянется */
 .game-screen #gameTopbar .turn-label {
   flex: 1 1 auto;
   text-align: center;
@@ -100,7 +85,7 @@
   vertical-align: middle;
 }
 
-/* Кнопки — тот же стиль, что в редакторе */
+/* Кнопки — как в редакторе */
 .game-screen button {
   background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
   padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 16px;
@@ -111,11 +96,11 @@
 .game-screen button.primary:hover:not(:disabled) { background: #369a5f; }
 .game-screen button.active { background: #2e8bff; border-color: #4aa3ff; }
 
-/* Боковая панель — слева, под топбаром */
+/* Боковая панель — тот же отступ 10px слева, сразу под топбаром */
 .game-screen #gameSidePanel {
   position: absolute;
-  top: 56px;               /* высота топбара + отступ */
-  left: 12px;
+  top: 70px;               /* 10 (top) + 50 (topbar) + 10 (зазор) */
+  left: 10px;
   min-width: 240px;
   max-width: 340px;
   background: rgba(20, 26, 34, .92);
@@ -129,11 +114,11 @@
 .game-screen #gameSidePanel .muted { color: #8899a6; }
 .game-screen #gameSidePanel .city-name { color: #ffd166; }
 
-/* Лог — справа снизу, как в редакторе */
+/* Лог — 10px справа и снизу */
 .game-screen #gameLog {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
+  bottom: 10px;
+  right: 10px;
   width: 280px;
   max-height: 200px;
   overflow: auto;
@@ -145,3 +130,20 @@
 }
 .game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
 .game-screen #gameLog div.hl { color: #ffd166; }
+
+/* ТОПБАР — во всю ширину экрана, отступы по 10px */
+.game-screen #hud #gameTopbar {      /* специфичность 2×ID + класс — бьёт одиночные #gameTopbar */
+  position: absolute;
+  top: 10px; left: 10px; right: 10px;
+  width: calc(100% - 20px);   /* явная ширина, а не auto по содержимому */
+  max-width: none; margin: 0; transform: none;  /* гасим чужие max-width/margin/translateX(-50%) */
+  box-sizing: border-box; height: 50px; display: flex; /* …остальное как было */
+}
+
+/* ПАНЕЛЬ — слева, отступ 10px, сразу под топбаром */
+.game-screen #hud #gameSidePanel {
+  position: absolute;
+  top: 70px;   /* 10 + 50 (топбар) + 10 зазор */
+  left: 10px; right: auto; margin: 0; transform: none;
+  min-width: 240px; max-width: 340px; box-sizing: border-box; /* …остальное как было */
+}
