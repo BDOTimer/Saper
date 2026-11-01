@@ -4,7 +4,7 @@
  *  Панель генератора
  *-----------------------------------------------*/
 #genPanel {
-  position: absolute; top: 10px; left: 5px; width: 300px;
+  position: absolute; top: 10px; left: 5px; bottom: 10px; width: 200px;
   max-height: calc(100% - 24px); overflow-y: auto;
   background: rgba(20,26,34,.94); padding: 12px; border-radius: 10px;
   border: 1px solid #3162a2; font-size: 22px; line-height: 1.4;
@@ -14,7 +14,7 @@
 #genPanel h4 { margin: 12px 0 6px; font-size: 18px; color: #7fa6c9;
   border-bottom: 1px solid #3162a2; padding-bottom: 4px; }
 
-.slider-row { margin: 6px 0; }
+.slider-row { margin: 1px 0; }
 .slider-row .label {
   display: flex; justify-content: space-between; margin-bottom: 2px;
   font-size: 22px; color: #b8c4cf;
@@ -26,7 +26,8 @@
 
 .seed-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
 .seed-row input[type=number] {
-  flex: 1; background: #141a22; color: #e6edf3; border: 1px solid #34495e;
+  width: 100px;
+  flex: 1; background: #0a1231; color: #e6edf3; border: 1px solid #34495e;
   border-radius: 6px; padding: 5px 8px; font-size: 18px;
 }
 
