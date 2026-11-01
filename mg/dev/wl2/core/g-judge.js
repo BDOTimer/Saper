@@ -4,6 +4,7 @@ import { mulberry32, fbm } from './rng.js';
 import { Players         } from './players.js';
 import { WorldMap        } from './world.js';
 import { STATE, TICK     } from './g-state.js';
+import { NAME            } from './gen-name.js';
 import { UNIT_TYPES, Unit, Army } from './units.js';
 
 ///----------------------------------------------------------------------------|
@@ -86,7 +87,8 @@ export class Judge {
   _createHero(city, owner)
   {   const hero  = Unit.spawn(owner.index, 'HERO');
       const army  = Army.spawn(owner.index, city.x, city.y, [hero]);
-      console.log("🔍 ", city.name, ": Была создана армия с героем ...")
+      console.log(`🔍 id:${owner.index} - ${city.name}: Была создана армия расы ` +
+                  `${NAME.race(owner.index)} с героем ${hero.name}`);
       return army;
   }
 }

@@ -28,6 +28,9 @@
  * build   — кол-во ходов производства в городе
  * isHero  — герой (особый юнит, качается, ищет руины)
  */
+
+import { NAME } from './gen-name.js';
+
 export const UNIT_TYPES = {
   // Пехота
   LIGHT_INF:   { id: 1,  name: 'Лёгкая пехота', strength: 1, move: 4, cost: 10, build: 1, isHero: false },
@@ -88,8 +91,18 @@ export class Unit {
 
   /* ---------- спавн ---------- */
   static spawn(idOwner, typeKey = 'LIGHT_INF')
-  { const id = IdCountUnit++;
-    return new Unit({ id, idOwner, typeKey });
+  { const  id   = IdCountUnit++;
+    const  unit = new Unit({ id, idOwner, typeKey });
+
+    if(typeKey === 'HERO')
+    {
+        const  name = NAME.hero(idOwner.id);
+          unit.name = 'ГЕРОЙ: ' + name;
+    }
+    else
+    {   unit.name = typeKey;
+    }
+    return unit;
   }
 
   get alive() { return this.hp > 0; }
