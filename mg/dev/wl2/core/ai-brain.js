@@ -62,9 +62,7 @@ export class AiBrainHelper {
    */
   static find(world, army, opts = {}) {
 
-    console.log("🔍: AiBrainHelper.find()-1");
-
-    AiBrainHelper.debug(world, army, opts);
+  //AiBrainHelper.debug(world, army, opts);
 
     if (!world || !army) return null;
     const start = world.get(army.x, army.y);

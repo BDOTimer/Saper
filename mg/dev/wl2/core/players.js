@@ -83,7 +83,7 @@ export class Player {
       army.route = route;
       army.cellGoal = cellGoal;
 
-      console.log('🔍 RouteView build:', army.id, 'cells=', army.route?.length);
+    //console.log('🔍 RouteView build:', army.id, 'cells=', army.route?.length);
     }
 
     // TODO: ...
