@@ -10,7 +10,7 @@
   border: 1px solid #3162a2; font-size: 22px; line-height: 1.4;
   backdrop-filter: blur(6px);
 }
-#genPanel h3 { margin: 0 0 8px; font-size: 18px; color: #9ab8d6; }
+#genPanel h3 { margin: 0 0 8px; font-size: 24px; color: #b2d2f2; }
 #genPanel h4 { margin: 12px 0 6px; font-size: 18px; color: #7fa6c9;
   border-bottom: 1px solid #3162a2; padding-bottom: 4px; }
 
@@ -20,7 +20,7 @@
   font-size: 22px; color: #b8c4cf;
 }
 .slider-row .label .val { color: #7fd47f; font-variant-numeric: tabular-nums; }
-.slider-row input[type=range] { width: 100%; accent-color: #2e8bff; height: 18px; }
+.slider-row input[type=range] { width: 100%; accent-color: #0d50a1; height: 18px; }
 
 .norm-row { font-size: 18px; color: #8899a6; margin-top: 4px; }
 
@@ -31,28 +31,52 @@
   border-radius: 6px; padding: 5px 8px; font-size: 18px;
 }
 
+#genPanel::-webkit-scrollbar { width: 8px; }
+#genPanel::-webkit-scrollbar-track { background: #0b0f14; border-radius: 6px; }
+#genPanel::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3a4658, #1b222b);
+  border: 2px solid #0b0f14; border-radius: 6px;
+}
+#genPanel {
+  scrollbar-color: #2a3441 #0b0f14;
+  scrollbar-width: thin;
+}
+
 .map-editor { position: absolute; inset: 0; }
 .map-editor #app { position: fixed; inset: 0; }
 .map-editor #hud { position: fixed; inset: 0; pointer-events: none; }
 .map-editor #hud > * { pointer-events: auto; }
 
 .map-editor #topbar {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 8px; align-items: center;
-  background: rgba(20,26,34,.88); padding: 8px 12px; border-radius: 10px;
-  border: 1px solid #3162a2; backdrop-filter: blur(6px); z-index: 10;
+  position: absolute;
+  top: 10px;
+  left: 240px;
+  right: 200px;
+  width: auto;
+  transform: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  box-sizing: border-box;
+  background: rgba(61, 82, 110, 0.5);
+  padding: 4px 12px;
+  border-radius: 10px;
+  border: 1px solid #3162a2;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  justify-content: center;
 }
 .map-editor #topbar .status { font-weight: 600; min-width: 220px; text-align: center; font-size: 16px; }
 
 .map-editor button {
-  background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
-  padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 16px;
+  background: #1f2b38; color: #e6edf3; border: 1px solid #4e77a0;
+  padding: 7px 11px; border-radius: 4px; cursor: pointer; font-size: 16px;
 }
 .map-editor button:hover:not(:disabled) { background: #2a3a4d; }
 .map-editor button:disabled { opacity: .45; cursor: default; }
-.map-editor button.primary { background: #2e7d4f; border-color: #3fa86a; }
+.map-editor button.primary { background: #1c4d30; border-color: #3fa86a; }
 .map-editor button.primary:hover:not(:disabled) { background: #369a5f; }
-.map-editor button.active { background: #2e8bff; border-color: #4aa3ff; }
+.map-editor button.active { background: #1e5599; border-color: #4aa3ff; }
 
 /* Родительская панель левого нижнего угла: на ней лежат #panel и #log,
    #genBusy тоже находится в DOM внутри неё. Сам dock прижат к углу. */
@@ -207,3 +231,50 @@
 }
 .game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
 .game-screen #gameLog div.hl { color: #ffd166; }
+
+/* ---- Свечение кнопки «Играть»  ------------------------------------------- */
+.map-editor #btnPlay {
+  position: relative;
+  border-color: #3fa86a;
+  background: linear-gradient(180deg, #2e7d4f 0%, #24613d 50%, #1b4a2f 100%);
+  box-shadow:
+    0 0 8px rgba(63, 168, 106, .55),
+    0 0 20px rgba(63, 168, 106, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .18);
+  transition: box-shadow .25s ease, transform .18s ease, filter .25s ease;
+  animation: playPulse 1.0s ease-in-out infinite;
+}
+
+@keyframes playPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(63, 168, 106, .55),
+      0 0 20px rgba(63, 168, 106, .30),
+      inset 0 1px 0 rgba(255, 255, 255, .18);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(63, 168, 106, .85),
+      0 0 34px rgba(63, 168, 106, .55),
+      0 0 60px rgba(63, 168, 106, .30),
+      inset 0 1px 0 rgba(255, 255, 255, .25);
+  }
+}
+
+.map-editor #btnPlay:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+  box-shadow:
+    0 0 18px rgba(63, 168, 106, 1),
+    0 0 42px rgba(63, 168, 106, .65),
+    0 0 80px rgba(63, 168, 106, .35),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+.map-editor #btnPlay:active:not(:disabled) {
+  transform: translateY(1px) scale(.98);
+  animation: none;
+  box-shadow:
+    0 0 10px rgba(63, 168, 106, .7),
+    inset 0 2px 4px rgba(0, 0, 0, .4);
+}

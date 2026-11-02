@@ -161,3 +161,4 @@ export class MapEditorScreen {
     delete window.__ui;
   }
 }
+
