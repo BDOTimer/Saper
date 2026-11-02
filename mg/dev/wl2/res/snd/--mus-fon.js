@@ -78,7 +78,8 @@ class MusFon1
     init()
     {   this.
         addTracks('calm', [
-            'res/snd/Lab-Eho.mp3',
+            //'res/snd/Lab-Eho.mp3',
+            'res/snd/123.mp3',
         ]);
         // .addTracks('dock', [
         //     'snd/fon/dock/d01.mp3',
