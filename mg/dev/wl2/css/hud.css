@@ -161,7 +161,7 @@
   gap: 8px;
   align-items: center;
   padding: 0 12px;
-  background: rgba(20, 26, 34, .88);
+  background: rgba(3, 28, 60, 0.5);
   border: 1px solid #2a3441;
   border-radius: 10px;
   backdrop-filter: blur(6px);
@@ -204,7 +204,7 @@
   box-sizing: border-box;
   min-width: 240px;
   max-width: 340px;
-  background: rgba(20, 26, 34, .92);
+  background: rgba(3, 28, 60, 0.5);
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid #2a3441;
@@ -223,7 +223,7 @@
   width: 280px;
   max-height: 200px;
   overflow: auto;
-  background: rgba(20, 26, 34, .92);
+  background: rgba(3, 28, 60, 0.5);
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid #2a3441;
