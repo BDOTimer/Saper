@@ -229,6 +229,11 @@ export class AiBrainHelper {
 
     for (const city of cities) {
       if (!city || !predicate(city)) continue;
+
+      // Город, на клетке которого армия УЖЕ стоит, целью не является —
+      // иначе buildRoute() вернёт пустой маршрут и армия «застынет».
+      if (city.x === army.x && city.y === army.y) continue;
+
       const d = this._heuristic(army.x, army.y, city.x, city.y);
       if (d < bestD) {
         bestD = d;

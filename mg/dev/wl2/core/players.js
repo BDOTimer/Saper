@@ -56,26 +56,27 @@ export class Player {
   }
 
   /**
-   * Игрок делает ход, используя AiBrainHelper
+   * Игрок делает ход, используя AiBrainHelper.
+   * Для КАЖДОЙ армии строится маршрут (army.route) до цели.
    */
   doStep()
   {
     const world = STATE.world;
+    if (!world)
+    {   console.warn('🔍 doStep(): STATE.world не задан — маршрут не построить');
+        return;
+    }
 
     for (const army of this.army)
     {
-      console.log(
-        '🔍 doStep(): Армия:', army.id, 'количество units:', army.count);
+      if (!army?.alive) continue;
+
+      army.resetTurn();   // новые очки движения всем юнитам стека
 
       const cellGoal = AiBrainHelper.find(world, army);
       if  (!cellGoal) continue;
 
-      console.log("🔍: doStep()-1");
-
       const route = AiBrainHelper.buildRoute(world, army, cellGoal);
-
-      console.log("🔍: doStep()-route", route);
-      console.log("🔍: doStep()-route.length", route.length);
 
       if  (!route || route.length === 0) continue;
 

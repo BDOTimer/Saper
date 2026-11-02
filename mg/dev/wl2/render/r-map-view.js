@@ -1,9 +1,10 @@
 // render/map-view.js
 import * as THREE from 'three';
 import { Renderer, TILE } from './renderer.js';
-import { hash2 } from '../core/rng.js';
-import { CITY_TYPE } from '../core/world.js';
-import { UnitsView } from './r-units-view.js';
+import { hash2       } from '../core/rng.js';
+import { CITY_TYPE   } from '../core/world.js';
+import { UnitsView   } from './r-units-view.js';
+import { disposeTree } from './r-units-view.js';
 
 export class MapView {
   constructor(world, container, players = null) {
@@ -27,6 +28,9 @@ export class MapView {
       getPlayers: () => this.players,
     });
     this.unitsView.rebuild();
+    this.routeView = new RouteView(this, {
+      onlyActiveOwner: false,   // true — только маршрут активного игрока
+    });
 
     this._buildBoard();
     this._buildOverlays();
@@ -84,6 +88,13 @@ export class MapView {
       getPlayers: () => this.players,
     });
     this.unitsView.rebuild();
+
+    this.routeView?.destroy();
+    this.routeView = new RouteView(this, {
+      onlyActiveOwner: false,
+    });
+    // routeView.rebuild() вызовется ниже, после того как появятся армии
+    this.routeView.rebuild();
   }
 
   setCameraMode(mode) {
@@ -398,6 +409,17 @@ export class MapView {
 
     // если армии двигаются — обновляем позиции узлов
     // (можно вызывать точечно из логики движения, см. ниже)
+
+    // мягкая пульсация маркеров маршрутов
+    if (this.routeView?._nodes) {
+      const t = performance.now() * 0.003;
+      for (const [, node] of this.routeView._nodes) {
+        node.root.children.forEach((m, i) => {
+          const k = 1 + 0.08 * Math.sin(t + i * 0.4);
+          m.scale.setScalar(k);
+        });
+      }
+    }
   }
 
   render(dt) {
@@ -437,6 +459,7 @@ export class MapView {
   }
 
   destroy() {
+    this.routeView?.destroy();
     this.renderer?.controls?.dispose?.();
     this.renderer?.renderer?.dispose?.();
     this.renderer?.domElement?.remove?.();
@@ -562,5 +585,160 @@ export class MapView {
     // const P = MapView.DEFAULT_OWNER_PALETTE;
     // return P[ownerId % P.length];
     return 0;
+  }
+}
+
+/* =========================================================
+   RouteView — визуализация маршрутов армий.
+   Читает army.route (Cell[]) и рисует маркеры на клетках.
+   ========================================================= */
+export class RouteView {
+  /**
+   * @param {MapView} mapView
+   * @param {object} [opts]
+   * @param {number} [opts.markerSize=0.28]
+   * @param {number} [opts.markerColor=0xff3333]
+   * @param {boolean} [opts.onlyActiveOwner=true] — рисовать только маршрут активного игрока
+   */
+  constructor(mapView, opts = {}) {
+    this.mapView = mapView;
+    this.scene   = mapView.scene;
+
+    this.markerSize  = opts.markerSize  ?? 0.28;
+    this.markerColor = opts.markerColor ?? 0xff3333;
+    this.onlyActiveOwner = opts.onlyActiveOwner !== false;
+
+    this.group = new THREE.Group();
+    this.group.name = 'RouteLayer';
+    this.scene.add(this.group);
+
+    /** Map<army, { root, cells }> — что нарисовано сейчас */
+    this._nodes = new Map();
+    /** Текущий активный ownerId (для фильтра) */
+    this._activeOwner = null;
+  }
+
+  /** Установить активного игрока — рисовать будем только его маршруты */
+  setActiveOwner(idOwner) {
+    if (this._activeOwner === idOwner) return;
+    this._activeOwner = idOwner;
+    this.rebuild();
+  }
+
+  /** Полная перерисовка всех маршрутов */
+  rebuild() {
+    this.clear();
+
+    const armies = this.mapView._collectArmies?.() ?? [];
+    for (const army of armies) {
+      if (!army.route?.length) continue;
+      if (this.onlyActiveOwner
+          && this._activeOwner !== null
+          && army.idOwner !== this._activeOwner) continue;
+
+      this._buildRoute(army);
+    }
+  }
+
+  /** Обновить маршрут одной армии (после пересчёта) */
+  updateArmy(army) {
+    this._removeArmy(army);
+    if (!army.route?.length) return;
+    if (this.onlyActiveOwner
+        && this._activeOwner !== null
+        && army.idOwner !== this._activeOwner) return;
+    this._buildRoute(army);
+  }
+
+  /** Убрать маршрут конкретной армии с карты */
+  _removeArmy(army) {
+    const node = this._nodes.get(army);
+    if (!node) return;
+    this.group.remove(node.root);
+    disposeTree(node.root);
+    this._nodes.delete(army);
+  }
+
+  clear() {
+    for (const [, node] of this._nodes) {
+      this.group.remove(node.root);
+      disposeTree(node.root);
+    }
+    this._nodes.clear();
+  }
+
+  destroy() {
+    this.clear();
+    this.scene.remove(this.group);
+  }
+
+  /* ---------- построение ---------- */
+  _buildRoute(army) {
+    const root = new THREE.Group();
+    root.name = `route-${army.id}`;
+
+    const cells = [];
+
+    for (const cell of army.route) {
+      if (!cell) continue;
+
+      const marker = UnitsView.createCellMarker(this.markerSize, this.markerColor);
+      const wx = this.mapView._worldX(cell.x);
+      const wz = this.mapView._worldZ(cell.y);
+      const wy = this.mapView._worldY(cell) + 0.02;
+
+      marker.position.set(wx, wy, wz);
+
+      // Опционально: чем ближе к цели, тем ярче (можно играться)
+      // marker.scale.setScalar(1 + 0.1 * i / army.route.length);
+
+      root.add(marker);
+      cells.push(cell);
+    }
+
+    this.group.add(root);
+    this._nodes.set(army, { root, cells });
+  }
+
+  /* ---------- очистка пройденных клеток ---------- */
+  /**
+   * Убирает из армии пройденные клетки и перерисовывает её маршрут.
+   * Вызывается после шага армии в игровой логике.
+   *
+   * @param {object} army
+   * @param {number} [steps=1] — сколько шагов армия только что прошла
+   */
+  consumeSteps(army, steps = 1) {
+    if (!army.route?.length) return;
+
+    const n = Math.min(steps, army.route.length);
+    army.route.splice(0, n);
+
+    // Если маршрут закончился — снять маркеры
+    if (army.route.length === 0) {
+      army.cellGoal = null;
+      this._removeArmy(army);
+      return;
+    }
+    this.updateArmy(army);
+  }
+
+  /**
+   * Синхронизирует маркеры с текущей клеткой армии:
+   * удаляет из маршрута все клетки «позади» армии.
+   * Полезно, если армия двигалась не через consumeSteps.
+   */
+  syncArmyPosition(army) {
+    if (!army.route?.length) return;
+    const { x, y } = army;
+    const idx = army.route.findIndex(c => c && c.x === x && c.y === y);
+    if (idx < 0) return;                // армия вне маршрута — не трогаем
+    army.route.splice(0, idx + 1);      // всё до текущей (включая её) — пройдено
+    if (army.route.length === 0) {
+      army.cellGoal = null;
+      this._removeArmy(army);
+      return;
+    }
+    this.updateArmy(army);
   }
 }

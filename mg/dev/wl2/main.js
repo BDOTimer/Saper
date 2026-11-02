@@ -7,8 +7,14 @@ import { PanelPlayers, Players } from './core/players.js';
 import { Game                  } from './core/g-game.js';
 import { gameLoop              } from './core/g-loop.js';
 
-
-import { musFon } from "./res/snd/--mus-fon.js";
+// Музыка опциональна: если res/snd/--mus-fon.js отсутствует —
+// игра всё равно стартует (динамический импорт с перехватом ошибки).
+let musFon = null;
+try {
+  ({ musFon } = await import('./res/snd/--mus-fon.js'));
+} catch (e) {
+  console.warn('musFon недоступен (res/snd/--mus-fon.js не найден) — играем без музыки');
+}
 
 class App {
   constructor(root) {
@@ -118,11 +124,19 @@ class App {
 
   _playMusic()
   {
-    // 
-    musFon.start('calm');
+    //
+    musFon?.start('calm');
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+// Модуль с top-level await — асинхронный: DOMContentLoaded мог уже
+// произойти, поэтому boot() не вешаем только на событие.
+const boot = () => {
   window.__app = new App(document.getElementById('root'));
-});
+};
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}

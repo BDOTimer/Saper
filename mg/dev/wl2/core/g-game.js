@@ -10,7 +10,7 @@ import { mulberry32, fbm } from './rng.js';
 import { MapView     } from '../render/r-map-view.js';
 import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
-import { STATE, TICK } from './g-state.js';
+import { ArmyMover   } from './g-move.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -39,6 +39,24 @@ export class Game {
 
     this.judge = new Judge(worldMap, playersModel);
 
+    // Аниматор: плавное передвижение армий по маршрутам (армия за армией).
+    this.mover = new ArmyMover({
+      speed: 2.6,   // клеток в секунду
+      onArmyStart: (army, cellsPlanned) => {
+        if (cellsPlanned > 0)
+          this._log(`Армия #${army.id} выступила: маршрут ${cellsPlanned} кл.`);
+      },
+      onArmyArrive: (army, stepsDone) => {
+        if (stepsDone > 0)
+          this._log(`Армия #${army.id} остановилась (${army.x}, ${army.y}) — пройдено ${stepsDone} кл.`);
+      },
+      // Все армии текущего игрока закончили ход → передаём ход следующему.
+      onQueueEmpty: () => this._finishPlayerTurn(),
+    });
+
+    // Контекст для аниматора — заполнится после создания MapView.
+    this._moveCtx = null;
+
     // DOM
     this.el = this._render();
     this.parent.appendChild(this.el);
@@ -46,9 +64,20 @@ export class Game {
     // карта — вся техника управления живёт в MapView
     this.mapView = new MapView(
       worldMap, this.el.querySelector('#app'), playersModel);
-      
+
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
     this.mapView.lowerAllFlags(600); // Опустить все флаги...
+
+    this._moveCtx = {
+      world:     worldMap,
+      mapView:   this.mapView,
+      routeView: this.mapView.routeView,
+      unitsView: this.mapView.unitsView,
+    };
+
+    // Судья сообщает игре о начале хода игрока:
+    // показываем красные маркеры маршрутов и ставим армии в очередь.
+    this.judge.onTurnStart = (player) => this._onTurnStart(player);
 
     this.selected = null;
     this._bindUI();
@@ -92,7 +121,7 @@ export class Game {
       this.onExit();
     });
     this.el.querySelector('#btnEndTurn').addEventListener('click', () => {
-      this._endTurn();
+      this._onNextCircle();   // зелёная кнопка: запустить следующий круг
     });
 
     const btnOrbit = this.el.querySelector('#btnCamOrbit');
@@ -110,25 +139,39 @@ export class Game {
     this._onKey = (e) => {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (e.code === 'Space') { e.preventDefault(); this._endTurn(); }
+      if (e.code === 'Space') { e.preventDefault(); this._onNextCircle(); }
       if (e.code === 'Escape') { this._clearSelection(); }
     };
     window.addEventListener('keydown', this._onKey);
   }
 
-_refreshHud() {
-  const j = this.judge;
-  const p = j.currentPlayer;
-  if (!p) return;
-  const role = p.isHuman ? 'Человек' : `ИИ (${p.aiMeta?.name ?? '—'})`;
+  _refreshHud() {
+    const j = this.judge;
+    const p = j.currentPlayer;
+    if (!p) return;
 
-  this.el.querySelector('#turnLabel').innerHTML =
-    `${this._playerDot(p, 10)}
-     Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}`;
+    const label = this.el.querySelector('#turnLabel');
+    const btn   = this.el.querySelector('#btnEndTurn');
 
-  const btn = this.el.querySelector('#btnEndTurn');
-  btn.disabled = !p.isHuman;
-}
+    if (j.isAwaitingNextCircle) {
+      // Круг завершён — ждём зелёную кнопку.
+      label.innerHTML =
+        `⭕ Круг ${j.turn - 1} завершён — нажмите зелёную кнопку,` +
+        ` чтобы начать круг ${j.turn}`;
+      btn.disabled    = false;
+      btn.textContent = '▶ Следующий круг';
+      btn.classList.add('ready');
+      return;
+    }
+
+    btn.classList.remove('ready');
+    btn.textContent = 'Завершить ход';
+    btn.disabled    = true;   // ходы идут автоматически (по анимациям)
+
+    const role = p.isHuman ? 'Человек' : `ИИ (${p.aiMeta?.name ?? '—'})`;
+    label.innerHTML =
+      `${this._playerDot(p, 10)} Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}`;
+  }
 
   _log(msg, hl = false) {
     const box = this.el.querySelector('#gameLog');
@@ -202,32 +245,44 @@ _refreshHud() {
     if (this.mapView.selRing) this.mapView.selRing.visible = false;
   }
 
-  /* ---------------- ход ---------------- */
-  _endTurn() {
-    const j = this.judge;
-    if (!j.isHumanTurn) return;   // ИИ не даём завершать вручную
+  /* ---------------- ход: автоматика + зелёная кнопка ---------------- */
 
-    const prev = j.currentPlayer;
-    const next = j.endTurn();
-    this._log(`Ход завершён: ${prev.name} → ${next.name}`);
+  /** Начало хода игрока (зовёт Judge через onTurnStart). */
+  _onTurnStart(player) {
+    const role = player.isHuman ? 'человек' : `ИИ ${player.aiMeta?.name ?? ''}`;
+    this._log(`— Ход: ${player.name} (${role}) —`, true);
+    this._refreshHud();
+
+    // Красные маркеры маршрутов на карте (маршруты уже построены
+    // в Player.doStep через AiBrainHelper).
+    this.mapView.routeView.rebuild();
+
+    // Армии текущего игрока идут по маршрутам ПО ОЧЕРЕДИ.
+    this.mover.enqueue(player.army.slice());
+  }
+
+  /** Все армии игрока закончили движение → передаём ход. */
+  _finishPlayerTurn() {
+    const res = this.judge.finishCurrentTurn();
+    if (!res) return;
+
+    this._log(`Ход завершён: ${res.prev.name} → ${res.next.name}`);
     this._refreshHud();
     this._clearSelection();
 
-    // если следующий — ИИ, через паузу запускаем его «мозг»
-    if (next.isAI) this._runAiTurn(next);
+    if (this.judge.isAwaitingNextCircle) {
+      this._log(
+        `⭕ Круг завершён. Нажмите зелёную кнопку — начать круг ${this.judge.turn}.`,
+        true);
+    }
   }
 
-  _runAiTurn(aiPlayer) {
-    this._log(`ИИ (${aiPlayer.name}) думает...`);
-    setTimeout(() => {
-      // TODO: реальный ИИ. Пока просто мгновенный пас.
-      this._log(`ИИ (${aiPlayer.name}) завершил ход`);
-      const prev = aiPlayer;
-      const next = this.judge.endTurn();
-      this._log(`Ход завершён: ${prev.name} → ${next.name}`);
-      this._refreshHud();
-      if (next.isAI) this._runAiTurn(next);
-    }, 600);
+  /** Зелёная кнопка HUD (и пробел): запустить следующий круг. */
+  _onNextCircle() {
+    if (!this.judge.isAwaitingNextCircle) return;  // активно только между кругами
+    this.judge.startNextCircle();
+    this._log(`▶ Круг ${this.judge.turn} начат.`, true);
+    this._refreshHud();
   }
 
   _playerColorHex(player) {
@@ -252,11 +307,11 @@ _refreshHud() {
   //---------------------------:
   update(dt) {
 
-    if(TICK.isTick)
-    {
-      this.judge.update(dt);
-    }
-    
+    // Судья: старт хода игрока / передача хода (после всех анимаций).
+    this.judge.update(dt);
+
+    // Аниматор: плавное передвижение армий по маршрутам — каждый кадр.
+    if (this._moveCtx) this.mover.update(dt, this._moveCtx);
   }
 
   //---------------------------|
@@ -276,6 +331,8 @@ _refreshHud() {
     if (this._destroyed) return;
     this._destroyed = true;
     window.removeEventListener('keydown', this._onKey);
+    this.mover?.clear();
+    this.judge.onTurnStart = null;
     this.mapView?.destroy?.();
     this.el.remove();
   }

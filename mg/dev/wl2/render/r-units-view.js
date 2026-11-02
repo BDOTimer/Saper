@@ -208,6 +208,23 @@ export class UnitsView {
     this._placeAt(node.root, army.x, army.y);
   }
 
+  /** Узел армии (для аниматоров: ArmyMover двигает node.root). */
+  getArmyNode(army) {
+    return this._armyNodes.find(n => n.army === army) ?? null;
+  }
+
+  /**
+   * Поставить узел армии в произвольную мировую точку сцены.
+   * Используется для ПЛАВНОЙ интерполяции позиции между клетками
+   * (каждый кадр из ArmyMover); по завершении шага зовётся
+   * updateArmyPosition(), чтобы точно посадить армию в клетку.
+   */
+  placeArmyAt(army, x, y, z) {
+    const node = this.getArmyNode(army);
+    if (!node) return;
+    node.root.position.set(x, y, z);
+  }
+
   /** Пересобрать один узел (например, после боя — состав/сила поменялись) */
   updateArmy(army) {
     const idx = this._armyNodes.findIndex(n => n.army === army);

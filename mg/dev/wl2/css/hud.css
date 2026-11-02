@@ -193,6 +193,35 @@
 .game-screen button.primary:hover:not(:disabled) { background: #369a5f; }
 .game-screen button.active { background: #2e8bff; border-color: #4aa3ff; }
 
+/* ---- Зелёная кнопка «▶ Следующий круг» ---------------------------------- */
+/* Круг завершён: кнопка пульсирует зелёным свечением и зовёт игрока. */
+.game-screen #btnEndTurn.ready {
+  background: linear-gradient(180deg, #2e7d4f 0%, #24613d 50%, #1b4a2f 100%);
+  border-color: #3fa86a;
+  font-weight: 700;
+  animation: nextCirclePulse 1.0s ease-in-out infinite;
+}
+
+@keyframes nextCirclePulse {
+  0%, 100% {
+    box-shadow:
+      0 0 6px rgba(63, 168, 106, .55),
+      0 0 16px rgba(63, 168, 106, .28),
+      inset 0 1px 0 rgba(255, 255, 255, .18);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(63, 168, 106, .85),
+      0 0 28px rgba(63, 168, 106, .50),
+      0 0 48px rgba(63, 168, 106, .28),
+      inset 0 1px 0 rgba(255, 255, 255, .25);
+  }
+}
+
+.game-screen #btnEndTurn.ready:hover {
+  filter: brightness(1.15);
+}
+
 /* БОКОВАЯ ПАНЕЛЬ — слева экрана, отступ 10px, сразу под топбаром */
 .game-screen #hud #gameSidePanel {
   position: absolute;
