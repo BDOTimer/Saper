@@ -166,6 +166,10 @@ export class Army {
     this.units = units.slice(0, MAX_ARMY_SIZE);
     // выставляем владельца всем юнитам
     for (const u of this.units) u.idOwner = idOwner;
+
+    // кеш машрута
+    this.route = [];
+    this.cellGoal = null;
   }
 
   /* ---------- спавн ---------- */

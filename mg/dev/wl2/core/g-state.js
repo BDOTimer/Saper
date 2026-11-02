@@ -47,7 +47,7 @@ export const STATE = new GameState();
  */
 export class TurnTimer {
 
-  #isTick = false;
+  #isTick = true;
 
   constructor(intervalSeconds = 0.5) {
     this._accumulator = 0;
@@ -72,7 +72,6 @@ export class TurnTimer {
       this._accumulator -= ticks * this._interval;
       this.#isTick = true;
     }
-    this.#isTick = false;
   }
 
   get isTick() { return this.#isTick ; }

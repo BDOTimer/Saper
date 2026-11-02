@@ -41,18 +41,34 @@ export class Judge {
 
   /** Найти Player по индексу */
   playerByIndex(i) { return this._byIndex.get(i) ?? null; }
-  playerGo     (i) { playerByIndex(i).isTurn = true; };
+
+  playerGo() 
+  {   const player = this.currentPlayer;
+            player.isTurn = true; /// Игрок в процессе хода
+
+      player.doStep();
+
+      // Чтобы передать ход другому игроку надо сделать
+      // player.isTurn = true;
+      // но это нужно сделать только после всех анимаций.
+  }
 
   update(dt) {
     
-    const player = currentPlayer();
+    const player = this.currentPlayer;
 
-    if (player.isTurn)
-    {   const nextId = this.endTurn();
-        this.playerGo(nextId);
+    if (!player.isTurn)
+    {   this.endTurn ();
+        this.playerGo();
+
+        //console.log("🔍: Signal-1");
     }
 
-    if (STATE.isTurnCircle) _doCities();
+    if (STATE.isTurnCircle)
+    {
+      this._doCities();
+      //player.update();
+    }
 
     /// ...
 
@@ -62,12 +78,15 @@ export class Judge {
   _doCities()
   {
     const cities = this.world.cities;
-    const player = currentPlayer();
+    const player = this.currentPlayer;
   }
 
   // В столицах спавнить героев...
   _citiesStart()
   {
+    // const player = this.currentPlayer;
+    // console.log("🔍: Signal-2", player.isTurn);
+
     const cities = this.world.cities;
 
     for (const city of cities) {
@@ -87,8 +106,8 @@ export class Judge {
   _createHero(city, owner)
   {   const hero  = Unit.spawn(owner.index, 'HERO');
       const army  = Army.spawn(owner.index, city.x, city.y, [hero]);
-      console.log(`🔍 id:${owner.index} - ${city.name}: Была создана армия расы ` +
-                  `${NAME.race(owner.index)} с героем ${hero.name}`);
+      // console.log(`🔍 id:${owner.index} - ${city.name}: Была создана армия расы ` +
+      //             `${NAME.race(owner.index)} с героем ${hero.name}`);
       return army;
   }
 }

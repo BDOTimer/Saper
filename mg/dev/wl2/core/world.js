@@ -389,6 +389,8 @@ export class WorldMap {
     this.cells = new Array(w * h);
     this.cityList = new CitiesAll(this); // ⬅️ держатель городов
     this.rivers = [];                    // [{ cells:[[x,y],...] }]
+
+    STATE.world = this;
   }
   idx(x, y) { return y * this.w + x; }
   inBounds(x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h; }

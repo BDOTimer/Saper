@@ -1,7 +1,7 @@
 // render/units-view.js
-import * as THREE from 'three';
-import { TILE } from './renderer.js';
-import { UNIT_TYPES } from '../core/units.js';
+import * as THREE      from 'three';
+import { TILE        } from './renderer.js';
+import { UNIT_TYPES  } from '../core/units.js';
 
 /* =========================================================
    РЕЕСТР НАБОРОВ (скинов) для юнитов.
@@ -382,6 +382,90 @@ export class UnitsView {
     spr.position.y = 1.35;
     return spr;
   }
+
+  /* =========================================================
+   Маркер клетки — красная 4-гранная пирамидка + основание.
+   Всего 5 граней: 4 боковые (треугольники) + 1 днище (квадрат).
+   ========================================================= */
+  static createCellMarker(size = 0.28, colorHex = 0xff3333) {
+    const group = new THREE.Group();
+
+    // Материал общий, чтобы диспоуз был один
+    const mat = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      roughness: 0.5,
+      metalness: 0.1,
+      emissive: 0x330000,
+      emissiveIntensity: 0.3,
+      side: THREE.DoubleSide,
+    });
+
+    const half = size;      // половина стороны основания
+    const height = size * 1.4;
+
+    // ── 4 боковые грани ────────────────────────────────────
+    // Вершина (апекс)
+    const apex = new THREE.Vector3(0, height, 0);
+
+    // Углы основания (в XZ), порядок по часовой стрелке
+    const c = [
+      new THREE.Vector3(-half, 0, -half),
+      new THREE.Vector3( half, 0, -half),
+      new THREE.Vector3( half, 0,  half),
+      new THREE.Vector3(-half, 0,  half),
+    ];
+
+    const sideGeo = new THREE.BufferGeometry();
+    const verts = [];
+    const normals = [];
+
+    for (let i = 0; i < 4; i++) {
+      const a = c[i];
+      const b = c[(i + 1) % 4];
+
+      // треугольник apex-a-b
+      verts.push(apex.x, apex.y, apex.z);
+      verts.push(a.x,    a.y,    a.z);
+      verts.push(b.x,    b.y,    b.z);
+
+      // нормаль грани
+      const n = new THREE.Vector3()
+        .subVectors(a, apex)
+        .cross(new THREE.Vector3().subVectors(b, apex))
+        .normalize();
+
+      for (let k = 0; k < 3; k++) normals.push(n.x, n.y, n.z);
+    }
+
+    sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    sideGeo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals, 3));
+
+    const sides = new THREE.Mesh(sideGeo, mat);
+    group.add(sides);
+
+    // ── основание (днище) ──────────────────────────────────
+    // Плоский квадрат из двух треугольников
+    const baseGeo = new THREE.BufferGeometry();
+    const bv = [];
+    const bn = [];
+
+    const baseTris = [
+      [c[0], c[1], c[2]],
+      [c[0], c[2], c[3]],
+    ];
+    for (const [p1, p2, p3] of baseTris) {
+      bv.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
+      for (let k = 0; k < 3; k++) bn.push(0, -1, 0); // нормаль вниз
+    }
+    baseGeo.setAttribute('position', new THREE.Float32BufferAttribute(bv, 3));
+    baseGeo.setAttribute('normal',   new THREE.Float32BufferAttribute(bn, 3));
+
+    const base = new THREE.Mesh(baseGeo, mat);
+    group.add(base);
+
+    group.userData = { type: 'cell-marker', size, colorHex };
+    return group;
+  }
 }
 
 /* =========================================================
@@ -401,7 +485,7 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function disposeTree(obj) {
+export function disposeTree(obj) {
   obj.traverse?.(o => {
     o.geometry?.dispose?.();
     if (Array.isArray(o.material)) o.material.forEach(m => m.dispose?.());

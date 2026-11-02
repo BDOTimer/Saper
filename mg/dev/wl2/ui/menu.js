@@ -3,7 +3,7 @@
 /// Экран "Главное меню."
 ///----------------------------------------------------------------------------:
 
-const VERSION = 'v-0.0.5.0';
+const VERSION = 'v-0.0.5.1';
 
 // MenuScreen (главное меню)
 //    ├── "В игру"  →   disabled
@@ -19,11 +19,11 @@ const GAME_NAME   = 'Грань Империи';
 const GAME_ACCENT = 'Империи';
 
 const MENU_ITEMS = [
-  { id: 'new-game',  label: 'В игру',    hint: 'Скоро',      enabled: true  },
-  { id: 'players',   label: 'Игроки',    hint: 'Кто в игре?',enabled: true  },
-  { id: 'map',       label: 'Карта',     hint: 'Выбор мира', enabled: true  },
-  { id: 'settings',  label: 'Настройки', hint: 'Скоро',      enabled: true  },
-  { id: 'about',     label: 'Описание',  hint: 'Об игре',    enabled: true  },
+  { id: 'new-game', label: 'В игру'   , hint: 'Не скоро ...', enabled: true },
+  { id: 'players' , label: 'Игроки'   , hint: 'Кто в игре?' , enabled: true },
+  { id: 'map'     , label: 'Карта'    , hint: 'Выбор мира'  , enabled: true },
+  { id: 'settings', label: 'Настройки', hint: 'Скоро'       , enabled: true },
+  { id: 'about'   , label: 'Описание' , hint: 'Об игре'     , enabled: true },
 ];
 
 /**

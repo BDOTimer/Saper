@@ -1,11 +1,12 @@
-// "./core/players.js"
+// ./core/players.js
 // class Player;       // класс 1 игрока
 // class Players;      // все игроки тут
 // class PanelPlayers; // определяем состав игроков тут
 // class Judge;        // правила, которые применяются к игровым объектам
 // class Game;         // --> экземляр игры
 
-import { STATE } from './g-state.js';
+import { STATE         } from './g-state.js';
+import { AiBrainHelper } from './ai-brain.js';
 
 // Текущая задача:
 //  - сделать Панель(оверлей) PanelPlayers в которой определить
@@ -52,6 +53,39 @@ export class Player {
 
     this.army = [];
     this._armyMap = new Map();
+  }
+
+  /**
+   * Игрок делает ход, используя AiBrainHelper
+   */
+  doStep()
+  {
+    const world = STATE.world;
+
+    for (const army of this.army)
+    {
+      console.log(
+        '🔍 doStep(): Армия:', army.id, 'количество units:', army.count);
+
+      const cellGoal = AiBrainHelper.find(world, army);
+      if  (!cellGoal) continue;
+
+      console.log("🔍: doStep()-1");
+
+      const route = AiBrainHelper.buildRoute(world, army, cellGoal);
+
+      console.log("🔍: doStep()-route", route);
+      console.log("🔍: doStep()-route.length", route.length);
+
+      if  (!route || route.length === 0) continue;
+
+      army.route = route;
+      army.cellGoal = cellGoal;
+
+      console.log('🔍 RouteView build:', army.id, 'cells=', army.route?.length);
+    }
+
+    // TODO: ...
   }
 
   /**

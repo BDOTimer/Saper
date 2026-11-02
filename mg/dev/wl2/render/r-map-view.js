@@ -32,8 +32,6 @@ export class MapView {
     this._buildOverlays();
     this._buildCities();
 
-
-
     this._buildRings();
     this._bindEvents();
     this.renderer.onResize(this.world.w, this.world.h);
