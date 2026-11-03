@@ -1,24 +1,24 @@
 // core/cell.js
 
-import { STATE, TICK     } from './g-state.js';
+import { STATE, TICK } from './g-state.js';
 
 export const CellType = Object.freeze({
-  PLAIN: 'plain',
+  PLAIN: 'plain' ,
   FOREST:'forest',
-  HILLS: 'hills',
-  MOUNT: 'mount',
-  WATER: 'water',
+  HILLS: 'hills' ,
+  MOUNT: 'mount' ,
+  WATER: 'water' ,
   // overlay-типы
-  ROAD:  'road',
-  RIVER: 'river',
+  ROAD:  'road'  ,
+  RIVER: 'river' ,
 });
 
 export const TYPE_META = {
-  plain:  { name: 'Поле',  color: 0x6d8f4e, stamina: 1, isWater: false, isMountain: false },
-  forest: { name: 'Лес',   color: 0x2f5a35, stamina: 2, isWater: false, isMountain: false },
-  hills:  { name: 'Холмы', color: 0x8a7b52, stamina: 2, isWater: false, isMountain: false },
-  mount:  { name: 'Горы',  color: 0x7d757e, stamina: 4, isWater: false, isMountain: true  },
-  water:  { name: 'Вода',  color: 0x2a5a8c, stamina: 6, isWater: true,  isMountain: false },
+  plain : { name: 'Поле' , color: 0x6d8f4e, stamina: 2, isWater: false, isMountain: false },
+  forest: { name: 'Лес'  , color: 0x2f5a35, stamina: 3, isWater: false, isMountain: false },
+  hills : { name: 'Холмы', color: 0x8a7b52, stamina: 3, isWater: false, isMountain: false },
+  mount : { name: 'Горы' , color: 0x7d757e, stamina: 4, isWater: false, isMountain: true  },
+  water : { name: 'Вода' , color: 0x2a5a8c, stamina: 6, isWater: true , isMountain: false },
 };
 
 export const OVERLAY = Object.freeze({
