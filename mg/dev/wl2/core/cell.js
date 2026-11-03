@@ -105,6 +105,9 @@ export class Cell {
 
     const world = STATE.world;
 
+    // army.debug();
+    // this.debug();
+
     const city = world.getCityAt?.(this.x, this.y)
               ?? world.cityList?.getAt?.(this.x, this.y)
               ?? null;
@@ -155,5 +158,46 @@ export class Cell {
   _reserveBattle(attacker, defenders, city) {
     // TODO: бой.
     // ...
+  }
+
+  /**
+   * Короткий отладочный дамп клетки.
+   * @param {string} [tag='Cell']
+   * @returns {object} снимок
+   */
+  debug(tag = 'Cell') {
+    const world   = STATE.world;
+    const players = STATE.players;   // Players (контейнер)
+
+    const ownerName = (id) => {
+      if (id == null) return '—';
+      const p = players?.get?.(id);
+      return p?.name ?? `P${id}`;
+    };
+
+    const city = world?.getCityAt?.(this.x, this.y)
+              ?? world?.cityList?.getAt?.(this.x, this.y)
+              ?? null;
+
+    const armies = (this.army ?? []).map(a => ({
+      id:      a?.id,
+      idOwner: a?.idOwner,
+      owner:   ownerName(a?.idOwner),
+      units:   a?.units?.filter(u => u && u.alive !== false).length ?? 0,
+    }));
+
+    const snap = {
+      x: this.x, y: this.y,
+      type: this.type,
+      overlay: this.overlayName,
+      staminaCost: this.staminaCost,
+      city: city
+        ? { name: city.name, type: city.type, owner: ownerName(city.ownerId) }
+        : null,
+      armies,
+    };
+
+    console.log(`🟩: [${tag}] (${this.x}, ${this.y})`, snap);
+    return snap;
   }
 }

@@ -12,6 +12,8 @@
 //  -   может передвигаться по Миру
 //  -   порядок в массиве ...
 
+import { STATE } from './g-state.js';
+
 /* =========================================================
    ТИПЫ ЮНИТОВ
    ========================================================= */
@@ -284,6 +286,51 @@ export class Army {
   get count() { return this.units?.length ?? 0; }
   get totalStrength() {
     return (this.units ?? []).reduce((s, u) => s + (u.power ?? u.strength ?? 0), 0);
+  }
+
+  /**
+   * Короткий отладочный дамп армии.
+   * @param {string} [tag='Army']
+   * @returns {object} снимок
+   */
+  debug(tag = 'Army') {
+    const world   = STATE.world;
+    const players = STATE.players;
+
+    const owner = players?.get?.(this.idOwner);
+    const ownerName = owner?.name ?? `P${this.idOwner ?? '—'}`;
+
+    const units = (this.units ?? []).map(u => ({
+      id:       u?.id,
+      type:     u?.typeKey ?? u?.name,
+      strength: u?.effectiveStrength ?? u?.strength ?? 0,
+      alive:    u?.alive !== false,
+    }));
+
+    const aliveUnits = units.filter(u => u.alive);
+
+    const cell = world?.get?.(this.x, this.y) ?? null;
+    const city = cell
+      ? (world.getCityAt?.(this.x, this.y) ?? world.cityList?.getAt?.(this.x, this.y) ?? null)
+      : null;
+
+    const snap = {
+      id:      this.id,
+      owner:   ownerName,
+      idOwner: this.idOwner,
+      x:       this.x,
+      y:       this.y,
+      cell:    cell ? `${cell.type}/${cell.overlayName}` : '—',
+      city:    city ? `${city.name} [${city.type}]` : null,
+      units:   `${aliveUnits.length}/${units.length}`,
+      strength: aliveUnits.reduce((s, u) => s + u.strength, 0),
+      movePoints: this.movePoints,
+      route:   this.route?.length ?? 0,
+      goal:    this.cellGoal ? `${this.cellGoal.x},${this.cellGoal.y}` : null,
+    };
+
+    console.log(`🔴: [${tag}] #${this.id} (${this.x}, ${this.y})`, snap);
+    return snap;
   }
 }
 
