@@ -159,7 +159,15 @@ export class ArmyMover {
       // Нейтральный город захватываем.     |
       //------------------------------------:
       const cell = ctx.world.get(army.x, army.y);
-      cell.onArmyArrive(army);
+      const captured = cell.onArmyArrive(army);
+
+      // Город захвачен → поднять флаг цвета игрока-победителя.
+      if (captured) {
+        const city = ctx.world.getCityAt(army.x, army.y);
+        if (city) {
+          ctx.mapView.setCityOwner(city, army.idOwner, { raised: true });
+        }
+      }
 
       ctx.unitsView.updateArmyPosition(army);        // точная посадка в клетку
       this.onArmyStep(army);

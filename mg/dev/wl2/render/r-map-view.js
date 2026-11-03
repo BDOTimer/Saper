@@ -467,6 +467,33 @@ export class MapView {
     // вешатели на window остаются — если хочешь чисто, вынеси их в _unbind
   }
 
+  /**
+   * Сменить владельца города и поднять флаг цвета нового владельца.
+   * @param {object|number} cityOrIndex
+   * @param {number|null} ownerId
+   * @param {object} [opts]
+   * @param {boolean} [opts.raised=true]  — поднять флаг
+   * @param {number}  [opts.duration=600] — длительность анимации (мс)
+   * @returns {boolean}
+   */
+  setCityOwner(cityOrIndex, ownerId, { raised = true, duration = 600 } = {}) {
+    const idx = this._resolveCityIndex(cityOrIndex);
+    if (idx < 0) return false;
+
+    const group = this.cityGroup?.children[idx];
+    const flag = group?.userData?.flag;
+    const city = group?.userData?.city;
+    if (!flag || !city) return false;
+
+    city.ownerId = ownerId ?? null;
+    flag.userData.ownerId = city.ownerId;
+
+    flag.material.color.setHex(this._ownerColor(city.ownerId));
+    flag.material.needsUpdate = true;
+
+    return this.setCityFlag(idx, raised, duration);
+  }
+
   setCityFlag(cityOrIndex, raised = true, duration = 600) {
     const idx = this._resolveCityIndex(cityOrIndex);
     if (idx < 0) return false;
