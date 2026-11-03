@@ -127,8 +127,8 @@ export class MapView {
   _worldZ(y) { return (y - (this.world.h - 1) / 2) * TILE; }
   _worldY(cell) {
     let h = 0;
-    if      (cell.type === 'mount') h = 0.35 + cell.elevation * 0.4;
-    else if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
+    // Горы стоят на общем уровне земли — без «подставки» под горой.
+    if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
     return h + 0.15;
   }
 
@@ -240,9 +240,11 @@ export class MapView {
       const rng = mulberry32((world.seed ^ 0xCAFE) + cell.x * 73856093 + cell.y * 19349663);
       const g = spawnRandomMountain(rng, { tile: TILE });
 
+      // Основание горы лежит на верхней поверхности клетки, а не в её центре:
+      // это убирает выступающий «пьедестал» под горой.
       g.position.set(
         this._worldX(cell.x),
-        this._worldY(cell),
+        this._worldY(cell) + 0.15,
         this._worldZ(cell.y),
       );
       // Лёгкая вариативность поворота, чтобы одинаковые силуэты не бросались в глаза
