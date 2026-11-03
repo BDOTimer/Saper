@@ -5,6 +5,8 @@ import { hash2       } from '../core/rng.js';
 import { CITY_TYPE   } from '../core/world.js';
 import { UnitsView   } from './r-units-view.js';
 import { disposeTree } from './r-units-view.js';
+import { mulberry32  } from '../core/rng.js';
+import { spawnRandomMountain } from './mesh.js';
 
 export class MapView {
   constructor(world, container, players = null) {
@@ -34,6 +36,7 @@ export class MapView {
 
     this._buildBoard();
     this._buildOverlays();
+    this._buildMountains();
     this._buildCities();
 
     this._buildRings();
@@ -61,6 +64,14 @@ export class MapView {
     this._disposeMesh('pickMesh');
     this._disposeMesh('roadMesh');
     this._disposeMesh('riverMesh');
+    this._disposeMesh('riverMesh');
+
+    if (this.mountainGroup) {
+      this.scene.remove(this.mountainGroup);
+      disposeTree(this.mountainGroup);
+      this.mountainGroup = null;
+    }
+
     if (this.cityGroup) {
       this.scene.remove(this.cityGroup);
       this.cityGroup.traverse?.(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
@@ -75,6 +86,7 @@ export class MapView {
 
     this._buildBoard();
     this._buildOverlays();
+    this._buildMountains();
     this._buildCities();
     this.renderer._fitTopCamera(world.w, world.h);
 
@@ -206,6 +218,38 @@ export class MapView {
       inst.instanceMatrix.needsUpdate = true;
       this.riverMesh = inst;
       this.scene.add(inst);
+    }
+  }
+
+    /**
+   * Процедурные горы: по одной THREE.Group на каждую клетку типа 'mount'.
+   * Форма выбирается детерминированно из (world.seed, x, y), поэтому
+   * одна и та же карта при пересборке даёт те же горы.
+   */
+  _buildMountains() {
+    const world = this.world;
+    const mountCells = world.cells.filter(c => c?.type === 'mount');
+    if (!mountCells.length) return;
+
+    this.mountainGroup = new THREE.Group();
+    this.mountainGroup.name = 'Mountains';
+    this.scene.add(this.mountainGroup);
+
+    for (const cell of mountCells) {
+      // Отдельный RNG на каждую клетку — не зависим от порядка обхода
+      const rng = mulberry32((world.seed ^ 0xCAFE) + cell.x * 73856093 + cell.y * 19349663);
+      const g = spawnRandomMountain(rng, { tile: TILE });
+
+      g.position.set(
+        this._worldX(cell.x),
+        this._worldY(cell),
+        this._worldZ(cell.y),
+      );
+      // Лёгкая вариативность поворота, чтобы одинаковые силуэты не бросались в глаза
+      g.rotation.y = rng() * Math.PI * 2;
+
+      g.userData.cell = cell;
+      this.mountainGroup.add(g);
     }
   }
 
@@ -345,6 +389,17 @@ export class MapView {
   _pickTile() {
     const cam = this.renderer.mode === 'top' ? this.renderer.cameraTop : this.renderer.cameraOrbit;
     this._raycaster.setFromCamera(this._mouse, cam);
+
+    // сначала — гора (если попали в неё, вернём её клетку)
+    if (this.mountainGroup) {
+      const mHits = this._raycaster.intersectObject(this.mountainGroup, true);
+      if (mHits.length) {
+        let obj = mHits[0].object;
+        while (obj && !obj.userData?.cell) obj = obj.parent;
+        if (obj?.userData?.cell) return obj.userData.cell;
+      }
+    }
+
     const hits = this._raycaster.intersectObject(this.pickMesh);
     if (!hits.length) return null;
     return this.world.cells[hits[0].instanceId];
@@ -460,6 +515,13 @@ export class MapView {
 
   destroy() {
     this.routeView?.destroy();
+
+    if (this.mountainGroup) {
+      this.scene.remove(this.mountainGroup);
+      disposeTree(this.mountainGroup);
+      this.mountainGroup = null;
+    }
+
     this.renderer?.controls?.dispose?.();
     this.renderer?.renderer?.dispose?.();
     this.renderer?.domElement?.remove?.();
