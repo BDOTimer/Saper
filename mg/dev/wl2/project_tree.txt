@@ -8,18 +8,19 @@
 │   ...
 │ 
 ├── core/
-│   ├── cell.js
+│   ├── ai-brain.js
+│   ├── cell.js               /// ☘️
 │   ├── g-game.js             /// 3: Тут логика игры ...
 │   ├── g-judge.js            /// 4: Тут судья применяет правила игры ...
 │   ├── g-loop.js             /// 1: Тут крутится вся игра ...
 │   ├── g-state.js            /// 0: Тут глобальное состояние ...
 │   ├── gen-name.js
 │   ├── generator.js
-│   ├── players.js
+│   ├── players.js            /// ☘️
 │   ├── rng.js
-│   ├── units.js
+│   ├── units.js              /// ☘️
 │   ├── world-editor.js
-│   └── world.js
+│   └── world.js              /// ☘️
 ├── css/
 │   ├── about.css
 │   ├── game.css

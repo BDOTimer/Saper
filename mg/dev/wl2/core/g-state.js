@@ -6,21 +6,24 @@ export class GameState {
     this._listeners = new Set();
     this._init(opts);
   }
-  _init({ world  = null, players = null, seed = 0 } = {}) {
-    this.world   = world;
-    this.players = players;
-    this.seed    = seed;
-    this.turn    = 1;
-    this.currentPlayerIndex = 0;
-    this.phase   = 'idle';          // idle|map|game|gameover
-    this.flags   = {};
-    this.meta    = {};
+  _init({ world  = null, players = null, seed = 0 } = {})
+  {
+    this.world   = world;         // Мир
+    this.players = players;       // Игроки
+    this.seed    = seed;          // Сид карты
+    this.turn    = 1;             // Номер круга
+    this.currentPlayerIndex = 0;  // Индекс игрока, делающего ход
+    this.phase   = 'idle';        // idle|map|game|gameover
+    this.flags   = {};            // Флаги городов(?)
+    this.meta    = {};            // ...
 
-    this.isTurnCircle = true; // Конец ходов круга.
+    this.isTurnCircle = true;     // Конец ходов круга.
   }
+
   get currentPlayer() {
     return this.players?.active()[this.currentPlayerIndex] ?? null;
   }
+
   subscribe(fn) { this._listeners.add(fn); return () => this._listeners.delete(fn); }
   _emit() { for (const fn of this._listeners) fn(this); }
   set(key, value) { this[key] = value; this._emit(); }
@@ -36,8 +39,6 @@ export class GameState {
   reset(opts = {}) { this._init(opts); this._emit(); }   // вместо new GameState
   toJSON() { /* снимок без _listeners */ }
   fromJSON(d) { /* Object.assign + _emit */ }
-
-
 }
 
 export const STATE = new GameState();

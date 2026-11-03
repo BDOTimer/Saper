@@ -29,7 +29,8 @@ export class Judge {
     // быстрый доступ: владелец клетки → Player
     this._byIndex = new Map(this.players.map(p => [p.index, p]));
 
-    this.turn = 1;
+    // Номер круга храним в глобальном состоянии — единый источник истины.
+    STATE.turn = 1;
 
     // Ожидание зелёной кнопки HUD между кругами:
     // true — круг завершился, следующий запускает игрок кнопкой.
@@ -43,13 +44,14 @@ export class Judge {
   }
 
   get currentPlayer() { return this.players[this.currentIndex] ?? null; }
+  get turn()          { return STATE.turn; }
   get isHumanTurn()   { return this.currentPlayer?.isHuman ?? false; }
   get isAwaitingNextCircle() { return this.awaitNextCircle; }
 
   /** Завершить ход текущего игрока и передать следующему */
   endTurn() {
     this.currentIndex = (this.currentIndex + 1) % this.players.length;
-    if (this.currentIndex === 0) this.turn++;
+    if (this.currentIndex === 0) STATE.turn++;
     return this.currentPlayer;
   }
 

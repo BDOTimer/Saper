@@ -585,8 +585,8 @@ export class WorldMap {
       throw new Error('distributeTerritoriesAndCapitals: нет активных игроков');
     }
 
-    const cities = world.cities;
-    const n = cities.length;
+    const cities      = world.cities;
+    const n           = cities.length;
     const playerCount = active.length;
 
     if (n < playerCount && !opts.allowEmpty) {
