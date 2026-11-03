@@ -128,7 +128,8 @@ export class MapView {
   _worldY(cell) {
     let h = 0;
     // Горы стоят на общем уровне земли — без «подставки» под горой.
-    if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
+         if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
+    else if (cell.type === 'mount') h = 0.15 + cell.elevation * 0.15;
     return h + 0.15;
   }
 

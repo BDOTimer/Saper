@@ -34,11 +34,11 @@ export const MOUNTAIN_SHAPES = Object.values(MountainShape);
 /* =========================================================
    Палитра горы
    ========================================================= */
-const C_ROCK_DARK  = new THREE.Color(0x494451);
-const C_ROCK_MID   = new THREE.Color(0x827c8d);
+const C_ROCK_DARK  = new THREE.Color(0x202020);
+const C_ROCK_MID   = new THREE.Color(0x424c4d);
 const C_ROCK_LIGHT = new THREE.Color(0xaaa4b3);
-const C_SNOW       = new THREE.Color(0xf2f4fa);
-const C_SNOW_SHADE = new THREE.Color(0xcbd3e2);
+const C_SNOW       = new THREE.Color(0xa2a4aa);
+const C_SNOW_SHADE = new THREE.Color(0x6b6362);
 const C_MOSS       = new THREE.Color(0x5f7047);
 
 const ROCK_MAT = new THREE.MeshStandardMaterial({
@@ -266,7 +266,7 @@ function paintMountain(geo, height, opts = {}) {
 
 /** 1. Одиночный острый пик. */
 function makeSpire(tile, rng) {
-  const height = tile * rand(rng, 1.35, 2.05);
+  const height = tile * rand(rng, 0.2, 2.5);
 
   const geo = buildMountainGeometry({
     height,
@@ -294,7 +294,7 @@ function makeSpire(tile, rng) {
 
 /** 2. Вытянутый гребень. */
 function makeRidge(tile, rng) {
-  const height = tile * rand(rng, 1.0, 1.5);
+  const height = tile * rand(rng, 0.2, 1.1);
 
   const geo = buildMountainGeometry({
     height,
@@ -324,8 +324,8 @@ function makeRidge(tile, rng) {
 
 /** 3. Два пика (общее основание на всю клетку). */
 function makeDouble(tile, rng) {
-  const hA = tile * rand(rng, 1.15, 1.7);
-  const hB = hA * rand(rng, 0.62, 0.82);
+  const hA = tile * rand(rng, 0.1, 1.0);
+  const hB = hA * rand(rng, 0.3, 0.8);
   const off = tile * rand(rng, 0.13, 0.18);
 
   const geoA = buildMountainGeometry({
@@ -377,7 +377,7 @@ function makeDouble(tile, rng) {
 
 /** 4. Плосковершинная («столовая») гора. */
 function makeMesa(tile, rng) {
-  const height = tile * rand(rng, 0.85, 1.25);
+  const height = tile * rand(rng, 0.1, 1.0);
   const topFrac = rand(rng, 0.42, 0.55);
 
   const geo = buildMountainGeometry({
@@ -411,7 +411,7 @@ function makeMesa(tile, rng) {
 
 /** 5. Рваный / «разрушенный» пик. */
 function makeRuined(tile, rng) {
-  const height = tile * rand(rng, 1.0, 1.55);
+  const height = tile * rand(rng, 0.1, 1.0);
   const jag = rand(rng, 0.06, 0.12);
 
   const geo = buildMountainGeometry({
