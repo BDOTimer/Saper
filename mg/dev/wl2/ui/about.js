@@ -12,8 +12,8 @@ export class GameTitle {
    * @param {HTMLElement} [opts.parent] — куда монтировать (по умолчанию document.body)
    */
   constructor(opts = {}) {
-    this.name = opts.name ?? 'Грань Империи';
-    this.accentWord = opts.accentWord ?? 'Империи';
+    this.name = opts.name ?? 'МИР ХОЛМОВ';
+    this.accentWord = opts.accentWord ?? 'ХОЛМОВ';
     this.subtitle = opts.subtitle ?? 'Remake of Warlords II';
     this.version = opts.version ?? '';
     this.parent = opts.parent ?? document.body;
@@ -101,8 +101,8 @@ export class GameTitle {
 import { GameTitle } from './ui/game-title.js';
 
 const title = new GameTitle({
-  name: 'Грань Империи',
-  accentWord: 'Империи',       // подсветится зелёным
+  name: 'МИР ХОЛМОВ',
+  accentWord: 'ХОЛМОВ',       // подсветится зелёным
   subtitle: 'Remake of Warlords II',
   version: 'v0.1.0-dev',
   parent: document.getElementById('hud'),
@@ -110,7 +110,7 @@ const title = new GameTitle({
 */
 
 const ABOUT_TEXT = `
-  <p><b>«Грань Империи»</b> — пошаговая стратегия в фэнтезийном мире и по совместительству
+  <p><b>«МИР ХОЛМОВ»</b> — пошаговая стратегия в фэнтезийном мире и по совместительству
      ремейк классической <i>Warlords II</i> (Strategic Studies Group, 1993/1995).
      Дух оригинала на месте: захват городов, армии, герои и борьба за власть.
      Всё остальное — интерфейс, баланс, графика — приведено в состояние, пригодное
@@ -151,7 +151,7 @@ const ABOUT_TEXT = `
   </ul>
 
   <h3>Наследие</h3>
-  <p>«Грань Империи» — дань уважения Warlords II, одной из классик жанра 4X/TBS,
+  <p>«МИР ХОЛМОВ» — дань уважения Warlords II, одной из классик жанра 4X/TBS,
      и попытка вернуть ощущение большой пошаговой стратегии, в которую хочется
      переигрывать. Проект самостоятельный и с Strategic Studies Group не связан:
      оригинал упоминается исключительно как источник вдохновения.</p>
@@ -187,8 +187,8 @@ export class AboutOverlay {
     titleWrap.className = 'about-title-wrap';
 
     this.title = new GameTitle({
-      name: 'Грань Империи',
-      accentWord: 'Империи',
+      name: 'МИР ХОЛМОВ',
+      accentWord: 'ХОЛМОВ',
       subtitle: 'Remake of Warlords II',
       parent: titleWrap,
     });

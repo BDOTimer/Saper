@@ -15,8 +15,8 @@ const VERSION = 'v-0.0.6.1';
 // MapEditorScreen
 //    └── "← В меню" →  MenuScreen
 
-const GAME_NAME   = 'Грань Империи';
-const GAME_ACCENT = 'Империи';
+const GAME_NAME   = 'МИР ХОЛМОВ';
+const GAME_ACCENT = 'ХОЛМОВ';
 
 const MENU_ITEMS = [
   { id: 'new-game', label: 'В игру'   , hint: 'Не скоро ...', enabled: true },
