@@ -153,10 +153,18 @@ export class ArmyMover {
       army.spendMoveAll(cost);                       // тратим очки стека
       ctx.world.moveArmy(army, a.cell.x, a.cell.y);  // перенос в модели
       ctx.routeView.consumeSteps(army, 1);           // снять красный маркер
+
+      //------------------------------------|
+      // Проверяем что или кто на клетке.   |
+      // Нейтральный город захватываем.     |
+      //------------------------------------:
+      const cell = ctx.world.get(army.x, army.y);
+      cell.onArmyArrive(army);
+
       ctx.unitsView.updateArmyPosition(army);        // точная посадка в клетку
       this.onArmyStep(army);
     } else {
-      done--;                              // шаг не состоялся
+      done--;                                        // шаг не состоялся
     }
 
     // ── продолжать маршрут той же армией? ─────────────────

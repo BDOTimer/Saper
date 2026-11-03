@@ -1,5 +1,7 @@
 // core/cell.js
 
+import { STATE, TICK     } from './g-state.js';
+
 export const CellType = Object.freeze({
   PLAIN: 'plain',
   FOREST:'forest',
@@ -81,5 +83,77 @@ export class Cell {
     const i = this.army.indexOf(army);
     if (i >= 0) { this.army.splice(i, 1); return true; }
     return false;
+  }
+
+  /**
+   * Событие «армия вошла в клетку».
+   *
+   * Вызывать после того, как армия уже добавлена в клетку
+   * (Cell.addArmy / WorldMap.moveArmy), т.е. army.x/army.y === this.x/this.y.
+   *
+   *  - Нейтральный город          → захват (ownerId = army.idOwner).
+   *  - Вражеский город:
+   *      · если в клетке есть вражеские юниты (не наши) → зарезервировать бой;
+   *      · иначе (город без гарнизона)                  → захват.
+   *  - Нейтрального/своего города нет → ничего.
+   *
+   * @param {object} army — объект армии (нужны поля idOwner, units?[])
+   * @returns {boolean} true, если город был захвачен
+   */
+  onArmyArrive(army) {
+    if (!army || army.idOwner == null) return false;
+
+    const world = STATE.world;
+
+    const city = world.getCityAt?.(this.x, this.y)
+              ?? world.cityList?.getAt?.(this.x, this.y)
+              ?? null;
+    if (!city) return false;
+
+    const owner = city.ownerId ?? null;
+
+    // ── 1. Нейтральный город → просто захват ─────────────────────
+    if (owner == null) {
+      city.ownerId = army.idOwner;
+      return true;
+    }
+
+    // ── 2. Свой город → ничего ───────────────────────────────────
+    if (owner === army.idOwner) return false;
+
+    // ── 3. Вражеский город ───────────────────────────────────────
+    // Ищем в клетке вражеские армии с живыми юнитами (не наша армия).
+    const enemies = (this.army ?? []).filter(a =>
+      a &&
+      a !== army &&
+      a.idOwner !== army.idOwner &&
+      (a.alive !== false) &&
+      Array.isArray(a.units) &&
+      a.units.some(u => u && u.alive !== false)
+    );
+
+    if (enemies.length > 0) {
+      // Гарнизон есть → бой. Пока только резервируем вызов.
+      this._reserveBattle(army, enemies, city);
+      return false;
+    }
+
+    // Гарнизона нет → захват.
+    city.ownerId = army.idOwner;
+    return true;
+  }
+
+  /**
+   * Зарезервированный метод сражения.
+   * Пока пустой: сюда придёт разрешение боя (Warlords II — 1-на-1 по порядку
+   * стека, слабые впереди, сильные сзади).
+   *
+   * @param {object} attacker — армия, вошедшая в клетку
+   * @param {object[]} defenders — вражеские армии в клетке
+   * @param {object} city — город на клетке (может быть null)
+   */
+  _reserveBattle(attacker, defenders, city) {
+    // TODO: бой.
+    // ...
   }
 }
