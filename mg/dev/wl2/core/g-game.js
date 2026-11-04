@@ -11,6 +11,7 @@ import { MapView     } from '../render/r-map-view.js';
 import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
+import { ArmyView    } from '../render/army-view.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -67,6 +68,11 @@ export class Game {
 
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
     this.mapView.lowerAllFlags(600); // Опустить все флаги...
+
+    // Панель армии: клик по модельке армии (первый юнит массива) → открывается
+    this.armyView = new ArmyView(this.mapView, {
+      getPlayers: () => this.playersModel,
+    });
 
     this._moveCtx = {
       world:     worldMap,
@@ -333,6 +339,7 @@ export class Game {
     window.removeEventListener('keydown', this._onKey);
     this.mover?.clear();
     this.judge.onTurnStart = null;
+    this.armyView?.destroy?.();
     this.mapView?.destroy?.();
     this.el.remove();
   }

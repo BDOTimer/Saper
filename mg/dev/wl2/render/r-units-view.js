@@ -304,8 +304,8 @@ export class UnitsView {
     const colorHex = player?.color ?? 0x9aa4ad;
     const skin = skinForPlayer(army.idOwner);
 
-    // 2) берём «лучшего» юнита стека для отображения
-    const top = army.strongest;
+    // 2) фигурка армии = первая модель юнита в массиве армии (ТЗ)
+    const top = army.units.find(u => u.alive) ?? army.units[0];
     if (!top) return null;
 
     // 3) строим меш юнита
