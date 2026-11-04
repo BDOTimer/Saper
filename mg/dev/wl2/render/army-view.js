@@ -1,13 +1,16 @@
 // render/army-view.js
+//
 // ТЗ:
 //  - при клике на модельке армии открывается панель
 //  - фигурка армии это первая модель юнита в массиве армии.
 //  - армия состоит из юнитов которые в массиве
 //  - открывшая панель с армией содержит:
-//      -   все модельки юнитов
-//      -   юниты стоят в ряд в порядке слева на право как в массиве
-//      -   отображаются общие статы армии
-//      -   при клике на модели юнита, отображаются статы этого юнита.
+//      -   все модельки юнитов (ряд слева направо как в массиве)
+//      -   общие статы армии
+//      -   при клике на модель юнита, отображаются статы этого юнита.
+//
+// Визуал: тёмная модальная панель 80vw×70vh по центру экрана,
+// кнопка ✕ и Esc закрывают. Стили инжектятся один раз в <head>.
 
 import * as THREE from 'three';
 import { skinForPlayer, disposeTree } from './r-units-view.js';
@@ -15,10 +18,150 @@ import { skinForPlayer, disposeTree } from './r-units-view.js';
 /** Шаг сетки между юнитами в панели (мировые единицы мини-сцены) */
 const ROW_SPACING = 1.0;
 
+const STYLE_ID = 'army-view-styles';
+
+const CSS = `
+.av-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(8, 10, 16, .55);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  opacity: 0; pointer-events: none;
+  transition: opacity .18s ease;
+}
+.av-backdrop.open { opacity: 1; pointer-events: auto; }
+
+.av-panel {
+  width: 80vw; height: 70vh;
+  min-width: 480px; min-height: 320px;
+  background: linear-gradient(160deg, #1b2130 0%, #141925 100%);
+  color: #e8ecf3;
+  border: 1px solid rgba(120,150,200,.25);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02) inset;
+  display: flex; flex-direction: column;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  transform: translateY(6px) scale(.98);
+  transition: transform .2s ease;
+  overflow: hidden;
+}
+.av-backdrop.open .av-panel { transform: translateY(0) scale(1); }
+
+.av-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(120,150,200,.18);
+  background: rgba(255,255,255,.02);
+}
+.av-swatch {
+  width: 14px; height: 14px; border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0,0,0,.35) inset, 0 0 12px currentColor;
+  flex: 0 0 auto;
+}
+.av-title  { font-size: 16px; font-weight: 700; letter-spacing: .2px; }
+.av-sub    { font-size: 12px; color: #97a3b6; }
+
+.av-close {
+  margin-left: auto;
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid rgba(120,150,200,.3);
+  background: rgba(255,255,255,.03);
+  color: #cfd7e3; cursor: pointer; font-size: 18px; line-height: 1;
+  display: grid; place-items: center;
+  transition: background .15s, color .15s, transform .1s;
+}
+.av-close:hover  { background: rgba(220,80,80,.15); color: #ff9a9a; }
+.av-close:active { transform: scale(.95); }
+
+.av-body {
+  flex: 1 1 auto; min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 0;
+}
+@media (max-width: 720px) {
+  .av-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+}
+
+.av-side {
+  padding: 16px;
+  border-right: 1px solid rgba(120,150,200,.15);
+  overflow: auto;
+  background: rgba(255,255,255,.015);
+}
+.av-main {
+  padding: 16px 18px; overflow: auto;
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 0;
+}
+
+.av-section h4 {
+  margin: 14px 0 8px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+  color: #7f8da3; font-weight: 600;
+}
+.av-section h4:first-child { margin-top: 0; }
+
+.av-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px dashed rgba(120,150,200,.12);
+  font-size: 13px;
+}
+.av-row .k { color: #8d9bb1; }
+.av-row .v { color: #e8ecf3; font-variant-numeric: tabular-nums; }
+.av-row .v.good { color: #7ee0a0; }
+.av-row .v.warn { color: #f0b070; }
+.av-row .v.bad  { color: #ff8a8a; }
+
+.av-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.av-chip {
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(120,150,200,.14);
+  border: 1px solid rgba(120,150,200,.25);
+  font-size: 12px; color: #cfd7e3;
+}
+.av-chip.hero { background: rgba(220,180,80,.16); border-color: rgba(220,180,80,.4); color: #f0c866; }
+
+/* Сцена с моделями юнитов */
+.av-row-canvas {
+  display: block; width: 100%;
+  flex: 1 1 auto; min-height: 180px;
+  background: radial-gradient(ellipse at center, #182030 0%, #0d1218 80%);
+  border: 1px solid rgba(120,150,200,.18);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.av-unit-stats {
+  padding: 10px 12px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(120,150,200,.18);
+  border-radius: 10px;
+  min-height: 64px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.av-unit-stats .muted { color: #8a97a5; font-style: italic; }
+.av-unit-stats b { color: #f0c866; }
+.av-unit-stats .star { color: #ffd166; font-weight: 700; }
+
+.av-empty {
+  padding: 24px; text-align: center; color: #7f8da3; font-style: italic;
+}
+`;
+
+function ensureStyles() {
+  if (document.getElementById(STYLE_ID)) return;
+  const s = document.createElement('style');
+  s.id = STYLE_ID;
+  s.textContent = CSS;
+  document.head.appendChild(s);
+}
+
 /* =========================================================
    ArmyView — панель состава армии.
-   Ловит клики по моделькам армий на карте и открывает DOM-панель:
-   мини-3D-сцена с рядком моделей юнитов + статы армии и выбранного юнита.
    ========================================================= */
 export class ArmyView {
   /**
@@ -40,75 +183,97 @@ export class ArmyView {
     this._raf    = null;
     this._selIdx = -1;
 
+    ensureStyles();
     this._buildPanel(opts.container ?? document.body);
     this._bindMapClick();
   }
 
   /* =========================================================
-     DOM панели
+     DOM панели — новая визуализация
      ========================================================= */
   _buildPanel(container) {
-    const root = document.createElement('div');
-    root.style.cssText = `
-      position: fixed; top: 60px; right: 12px; width: 380px;
-      background: rgba(10,14,18,0.95); color: #e6edf3;
-      border: 1px solid #2a3440; border-radius: 10px;
-      font: 13px/1.4 system-ui, sans-serif; z-index: 60;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.5);
-      display: none; user-select: none;
-    `;
-    this._root = root;
+    // backdrop
+    const back = document.createElement('div');
+    back.className = 'av-backdrop';
+    this._backdrop = back;
 
-    // заголовок + кнопка закрыть
+    // panel
+    const panel = document.createElement('div');
+    panel.className = 'av-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    back.appendChild(panel);
+
+    // header
     const head = document.createElement('div');
-    head.style.cssText = `
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px; border-bottom: 1px solid #2a3440;
-    `;
+    head.className = 'av-header';
+
     const swatch = document.createElement('span');
-    swatch.style.cssText = 'width:12px;height:12px;border-radius:3px;flex:0 0 auto;';
+    swatch.className = 'av-swatch';
     this._ownerSwatch = swatch;
 
+    const titleWrap = document.createElement('div');
     const title = document.createElement('div');
-    title.style.cssText = 'font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    title.className = 'av-title';
+    title.textContent = '—';
     this._titleEl = title;
 
+    const sub = document.createElement('div');
+    sub.className = 'av-sub';
+    sub.textContent = '—';
+    this._subEl = sub;
+
+    titleWrap.appendChild(title);
+    titleWrap.appendChild(sub);
+
     const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'av-close';
+    close.title = 'Закрыть (Esc)';
     close.textContent = '✕';
-    close.style.cssText = `
-      background:#1a222b;color:#e6edf3;border:1px solid #2a3440;border-radius:6px;
-      width:24px;height:24px;cursor:pointer;font-size:12px;
-    `;
     close.addEventListener('click', () => this.close());
 
     head.appendChild(swatch);
-    head.appendChild(title);
+    head.appendChild(titleWrap);
     head.appendChild(close);
-    root.appendChild(head);
+    panel.appendChild(head);
 
-    // общие статы армии
-    const stats = document.createElement('div');
-    stats.style.cssText = 'padding:8px 12px;border-bottom:1px solid #2a3440;';
-    this._armyStatsEl = stats;
-    root.appendChild(stats);
+    // body: left side (сводка) + main (ряд + статы)
+    const body = document.createElement('div');
+    body.className = 'av-body';
+    panel.appendChild(body);
 
-    // мини-сцена: ряд моделей юнитов
+    const side = document.createElement('aside');
+    side.className = 'av-side';
+    this._armyStatsEl = side;
+    body.appendChild(side);
+
+    const main = document.createElement('main');
+    main.className = 'av-main';
+    body.appendChild(main);
+
+    // canvas с моделями
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = `
-      display:block;width:100%;height:190px;cursor:pointer;
-      background:#0d1218;border-bottom:1px solid #2a3440;
-    `;
-    this._canvas = canvas;
+    canvas.className = 'av-row-canvas';
     canvas.addEventListener('pointerdown', (e) => this._onRowClick(e));
-    root.appendChild(canvas);
+    this._canvas = canvas;
+    main.appendChild(canvas);
 
     // статы выбранного юнита
-    const us = document.createElement('div');
-    us.style.cssText = 'padding:8px 12px;min-height:64px;';
-    this._unitStatsEl = us;
-    root.appendChild(us);
+    const unitStats = document.createElement('div');
+    unitStats.className = 'av-unit-stats';
+    this._unitStatsEl = unitStats;
+    main.appendChild(unitStats);
 
-    container.appendChild(root);
+    // закрытие по клику на backdrop и по Esc
+    back.addEventListener('click', (e) => {
+      if (e.target === back) this.close();
+    });
+    this._onEsc = (e) => { if (e.key === 'Escape' && this._open) this.close(); };
+    document.addEventListener('keydown', this._onEsc);
+
+    container.appendChild(back);
+    this._root = back;
 
     // мини-рендерер для панели (создаётся один раз, переиспользуется)
     this._rowRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -165,16 +330,16 @@ export class ArmyView {
      ========================================================= */
   show(army) {
     if (!army || !army.units?.length) return;
-    this.close();                       // на случай повторного клика по другой армии
+    this.close();
     this._army   = army;
     this._open   = true;
     this._selIdx = -1;
-    this._root.style.display = 'block';
+    this._root.classList.add('open');
 
     this._buildRowScene();
     this._refreshArmyStats();
     this._refreshTitle();
-    this._showHint();                   // «кликните по фигурке юнита...»
+    this._showHint();
 
     this._startLoop();
   }
@@ -188,11 +353,12 @@ export class ArmyView {
       this._rowScene = null;
     }
     this._rowNodes = [];
-    this._root.style.display = 'none';
+    this._root.classList.remove('open');
   }
 
   destroy() {
     this.close();
+    document.removeEventListener('keydown', this._onEsc);
     this._rowRenderer?.dispose?.();
     this._root?.remove?.();
   }
@@ -209,8 +375,8 @@ export class ArmyView {
     dir.position.set(3, 5, 4);
     this._rowScene.add(dir);
     this._rowScene.add(this._selRing);
+    this._selRing.visible = false;
 
-    // цвет скина по владельцу армии
     const players = this.getPlayers();
     const player  = players?.get?.(army.idOwner) ?? players?.list?.[army.idOwner];
     const colorHex = player?.color ?? 0x9aa4ad;
@@ -223,14 +389,12 @@ export class ArmyView {
       const mesh = skin.build(u.typeKey, colorHex);
       const holder = new THREE.Group();
       holder.add(mesh);
-      // слева направо — порядок как в массиве армии
       holder.position.x = (i - (units.length - 1) / 2) * ROW_SPACING;
       holder.userData = { type: 'unit', unit: u, index: i };
       this._rowScene.add(holder);
       this._rowNodes.push(holder);
     });
 
-    // камера панели
     this._rowCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
     this._rowCam.position.set(0, 0.7, 6);
     this._rowCam.lookAt(0, 0.7, 0);
@@ -286,7 +450,6 @@ export class ArmyView {
     const { unit, index } = holder.userData;
     this._selIdx = index;
 
-    // кольцо под выбранной фигуркой
     this._selRing.visible = true;
     this._selRing.position.set(holder.position.x, 0.02, 0);
 
@@ -300,32 +463,66 @@ export class ArmyView {
     const army = this._army;
     const players = this.getPlayers();
     const player  = players?.get?.(army.idOwner) ?? players?.list?.[army.idOwner];
-    const color = '#' + (player?.color ?? 0x9aa4ad).toString(16).padStart(6, '0');
+    const colorNum = player?.color ?? 0x9aa4ad;
+    const color = '#' + (colorNum >>> 0).toString(16).padStart(6, '0');
 
     this._ownerSwatch.style.background = color;
+    this._ownerSwatch.style.color      = color; // для glow
+
     const name = player?.name ?? `Игрок ${army.idOwner}`;
-    // фигурка армии = первая модель в массиве (heads-up в заголовке)
     const head = army.units.find(u => u.alive);
-    this._titleEl.textContent = `Армия #${army.id} — ${name}` + (head ? ` (${head.name})` : '');
+
+    this._titleEl.textContent = `Армия #${army.id}`;
+    this._subEl.textContent   = head
+      ? `${name} · ${head.name}`
+      : name;
   }
 
   _refreshArmyStats() {
     const army = this._army;
     const total = army.units.length;
-    const alive = army.units.filter(u => u.alive).length;
-    const str = army.units.filter(u => u.alive).reduce((s, u) => s + u.effectiveStrength, 0);
-    const move = army.units.filter(u => u.alive).reduce((m, u) => Math.min(m, u.moveLeft), Infinity);
+    const aliveUnits = army.units.filter(u => u.alive);
+    const alive = aliveUnits.length;
+    const str = aliveUnits.reduce((s, u) => s + u.effectiveStrength, 0);
+    const move = aliveUnits.reduce((m, u) => Math.min(m, u.moveLeft), Infinity);
+    const mp = Number.isFinite(move) ? move : 0;
+    const mpClass = mp <= 0 ? 'bad' : (mp < 3 ? 'warn' : 'good');
+
+    const route = army.route ?? [];
+    const goal  = army.cellGoal
+      ? `(${army.cellGoal.x}, ${army.cellGoal.y})`
+      : (route.length ? `(${route[route.length - 1].x}, ${route[route.length - 1].y})` : '—');
+
+    const heroes = aliveUnits.filter(u => u.isHero);
+    const heroChips = heroes.map(u =>
+      `<span class="av-chip hero">${escapeHtml(u.name ?? 'Герой')}</span>`).join('');
 
     this._armyStatsEl.innerHTML = `
-      <div>Юнитов: <b>${alive}/${total}</b> &nbsp; Сила: <b>${str}</b></div>
-      <div>Ход (осталось): <b>${Number.isFinite(move) ? move : 0}</b> &nbsp; Клетка: <b>${army.x}, ${army.y}</b></div>
+      <div class="av-section">
+        <h4>Общее</h4>
+        <div class="av-row"><span class="k">Позиция</span><span class="v">(${army.x}, ${army.y})</span></div>
+        <div class="av-row"><span class="k">Сила стека</span><span class="v good">${str}</span></div>
+        <div class="av-row"><span class="k">Юнитов</span><span class="v">${alive} / ${total}</span></div>
+        <div class="av-row"><span class="k">Очки хода</span><span class="v ${mpClass}">${mp}</span></div>
+      </div>
+
+      <div class="av-section">
+        <h4>Маршрут</h4>
+        <div class="av-row"><span class="k">Шагов</span><span class="v">${route.length}</span></div>
+        <div class="av-row"><span class="k">Цель</span><span class="v">${escapeHtml(goal)}</span></div>
+      </div>
+
+      ${heroes.length ? `
+      <div class="av-section">
+        <h4>Герои</h4>
+        <div class="av-chips">${heroChips}</div>
+      </div>` : ''}
     `;
   }
 
   _showHint() {
-    this._unitStatsEl.innerHTML = `
-      <div class="muted" style="color:#8a97a5;">Кликните по фигурке юнита, чтобы увидеть его статы.</div>
-    `;
+    this._unitStatsEl.innerHTML =
+      `<div class="muted">Кликните по фигурке юнита, чтобы увидеть его статы.</div>`;
     this._selRing.visible = false;
   }
 
@@ -337,9 +534,19 @@ export class ArmyView {
     ].filter(Boolean).join(', ');
 
     this._unitStatsEl.innerHTML = `
-      <div><b>#${index + 1} ${unit.name}</b>${unit.isHero ? ' <span style="color:#ffd166;">★ ГЕРОЙ</span>' : ''}</div>
-      <div>Сила: <b>${unit.effectiveStrength}</b> (база ${unit.strength}${mods ? '; ' + mods : ''})</div>
+      <div><b>#${index + 1} ${escapeHtml(unit.name ?? unit.typeKey ?? '—')}</b>
+        ${unit.isHero ? '<span class="star">★ ГЕРОЙ</span>' : ''}</div>
+      <div>Сила: <b>${unit.effectiveStrength}</b> (база ${unit.strength}${mods ? '; ' + escapeHtml(mods) : ''})</div>
       <div>HP: <b>${unit.hp}/${unit.maxHp}</b> &nbsp; Ход: <b>${unit.moveLeft}/${unit.move}</b></div>
     `;
   }
+}
+
+/* =========================================================
+   Вспомогательное — экранирование текста в innerHTML
+   ========================================================= */
+function escapeHtml(v) {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
