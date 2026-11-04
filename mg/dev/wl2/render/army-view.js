@@ -21,6 +21,32 @@ const ROW_SPACING = 1.0;
 const STYLE_ID = 'army-view-styles';
 
 const CSS = `
+
+/* скроллбары под общий тёмный стиль панели */
+.av-backdrop * {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3440 #141925;
+}
+.av-backdrop *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.av-backdrop *::-webkit-scrollbar-track {
+  background: #141925;
+  border-radius: 6px;
+}
+.av-backdrop *::-webkit-scrollbar-thumb {
+  background: #2a3440;
+  border-radius: 6px;
+  border: 2px solid #141925;
+}
+.av-backdrop *::-webkit-scrollbar-thumb:hover {
+  background: #3a4755;
+}
+.av-backdrop *::-webkit-scrollbar-corner {
+  background: #141925;
+}
+
 .av-backdrop {
   position: fixed; inset: 0;
   background: rgba(8, 10, 16, .55);
@@ -64,7 +90,7 @@ const CSS = `
 
 .av-close {
   margin-left: auto;
-  width: 32px; height: 32px; border-radius: 8px;
+  height: 32px; border-radius: 8px;
   border: 1px solid rgba(120,150,200,.3);
   background: rgba(255,255,255,.03);
   color: #cfd7e3; cursor: pointer; font-size: 18px; line-height: 1;
@@ -230,7 +256,7 @@ export class ArmyView {
     close.type = 'button';
     close.className = 'av-close';
     close.title = 'Закрыть (Esc)';
-    close.textContent = '✕';
+    close.textContent = 'ЗАКРЫТЬ';
     close.addEventListener('click', () => this.close());
 
     head.appendChild(swatch);
@@ -389,6 +415,7 @@ export class ArmyView {
       const mesh = skin.build(u.typeKey, colorHex);
       const holder = new THREE.Group();
       holder.add(mesh);
+       holder.scale.setScalar(0.7); 
       holder.position.x = (i - (units.length - 1) / 2) * ROW_SPACING;
       holder.userData = { type: 'unit', unit: u, index: i };
       this._rowScene.add(holder);
