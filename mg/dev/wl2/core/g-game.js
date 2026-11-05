@@ -12,6 +12,7 @@ import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
 import { ArmyView    } from '../render/army-view.js';
+import { BattleView  } from '../render/battle-view.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -51,6 +52,8 @@ export class Game {
         if (stepsDone > 0)
           this._log(`Армия #${army.id} остановилась (${army.x}, ${army.y}) — пройдено ${stepsDone} кл.`);
       },
+      // Встреча с врагом: окно боя (армия текущего хода останавливается).
+      onBattleRequest: (army, enemies) => this._onBattleRequest(army, enemies),
       // Все армии текущего игрока закончили ход → передаём ход следующему.
       onQueueEmpty: () => this._finishPlayerTurn(),
     });
@@ -72,6 +75,12 @@ export class Game {
     // Панель армии: клик по модельке армии (первый юнит массива) → открывается
     this.armyView = new ArmyView(this.mapView, {
       getPlayers: () => this.playersModel,
+    });
+
+    // Окно битвы: создаётся один раз, используется повторно при каждой встрече.
+    this.battleView = new BattleView({
+      getPlayers:   () => this.playersModel,
+      getTurnIndex: () => this.judge.currentPlayer?.index ?? -1,
     });
 
     this._moveCtx = {
@@ -283,6 +292,46 @@ export class Game {
     }
   }
 
+  /* ---------------- битвы армий ---------------- */
+
+  /**
+   * Встреча с врагом (зовёт ArmyMover через onBattleRequest):
+   * движение остановлено, очередь ждёт конца битвы.
+   * @param {Army}   attacker — армия текущего хода (в окне слева)
+   * @param {Army[]} enemies  — вражеские армии в клетке
+   */
+  _onBattleRequest(attacker, enemies) {
+    const defender = enemies[0];
+    if (!defender) return;
+
+    const dp = this.judge.playerByIndex(defender.idOwner);
+    this._log(
+      `⚔ Армия #${attacker.id} встретила армию #${defender.id}` +
+      (dp ? ` (${dp.name})` : '') + ` — бой!`, true);
+
+    this.battleView.runBattle(attacker, defender, {
+      onEnd: (winner, loser) => this._onBattleEnd(winner, loser),
+    });
+  }
+
+  /**
+   * Сигнал «конец битвы» (зовёт BattleView): снять проигравшего с карты.
+   * Мертвецы и удаление армии из мира/игрока уже сделал core/g-battle.js.
+   */
+  _onBattleEnd(winner, loser) {
+    if (loser) {
+      // меш исчезающей армии — снятие с карты (модель чистится в Battle)
+      this.mapView.unitsView.removeArmy?.(loser);
+      const lp = this.judge.playerByIndex(loser.idOwner);
+      this._log(
+        `☠ Армия #${loser.id} уничтожена; победила армия #${winner.id}` +
+        (lp ? ` (${lp.name})` : ''), true);
+    }
+
+    this.mapView.unitsView.updateArmy?.(winner);
+    this.mapView.routeView.rebuild();
+  }
+
   /** Зелёная кнопка HUD (и пробел): запустить следующий круг. */
   _onNextCircle() {
     if (!this.judge.isAwaitingNextCircle) return;  // активно только между кругами
@@ -340,6 +389,7 @@ export class Game {
     this.mover?.clear();
     this.judge.onTurnStart = null;
     this.armyView?.destroy?.();
+    this.battleView?.destroy?.();
     this.mapView?.destroy?.();
     this.el.remove();
   }

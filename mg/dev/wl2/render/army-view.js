@@ -567,6 +567,7 @@ export class ArmyView {
       <div><b>#${index + 1} ${escapeHtml(unit.name ?? unit.typeKey ?? '—')}</b>
         ${unit.isHero ? '<span class="star">★ ГЕРОЙ</span>' : ''}</div>
       <div>Сила: <b>${unit.effectiveStrength}</b> (база ${unit.strength}${mods ? '; ' + escapeHtml(mods) : ''})</div>
+      <div>Атака: <b>${unit.damage ?? 1}</b> &nbsp; Защита: <b>${unit.defense ?? 1}</b></div>
       <div>HP: <b>${unit.hp}/${unit.maxHp}</b> &nbsp; Ход: <b>${unit.moveLeft}/${unit.move}</b></div>
     `;
   }

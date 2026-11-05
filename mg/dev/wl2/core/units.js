@@ -25,6 +25,8 @@ import { STATE } from './g-state.js';
  * id      — для выбора меша/иконки в рендере
  * name    — читаемое название
  * strength— базовая боевая сила (1..9 в оригинале, здесь 1..10)
+ * damage  — атака: урон в раунде боя (влияет на вероятность победы раунда)
+ * defense — защита: сопротивление урону в раунде боя
  * move    — очков движения за ход
  * cost    — стоимость найма в золоте
  * build   — кол-во ходов производства в городе
@@ -35,23 +37,23 @@ import { NAME } from './gen-name.js';
 
 export const UNIT_TYPES = {
   // Пехота
-  LIGHT_INF:   { id: 1,  name: 'Лёгкая пехота', strength: 1, move: 4, cost: 10, build: 1, isHero: false },
-  MEDIUM_INF:  { id: 2,  name: 'Средняя пехота', strength: 3, move: 4, cost: 25, build: 2, isHero: false },
-  HEAVY_INF:   { id: 3,  name: 'Тяжёлая пехота', strength: 5, move: 3, cost: 50, build: 3, isHero: false },
+  LIGHT_INF:   { id: 1,  name: 'Лёгкая пехота', strength: 1, damage: 1,  defense: 1, move: 4, cost: 10, build: 1, isHero: false },
+  MEDIUM_INF:  { id: 2,  name: 'Средняя пехота', strength: 3, damage: 3,  defense: 3, move: 4, cost: 25, build: 2, isHero: false },
+  HEAVY_INF:   { id: 3,  name: 'Тяжёлая пехота', strength: 5, damage: 4,  defense: 6, move: 3, cost: 50, build: 3, isHero: false },
   // Кавалерия
-  LIGHT_CAV:   { id: 4,  name: 'Лёгкая кавалерия', strength: 3, move: 6, cost: 30, build: 2, isHero: false },
-  HEAVY_CAV:   { id: 5,  name: 'Тяжёлая кавалерия', strength: 6, move: 5, cost: 70, build: 4, isHero: false },
+  LIGHT_CAV:   { id: 4,  name: 'Лёгкая кавалерия', strength: 3, damage: 4,  defense: 2, move: 6, cost: 30, build: 2, isHero: false },
+  HEAVY_CAV:   { id: 5,  name: 'Тяжёлая кавалерия', strength: 6, damage: 6,  defense: 4, move: 5, cost: 70, build: 4, isHero: false },
   // Стрелки
-  ARCHERS:     { id: 6,  name: 'Лучники', strength: 2, move: 4, cost: 20, build: 2, isHero: false },
-  CROSSBOW:    { id: 7,  name: 'Арбалетчики', strength: 4, move: 4, cost: 40, build: 3, isHero: false },
+  ARCHERS:     { id: 6,  name: 'Лучники', strength: 2, damage: 3,  defense: 1, move: 4, cost: 20, build: 2, isHero: false },
+  CROSSBOW:    { id: 7,  name: 'Арбалетчики', strength: 4, damage: 4,  defense: 2, move: 4, cost: 40, build: 3, isHero: false },
   // Осадные
-  CATAPULT:    { id: 8,  name: 'Катапульта', strength: 4, move: 2, cost: 60, build: 4, isHero: false },
+  CATAPULT:    { id: 8,  name: 'Катапульта', strength: 4, damage: 6,  defense: 1, move: 2, cost: 60, build: 4, isHero: false },
   // Магия
-  MAGE:        { id: 9,  name: 'Маг', strength: 3, move: 4, cost: 80, build: 5, isHero: false },
+  MAGE:        { id: 9,  name: 'Маг', strength: 3, damage: 5,  defense: 2, move: 4, cost: 80, build: 5, isHero: false },
   // Особые
-  DRAGON:      { id: 10, name: 'Дракон', strength: 9, move: 7, cost: 200, build: 8, isHero: false },
+  DRAGON:      { id: 10, name: 'Дракон', strength: 9, damage: 10, defense: 6, move: 7, cost: 200, build: 8, isHero: false },
   // Герои (создаются отдельно, не производятся как обычные юниты)
-  HERO:        { id: 11, name: 'Герой', strength: 3, move: 5, cost: 100, build: 0, isHero: true },
+  HERO:        { id: 11, name: 'Герой', strength: 3, damage: 4,  defense: 3, move: 5, cost: 100, build: 0, isHero: true },
 };
 
 let IdCountUnit = 0;
@@ -75,6 +77,8 @@ export class Unit {
     this.typeKey  = typeKey;
     this.name     = overrides.name     ?? base.name;
     this.strength = overrides.strength ?? base.strength;
+    this.damage   = overrides.damage   ?? base.damage   ?? this.strength; // атака
+    this.defense  = overrides.defense  ?? base.defense  ?? this.strength; // защита
     this.move     = overrides.move     ?? base.move;
     this.cost     = overrides.cost     ?? base.cost;
     this.build    = overrides.build    ?? base.build;
@@ -135,7 +139,9 @@ export class Unit {
   snapshot() {
     return {
       id: this.id, idOwner: this.idOwner, typeKey: this.typeKey,
-      name: this.name, strength: this.effectiveStrength, hp: this.hp,
+      name: this.name, strength: this.effectiveStrength,
+      damage: this.damage, defense: this.defense,
+      hp: this.hp,
       move: this.move, moveLeft: this.moveLeft, isHero: this.isHero,
       bonus: this.bonus, blessed: this.blessed, encamped: this.encamped,
     };

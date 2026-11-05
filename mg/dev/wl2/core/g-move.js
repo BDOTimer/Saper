@@ -23,10 +23,12 @@
 export class ArmyMover {
   /**
    * @param {Object} [opts]
-   * @param {number}  [opts.speed=2.6]       — клеток в секунду
+    * @param {number}  [opts.speed=2.6]       — клеток в секунду
    * @param {Function} [opts.onArmyStart]    — (army, cellsPlanned)
    * @param {Function} [opts.onArmyStep]     — (army) — модельный шаг сделан
    * @param {Function} [opts.onArmyArrive]   — (army, stepsDone)
+   * @param {Function} [opts.onBattleRequest]— (army, enemies) — встречен враг;
+   *   движение останавливается до конца битвы
    * @param {Function} [opts.onQueueEmpty]   — все армии очереди закончили ход
    */
   constructor(opts = {}) {
@@ -35,6 +37,7 @@ export class ArmyMover {
     this.onArmyStart  = opts.onArmyStart  ?? (() => {});
     this.onArmyStep   = opts.onArmyStep   ?? (() => {});
     this.onArmyArrive = opts.onArmyArrive ?? (() => {});
+    this.onBattleRequest = opts.onBattleRequest ?? (() => {});
     this.onQueueEmpty = opts.onQueueEmpty ?? (() => {});
 
     /** @type {Array<Army>} — ожидающие хода (порядок сохранён) */
@@ -171,6 +174,19 @@ export class ArmyMover {
 
       ctx.unitsView.updateArmyPosition(army);        // точная посадка в клетку
       this.onArmyStep(army);
+
+      // ── встреча с врагом: бой (и город-гарнизон, и пустая клетка) ──
+      // `onArmyArrive` выше уже не позволил захватить город с гарнизоном
+      // (_reserveBattle). Здесь единая точка запуска битвы: очередь
+      // оставшихся армий и остаток хода ждут результата (onBattleRequest).
+      const enemies = this._enemyArmiesAt(cell, army);
+      if (enemies.length) {
+        ctx.routeView.consumeSteps(army, Infinity);  // снять остаток маркеров
+        army.route     = [];                         // маршрут обрывается на клетке боя
+        army.cellGoal  = null;
+        this.onBattleRequest(army, enemies);         // бой запускает Game
+        return;
+      }
     } else {
       done--;                                        // шаг не состоялся
     }
@@ -188,6 +204,23 @@ export class ArmyMover {
   }
 
   /* ---------- координаты ---------- */
+
+  /**
+   * Вражеские армии, стоящие в клетке cell (с живыми юнитами).
+   * @param {Cell} cell — клетка, куда шагнула армия
+   * @param {Army} army — эта армия (исключаем из проверки)
+   * @returns {Army[]}
+   */
+  _enemyArmiesAt(cell, army) {
+    if (!cell?.army?.length) return [];
+    return cell.army.filter(a =>
+      a && a !== army &&
+      a.idOwner !== army.idOwner &&
+      a.alive !== false &&
+      Array.isArray(a.units) &&
+      a.units.some(u => u && u.alive !== false)
+    );
+  }
 
   /** Мировая позиция клетки на сцене (верх плитки). */
   _cellPos(ctx, x, y) {
