@@ -1,10 +1,28 @@
 // g-state.js
 // import { STATE } from '../core/g-state.js';
 
+const Config =
+{
+  test: 
+  {
+    seed  : 1337,
+    map   : { minW: 10, maxW: 200, W: 20, minH: 10, maxH: 100, H: 20 },
+    cities: { min: 8, max: 20, val: 8 }
+  },
+
+  game:
+  { seed  : 1337,
+    map   : { minW: 40, maxW: 200, W: 20, minH: 40, maxH: 100, H: 20 },
+    cities: { min: 30, max: 50, val: 40 }
+  }
+};
+
 export class GameState {
   constructor(opts  = {}) {
     this._listeners = new Set();
     this._init(opts);
+
+    this.config = Config.test;
   }
   _init({ world  = null, players = null, seed = 0 } = {})
   {

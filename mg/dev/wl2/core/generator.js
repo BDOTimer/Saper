@@ -8,9 +8,9 @@ import { STATE } from './g-state.js';
 //--------------------------------------------------------------------------- ⭐
 export class WorldMapGeneratorConfig {
   constructor(overrides = {}) {
-    this.height = 50;
-    this.width  = 100;
-    this.citiesCount = 40;
+    this.height = STATE.config.map.H;
+    this.width  = STATE.config.map.W;
+    this.citiesCount = STATE.config.cities.val;
     this.riversCount =  6;
     this.water  = 0.30;
     this.forest = 0.20;
