@@ -374,7 +374,9 @@ export class ArmyView {
     this._open = false;
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
     if (this._rowScene) {
-      this._rowScene.traverse(o => { if (o !== this._selRing) disposeTree(o); });
+      // диспоузим только прямых детей сцены, _selRing не трогаем —
+      // он переиспользуется между открытиями панели
+      this._rowScene.children.forEach(o => { if (o !== this._selRing) disposeTree(o); });
       this._rowScene.clear();
       this._rowScene = null;
     }
@@ -423,8 +425,9 @@ export class ArmyView {
     });
 
     this._rowCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-    this._rowCam.position.set(0, 0.7, 6);
-    this._rowCam.lookAt(0, 0.7, 0);
+    // лёгкий наклон сверху: иначе горизонтальное кольцо видно «в ребро»
+    this._rowCam.position.set(0, 2.6, 5.0);
+    this._rowCam.lookAt(0, 0.55, 0);
   }
 
   /** подгон фрустума мини-камеры под ширину ряда и размер канваса */
@@ -478,7 +481,7 @@ export class ArmyView {
     this._selIdx = index;
 
     this._selRing.visible = true;
-    this._selRing.position.set(holder.position.x, 0.02, 0);
+    this._selRing.position.set(holder.position.x, 0.05, 0);
 
     this._showUnitStats(unit, index);
   }
