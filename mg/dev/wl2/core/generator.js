@@ -166,7 +166,7 @@ export class WorldMapGenerator {
         if (!here) break;
         if (here.type === 'water') { path.push([x, y]); break; }
         path.push([x, y]);
-        if (here.overlay !== 'road') here.addOverlay(OVERLAY.RIVER);
+        if (!here.hasRoad) here.addOverlay(OVERLAY.RIVER);
 
         let best = null, bestE = here.elevation;
         for (const nb of world.neighbors4(x, y)) {

@@ -64,7 +64,6 @@ export class MapView {
     this._disposeMesh('pickMesh');
     this._disposeMesh('roadMesh');
     this._disposeMesh('riverMesh');
-    this._disposeMesh('riverMesh');
 
     if (this.mountainGroup) {
       this.scene.remove(this.mountainGroup);
@@ -120,6 +119,7 @@ export class MapView {
     this.scene.remove(m);
     m.geometry?.dispose?.();
     m.material?.dispose?.();
+    m.dispose?.();   // InstancedMesh: освобождает instance-атрибуты
     this[name] = null;
   }
 
@@ -333,13 +333,15 @@ export class MapView {
   }
 
   _bindEvents() {
+    // сохраняем ссылки, чтобы снять слушатели в destroy() — иначе
+    // обработчики с this/mapView остаются жить в window после смены экрана
     const dom = this.renderer.domElement;
-    dom.addEventListener('contextmenu', e => e.preventDefault());
-    dom.addEventListener('pointermove', (e) => this._onPointerMove(e));
-    dom.addEventListener('pointerdown', (e) => this._onPointerDown(e));
-    window.addEventListener('resize', () => this.renderer.onResize(this.world.w, this.world.h));
 
-    window.addEventListener('wheel', (e) => {
+    this._onContextMenu = (e) => e.preventDefault();
+    this._onPointerMoveDom = (e) => this._onPointerMove(e);
+    this._onPointerDownDom = (e) => this._onPointerDown(e);
+    this._onWindowResize = () => this.renderer.onResize(this.world.w, this.world.h);
+    this._onWindowWheel = (e) => {
       if (this.renderer.mode !== 'top') return;
       e.preventDefault();
 
@@ -377,10 +379,33 @@ export class MapView {
       cam.position.x = cl.x;
       cam.position.z = cl.z;
       cam.lookAt(cam.position.x, 0, cam.position.z);
-    }, { passive: false });
+    };
 
-    window.addEventListener('keydown', (e) => { this._keys[e.code] = true; });
-    window.addEventListener('keyup',   (e) => { this._keys[e.code] = false; });
+    dom.addEventListener('contextmenu', this._onContextMenu);
+    dom.addEventListener('pointermove', this._onPointerMoveDom);
+    dom.addEventListener('pointerdown', this._onPointerDownDom);
+    window.addEventListener('resize', this._onWindowResize);
+    window.addEventListener('wheel', this._onWindowWheel, { passive: false });
+    this._onWindowKeyDown = (e) => { this._keys[e.code] = true; };
+    this._onWindowKeyUp   = (e) => { this._keys[e.code] = false; };
+    window.addEventListener('keydown', this._onWindowKeyDown);
+    window.addEventListener('keyup',   this._onWindowKeyUp);
+  }
+
+  _unbindEvents() {
+    if (!this.renderer?.domElement) return;
+    const dom = this.renderer.domElement;
+
+    dom.removeEventListener('contextmenu', this._onContextMenu);
+    dom.removeEventListener('pointermove', this._onPointerMoveDom);
+    dom.removeEventListener('pointerdown', this._onPointerDownDom);
+    window.removeEventListener('resize', this._onWindowResize);
+    window.removeEventListener('wheel', this._onWindowWheel);
+    window.removeEventListener('keydown', this._onWindowKeyDown);
+    window.removeEventListener('keyup', this._onWindowKeyUp);
+    this._onContextMenu = this._onPointerMoveDom = this._onPointerDownDom = null;
+    this._onWindowResize = this._onWindowWheel = null;
+    this._onWindowKeyDown = this._onWindowKeyUp = null;
   }
 
   _updateMouse(e) {
@@ -517,7 +542,12 @@ export class MapView {
   }
 
   destroy() {
+    this._unbindEvents();
+
     this.routeView?.destroy();
+    this.routeView = null;
+    this.unitsView?.destroy();
+    this.unitsView = null;
 
     if (this.mountainGroup) {
       this.scene.remove(this.mountainGroup);
@@ -525,11 +555,31 @@ export class MapView {
       this.mountainGroup = null;
     }
 
-    this.renderer?.controls?.dispose?.();
-    this.renderer?.renderer?.dispose?.();
-    this.renderer?.domElement?.remove?.();
-    this.scene?.clear?.();
-    // вешатели на window остаются — если хочешь чисто, вынеси их в _unbind
+    this._disposeMesh('tileMesh');
+    this._disposeMesh('pickMesh');
+    this._disposeMesh('roadMesh');
+    this._disposeMesh('riverMesh');
+
+    if (this.cityGroup) {
+      this.scene.remove(this.cityGroup);
+      disposeTree(this.cityGroup);
+      this.cityGroup = null;
+    }
+
+    for (const ring of [this.hoverRing, this.selRing]) {
+      if (!ring) continue;
+      this.scene.remove(ring);
+      ring.geometry?.dispose?.();
+      ring.material?.dispose?.();
+    }
+    this.hoverRing = this.selRing = null;
+
+    if (this.renderer) {
+      this.renderer.controls?.dispose?.();
+      this.renderer.renderer?.dispose?.();
+      this.renderer.domElement?.remove?.();
+      this.renderer.scene?.clear?.();
+    }
   }
 
   /**

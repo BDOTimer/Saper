@@ -98,7 +98,7 @@ export class Unit {
 
     if(typeKey === 'HERO')
     {
-        const  name = NAME.hero(idOwner.id);
+        const  name = NAME.hero(typeof idOwner === 'number' ? idOwner : idOwner?.id);
           unit.name = 'ГЕРОЙ: ' + name;
     }
     else
@@ -277,16 +277,7 @@ export class Army {
     };
   }
 
-  get strongest() {
-    if (!this.units?.length) return null;
-    return this.units.reduce((a, b) =>
-      (b.power ?? b.strength ?? 0) > (a.power ?? a.strength ?? 0) ? b : a
-    );
-  }
-  get count() { return this.units?.length ?? 0; }
-  get totalStrength() {
-    return (this.units ?? []).reduce((s, u) => s + (u.power ?? u.strength ?? 0), 0);
-  }
+    // ── примечание: count / totalStrength / strongest объявлены выше ──
 
   /**
    * Короткий отладочный дамп армии.
