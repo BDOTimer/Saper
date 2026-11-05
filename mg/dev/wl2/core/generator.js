@@ -28,9 +28,9 @@ export class WorldMapGeneratorConfig {
     this.normalized = {};
     for (const k of keys) this.normalized[k] = this[k] / sum;
 
-    this.height      = Math.max(40, Math.min(100, this.height|0));
-    this.width       = Math.max(40, Math.min(200, this.width|0));
-    this.citiesCount = Math.max(30, Math.min(60,  this.citiesCount|0));
+    this.height      = Math.max(STATE.config.map.minH, Math.min(STATE.config.map.maxH, this.height|0));
+    this.width       = Math.max(STATE.config.map.minW, Math.min(STATE.config.map.maxW, this.width|0));
+    this.citiesCount = Math.max(STATE.config.cities.min, Math.min(STATE.config.cities.max, this.citiesCount|0));
     this.riversCount = Math.max( 0, Math.min(20,  this.riversCount|0));
   }
 }

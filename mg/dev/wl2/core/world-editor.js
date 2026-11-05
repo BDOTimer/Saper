@@ -2,6 +2,7 @@
 import { WorldMap }                from './world.js';
 import { Cell, CellType }          from './cell.js';
 import { WorldMapGeneratorConfig, WorldMapGenerator } from './generator.js';
+import { STATE }                   from './g-state.js';
 import { MapView }                 from '../render/r-map-view.js';
 import { GeneratorPanel }          from '../ui/generator-panel.js';
 import { UI }                      from '../ui/ui.js';
@@ -17,7 +18,7 @@ export class MapEditorScreen {
 
     // конфиг и мир
     this.config = new WorldMapGeneratorConfig();
-    let world = new WorldMap(this.config.width, this.config.height, 1337);
+    let world = new WorldMap(this.config.width, this.config.height, STATE.config.seed);
     for (let y = 0; y < this.config.height; y++)
       for (let x = 0; x < this.config.width; x++)
         world.set(x, y, new Cell(x, y, CellType.PLAIN));
@@ -116,7 +117,7 @@ export class MapEditorScreen {
           <div id="typeSliders"></div>
           <h4>Seed</h4>
           <div class="seed-row">
-            <input type="number" id="seedInput" value="1337" min="0" step="1" />
+            <input type="number" id="seedInput" value="${STATE.config.seed}" min="0" step="1" />
             <button id="btnRandomSeed">🎲</button>
           </div>
         </div>

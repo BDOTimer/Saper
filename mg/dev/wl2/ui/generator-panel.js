@@ -1,5 +1,7 @@
 // ui/generator-panel.js
 
+import { STATE } from '../core/g-state.js';
+
 export class GeneratorPanel {
   constructor(config, { onGenerate }) {
     this.config = config;
@@ -53,20 +55,22 @@ export class GeneratorPanel {
 
   _buildSizeSliders() {
     const c = document.getElementById('sizeSliders');
+    const m = STATE.config.map;
     this._slider(c, {
-      label: 'Высота', value: this.config.height, min: 40, max: 100, step: 1, integer: true,
+      label: 'Высота', value: this.config.height, min: m.minH, max: m.maxH, step: 1, integer: true,
       onChange: v => this.config.height = v,
     });
     this._slider(c, {
-      label: 'Ширина', value: this.config.width, min: 40, max: 200, step: 1, integer: true,
+      label: 'Ширина', value: this.config.width, min: m.minW, max: m.maxW, step: 1, integer: true,
       onChange: v => this.config.width = v,
     });
   }
 
   _buildCountSliders() {
     const c = document.getElementById('countSliders');
+    const cities = STATE.config.cities;
     this._slider(c, {
-      label: 'Городов', value: this.config.citiesCount, min: 30, max: 60, step: 1, integer: true,
+      label: 'Городов', value: this.config.citiesCount, min: cities.min, max: cities.max, step: 1, integer: true,
       onChange: v => this.config.citiesCount = v,
     });
     this._slider(c, {

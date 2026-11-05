@@ -1,7 +1,7 @@
 // g-state.js
 // import { STATE } from '../core/g-state.js';
 
-const Config =
+export const Config =
 {
   test: 
   {
@@ -12,7 +12,7 @@ const Config =
 
   game:
   { seed  : 1337,
-    map   : { minW: 40, maxW: 200, W: 20, minH: 40, maxH: 100, H: 20 },
+    map   : { minW: 40, maxW: 200, W: 40, minH: 40, maxH: 100, H: 40 },
     cities: { min: 30, max: 50, val: 40 }
   }
 };
