@@ -346,12 +346,15 @@ export class BattleView {
     dir.position.set(3, 5, 4);
     scene.add(dir);
 
-    // земля (тёмная площадка под армиями)
+    // земля (тёмная площадка под армиями).
+    // Глубина 5 и сдвиг z=1.5 ставят дальний край (горизонт) на z=-1 —
+    // при текущей камере это ровно середина сцены по вертикали.
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 8),
+      new THREE.PlaneGeometry(40, 5),
       new THREE.MeshStandardMaterial({ color: 0x1a2130, roughness: 1 })
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.position.z = 1.5;
     scene.add(ground);
 
     this._nodesL = this._buildSide(this._left, -1);
