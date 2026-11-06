@@ -52,7 +52,9 @@ const CSS = `
 .bv-panel {
   width: 72vw; height: 62vh;
   min-width: 520px; min-height: 360px;
-  background: linear-gradient(160deg, #1b1420 0%, #141925 100%);
+  background:
+    linear-gradient(160deg, rgba(27,20,32,.55) 0%, rgba(20,25,37,.72) 100%),
+    url("./res/img/bg1.jpg") center / cover no-repeat;
   color: #e8ecf3;
   border: 1px solid rgba(200,120,90,.35);
   border-radius: 14px;
@@ -94,7 +96,9 @@ const CSS = `
 .bv-stage {
   position: relative;
   flex: 1 1 auto; min-height: 0;
-  background: radial-gradient(ellipse at center, #232030 0%, #0d1218 85%);
+  background:
+    linear-gradient(rgba(13,18,24,.35), rgba(13,18,24,.55)),
+    url("./res/img/bg2.jpg") center / cover no-repeat;
 }
 .bv-stage-canvas { display: block; width: 100%; height: 100%; }
 

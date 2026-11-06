@@ -61,7 +61,9 @@ const CSS = `
 .av-panel {
   width: 80vw; height: 70vh;
   min-width: 480px; min-height: 320px;
-  background: linear-gradient(160deg, #1b2130 0%, #141925 100%);
+  background:
+    linear-gradient(160deg, rgba(27,33,48,.55) 0%, rgba(20,25,37,.72) 100%),
+    url("./res/img/bg1.jpg") center / cover no-repeat;
   color: #e8ecf3;
   border: 1px solid rgba(120,150,200,.25);
   border-radius: 14px;
@@ -154,7 +156,9 @@ const CSS = `
 .av-row-canvas {
   display: block; width: 100%;
   flex: 1 1 auto; min-height: 180px;
-  background: radial-gradient(ellipse at center, #182030 0%, #0d1218 80%);
+  background:
+    linear-gradient(rgba(13,18,24,.35), rgba(13,18,24,.55)),
+    url("./res/img/bg2.jpg") center / cover no-repeat;
   border: 1px solid rgba(120,150,200,.18);
   border-radius: 10px;
   cursor: pointer;
