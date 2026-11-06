@@ -13,6 +13,11 @@
 //
 // Стоимость прохода берётся из Cell.staminaCost (дорога = 1).
 // Непроходимые клетки (вода/горы) в маршрут не попадают.
+//
+// Медленные армии (в стеке есть юнит с move < 3):
+//   маршрут ищется только по дорогам и полям (staminaCost <= 2),
+//   кратчайшим числом клеток; целевая клетка разрешена любой —
+//   армия войдёт в неё, потратив весь остаток хода.
 
 // class Army имеет кеш маршрута this.rote = [];
 // class Player имеет метод doStep() работающий с AiBrainHelper
@@ -117,6 +122,11 @@ export class AiBrainHelper {
     const maxCost = opts.maxCost ?? Infinity;
     const allowGoalOnWater = opts.allowGoalOnWater === true;
 
+    // Медленная армия (есть юнит с move < 3) → только дороги и поля,
+    // путь — наикратчайший по числу клеток (шаг = 1 независимо от stamina).
+    const slowArmy     = this._armyMinMove(army) < 3;
+    const maxStepCost  = slowArmy ? 2 : Infinity;   // дорога=1, поле=2
+
     // Dijkstra. Ключ — cell; value — { cost, prev }
     const open   = new MinHeap((a, b) => a.cost - b.cost);
     const costs  = new Map();  // cell -> { cost, prev }
@@ -140,7 +150,12 @@ export class AiBrainHelper {
         if (this._isImpassable(nb) && !(allowGoalOnWater && nb === cellGoal)) continue;
 
         const step = this._stepCost(nb);
-        const nc = cost + step;
+
+        // Медленная армия: промежуточные клетки — только дороги/поля
+        // (целевая клетка разрешена любой — войдёт, потратив весь остаток хода)
+        if (step > maxStepCost && nb !== cellGoal) continue;
+
+        const nc = cost + (slowArmy ? 1 : step);
         if (nc > maxCost) continue;
 
         const existing = costs.get(nb);
@@ -203,6 +218,16 @@ export class AiBrainHelper {
   /* =========================================================
      Внутренние помощники
      ========================================================= */
+
+  /** Минимальный запас хода среди живых юнитов армии. */
+  static _armyMinMove(army) {
+    let min = Infinity;
+    for (const u of army?.units ?? []) {
+      if (!u || u.alive === false) continue;
+      if (typeof u.move === 'number') min = Math.min(min, u.move);
+    }
+    return Number.isFinite(min) ? min : this.MAX_STEP_COST;
+  }
 
   /** Непроходимая ли клетка для ИИ. */
   static _isImpassable(cell) {

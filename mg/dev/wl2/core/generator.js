@@ -327,7 +327,7 @@ export class WorldMapGenerator {
       CellType.WATER, CellType.WATER,
     ];
     const landPalette = [
-      CellType.PLAIN, CellType.PLAIN, CellType.PLAIN, CellType.PLAIN,
+    //CellType.PLAIN, CellType.PLAIN, CellType.PLAIN, CellType.PLAIN,
       CellType.HILLS, CellType.HILLS,
       CellType.MOUNT, CellType.MOUNT,
     ];
