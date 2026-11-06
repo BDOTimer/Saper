@@ -5,7 +5,7 @@
 
 import { SND } from '../res/snd/--sound-lib.js';
 
-const VERSION = 'v-0.0.7.0';
+const VERSION = 'v-0.0.7.1';
 
 // MenuScreen (главное меню)
 //    ├── "В игру"  →   disabled
