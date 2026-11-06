@@ -75,14 +75,14 @@ class App {
       case 'new-game': {
         // запускаем игру: если карты ещё нет — идём в редактор
         if (!this.world)
-        {    this._playMusic();
+        {  //this._playMusic();
              this._showMapEditor();
         }
         else this._showGame();
         break;
       }
       case 'map':
-        this._playMusic();
+      //this._playMusic();
         this._showMapEditor();
         break;
       case 'players':

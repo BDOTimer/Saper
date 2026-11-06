@@ -156,6 +156,22 @@ export class Judge {
       const army  = Army.spawn(owner.index, city.x, city.y, [hero]);
       // console.log(`🔍 id:${owner.index} - ${city.name}: Была создана армия расы ` +
       //             `${NAME.race(owner.index)} с героем ${hero.name}`);
+
+      this._addUnits2ArmyHero(army, owner);
+
       return army;
+  }
+
+  _addUnits2ArmyHero(army, owner)
+  {
+    if (!army || !owner) return;
+
+    for (const typeKey of Object.keys(UNIT_TYPES))
+    {
+      if (typeKey === 'HERO') continue;       // герой уже в армии
+
+      const unit = Unit.spawn(owner.index, typeKey);
+      if (!army.addUnit(unit)) break;         // армия заполнена
+    }
   }
 }
