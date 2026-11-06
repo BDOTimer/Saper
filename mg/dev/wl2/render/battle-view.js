@@ -349,10 +349,23 @@ export class BattleView {
     // земля (тёмная площадка под армиями).
     // Глубина 5 и сдвиг z=1.5 ставят дальний край (горизонт) на z=-1 —
     // при текущей камере это ровно середина сцены по вертикали.
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 5),
-      new THREE.MeshStandardMaterial({ color: 0x1a2130, roughness: 1 })
-    );
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 1,
+      metalness: 0,
+    });
+    // Текстура земли: 1600x1000 (1.6:1), плоскость 40x5 (8:1).
+    // repeat 5x1 даёт тайл 8x5 — тоже 1.6:1, без растяжения картинки.
+    new THREE.TextureLoader().load('./res/img/bg3.jpg', (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(5, 1);
+      t.anisotropy = 4;
+      groundMat.map = t;
+      groundMat.needsUpdate = true;
+    });
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 5), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.z = 1.5;
     scene.add(ground);
