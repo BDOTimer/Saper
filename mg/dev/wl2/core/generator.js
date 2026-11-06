@@ -315,14 +315,27 @@ export class WorldMapGenerator {
     this._log(`[Test4Battle] ${W}x${H}`);
 
     // 2. Ландшафт: поля / холмы / горы / моря (детерминированно по seed).
-    const palette = [
+    //    В «коридоре» между коленами зигзага вода запрещена — только суша,
+    //    чтобы между соседними участками дороги были холмы/горы/поля.
+    const yTop    = 2;
+    const yBottom = H - 3;
+
+    const fullPalette = [
       CellType.PLAIN, CellType.PLAIN, CellType.PLAIN,
       CellType.HILLS, CellType.HILLS,
       CellType.MOUNT, CellType.MOUNT,
       CellType.WATER, CellType.WATER,
     ];
+    const landPalette = [
+      CellType.PLAIN, CellType.PLAIN, CellType.PLAIN, CellType.PLAIN,
+      CellType.HILLS, CellType.HILLS,
+      CellType.MOUNT, CellType.MOUNT,
+    ];
+
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
+        const inCorridor = x >= 1 && x <= W - 2 && y >= yTop && y <= yBottom;
+        const palette = inCorridor ? landPalette : fullPalette;
         const type = palette[Math.floor(this.rng() * palette.length)];
         const cell = new Cell(x, y, type);
         cell.elevation = (type === CellType.HILLS || type === CellType.MOUNT)
@@ -362,8 +375,11 @@ export class WorldMapGenerator {
 
   /**
    * Путь-зигзаг по 4-связности: запад → восток.
-   * Вертикальные проходы в колонках чередуют верхний и нижний край,
-   * соединяясь горизонтальными шагами. Оба конца — на средней линии.
+   *
+   * Вертикальные «колена» стоят через одну колонку (1, 3, 5, 7, …),
+   * чередуя верхний и нижний край. Между соседними коленами остаётся
+   * полоса суши, куда генератор кладёт холмы/горы/поля.
+   * Оба конца — на средней линии (города на разных сторонах карты).
    *
    * @param {number} W
    * @param {number} H
@@ -371,40 +387,50 @@ export class WorldMapGenerator {
    */
   _battleZigzagPath(W, H) {
     const path = [];
-    const seen = new Set();
-    const push = (x, y) => {
-      const k = x + ',' + y;
-      if (seen.has(k)) return;
-      seen.add(k);
-      path.push({ x, y });
-    };
+    // Без дедупликации: на обратном проходе клетки колена могут повториться,
+    // но последовательность остаётся непрерывной по 4-связности.
+    const push = (x, y) => path.push({ x, y });
 
     const yStart  = Math.floor(H / 2);
     const yTop    = 2;
     const yBottom = H - 3;
-    const lastCol = W - 2;
 
     let x = 0, y = yStart;
     push(x, y);
 
-    x = 1; push(x, y);
+    // Колена через одну колонку: 1, 3, 5, 7 (не доходя до восточного края).
+    const runCols = [];
+    for (let c = 1; c <= W - 3; c += 2) runCols.push(c);
+
+    const first = runCols[0] ?? (W - 1);
+    while (x !== first) { x += x < first ? 1 : -1; push(x, y); }
 
     let toTop = true;
-    for (let col = 1; col <= lastCol; col++) {
+    for (let i = 0; i < runCols.length; i++) {
+      const col = runCols[i];
+
+      while (x !== col) { x += x < col ? 1 : -1; push(x, y); }
+
       const targetY = toTop ? yTop : yBottom;
       while (y !== targetY) {
         y += y < targetY ? 1 : -1;
         push(x, y);
       }
-      if (col < lastCol) { x = col + 1; push(x, y); }
+
+      const next = runCols[i + 1];
+      if (next !== undefined) {
+        while (x !== next) { x += x < next ? 1 : -1; push(x, y); }
+      }
+
       toTop = !toTop;
     }
 
+    // Возврат к средней линии и вход в восточный город.
     while (y !== yStart) {
       y += y < yStart ? 1 : -1;
       push(x, y);
     }
-    x = W - 1; push(x, y);
+    while (x !== W - 1) { x += x < W - 1 ? 1 : -1; push(x, y); }
 
     return path;
   }
