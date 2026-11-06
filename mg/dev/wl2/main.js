@@ -2,6 +2,7 @@
 
 import { MenuScreen            } from './ui/menu.js';
 import { AboutOverlay          } from './ui/about.js';
+import { TUNE, TunePanel       } from './ui/tune.js';
 import { MapEditorScreen       } from './core/world-editor.js';
 import { PanelPlayers, Players } from './core/players.js';
 import { Game                  } from './core/g-game.js';
@@ -88,7 +89,7 @@ class App {
         this._showPlayers();
         break;
       case 'settings':
-        Stub.open({ title: "Настройки", text: "Настройки в разработке." });
+        TunePanel.open();
         break;
       case 'about':
         this._playMusic();
