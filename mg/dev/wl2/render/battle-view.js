@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 import { skinForPlayer, disposeTree } from './r-units-view.js';
 import { Battle, ROUND_MS, FRONT_GAP } from '../core/g-battle.js';
+import { SND } from '../res/snd/--sound-lib.js';
 
 /** Шаг сетки между юнитами стороны (мировые единицы мини-сцены) */
 const SPACING = 0.7;
@@ -291,6 +292,8 @@ export class BattleView {
     this._bannerEl.classList.remove('show');
     this._closeBtn.classList.add('hidden');
 
+    SND.startBattle.play();   // начать битву
+
     this._startLoop();
   }
 
@@ -301,6 +304,9 @@ export class BattleView {
   close(force = false) {
     if (this._open && !this._finished && !force) return;
 
+    if (this._open && !force) {
+      SND.winClose.play();   // звук закрыть окно
+    }
     this._open = false;
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
 
@@ -455,6 +461,8 @@ export class BattleView {
 
     const res = this._battle.step();
     if (!res) return;
+
+    SND.deathUnit.play();   // смерть юнита
 
     const dSec = dt / 1000;
     this._fx = {

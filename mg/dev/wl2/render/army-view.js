@@ -14,6 +14,7 @@
 
 import * as THREE from 'three';
 import { skinForPlayer, disposeTree } from './r-units-view.js';
+import { SND } from '../res/snd/--sound-lib.js';
 
 /** Шаг сетки между юнитами в панели (мировые единицы мини-сцены) */
 const ROW_SPACING = 1.0;
@@ -328,7 +329,7 @@ export class ArmyView {
     dom.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       const army = this._pickArmy(e);
-      if (army) this.show(army);
+      if (army) { SND.clickUnit.play(); this.show(army); }   // клик по юниту
     });
   }
 
@@ -375,7 +376,10 @@ export class ArmyView {
   }
 
   close() {
-    this._open = false;
+    if (this._open) {
+      SND.winClose.play();   // звук закрыть окно
+      this._open = false;
+    }
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
     if (this._rowScene) {
       // диспоузим только прямых детей сцены, _selRing не трогаем —
@@ -483,6 +487,7 @@ export class ArmyView {
   _selectUnit(holder) {
     const { unit, index } = holder.userData;
     this._selIdx = index;
+    SND.clickUnit.play();   // клик по юниту
 
     this._selRing.visible = true;
     this._selRing.position.set(holder.position.x, 0.05, 0);

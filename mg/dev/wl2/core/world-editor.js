@@ -6,6 +6,7 @@ import { STATE }                   from './g-state.js';
 import { MapView }                 from '../render/r-map-view.js';
 import { GeneratorPanel }          from '../ui/generator-panel.js';
 import { UI }                      from '../ui/ui.js';
+import { SND }                     from '../res/snd/--sound-lib.js';
 
 export class MapEditorScreen {
   constructor({ parent, onExit = () => {}, onWorldGenerated = () => {} }) {
@@ -36,20 +37,24 @@ export class MapEditorScreen {
 
     // кнопки
     this.el.querySelector('#btnExit').addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
       this.onExit();
     });
 
     const btnOrbit = this.el.querySelector('#btnCamOrbit');
     const btnTop   = this.el.querySelector('#btnCamTop');
     btnOrbit.addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
       btnOrbit.classList.add('active'); btnTop.classList.remove('active');
       this.mapView.setCameraMode('orbit');
     });
     btnTop.addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
       btnTop.classList.add('active'); btnOrbit.classList.remove('active');
       this.mapView.setCameraMode('top');
     });
     this.el.querySelector('#btnPlay').addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
       this.onWorldGenerated(this.world);   // гарантируем актуальный мир
       this.onExit?.('play');               // ← сообщаем App, что хотим в игру
     });

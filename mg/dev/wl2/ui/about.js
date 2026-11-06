@@ -2,6 +2,8 @@
 // class GameTitle;
 // class AboutOverlay;
 
+import { SND } from '../res/snd/--sound-lib.js';
+
 export class GameTitle {
   /**
    * @param {Object} [opts]
@@ -219,6 +221,7 @@ export class AboutOverlay {
   _close() {
     if (this._closed) return;
     this._closed = true;
+    SND.winClose.play();   // звук закрыть окно
     this.el.classList.remove('open');
     document.removeEventListener('keydown', this._onKey);
     // дать анимации закрытия доиграть

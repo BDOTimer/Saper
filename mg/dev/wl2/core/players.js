@@ -5,6 +5,8 @@
 // class Judge;        // правила, которые применяются к игровым объектам
 // class Game;         // --> экземляр игры
 
+import { SND } from '../res/snd/--sound-lib.js';
+
 import { STATE         } from './g-state.js';
 import { AiBrainHelper } from './ai-brain.js';
 
@@ -396,6 +398,7 @@ export class PanelPlayers {
   _close(cb) {
     if (this._closed) return;
     this._closed = true;
+    SND.winClose.play();   // звук закрыть окно
     this.el.classList.remove('open');
     document.removeEventListener('keydown', this._onKey);
     setTimeout(() => {

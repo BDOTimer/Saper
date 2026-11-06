@@ -15,6 +15,8 @@
  *   TUNE.isTestButtle = false;   // "Тест битвы"
  */
 
+import { SND } from '../res/snd/--sound-lib.js';
+
 // ---------- состояние настроек ----------
 export let TUNE = {
   isTestButtle: true, // Тест битвы
@@ -242,6 +244,7 @@ export const TunePanel = (() => {
     if (!isOpen) return;
     isOpen = false;
 
+    SND.winClose.play();   // звук закрыть окно
     root.classList.remove("open");
     root.setAttribute("aria-hidden", "true");
 

@@ -1,5 +1,5 @@
 /*!
- * --sound-lib.js — пул звуков для игр/UI
+ * res/snd/--sound-lib.js — пул звуков для игр/UI
  * Без зависимостей. Подключается через 
  * <script src="./snd/sound-lib.js"></script>
  * Публичный API: window.SND
@@ -163,13 +163,13 @@
 // Использовать так: SND.shoot.play();
 // ============================================================
 const Vol = 0.3; // Settings.volume;
-const kit = SND.createSoundKit({
-    clickMenu   : { src: "./snd/s/dzin-1.mp3", volume: Vol, pool: 4 }, // клик по кнопкам меню
-    clickBtn    : { src: "./snd/s/dzin-2.mp3", volume: Vol, pool: 4 }, // клик по кнопкам в игре и генератора карт
-    clickUnit   : { src: "./snd/s/dzin-3.mp3", volume: Vol, pool: 4 }, // клик по юниту
-    startBattle : { src: "./snd/s/st-b1.mp3" , volume: Vol, pool: 4 }, // начать битву
-    deathUnit   : { src: "./snd/s/d-u-1.mp3" , volume: Vol, pool: 4 }, // смерть юнита
-    winClose    : { src: "./snd/s/winclose-3.mp3", volume: Vol, pool: 4 }, // звук закрыть окно
+const kit = window.SND.createSoundKit({
+    clickMenu   : { src: "./res/snd/s/dzin-1.mp3", volume: Vol, pool: 4 }, // клик по кнопкам меню
+    clickBtn    : { src: "./res/snd/s/dzin-2.mp3", volume: Vol, pool: 4 }, // клик по кнопкам в игре и генератора карт
+    clickUnit   : { src: "./res/snd/s/dzin-3.mp3", volume: Vol, pool: 4 }, // клик по юниту
+    startBattle : { src: "./res/snd/s/st-b1.mp3" , volume: Vol, pool: 4 }, // начать битву
+    deathUnit   : { src: "./res/snd/s/d-u-1.mp3" , volume: Vol, pool: 4 }, // смерть юнита
+    winClose    : { src: "./res/snd/s/winclose-3.mp3", volume: Vol, pool: 4 }, // звук закрыть окно
 });
 
 kit.autoUnlock();

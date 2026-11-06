@@ -7,6 +7,7 @@
 ///  -  players.js отображает всех
 
 import { mulberry32, fbm } from './rng.js';
+import { SND } from '../res/snd/--sound-lib.js';
 import { MapView     } from '../render/r-map-view.js';
 import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
@@ -133,19 +134,23 @@ export class Game {
 
   _bindUI() {
     this.el.querySelector('#btnExitGame').addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам в игре
       this.onExit();
     });
     this.el.querySelector('#btnEndTurn').addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам в игре
       this._onNextCircle();   // зелёная кнопка: запустить следующий круг
     });
 
     const btnOrbit = this.el.querySelector('#btnCamOrbit');
     const btnTop   = this.el.querySelector('#btnCamTop');
     btnOrbit.addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам в игре
       btnOrbit.classList.add('active'); btnTop.classList.remove('active');
       this.mapView.setCameraMode('orbit');
     });
     btnTop.addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам в игре
       btnTop.classList.add('active'); btnOrbit.classList.remove('active');
       this.mapView.setCameraMode('top');
     });

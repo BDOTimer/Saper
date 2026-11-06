@@ -3,6 +3,8 @@
 /// Экран "Главное меню."
 ///----------------------------------------------------------------------------:
 
+import { SND } from '../res/snd/--sound-lib.js';
+
 const VERSION = 'v-0.0.7.0';
 
 // MenuScreen (главное меню)
@@ -95,6 +97,7 @@ export class MenuScreen {
       btn.append(label, hint);
       btn.addEventListener('click', () => {
         if (btn.disabled) return;
+        SND.clickMenu.play();   // клик по кнопкам меню
         this.onSelect(item.id, item.label);
       });
 

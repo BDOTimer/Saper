@@ -1,6 +1,7 @@
 // ui/generator-panel.js
 
 import { STATE } from '../core/g-state.js';
+import { SND } from '../res/snd/--sound-lib.js';
 
 export class GeneratorPanel {
   constructor(config, { onGenerate }) {
@@ -12,10 +13,14 @@ export class GeneratorPanel {
     this._buildTypeSliders();
 
     document.getElementById('btnRandomSeed').addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
       document.getElementById('seedInput').value = Math.floor(Math.random() * 1e6);
       this._doGenerate();
     });
-    document.getElementById('btnGen').addEventListener('click', () => this._doGenerate());
+    document.getElementById('btnGen').addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
+      this._doGenerate();
+    });
   }
 
   _doGenerate() {
