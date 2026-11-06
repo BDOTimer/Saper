@@ -2,12 +2,14 @@
 import { mulberry32, fbm } from './rng.js';
 import { Cell, CellType, OVERLAY }  from './cell.js';
 import { STATE } from './g-state.js';
+import { TUNE  } from '../ui/tune.js';
 
 //-----------------------------------------------------------------------------|
 // WorldMapGeneratorConfig
 //--------------------------------------------------------------------------- ⭐
 export class WorldMapGeneratorConfig {
   constructor(overrides = {}) {
+
     this.height = STATE.config.map.H;
     this.width  = STATE.config.map.W;
     this.citiesCount = STATE.config.cities.val;
@@ -48,6 +50,13 @@ export class WorldMapGenerator {
   _log(s) { this.logs.push(s); /* console.log('[gen]', s); */ }
 
   generate(seed = -1) {
+
+    if(TUNE.isTestButtle)
+    {
+      this._generateTest4Battle();
+      return;
+    }
+
     const cfg = this.config;
     const seedVal = seed < 0 ? Math.floor(Math.random() * 1e6) : (seed | 0);
     this.world.seed = seedVal;
@@ -284,5 +293,119 @@ export class WorldMapGenerator {
       }
     }
     return null;
+  }
+
+  _generateTest4Battle()
+  {
+    const W = 10, H = 10;
+    const world = this.world;
+
+    // 1. Принудительно приводим мир к размеру 10×10.
+    this.config.width  = W;
+    this.config.height = H;
+    world.w = W;
+    world.h = H;
+    world.cells = new Array(W * H);
+    world.cities = [];
+    world.rivers = [];
+    world.seed = 1337;
+
+    this.rng = mulberry32(world.seed);
+    this.logs = [];
+    this._log(`[Test4Battle] ${W}x${H}`);
+
+    // 2. Ландшафт: поля / холмы / горы / моря (детерминированно по seed).
+    const palette = [
+      CellType.PLAIN, CellType.PLAIN, CellType.PLAIN,
+      CellType.HILLS, CellType.HILLS,
+      CellType.MOUNT, CellType.MOUNT,
+      CellType.WATER, CellType.WATER,
+    ];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const type = palette[Math.floor(this.rng() * palette.length)];
+        const cell = new Cell(x, y, type);
+        cell.elevation = (type === CellType.HILLS || type === CellType.MOUNT)
+          ? 0.3 + this.rng() * 0.7
+          : 0.5;
+        world.set(x, y, cell);
+      }
+    }
+
+    // 3. Дорога зигзагом с запада на восток.
+    const path = this._battleZigzagPath(W, H);
+
+    // 4. Клетки дороги делаем равниной + overlay ROAD.
+    for (const { x, y } of path) {
+      const cell = world.get(x, y);
+      if (!cell) continue;
+      cell.type = CellType.PLAIN;
+      cell.elevation = 0.5;
+      cell.addOverlay(OVERLAY.ROAD);
+    }
+
+    // 5. Два города на концах дороги — на разных сторонах карты.
+    const start = path[0];
+    const end   = path[path.length - 1];
+
+    const west = world.addCity({ x: start.x, y: start.y, name: 'Западный город' });
+    const east = world.addCity({ x: end.x,   y: end.y,   name: 'Восточный город' });
+
+    const westCell = world.get(start.x, start.y);
+    const eastCell = world.get(end.x,   end.y);
+    if (west) { westCell.city = world.getCityIndex(west); westCell.removeOverlay(OVERLAY.ROAD); }
+    if (east) { eastCell.city = world.getCityIndex(east); eastCell.removeOverlay(OVERLAY.ROAD); }
+
+    this._log(`Города: ${world.cities.length}, дорога: ${path.length} клеток`);
+    return world;
+  }
+
+  /**
+   * Путь-зигзаг по 4-связности: запад → восток.
+   * Вертикальные проходы в колонках чередуют верхний и нижний край,
+   * соединяясь горизонтальными шагами. Оба конца — на средней линии.
+   *
+   * @param {number} W
+   * @param {number} H
+   * @returns {{x:number,y:number}[]}
+   */
+  _battleZigzagPath(W, H) {
+    const path = [];
+    const seen = new Set();
+    const push = (x, y) => {
+      const k = x + ',' + y;
+      if (seen.has(k)) return;
+      seen.add(k);
+      path.push({ x, y });
+    };
+
+    const yStart  = Math.floor(H / 2);
+    const yTop    = 2;
+    const yBottom = H - 3;
+    const lastCol = W - 2;
+
+    let x = 0, y = yStart;
+    push(x, y);
+
+    x = 1; push(x, y);
+
+    let toTop = true;
+    for (let col = 1; col <= lastCol; col++) {
+      const targetY = toTop ? yTop : yBottom;
+      while (y !== targetY) {
+        y += y < targetY ? 1 : -1;
+        push(x, y);
+      }
+      if (col < lastCol) { x = col + 1; push(x, y); }
+      toTop = !toTop;
+    }
+
+    while (y !== yStart) {
+      y += y < yStart ? 1 : -1;
+      push(x, y);
+    }
+    x = W - 1; push(x, y);
+
+    return path;
   }
 }
