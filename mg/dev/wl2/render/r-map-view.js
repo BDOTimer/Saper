@@ -22,6 +22,11 @@ export class MapView {
     this._onTileClick = null;
     this._keys = {};
 
+    // инерционный зум (состояние пружины)
+    this._topZoom   = null;   // { log, target, vel, ratio }
+    this._orbitZoom = null;   // { log, target, vel }
+    this._tmpDir    = new THREE.Vector3();
+
     this._raisedFlags = new Set();
     this._flagAnims = new Map();
 
@@ -342,50 +347,47 @@ export class MapView {
     this._onPointerDownDom = (e) => this._onPointerDown(e);
     this._onWindowResize = () => this.renderer.onResize(this.world.w, this.world.h);
     this._onWindowWheel = (e) => {
-      if (this.renderer.mode !== 'top') return;
+      // не мешаем прокрутке панелей/списков в HUD
+      if (e.target !== this.renderer.domElement) return;
+      const mode = this.renderer.mode;
+      if (mode !== 'top' && mode !== 'orbit') return;
+
       e.preventDefault();
+      e.stopPropagation();
 
-      const cam = this.renderer.cameraTop;
+      let dy = e.deltaY;
+      if (e.deltaMode === 1) dy *= 16;        // строки
+      else if (e.deltaMode === 2) dy *= 100;  // страницы
+      if (!dy) return;
 
-      // базовый «полный» размер фрустума — по всей карте (эталон)
-      const baseW = this.world.w * TILE * 1.1;
-      const baseH = this.world.h * TILE * 1.1;
+      // один и тот же шаг зума в логарифмическом масштабе
+      const factor = Math.exp(dy * 0.0012);
 
-      // текущий размер фрустума
-      const curW = cam.right - cam.left;
-      const curH = cam.top - cam.bottom;
-
-      const factor = e.deltaY > 0 ? 1.1 : 0.9;
-      const nextW = curW * factor;
-      const nextH = curH * factor;
-
-      // границы зума: от 14% обзора (макс. приближение) до 210% обзора (макс. отдаление)
-      const minW = baseW * 0.04;
-      const maxW = baseW * 2.1;
-      const minH = baseH * 0.04;
-      const maxH = baseH * 2.1;
-
-      const finalW = Math.max(minW, Math.min(maxW, nextW));
-      const finalH = Math.max(minH, Math.min(maxH, nextH));
-
-      cam.left   = -finalW / 2;
-      cam.right  =  finalW / 2;
-      cam.top    =  finalH / 2;
-      cam.bottom = -finalH / 2;
-      cam.updateProjectionMatrix();
-
-      // после зума нужно и позицию clamp'нуть — фрустум изменился
-      const cl = this._clampTopXZ(cam.position.x, cam.position.z);
-      cam.position.x = cl.x;
-      cam.position.z = cl.z;
-      cam.lookAt(cam.position.x, 0, cam.position.z);
+      if (mode === 'top') {
+        const z = this._topZoom ?? this._initTopZoom();
+        const lim = this._topZoomLimit(z);
+        z.target = THREE.MathUtils.clamp(
+          z.target + Math.log(factor),
+          Math.log(lim.minW),
+          Math.log(lim.maxW),
+        );
+      } else {
+        const z = this._orbitZoom ?? this._initOrbitZoom();
+        const c = this.renderer.controls;
+        z.target = THREE.MathUtils.clamp(
+          z.target + Math.log(factor),
+          Math.log(c.minDistance),
+          Math.log(c.maxDistance),
+        );
+      }
     };
 
     dom.addEventListener('contextmenu', this._onContextMenu);
     dom.addEventListener('pointermove', this._onPointerMoveDom);
     dom.addEventListener('pointerdown', this._onPointerDownDom);
     window.addEventListener('resize', this._onWindowResize);
-    window.addEventListener('wheel', this._onWindowWheel, { passive: false });
+    // capture: перехватываем wheel раньше OrbitControls, но не мешаем HUD
+    window.addEventListener('wheel', this._onWindowWheel, { passive: false, capture: true });
     this._onWindowKeyDown = (e) => { this._keys[e.code] = true; };
     this._onWindowKeyUp   = (e) => { this._keys[e.code] = false; };
     window.addEventListener('keydown', this._onWindowKeyDown);
@@ -400,12 +402,107 @@ export class MapView {
     dom.removeEventListener('pointermove', this._onPointerMoveDom);
     dom.removeEventListener('pointerdown', this._onPointerDownDom);
     window.removeEventListener('resize', this._onWindowResize);
-    window.removeEventListener('wheel', this._onWindowWheel);
+    window.removeEventListener('wheel', this._onWindowWheel, true);
     window.removeEventListener('keydown', this._onWindowKeyDown);
     window.removeEventListener('keyup', this._onWindowKeyUp);
     this._onContextMenu = this._onPointerMoveDom = this._onPointerDownDom = null;
     this._onWindowResize = this._onWindowWheel = null;
     this._onWindowKeyDown = this._onWindowKeyUp = null;
+  }
+
+  // ---------- инерционный зум ----------
+
+  _resetZoomState() {
+    this._topZoom = null;
+    this._orbitZoom = null;
+  }
+
+  _initTopZoom() {
+    const cam = this.renderer.cameraTop;
+    const w = cam.right - cam.left;
+    const h = cam.top - cam.bottom;
+    const log = Math.log(w);
+    this._topZoom = { log, target: log, vel: 0, ratio: w / h };
+    return this._topZoom;
+  }
+
+  _topZoomLimit(z) {
+    const baseW = this.world.w * TILE * 1.1;
+    const baseH = this.world.h * TILE * 1.1;
+    // одинаковый относительный диапазон, но с учётом соотношения сторон
+    const minW = Math.max(baseW * 0.04, baseH * 0.04 * z.ratio);
+    const maxW = Math.min(baseW * 2.1, baseH * 2.1 * z.ratio);
+    return { minW, maxW };
+  }
+
+  _initOrbitZoom() {
+    const c = this.renderer.controls;
+    const d = this.renderer.cameraOrbit.position.distanceTo(c.target);
+    const log = Math.log(Math.max(d, 1e-4));
+    this._orbitZoom = { log, target: log, vel: 0 };
+    return this._orbitZoom;
+  }
+
+  // пружина с демпфером в лог-пространстве: даёт инерцию и «довыброс»
+  _spring(log, vel, target, dtSec, omega = 14, zeta = 0.85) {
+    if (dtSec <= 0) return { log, vel };
+    const k = omega * omega;
+    const c = 2 * zeta * omega;
+    const x = log - target;
+    vel += (-k * x - c * vel) * dtSec;
+    log += vel * dtSec;
+    return { log, vel };
+  }
+
+  _updateTopZoom(dt) {
+    const z = this._topZoom;
+    if (!z) return;
+
+    const dtSec = Math.min(dt, 50) / 1000;
+    ({ log: z.log, vel: z.vel } = this._spring(z.log, z.vel, z.target, dtSec));
+
+    const lim = this._topZoomLimit(z);
+    const minLog = Math.log(lim.minW);
+    const maxLog = Math.log(lim.maxW);
+    if (z.log <= minLog) { z.log = minLog; z.vel = 0; }
+    else if (z.log >= maxLog) { z.log = maxLog; z.vel = 0; }
+
+    const w = Math.exp(z.log);
+    const h = w / z.ratio;
+
+    const cam = this.renderer.cameraTop;
+    cam.left   = -w / 2;
+    cam.right  =  w / 2;
+    cam.top    =  h / 2;
+    cam.bottom = -h / 2;
+    cam.updateProjectionMatrix();
+
+    // после зума нужно пересчитать clamp позиции — фрустум изменился
+    const cl = this._clampTopXZ(cam.position.x, cam.position.z);
+    cam.position.x = cl.x;
+    cam.position.z = cl.z;
+    cam.lookAt(cam.position.x, 0, cam.position.z);
+  }
+
+  _updateOrbitZoom(dt) {
+    const z = this._orbitZoom;
+    if (!z) return;
+
+    const c = this.renderer.controls;
+    const dtSec = Math.min(dt, 50) / 1000;
+    ({ log: z.log, vel: z.vel } = this._spring(z.log, z.vel, z.target, dtSec));
+
+    const minLog = Math.log(c.minDistance);
+    const maxLog = Math.log(c.maxDistance);
+    if (z.log <= minLog) { z.log = minLog; z.vel = 0; }
+    else if (z.log >= maxLog) { z.log = maxLog; z.vel = 0; }
+
+    const dist = Math.exp(z.log);
+    const cam = this.renderer.cameraOrbit;
+    const dir = this._tmpDir.copy(cam.position).sub(c.target);
+    if (dir.lengthSq() < 1e-9) return;
+    dir.normalize().multiplyScalar(dist);
+    cam.position.copy(c.target).add(dir);
   }
 
   _updateMouse(e) {
@@ -469,6 +566,7 @@ export class MapView {
 
   update(dt) {
     if (this.renderer.mode === 'top') {
+      this._updateTopZoom(dt);
       const cam = this.renderer.cameraTop;
       if (!this.renderer._focusAnim) {
         const speed = 0.6 * (cam.right - cam.left) * 0.02;
@@ -486,6 +584,7 @@ export class MapView {
       }
     } else {
       this.renderer.controls.update();
+      this._updateOrbitZoom(dt);
     }
 
     this._stepFlagAnims(dt);
