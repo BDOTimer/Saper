@@ -35,6 +35,12 @@ const LUNG_SEC = 0.28;
 /** Длительность анимации смерти проигравшего юнита, сек */
 const DEATH_SEC = 0.6;
 
+/** Скорость плавного «догона» целевой позиции при смыкании ряда, 1/сек */
+const SLIDE_RATE = 12;
+
+/** Амплитуда лёгкого «дыхания» фигурок, мировые единицы */
+const IDLE_BOB = 0.02;
+
 const STYLE_ID = 'battle-view-styles';
 
 const CSS = `
@@ -288,6 +294,7 @@ export class BattleView {
 
     this._open    = true;
     this._roundAt = 0;                       // первый раунд — через ROUND_MS
+    this._animClock = 0;                     // общий таймер idle-анимации
     this._root.classList.add('open');
     this._bannerEl.classList.remove('show');
     this._closeBtn.classList.add('hidden');
@@ -401,7 +408,29 @@ export class BattleView {
       holder.scale.setScalar(0.8);
       // i=0 — фронтовый (ближний к центру) юнит: он первым идёт в бой
       holder.position.x = dir * (FRONT_GAP + i * SPACING);
-      holder.userData = { unit: u, side: dir, index: i };
+
+      // материалы для плавного fade при гибели (с базовой прозрачностью)
+      const materials = [];
+      mesh.traverse((o) => {
+        if (!o.isMesh) return;
+        const list = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of list) {
+          if (m && !materials.some((x) => x.mat === m)) {
+            materials.push({ mat: m, opacity: m.opacity ?? 1 });
+          }
+        }
+      });
+
+      holder.userData = {
+        unit: u,
+        side: dir,
+        index: i,
+        baseX: holder.position.x,   // сглаженная базовая позиция слота
+        lunge: 0,                   // текущий выпад к центру
+        phase: Math.random() * Math.PI * 2,
+        dying: false,
+        materials,
+      };
       this._scene.add(holder);
       nodes.push(holder);
     });
@@ -417,10 +446,18 @@ export class BattleView {
     if (size.x !== w || size.y !== h) this._renderer.setSize(w, h, false);
 
     const aspect = w / h;
-    const halfH  = 1.35;
     const maxIdx = Math.max(this._nodesL.length, this._nodesR.length) - 1;
     const halfRow = FRONT_GAP + Math.max(1, maxIdx + 1) * SPACING;
-    const halfW  = Math.max(halfRow, halfH * aspect);
+
+    // Фрустум ортокамеры обязан повторять аспект канваса (halfW/halfH === aspect),
+    // иначе фигурки растягиваются/зауживаются. Если ряд не влезает по ширине —
+    // расширяем обе полуоси (зумим), а не только halfW.
+    let halfH = 1.35;
+    let halfW = halfH * aspect;
+    if (halfW < halfRow) {
+      halfW = halfRow;
+      halfH = halfW / aspect;
+    }
 
     this._cam.left = -halfW; this._cam.right = halfW;
     this._cam.top  =  halfH; this._cam.bottom = -halfH;
@@ -439,7 +476,8 @@ export class BattleView {
       if (!this._finished) {
         this._tickRound(dt);
       }
-      this._updateFx(dt);   // анимация последнего удара должна доиграться
+      this._updateFx(dt);     // анимация последнего удара должна доиграться
+      this._updateNodes(dt);  // плавное смыкание ряда + idle-«дыхание»
 
       this._fitCamera();
       this._renderer.render(this._scene, this._cam);
@@ -464,7 +502,6 @@ export class BattleView {
 
     SND.deathUnit.play();   // смерть юнита
 
-    const dSec = dt / 1000;
     this._fx = {
       t: 0,
       nodesFighter: [],   // кого анимируем выпадом
@@ -509,23 +546,62 @@ export class BattleView {
 
     fx.t += dt / 1000;
 
-    // выпад к центру: смещение к центру и обратно
+    // Выпад к центру: sin² — плавный старт и плавный возврат (нулевая
+    // производная на концах), без рывка в начале, как было у sin.
+    const lp = Math.min(1, fx.t / LUNG_SEC);
+    const lunge = Math.sin(Math.PI * lp) ** 2 * 0.35;
     for (const { n, dir } of fx.nodesFighter) {
-      const base = dir * FRONT_GAP;
-      const lunge = Math.sin(Math.min(1, fx.t / LUNG_SEC) * Math.PI) * 0.35;
-      n.position.x = base - dir * lunge;
+      n.userData.lunge = -dir * lunge;   // dir=-1 (слева) → +x к центру
     }
 
-    // гибель проигравшего: после удара исчезает (масштаб+провал+fade)
+    // Гибель проигравшего: ускоряющееся падение + сжатие + fade.
     if (fx.loser && fx.t >= LUNG_SEC) {
-      const sideDir = fx.loser.userData.side ?? 0;
-      const baseX = sideDir * FRONT_GAP;
+      const ud = fx.loser.userData;
+      ud.dying = true;
+
       const k = Math.min(1, (fx.t - LUNG_SEC) / DEATH_SEC);
-      fx.loser.scale.setScalar(Math.max(0.001, 0.8 * (1 - k)));
-      fx.loser.position.y = -0.5 * k;
+      const e = easeInCubic(k);
+      fx.loser.scale.setScalar(Math.max(0.001, 0.8 * (1 - e)));
+      fx.loser.position.y = -0.5 * e;
+
+      for (const { mat, opacity } of ud.materials) {
+        mat.transparent = true;
+        mat.opacity = opacity * (1 - k);
+      }
 
       if (k >= 1) this._endFx();
     }
+  }
+
+  /* =========================================================
+     Плавное смыкание ряда + idle-«дыхание».
+     Вызывается каждый кадр: каждая фигурка экспоненциально
+     догоняет свою целевую позицию (не зависит от FPS).
+     ========================================================= */
+  _updateNodes(dt) {
+    const sec = dt / 1000;
+    this._animClock = (this._animClock ?? 0) + sec;
+    const smooth = 1 - Math.exp(-sec * SLIDE_RATE);
+
+    const apply = (nodes, dir) => {
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        const ud = n.userData;
+
+        // целевой слот ряда: i=0 — фронт (ближе к центру)
+        const targetX = dir * (FRONT_GAP + i * SPACING);
+        ud.baseX += (targetX - ud.baseX) * smooth;
+
+        n.position.x = ud.baseX + (ud.lunge || 0);
+
+        // лёгкое покачивание, чтобы фигурки не выглядели застывшими
+        if (!ud.dying) {
+          n.position.y = Math.sin(this._animClock * 2.2 + ud.phase) * IDLE_BOB;
+        }
+      }
+    };
+    apply(this._nodesL, -1);
+    apply(this._nodesR, +1);
   }
 
   _endFx() {
@@ -533,11 +609,9 @@ export class BattleView {
     this._fx = null;
     if (!fx) return;
 
-    // вернуть выпады в исходные позиции
-    for (const { n, dir } of fx.nodesFighter) {
-      n.position.x = dir * FRONT_GAP;
-      n.position.y = 0;
-      n.scale.setScalar(0.8);
+    // вернуть выпады в исходное состояние (позицию плавно догонит _updateNodes)
+    for (const { n } of fx.nodesFighter) {
+      n.userData.lunge = 0;
     }
 
     // убрать мёртвого юнита из сцены и списков стороны
@@ -610,4 +684,9 @@ function escapeHtml(v) {
   return String(v ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Ускоряющаяся кривая (для падения погибшего юнита) */
+function easeInCubic(t) {
+  return t * t * t;
 }
