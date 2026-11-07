@@ -9,8 +9,9 @@ import { UI }                      from '../ui/ui.js';
 import { SND }                     from '../res/snd/--sound-lib.js';
 
 export class MapEditorScreen {
-  constructor({ parent, onExit = () => {}, onWorldGenerated = () => {} }) {
+  constructor({ parent, players = null, onExit = () => {}, onWorldGenerated = () => {} }) {
     this.parent = parent;
+    this.players = players;
     this.onExit = onExit;
     this.onWorldGenerated = onWorldGenerated;
 
@@ -58,6 +59,7 @@ export class MapEditorScreen {
     });
     this.el.querySelector('#btnPlay').addEventListener('click', () => {
       SND.clickBtn.play();   // клик по кнопкам генератора карт
+      this._resetGameData();               // очистить карту от прошлой партии
       this.onWorldGenerated(this.world);   // гарантируем актуальный мир
       this.onExit?.('play');               // ← сообщаем App, что хотим в игру
     });
@@ -72,7 +74,18 @@ export class MapEditorScreen {
     window.__ui       = this.ui;
   }
 
+  /**
+   * Полный сброс игровых данных перед новой партией:
+   * убирает армии/юнитов с карты и из игроков, снимает владельцев городов.
+   */
+  _resetGameData() {
+    this.world?.clearArmies?.();
+    this.world?.resetCities?.();
+    this.players?.resetArmies?.();
+  }
+
   _generate(seed) {
+    this._resetGameData();
     const ui = this.ui;
     ui.setStatus('Генерация...');
     this.el.querySelector('#genBusy').style.display = 'flex';

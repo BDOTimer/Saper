@@ -48,6 +48,7 @@ class App {
     this._clearScreen();
     this.screen = new MapEditorScreen({
       parent: this.root,
+      players: this.players,
       onExit: (reason) => {
         if (reason === 'play') this._showGame();
         else this._showMenu();
@@ -62,12 +63,20 @@ class App {
     if (!this.world) { this._showMapEditor(); return; }
 
     this._clearScreen();
+    this._resetGameData();   // не тащим армии/города из прошлой партии
     this.screen = new Game(this.world, this.players, {
       parent: this.root,
       onExit: () => this._showMenu(),
     });
     gameLoop.setScreen(this.screen);
     gameLoop.start();
+  }
+
+  /** Очистка игровых данных: армии/юниты и владельцы городов. */
+  _resetGameData() {
+    this.world?.clearArmies?.();
+    this.world?.resetCities?.();
+    this.players?.resetArmies?.();
   }
 
   _onMenuSelect(id) {

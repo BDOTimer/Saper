@@ -488,6 +488,18 @@ export class WorldMap {
     cell.addArmy(army);
   }
 
+  /** Убрать все армии со всех клеток карты. */
+  clearArmies() {
+    for (const cell of this.cells) {
+      if (cell && Array.isArray(cell.army)) cell.army.length = 0;
+    }
+  }
+
+  /** Сброс городов: снять владельцев (флаги становятся нейтральными). */
+  resetCities() {
+    return this.clearAllOwners();
+  }
+
   // ─────────────────────────────────────────────────────────────
   //  ВЛАДЕЛЬЦЫ ГОРОДОВ (делегаты)
   // ─────────────────────────────────────────────────────────────

@@ -145,6 +145,13 @@ export class Player {
     this._armyMap.delete(id);
   }
 
+  /** Убрать все армии игрока (сброс перед новой партией). */
+  clearArmies() {
+    this.army.length = 0;
+    this._armyMap.clear();
+    this.isTurn = false;
+  }
+
   set isTurn (b){        this.#isTurn = b; }
   get isTurn () { return this.#isTurn; }
   get isHuman() { return this.aiLevel === HUMAN; }
@@ -186,6 +193,11 @@ export class Players {
   setName(i, n) { if (this.list[i]) this.list[i].name = n; }
   get count()   { return this.list.length; }
   get activeCount() { return this.list.filter(p => p.active).length; }
+
+  /** Сбросить армии всех игроков (перед новой партией). */
+  resetArmies() {
+    for (const p of this.list) p.clearArmies();
+  }
 }
 
 ///----------------------------------------------------------------------------|
