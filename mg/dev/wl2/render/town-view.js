@@ -354,6 +354,62 @@ function buildCityMesh(colorHex, type = 'provincial') {
 }
 
 /* =========================================================
+   Подложка текущего производства:
+   тонированный чёрный фон в выпуклой рамке.
+   ========================================================= */
+function makeProductionBackdrop() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 320;
+  const ctx = c.getContext('2d');
+
+  const frame = ctx.createLinearGradient(0, 0, 256, 320);
+  frame.addColorStop(0, '#565d68');
+  frame.addColorStop(0.5, '#2c3138');
+  frame.addColorStop(1, '#0d0f12');
+  ctx.fillStyle = frame;
+  roundRect(ctx, 4, 4, 248, 312, 22);
+  ctx.fill();
+
+  const inner = ctx.createLinearGradient(0, 16, 0, 304);
+  inner.addColorStop(0, 'rgba(26,29,35,.97)');
+  inner.addColorStop(0.55, 'rgba(11,13,17,.98)');
+  inner.addColorStop(1, 'rgba(4,5,7,1)');
+  ctx.fillStyle = inner;
+  roundRect(ctx, 16, 16, 224, 288, 16);
+  ctx.fill();
+
+  const glow = ctx.createRadialGradient(128, 150, 8, 128, 150, 130);
+  glow.addColorStop(0, 'rgba(255,209,102,.10)');
+  glow.addColorStop(1, 'rgba(255,209,102,0)');
+  ctx.fillStyle = glow;
+  roundRect(ctx, 18, 18, 220, 284, 15);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,.12)';
+  ctx.lineWidth = 2;
+  roundRect(ctx, 17, 17, 222, 286, 15);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(0,0,0,.55)';
+  ctx.lineWidth = 3;
+  roundRect(ctx, 15, 15, 226, 290, 17);
+  ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+  });
+  const spr = new THREE.Sprite(mat);
+  spr.scale.set(1.52, 2.14, 1);
+  return spr;
+}
+
+/* =========================================================
    Подпись над моделью юнита: название + стоимость.
    ========================================================= */
 function makeUnitLabel(name, cost) {
@@ -874,6 +930,10 @@ export class TownView {
     holderCurrent.userData = { type: 'unit-current', typeKey: current };
     this._unitsRoot.add(holderCurrent);
     this._unitNodes.push({ holder: holderCurrent, typeKey: current, isCurrent: true });
+
+    const backdrop = makeProductionBackdrop();
+    backdrop.position.set(currentX, 0.56, -0.5);
+    this._unitsRoot.add(backdrop);
 
     if (current) {
       const label = makeUnitLabel(
