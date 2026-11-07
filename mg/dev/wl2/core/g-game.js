@@ -112,8 +112,8 @@ export class Game {
     this._log(
 `Партия начата. Игроков: ${this.judge.players.length}. Ход ${this.judge.turn}.`);
 
-    // первая камера
-    this.mapView.setCameraMode('orbit');
+    // первая камера: старт издалека и подлёт к карте на весь экран
+    this.mapView.playIntroCamera();
   }
 
   /* ---------------- UI ---------------- */

@@ -118,6 +118,15 @@ export class MapView {
     if (mode === 'top') this.renderer._fitTopCamera(this.world.w, this.world.h);
   }
 
+  /**
+   * Вступительная анимация камеры: карта сначала видна издалека,
+   * затем камера подлетает так, что карта занимает весь экран.
+   */
+  playIntroCamera(opts = {}) {
+    this.renderer.setCameraMode('orbit');
+    this.renderer.flyInToMap(this.world.w, this.world.h, opts);
+  }
+
   _disposeMesh(name) {
     const m = this[name];
     if (!m) return;
@@ -372,6 +381,13 @@ export class MapView {
           Math.log(lim.maxW),
         );
       } else {
+        // во время вступительного подлёта дистанцию задаёт анимация —
+        // колесо просто масштабирует её траекторию.
+        const fa = this.renderer._focusAnim;
+        if (fa?.kind === 'fly') {
+          fa.zoomFactor = THREE.MathUtils.clamp((fa.zoomFactor ?? 1) * factor, 0.1, 1.5);
+          return;
+        }
         const z = this._orbitZoom ?? this._initOrbitZoom();
         const c = this.renderer.controls;
         z.target = THREE.MathUtils.clamp(
@@ -565,6 +581,10 @@ export class MapView {
   }
 
   update(dt) {
+    // сначала двигаем камеру анимацией фокуса/подлёта,
+    // затем применяем зум — чтобы колесо работало и во время движения.
+    this.renderer._stepFocusAnim(dt);
+
     if (this.renderer.mode === 'top') {
       this._updateTopZoom(dt);
       const cam = this.renderer.cameraTop;
@@ -584,7 +604,11 @@ export class MapView {
       }
     } else {
       this.renderer.controls.update();
-      this._updateOrbitZoom(dt);
+      // во время подлёта дистанцией управляет сама анимация (zoomFactor),
+      // поэтому пружину зума не трогаем — иначе она будет спорить с ней.
+      if (this.renderer._focusAnim?.kind !== 'fly') {
+        this._updateOrbitZoom(dt);
+      }
     }
 
     this._stepFlagAnims(dt);
