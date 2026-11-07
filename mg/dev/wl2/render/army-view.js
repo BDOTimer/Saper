@@ -106,7 +106,7 @@ const CSS = `
 .av-body {
   flex: 1 1 auto; min-height: 0;
   display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
+  grid-template-columns: minmax(173px, 213px) 1fr;
   gap: 0;
 }
 @media (max-width: 720px) {
@@ -446,9 +446,17 @@ export class ArmyView {
     if (size.x !== w || size.y !== h) this._rowRenderer.setSize(w, h, false);
 
     const aspect  = w / h;
-    const halfH   = 0.95;
     const halfRow = (this._rowNodes.length * ROW_SPACING) / 2 + 0.15;
-    const halfW   = Math.max(halfRow, halfH * aspect);
+
+    // Фрустум ортокамеры обязан повторять аспект канваса (halfW/halfH === aspect),
+    // иначе фигурки растягиваются/зауживаются. Если ряд не влезает по ширине —
+    // расширяем обе полуоси (зумим), а не только halfW.
+    let halfH = 0.95;
+    let halfW = halfH * aspect;
+    if (halfW < halfRow) {
+      halfW = halfRow;
+      halfH = halfW / aspect;
+    }
 
     this._rowCam.left = -halfW; this._rowCam.right = halfW;
     this._rowCam.top  =  halfH; this._rowCam.bottom = -halfH;
