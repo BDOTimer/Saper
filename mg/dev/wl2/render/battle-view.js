@@ -362,27 +362,30 @@ export class BattleView {
     scene.add(dir);
 
     // земля (тёмная площадка под армиями).
-    // Глубина 5 и сдвиг z=1.5 ставят дальний край (горизонт) на z=-1 —
-    // при текущей камере это ровно середина сцены по вертикали.
+    // Дальний край (горизонт) держим на z=-1 — ровно середина сцены по
+    // вертикали, как и раньше. Ближний край уводим к камере (z=+7),
+    // чтобы внизу суб-окна не просвечивал фон.
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 1,
       metalness: 0,
     });
-    // Текстура земли: 1600x1000 (1.6:1), плоскость 40x5 (8:1).
-    // repeat 5x1 даёт тайл 8x5 — тоже 1.6:1, без растяжения картинки.
+    // Текстура земли: 1600x1000 (1.6:1), плоскость 40x8.
+    // repeat 5x1.6 даёт тайл 8x5 — та же плотность, что и раньше.
+    // offset.y выравнивает рисунок по дальнему краю (горизонту).
     new THREE.TextureLoader().load('./res/img/bg3.jpg', (t) => {
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(5, 1);
+      t.repeat.set(5, 1.6);
+      t.offset.y = 1 - 1.6;
       t.anisotropy = 4;
       groundMat.map = t;
       groundMat.needsUpdate = true;
     });
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 5), groundMat);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 8), groundMat);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.z = 1.5;
+    ground.position.z = 3.0;
     scene.add(ground);
 
     this._nodesL = this._buildSide(this._left, -1);
