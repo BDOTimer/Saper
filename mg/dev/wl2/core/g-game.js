@@ -13,6 +13,7 @@ import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
 import { ArmyView    } from '../render/army-view.js';
+import { TownView    } from '../render/town-view.js';
 import { BattleView  } from '../render/battle-view.js';
 
 ///----------------------------------------------------------------------------|
@@ -79,6 +80,12 @@ export class Game {
 
     // Панель армии: клик по модельке армии (первый юнит массива) → открывается
     this.armyView = new ArmyView(this.mapView, {
+      getPlayers: () => this.playersModel,
+    });
+
+    // Панель города: клик по модельке города на карте → открывается.
+    // TownView — singleton, при смене карты сам перепривязывается.
+    this.townView = TownView.get(this.mapView, {
       getPlayers: () => this.playersModel,
     });
 
@@ -401,6 +408,7 @@ export class Game {
     this.mover?.clear();
     this.judge.onTurnStart = null;
     this.armyView?.destroy?.();
+    this.townView?.destroy?.();
     this.battleView?.destroy?.();
     this.mapView?.destroy?.();
     this.el.remove();
