@@ -497,6 +497,7 @@ export class TownView {
     this._cityRoot = null;
     this._boundDom = null;
     this._onDomDown = null;
+    this._selType = null;
 
     ensureStyles();
     this._buildPanel(opts.container ?? document.body);
@@ -731,6 +732,7 @@ export class TownView {
     if (!city) return;
     this.close();
     this._city = city;
+    this._selType = null;
     this._open = true;
     this._root.classList.add('open');
 
@@ -944,14 +946,6 @@ export class TownView {
       this._unitsRoot.add(label);
     }
 
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.32, 0.38, 28),
-      new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95 })
-    );
-    ring.geometry.rotateX(-Math.PI / 2);
-    ring.position.set(currentX, 0.04, 0);
-    this._unitsRoot.add(ring);
-
     options.forEach((typeKey, i) => {
       const holder = new THREE.Group();
       const mesh = skin.build(typeKey, colorHex);
@@ -969,6 +963,22 @@ export class TownView {
       label.position.set(holder.position.x, 1.52, 0);
       this._unitsRoot.add(label);
     });
+
+    // Кольцо выбора — на юните, по которому кликнул игрок
+    // (по умолчанию — на юните текущего производства).
+    const ringKey = (this._selType && options.includes(this._selType))
+      ? this._selType
+      : current;
+    const ringIdx = options.indexOf(ringKey);
+    if (ringIdx >= 0) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.32, 0.38, 28),
+        new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95 })
+      );
+      ring.geometry.rotateX(-Math.PI / 2);
+      ring.position.set(centered[ringIdx + 1], 0.04, 0);
+      this._unitsRoot.add(ring);
+    }
 
     this._refreshProductionBar();
   }
@@ -1019,10 +1029,13 @@ export class TownView {
 
   _selectProduction(typeKey) {
     if (!this._city || !UNIT_TYPES[typeKey]) return;
-    if (this._city.production === typeKey) return;
 
-    this._city.production = typeKey;
-    SND.clickUnit.play();
+    this._selType = typeKey;
+
+    if (this._city.production !== typeKey) {
+      this._city.production = typeKey;
+      SND.clickUnit.play();
+    }
 
     this._buildUnitsRow();
     this._refreshStats();
