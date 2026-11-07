@@ -395,7 +395,9 @@ export class ArmyView {
   destroy() {
     this.close();
     document.removeEventListener('keydown', this._onEsc);
+    this._rowRenderer?.forceContextLoss?.();
     this._rowRenderer?.dispose?.();
+    this._rowRenderer = null;
     this._root?.remove?.();
   }
 

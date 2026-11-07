@@ -53,6 +53,26 @@ export class Renderer {
     this._buildLights();
   }
 
+  /**
+   * Полностью освободить WebGL-контекст.
+   * dispose() сам по себе НЕ освобождает контекст — нужен forceContextLoss(),
+   * иначе браузер копит активные контексты и пишет
+   * "Too many active WebGL contexts".
+   */
+  dispose() {
+    this._focusAnim = null;
+    this.controls?.dispose?.();
+    this.scene?.clear?.();
+    const gl = this.renderer;
+    if (gl) {
+      gl.dispose?.();
+      gl.forceContextLoss?.();
+      gl.domElement?.remove?.();
+    }
+    this.renderer = null;
+    this.controls = null;
+  }
+
   _buildLights() {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.65));
     const dir = new THREE.DirectionalLight(0xffffff, 0.85);

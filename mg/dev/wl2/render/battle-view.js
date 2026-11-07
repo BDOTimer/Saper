@@ -343,7 +343,9 @@ export class BattleView {
   destroy() {
     this.close(true);
     document.removeEventListener('keydown', this._onEsc);
+    this._renderer?.forceContextLoss?.();
     this._renderer?.dispose?.();
+    this._renderer = null;
     this._root?.remove?.();
   }
 

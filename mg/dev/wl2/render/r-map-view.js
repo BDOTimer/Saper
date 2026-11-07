@@ -698,10 +698,8 @@ export class MapView {
     this.hoverRing = this.selRing = null;
 
     if (this.renderer) {
-      this.renderer.controls?.dispose?.();
-      this.renderer.renderer?.dispose?.();
-      this.renderer.domElement?.remove?.();
-      this.renderer.scene?.clear?.();
+      this.renderer.dispose?.();
+      this.renderer = null;
     }
   }
 

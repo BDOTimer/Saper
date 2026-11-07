@@ -760,8 +760,12 @@ export class TownView {
     this.close();
     document.removeEventListener('keydown', this._onEsc);
     this._unbindMapClick();
+    this._cityRenderer?.forceContextLoss?.();
     this._cityRenderer?.dispose?.();
+    this._cityRenderer = null;
+    this._unitsRenderer?.forceContextLoss?.();
     this._unitsRenderer?.dispose?.();
+    this._unitsRenderer = null;
     this._root?.remove?.();
     if (TownView._instance === this) TownView._instance = null;
   }
