@@ -99,7 +99,7 @@ const CSS = `
   flex: 1 1 auto; min-height: 0;
   background:
     linear-gradient(rgba(13,18,24,.35), rgba(13,18,24,.55)),
-    url("./res/img/bg2.jpg") center / cover no-repeat;
+    url("./res/img/bg5.jpg") center / cover no-repeat;
 }
 .bv-stage-canvas { display: block; width: 100%; height: 100%; }
 
