@@ -29,7 +29,10 @@ export class MapEditorScreen {
 
     // three.js монтируется в #app
     this.mapView = new MapView(world, this.el.querySelector('#app'));
-    this.mapView._onTileClick = (tile) => this.ui.showCell(tile);
+    this.mapView._onTileClick = (tile) => {
+      SND.clickCell.play();   // клик по клетке без города
+      this.ui.showCell(tile);
+    };
 
     this.panel = new GeneratorPanel(this.config, {
       onGenerate: (seed) => this._generate(seed),

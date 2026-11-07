@@ -49,6 +49,10 @@ export class Game {
         if (cellsPlanned > 0)
           this._log(`Армия #${army.id} выступила: маршрут ${cellsPlanned} кл.`);
       },
+      // Каждый шаг армии на одну клетку.
+      onArmyStep: (army) => {
+        SND.stepUnit.play();   // движение юнита по 1 клетке
+      },
       onArmyArrive: (army, stepsDone) => {
         if (stepsDone > 0)
           this._log(`Армия #${army.id} остановилась (${army.x}, ${army.y}) — пройдено ${stepsDone} кл.`);
@@ -214,6 +218,9 @@ export class Game {
       : null;
 
     const city = this.worldMap.getCityAt(tile.x, tile.y);
+
+    if (city) SND.clickTown.play();   // клик по клетке с городом
+    else      SND.clickCell.play();   // клик по клетке без города
 
     const cityTypeLabel = city
       ? ({

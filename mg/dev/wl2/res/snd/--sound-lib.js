@@ -170,6 +170,10 @@ const kit = window.SND.createSoundKit({
     startBattle : { src: "./res/snd/s/st-b1.mp3" , volume: Vol, pool: 4 }, // начать битву
     deathUnit   : { src: "./res/snd/s/d-u-1.mp3" , volume: Vol, pool: 4 }, // смерть юнита
     winClose    : { src: "./res/snd/s/winclose-3.mp3", volume: Vol, pool: 4 }, // звук закрыть окно
+
+    stepUnit    : { src: "./res/snd/s/step-1.mp3" , volume: Vol, pool: 4 }, // дввижение юнита по 1 клетке
+    clickTown   : { src: "./res/snd/s/town-1.mp3" , volume: Vol, pool: 4 }, // клик по клетке с городом
+    clickCell   : { src: "./res/snd/s/clickCell-1.mp3", volume: Vol, pool: 4 }, // клик по клетке без города 
 });
 
 kit.autoUnlock();
