@@ -214,6 +214,12 @@ export class Game {
     while (box.children.length > 40) box.removeChild(box.firstChild);
   }
 
+  /** Очистить панель лога (новый круг начинается с чистого листа). */
+  _clearLog() {
+    const box = this.el.querySelector('#gameLog');
+    if (box) box.replaceChildren();
+  }
+
   /* ---------------- игровое действие по клику ---------------- */
   _onTileClick(tile) {
     this.selected = tile;
@@ -354,6 +360,7 @@ export class Game {
   /** Зелёная кнопка HUD (и пробел): запустить следующий круг. */
   _onNextCircle() {
     if (!this.judge.isAwaitingNextCircle) return;  // активно только между кругами
+    this._clearLog();                              // новый круг — чистая панель лога
     this.judge.startNextCircle();
     this._log(`▶ Круг ${this.judge.turn} начат.`, true);
     this._refreshHud();
