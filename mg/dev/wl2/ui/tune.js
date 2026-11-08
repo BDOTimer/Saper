@@ -19,7 +19,7 @@ import { SND } from '../res/snd/--sound-lib.js';
 
 // ---------- состояние настроек ----------
 export let TUNE = {
-  isTestButtle: true, // Тест битвы
+  isTestButtle: false, // Тест битвы
 };
 
 // ---------- панель ----------

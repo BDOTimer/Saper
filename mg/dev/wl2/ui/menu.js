@@ -5,7 +5,7 @@
 
 import { SND } from '../res/snd/--sound-lib.js';
 
-const VERSION = 'v-0.0.7.1';
+const VERSION = 'v-0.0.7.2';
 
 // MenuScreen (главное меню)
 //    ├── "В игру"  →   disabled
@@ -24,7 +24,7 @@ const MENU_ITEMS = [
   { id: 'new-game', label: 'В игру'   , hint: 'Не скоро ...', enabled: true },
   { id: 'players' , label: 'Игроки'   , hint: 'Кто в игре?' , enabled: true },
   { id: 'map'     , label: 'Карта'    , hint: 'Выбор мира'  , enabled: true },
-  { id: 'settings', label: 'Настройки', hint: 'TUNE'     , enabled: true },
+  { id: 'settings', label: 'Настройки', hint: 'TUNE'        , enabled: true },
   { id: 'about'   , label: 'Описание' , hint: 'Об игре'     , enabled: true },
 ];
 

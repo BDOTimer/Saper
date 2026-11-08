@@ -46,7 +46,9 @@ export class Cell {
   addOverlay(flag)   { this.overlay |= flag; }
   removeOverlay(flag){ this.overlay &= ~flag; }
 
-  get staminaCost() { return this.hasRoad ? 1 : this.meta.stamina; }
+  // Город на клетке проходится как дорога (+1 стамины),
+  // независимо от рельефа (холмы, лес и т.п.).
+  get staminaCost() { return (this.city >= 0 || this.hasRoad) ? 1 : this.meta.stamina; }
 
   // для UI / отладки
   get overlayName() {

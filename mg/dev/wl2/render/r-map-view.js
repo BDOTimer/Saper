@@ -895,12 +895,25 @@ export class RouteView {
     this._nodes = new Map();
     /** Текущий активный ownerId (для фильтра) */
     this._activeOwner = null;
+    /** Если задан — рисуем маршрут ТОЛЬКО этой армии (выбор человека). */
+    this._armyFilter = null;
   }
 
   /** Установить активного игрока — рисовать будем только его маршруты */
   setActiveOwner(idOwner) {
     if (this._activeOwner === idOwner) return;
     this._activeOwner = idOwner;
+    this.rebuild();
+  }
+
+  /**
+   * Показывать маршрут только одной армии (выбранной игроком-человеком).
+   * null — снять фильтр (рисовать все доступные маршруты).
+   */
+  setArmyFilter(army) {
+    const next = army ?? null;
+    if (this._armyFilter === next) return;
+    this._armyFilter = next;
     this.rebuild();
   }
 
@@ -911,6 +924,7 @@ export class RouteView {
     const armies = this.mapView._collectArmies?.() ?? [];
     for (const army of armies) {
       if (!army.route?.length) continue;
+      if (this._armyFilter && army !== this._armyFilter) continue;
       if (this.onlyActiveOwner
           && this._activeOwner !== null
           && army.idOwner !== this._activeOwner) continue;
@@ -923,6 +937,7 @@ export class RouteView {
   updateArmy(army) {
     this._removeArmy(army);
     if (!army.route?.length) return;
+    if (this._armyFilter && army !== this._armyFilter) return;
     if (this.onlyActiveOwner
         && this._activeOwner !== null
         && army.idOwner !== this._activeOwner) return;

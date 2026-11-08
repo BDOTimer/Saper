@@ -307,3 +307,42 @@
     0 0 10px rgba(63, 168, 106, .7),
     inset 0 2px 4px rgba(0, 0, 0, .4);
 }
+
+/* ---- Панель хода игрока-человека ---------------------------------------- */
+.game-screen #humanTurnPanel {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 300px;
+  max-width: 560px;
+  box-sizing: border-box;
+  background: rgba(3, 28, 60, 0.6);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a3441;
+  backdrop-filter: blur(6px);
+  font-size: 16px;
+  z-index: 10;
+}
+.game-screen #humanTurnPanel .htp-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.game-screen #humanTurnPanel .htp-title {
+  font-weight: 700;
+  color: #ffd166;
+}
+.game-screen #humanTurnPanel .htp-sub {
+  color: #b8c4cf;
+  font-size: 14px;
+}
+.game-screen #humanTurnPanel .htp-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

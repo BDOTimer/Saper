@@ -12,6 +12,7 @@ import { MapView     } from '../render/r-map-view.js';
 import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
+import { HumanBrain  } from './human-brain.js';
 import { ArmyView    } from '../render/army-view.js';
 import { TownView    } from '../render/town-view.js';
 import { BattleView  } from '../render/battle-view.js';
@@ -57,11 +58,17 @@ export class Game {
       onArmyArrive: (army, stepsDone) => {
         if (stepsDone > 0)
           this._log(`Армия #${army.id} остановилась (${army.x}, ${army.y}) — пройдено ${stepsDone} кл.`);
+        // Ход человека: армия закончила — передаём управление следующей.
+        this.humanBrain?.onArmyArrive?.(army, stepsDone);
       },
       // Встреча с врагом: окно боя (армия текущего хода останавливается).
       onBattleRequest: (army, enemies) => this._onBattleRequest(army, enemies),
-      // Все армии текущего игрока закончили ход → передаём ход следующему.
-      onQueueEmpty: () => this._finishPlayerTurn(),
+      // Очередь анимаций опустела. Ход человека сам решает, что делать;
+      // у ИИ — это сигнал «передать ход следующему игроку».
+      onQueueEmpty: () => {
+        if (this.humanBrain?.onQueueEmpty?.()) return;
+        this._finishPlayerTurn();
+      },
     });
 
     // Контекст для аниматора — заполнится после создания MapView.
@@ -78,15 +85,21 @@ export class Game {
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
     this.mapView.lowerAllFlags(600); // Опустить все флаги...
 
-    // Панель армии: клик по модельке армии (первый юнит массива) → открывается
+    // Единственный на всю игру «мозг» игрока-человека.
+    this.humanBrain = HumanBrain.get();
+
+    // Панель армии: клик по модельке армии (первый юнит массива) → открывается.
+    // Во время хода человека клики по армиям обрабатывает HumanBrain.
     this.armyView = new ArmyView(this.mapView, {
       getPlayers: () => this.playersModel,
+      getMapClickEnabled: () => !this.humanBrain?.isActive,
     });
 
     // Панель города: клик по модельке города на карте → открывается.
     // TownView — singleton, при смене карты сам перепривязывается.
     this.townView = TownView.get(this.mapView, {
       getPlayers: () => this.playersModel,
+      getMapClickEnabled: () => !this.humanBrain?.isActive,
     });
 
     // Окно битвы: создаётся один раз, используется повторно при каждой встрече.
@@ -101,6 +114,24 @@ export class Game {
       routeView: this.mapView.routeView,
       unitsView: this.mapView.unitsView,
     };
+
+    // Подключаем HumanBrain к этому игровому экрану (единственный экземпляр).
+    this.humanBrain.attach({
+      world:     worldMap,
+      mapView:   this.mapView,
+      routeView: this.mapView.routeView,
+      unitsView: this.mapView.unitsView,
+      mover:     this.mover,
+      log:       (msg, hl) => this._log(msg, hl),
+      requestFinish: () => this._finishPlayerTurn(),
+      ui: {
+        panel:   this.el.querySelector('#humanTurnPanel'),
+        title:   this.el.querySelector('#htpTitle'),
+        sub:     this.el.querySelector('#htpSub'),
+        btnGo:   this.el.querySelector('#btnGoRoute'),
+        btnSkip: this.el.querySelector('#btnSkipArmy'),
+      },
+    });
 
     // Судья сообщает игре о начале хода игрока:
     // показываем красные маркеры маршрутов и ставим армии в очередь.
@@ -127,6 +158,17 @@ export class Game {
         <div id="gameSidePanel">
           <h3>Выбрано</h3>
           <div class="muted" id="selInfo">Кликни по клетке</div>
+        </div>
+
+        <div id="humanTurnPanel" style="display:none">
+          <div class="htp-head">
+            <span class="htp-title" id="htpTitle">—</span>
+            <span class="htp-sub" id="htpSub">—</span>
+          </div>
+          <div class="htp-actions">
+            <button id="btnGoRoute" class="primary" disabled>Идти по маршруту</button>
+            <button id="btnSkipArmy" disabled>Пропустить армию</button>
+          </div>
         </div>
 
         <div id="gameTopbar">
@@ -222,6 +264,9 @@ export class Game {
 
   /* ---------------- игровое действие по клику ---------------- */
   _onTileClick(tile) {
+    // Ход человека: клик выбирает свою армию или строит ей маршрут.
+    this.humanBrain?.handleTileClick?.(tile);
+
     this.selected = tile;
 
     const info = this.el.querySelector('#selInfo');
@@ -293,16 +338,25 @@ export class Game {
     this._log(`— Ход: ${player.name} (${role}) —`, true);
     this._refreshHud();
 
-    // Красные маркеры маршрутов на карте (маршруты уже построены
-    // в Player.doStep через AiBrainHelper).
+    // Красные маркеры маршрутов на карте.
+    // У ИИ маршруты уже построены в Player.doStep через AiBrainHelper.
     this.mapView.routeView.rebuild();
 
-    // Армии текущего игрока идут по маршрутам ПО ОЧЕРЕДИ.
+    if (player.isHuman) {
+      // Человек: маршруты строятся кликами, армии идут по кнопке.
+      this.humanBrain.begin(player);
+      return;
+    }
+
+    // Армии компьютера идут по маршрутам ПО ОЧЕРЕДИ автоматически.
     this.mover.enqueue(player.army.slice());
   }
 
   /** Все армии игрока закончили движение → передаём ход. */
   _finishPlayerTurn() {
+    // Ход человека (если был) уже завершён; на всякий случай гасим состояние.
+    this.humanBrain?.endTurn?.();
+
     const res = this.judge.finishCurrentTurn();
     if (!res) return;
 
@@ -334,6 +388,9 @@ export class Game {
       `⚔ Армия #${attacker.id} встретила армию #${defender.id}` +
       (dp ? ` (${dp.name})` : '') + ` — бой!`, true);
 
+    // Если ход человека — приостанавливаем передачу управления армиям.
+    this.humanBrain?.onBattleStart?.(attacker);
+
     this.battleView.runBattle(attacker, defender, {
       onEnd: (winner, loser) => this._onBattleEnd(winner, loser),
     });
@@ -352,6 +409,9 @@ export class Game {
         `☠ Армия #${loser.id} уничтожена; победила армия #${winner.id}` +
         (lp ? ` (${lp.name})` : ''), true);
     }
+
+    // Ход человека: бой завершён — армия закончила действие.
+    this.humanBrain?.onBattleEnd?.(winner, loser);
 
     this.mapView.unitsView.updateArmy?.(winner);
     this.mapView.routeView.rebuild();
@@ -414,6 +474,7 @@ export class Game {
     window.removeEventListener('keydown', this._onKey);
     this.mover?.clear();
     this.judge.onTurnStart = null;
+    this.humanBrain?.detach?.();
     this.armyView?.destroy?.();
     this.townView?.destroy?.();
     this.battleView?.destroy?.();

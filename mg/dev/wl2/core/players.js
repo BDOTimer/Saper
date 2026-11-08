@@ -5,8 +5,7 @@
 // class Judge;        // правила, которые применяются к игровым объектам
 // class Game;         // --> экземляр игры
 
-import { SND } from '../res/snd/--sound-lib.js';
-
+import { SND           } from '../res/snd/--sound-lib.js';
 import { STATE         } from './g-state.js';
 import { AiBrainHelper } from './ai-brain.js';
 
@@ -44,22 +43,26 @@ export const HUMAN = -1;
    ========================================================= */
 export class Player {
 
-    #isTurn = false; // Игрок в процессе хода?
+  #isTurn = false; // Игрок в процессе хода?
 
   constructor(index, overrides = {}) {
     this.index = index;
     this.active = overrides.active ?? (index < 2);  // первые два по умолчанию в игре
-    this.aiLevel = overrides.aiLevel ?? 2;          // по умолчанию «Рыцарь»
+    // Первый игрок по умолчанию — человек, остальные — «Рыцарь».
+    this.aiLevel = overrides.aiLevel ?? (index === 0 ? HUMAN : 2);
     this.color = overrides.color ?? defaultColor(index);
-    this.name  = overrides.name ?? `Игрок-${index + 1}: ${AI_LEVELS[this.aiLevel].name}`;
+    const typeName = AI_LEVELS[this.aiLevel]?.name ?? 'Человек';
+    this.name  = overrides.name ?? `Игрок-${index + 1}: ${typeName}`;
 
     this.army = [];
     this._armyMap = new Map();
   }
 
   /**
-   * Игрок делает ход, используя AiBrainHelper.
-   * Для КАЖДОЙ армии строится маршрут (army.route) до цели.
+   * Игрок делает ход.
+   *  - Компьютер: для КАЖДОЙ армии строится маршрут (army.route) до цели.
+   *  - Человек: армии готовятся к ручному ходу — сбрасываются очки движения,
+   *    маршруты очищаются (их построит HumanBrain по кликам игрока).
    */
   doStep()
   {
@@ -67,6 +70,19 @@ export class Player {
     if (!world)
     {   console.warn('🔍 doStep(): STATE.world не задан — маршрут не построить');
         return;
+    }
+
+    // ── Человек: ход делает HumanBrain, ИИ-маршруты не строим ──────
+    if (this.isHuman)
+    {
+      for (const army of this.army)
+      {
+        if (!army?.alive) continue;
+        army.resetTurn();
+        army.route = [];
+        army.cellGoal = null;
+      }
+      return;
     }
 
     for (const army of this.army)
@@ -205,15 +221,15 @@ export class Players {
 ///----------------------------------------------------------------------------:
 export class PanelPlayers {
   /**
-   * @param {Object} [opts]
-   * @param {Players} [opts.players]   — модель (по умолчанию новая на 8)
+   * @param {Object}   [opts]
+   * @param {Players}  [opts.players]   — модель (по умолчанию новая на 8)
    * @param {HTMLElement} [opts.parent] — куда монтировать
    * @param {Function} [opts.onConfirm] — (players) при нажатии «Готово»
    * @param {Function} [opts.onCancel]  — при отмене/закрытии
    */
   constructor(opts = {}) {
-    this.players = opts.players ?? new Players(8);
-    this.parent  = opts.parent  ?? document.body;
+    this.players   = opts.players   ?? new Players(8);
+    this.parent    = opts.parent    ?? document.body;
     this.onConfirm = opts.onConfirm ?? (() => {});
     this.onCancel  = opts.onCancel  ?? (() => {});
 

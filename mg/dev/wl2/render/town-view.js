@@ -486,6 +486,9 @@ export class TownView {
     this._opts = opts;
     this.mapView = mapView;
     this.getPlayers = opts.getPlayers ?? (() => mapView?.players ?? null);
+    // Во время хода человека клики по городам уходят в HumanBrain
+    // (построение маршрута), а не в модальную панель города.
+    this._getMapClickEnabled = opts.getMapClickEnabled ?? (() => true);
 
     this._raycaster = new THREE.Raycaster();
     this._mouse = new THREE.Vector2();
@@ -669,6 +672,7 @@ export class TownView {
 
     this._onDomDown = (e) => {
       if (e.button !== 0) return;
+      if (!this._getMapClickEnabled()) return;
       const city = this._pickCity(e);
       if (!city) return;
       SND.clickTown.play();
@@ -721,6 +725,7 @@ export class TownView {
     this._opts = opts ?? this._opts;
     this.mapView = mapView;
     this.getPlayers = this._opts?.getPlayers ?? (() => mapView.players ?? null);
+    this._getMapClickEnabled = this._opts?.getMapClickEnabled ?? (() => true);
     this._bindMapClick();
     return this;
   }

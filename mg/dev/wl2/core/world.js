@@ -165,6 +165,11 @@ export class CitiesAll {
 
     const city = new City().init(data);
     this.list.push(city);
+
+    // Помечаем клетку городом: цена входа = 1 (как дорога).
+    const cell = this.world?.get?.(x, y);
+    if (cell) cell.city = this.list.length - 1;
+
     return city;
   }
 
