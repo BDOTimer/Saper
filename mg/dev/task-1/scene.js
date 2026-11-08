@@ -3,9 +3,9 @@
  *
  * Отвечает за:
  *   - инициализацию сцены, камеры, рендерера и света;
- *   - стойку, три полки и заднюю стенку;
+ *   - текстурированные пол, обои, полки и «мокрую» синюю стойку;
  *   - 12 кликабельных объектов ингредиентов;
- *   - очередь клиентов за стойкой;
+ *   - очередь клиентов перед стойкой (туловище, голова, руки, ноги);
  *   - подсветку выбранного ингредиента.
  *
  * Экспорт: initScene, getIngredientObjects, getClientObjects, removeClient,
@@ -21,16 +21,29 @@ const SHELF_HEIGHTS = { 1: 1.5, 2: 2.2, 3: 2.9 };
 /** Полки висят на задней стенке, чуть впереди неё. */
 const SHELF_Z = -1.55;
 
-/** Клиенты стоят в линию за стойкой. */
-const CLIENT_Z = -1;
-const CLIENT_SLOTS_X = [-2, -0.7, 0.7, 2];
+/** Клиенты стоят ПЕРЕД стойкой, ближе к зрителю, чем прилавок. */
+const CLIENT_Z = 2.45;
+const CLIENT_SLOTS_X = [-1.35, -0.45, 0.45, 1.35];
 
-/** Цвета клиентов — чтобы очередь визуально различалась. */
+/**
+ * Вся стойка сдвинута вправо: на экране она должна занимать свободную
+ * часть — между левыми панелями и правым краем окна.
+ */
+const WORLD_OFFSET_X = 2.4;
+
+/** Цвета одежды клиентов — чтобы очередь визуально различалась. */
 const CLIENT_COLORS = [0xf06292, 0x4fc3f7, 0xffd54f, 0x81c784];
+
+/** Цвет кожи клиентов. */
+const SKIN_COLOR = 0xe8b98f;
+
+/** Цвет брюк клиентов. */
+const PANTS_COLOR = 0x2b3242;
 
 /** Пути к текстурам (лежат в папке res проекта). */
 const WALL_TEXTURE_PATH = 'res/wall-1.jpg';
 const SHELF_TEXTURE_PATH = 'res/shelf-1.jpg';
+const FLOOR_TEXTURE_PATH = 'res/floor-1.jpg';
 
 /** Размер исходной картинки обоев и доля, занятая самими обоями (ниже — пол). */
 const WALL_IMAGE_WIDTH = 900;
@@ -42,6 +55,12 @@ const textureLoader = new THREE.TextureLoader();
 let scene = null;
 let camera = null;
 let renderer = null;
+
+/**
+ * Группа всей стойки (прилавок, полки, ингредиенты, клиенты, свет над ними).
+ * Сдвигая одну группу, двигаем по экрану всю сцену целиком.
+ */
+const world = new THREE.Group();
 
 /** Живые 3D-объекты ингредиентов (по одному на ингредиент). */
 const ingredientObjects = [];
@@ -102,9 +121,61 @@ function createIngredientObject(ingredient, shelfTop) {
 }
 
 /**
- * Создаёт клиента-капсулу и ставит его в указанный слот очереди.
+ * Собирает человекоподобную фигуру клиента: ноги, туловище, руки, голова.
+ * @param {number} color — цвет одежды
+ * @returns {THREE.Group}
+ */
+function createHumanoid(color) {
+  const client = new THREE.Group();
+
+  const skinMaterial = new THREE.MeshStandardMaterial({
+    color: SKIN_COLOR,
+    roughness: 0.75,
+    metalness: 0,
+  });
+  const clothMaterial = new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.7,
+    metalness: 0.03,
+  });
+  const pantsMaterial = new THREE.MeshStandardMaterial({
+    color: PANTS_COLOR,
+    roughness: 0.85,
+    metalness: 0,
+  });
+
+  // Ноги
+  [-0.11, 0.11].forEach((x) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.62, 10), pantsMaterial);
+    leg.position.set(x, 0.31, 0);
+    client.add(leg);
+  });
+
+  // Туловище
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.42, 6, 14), clothMaterial);
+  torso.position.set(0, 1.03, 0);
+  client.add(torso);
+
+  // Руки
+  [-0.27, 0.27].forEach((x) => {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.52, 8), clothMaterial);
+    arm.position.set(x, 1.05, 0);
+    arm.rotation.z = x > 0 ? -0.16 : 0.16;
+    client.add(arm);
+  });
+
+  // Голова
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), skinMaterial);
+  head.position.set(0, 1.52, 0);
+  client.add(head);
+
+  return client;
+}
+
+/**
+ * Создаёт клиента и ставит его в указанный слот очереди перед стойкой.
  * @param {number} slotIndex — 0..3
- * @returns {THREE.Mesh}
+ * @returns {THREE.Group}
  */
 function createClientObject(slotIndex) {
   const color = CLIENT_COLORS[clientColorCursor % CLIENT_COLORS.length];
@@ -113,20 +184,40 @@ function createClientObject(slotIndex) {
   // Страховка: слот всегда существует, даже если очередь окажется длиннее
   const safeSlot = Math.min(slotIndex, CLIENT_SLOTS_X.length - 1);
 
-  const geometry = new THREE.CapsuleGeometry(0.32, 0.55, 6, 16);
-  const material = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.6,
-    metalness: 0.05,
-  });
+  const client = createHumanoid(color);
+  client.position.set(CLIENT_SLOTS_X[safeSlot], 0, CLIENT_Z);
+  client.userData.slotIndex = safeSlot;
+  client.userData.targetX = CLIENT_SLOTS_X[safeSlot];
 
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(CLIENT_SLOTS_X[safeSlot], 0.6, CLIENT_Z);
-  mesh.userData.slotIndex = safeSlot;
-  mesh.userData.targetX = CLIENT_SLOTS_X[safeSlot];
+  world.add(client);
+  return client;
+}
 
-  scene.add(mesh);
-  return mesh;
+/** Пол кафе — паркет из res/floor-1.jpg. */
+function buildFloor() {
+  const texture = textureLoader.load(FLOOR_TEXTURE_PATH);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(7, 7);
+  texture.center.set(0.5, 0.5);
+  // Доски разворачиваем вдоль оси Z — «от зрителя в глубину»
+  texture.rotation = Math.PI / 2;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(40, 40),
+    new THREE.MeshStandardMaterial({
+      map: texture,
+      // Текстура серая — подкрашиваем её под дерево кафе
+      color: 0x9a8574,
+      roughness: 0.7,
+      metalness: 0.02,
+    }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  scene.add(floor);
 }
 
 /**
@@ -169,51 +260,115 @@ function createShelfMaterial() {
 
   return new THREE.MeshStandardMaterial({
     map: texture,
+    color: 0x8f7663,
     roughness: 0.72,
     metalness: 0.04,
   });
 }
 
+/**
+ * Материал стойки: тёмно-синий PBR с clearcoat («мокрый» блеск).
+ * В вершинный/фрагментный шейдер добавлен вертикальный градиент:
+ * низ стола заметно темнее верха.
+ *
+ * @param {object} options
+ * @param {number} options.topColor — цвет верхней кромки
+ * @param {number} options.bottomColor — цвет низа
+ * @param {number} options.height — высота геометрии (для нормировки градиента)
+ * @param {number} options.roughness
+ * @param {number} options.clearcoatRoughness
+ * @returns {THREE.MeshPhysicalMaterial}
+ */
+function createCounterMaterial({ topColor, bottomColor, height, roughness, clearcoatRoughness }) {
+  const material = new THREE.MeshPhysicalMaterial({
+    // Запасной цвет: если шейдер почему-то не применится, стол останется синим
+    color: new THREE.Color(topColor),
+    roughness,
+    metalness: 0.28,
+    clearcoat: 1,
+    clearcoatRoughness,
+  });
+
+  const halfHeight = height / 2;
+
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTopColor = { value: new THREE.Color(topColor) };
+    shader.uniforms.uBottomColor = { value: new THREE.Color(bottomColor) };
+    shader.uniforms.uHalfHeight = { value: halfHeight };
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        ['#include <common>', 'uniform float uHalfHeight;', 'varying float vHeightRatio;'].join('\n'),
+      )
+      .replace(
+        '#include <begin_vertex>',
+        [
+          '#include <begin_vertex>',
+          'vHeightRatio = clamp((position.y + uHalfHeight) / (2.0 * uHalfHeight), 0.0, 1.0);',
+        ].join('\n'),
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        [
+          '#include <common>',
+          'uniform vec3 uTopColor;',
+          'uniform vec3 uBottomColor;',
+          'varying float vHeightRatio;',
+        ].join('\n'),
+      )
+      .replace(
+        '#include <color_fragment>',
+        [
+          '#include <color_fragment>',
+          'diffuseColor.rgb = mix(uBottomColor, uTopColor, vHeightRatio);',
+        ].join('\n'),
+      );
+  };
+
+  // Код градиента одинаковый — скомпилированную программу можно делить
+  material.customProgramCacheKey = () => 'counter-wet-gradient';
+
+  return material;
+}
+
 /** Строит стойку с полками и общим фоном. */
 function buildCounterAndShelves() {
   // Пол кафе
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 40),
-    new THREE.MeshStandardMaterial({ color: 0x2f2318, roughness: 0.95, metalness: 0 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0;
-  scene.add(floor);
+  buildFloor();
 
   // Обои на общем фоне
   buildWallBackground();
 
-  // Стойка-прилавок: тёмно-синяя с «мокрым» блеском (clearcoat)
-  const counterMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x102a52,
-    roughness: 0.16,
-    metalness: 0.22,
-    clearcoat: 1,
-    clearcoatRoughness: 0.06,
-  });
-
-  const counter = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 1.6), counterMaterial);
+  // Стойка-прилавок: тёмно-синяя, низ темнее верха (шейдер), сверху «мокрый» блеск
+  const counter = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 1, 1.6),
+    createCounterMaterial({
+      topColor: 0x16386b,
+      bottomColor: 0x050b18,
+      height: 1,
+      roughness: 0.22,
+      clearcoatRoughness: 0.08,
+    }),
+  );
   counter.position.set(0, 0.5, 1);
-  scene.add(counter);
+  world.add(counter);
 
   // Глянцевая столешница — тот же синий, но с более резким блеском
   const counterTop = new THREE.Mesh(
     new THREE.BoxGeometry(8.2, 0.1, 1.7),
-    new THREE.MeshPhysicalMaterial({
-      color: 0x14346a,
+    createCounterMaterial({
+      topColor: 0x1c4785,
+      bottomColor: 0x0a1730,
+      height: 0.1,
       roughness: 0.08,
-      metalness: 0.3,
-      clearcoat: 1,
       clearcoatRoughness: 0.03,
     }),
   );
   counterTop.position.set(0, 1.05, 1);
-  scene.add(counterTop);
+  world.add(counterTop);
 
   // Боковые стойки полок
   const sideMaterial = new THREE.MeshStandardMaterial({
@@ -224,7 +379,7 @@ function buildCounterAndShelves() {
   [-3.3, 3.3].forEach((x) => {
     const side = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.2, 0.9), sideMaterial);
     side.position.set(x, 2.15, -1.6);
-    scene.add(side);
+    world.add(side);
   });
 
   // Три полки с деревянной текстурой
@@ -233,7 +388,7 @@ function buildCounterAndShelves() {
   Object.values(SHELF_HEIGHTS).forEach((shelfY) => {
     const shelf = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.12, 0.7), shelfMaterial);
     shelf.position.set(0, shelfY, SHELF_Z);
-    scene.add(shelf);
+    world.add(shelf);
   });
 }
 
@@ -245,7 +400,7 @@ function buildIngredients() {
 
     // Полка — бокс толщиной 0.12, её верхняя плоскость выше центра на 0.06.
     const mesh = createIngredientObject(ingredient, shelfY + 0.06);
-    scene.add(mesh);
+    world.add(mesh);
     ingredientObjects.push(mesh);
   });
 }
@@ -298,10 +453,19 @@ export function initScene(canvas) {
   keyLight.position.set(5, 8, 6);
   scene.add(keyLight);
 
-  // Точечный свет над прилавком — даёт яркое пятно на «мокрой» столешнице
-  const counterGlow = new THREE.PointLight(0xbfe0ff, 8, 12, 2);
-  counterGlow.position.set(0, 4.2, 2.6);
-  scene.add(counterGlow);
+  // Вся стойка живёт в отдельной группе и сдвинута вправо
+  world.position.set(WORLD_OFFSET_X, 0, 0);
+  scene.add(world);
+
+  // Точечный свет над прилавком — яркое пятно на «мокрой» столешнице
+  const counterGlow = new THREE.PointLight(0xcfe4ff, 14, 16, 2);
+  counterGlow.position.set(0, 3.6, 1.5);
+  world.add(counterGlow);
+
+  // Тёплый точечный свет у очереди — подсвечивает клиентов
+  const warmGlow = new THREE.PointLight(0xffb066, 7, 12, 2);
+  warmGlow.position.set(-0.4, 2.6, 4.1);
+  world.add(warmGlow);
 
   buildCounterAndShelves();
   buildIngredients();
@@ -318,7 +482,7 @@ export function getIngredientObjects() {
   return ingredientObjects;
 }
 
-/** @returns {THREE.Mesh[]} живые 3D-объекты клиентов в порядке очереди */
+/** @returns {THREE.Group[]} живые 3D-объекты клиентов в порядке очереди */
 export function getClientObjects() {
   return clientObjects;
 }
@@ -326,8 +490,8 @@ export function getClientObjects() {
 /**
  * Убирает ушедшего клиента со сцены и создаёт нового в конце очереди.
  * Возвращает 3D-объект нового клиента, чтобы вызвавший код поставил его в слот.
- * @param {THREE.Mesh} clientObject
- * @returns {THREE.Mesh|null}
+ * @param {THREE.Group} clientObject
+ * @returns {THREE.Group|null}
  */
 export function removeClient(clientObject) {
   if (!clientObject) return null;
@@ -337,9 +501,14 @@ export function removeClient(clientObject) {
     clientObjects.splice(index, 1);
   }
 
-  scene.remove(clientObject);
-  clientObject.geometry.dispose();
-  clientObject.material.dispose();
+  world.remove(clientObject);
+
+  // У каждого клиента свои материалы и геометрии — освобождаем всё
+  clientObject.traverse((child) => {
+    if (!child.isMesh) return;
+    child.geometry.dispose();
+    child.material.dispose();
+  });
 
   // Новый клиент подходит с конца очереди
   const freshClient = createClientObject(clientObjects.length);

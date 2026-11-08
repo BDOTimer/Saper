@@ -115,7 +115,9 @@ function showIngredientLabel(mesh) {
   if (!ingredientLabel) return;
 
   const rect = canvas.getBoundingClientRect();
-  const point = mesh.position.clone();
+  // Ингредиенты лежат внутри сдвинутой группы, поэтому берём мировые координаты
+  const point = new THREE.Vector3();
+  mesh.getWorldPosition(point);
   point.y += 0.42;
   point.project(camera);
 

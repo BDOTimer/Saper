@@ -42,42 +42,43 @@
         </div>
       </header>
 
-      <!-- Левая панель: монолог клиента, модели заказа и таймер -->
-      <section class="panel panel--order">
-        <p class="panel__title">Заказ клиента</p>
-        <p class="speech" id="client-speech">Клиент подходит к стойке…</p>
+      <!-- Левая колонка: сверху «Собранный заказ», ниже — «Заказ клиента» -->
+      <div class="sidebar">
+        <aside class="panel panel--basket">
+          <p class="panel__title">Собранный заказ</p>
 
-        <!-- Визуальные модели того, что заказал клиент -->
-        <div class="order-visual" id="order-visual" aria-label="Состав заказа"></div>
-        <p class="caption" id="ingredient-caption">
-          Нажмите на модель, чтобы увидеть название ингредиента.
-        </p>
+          <p class="basket__empty" id="basket-empty">
+            Кликните по ингредиентам на полках
+          </p>
+          <ul class="basket" id="basket-list"></ul>
 
-        <!-- Кнопка подтверждения стоит рядом с составом заказа -->
-        <button class="submit" id="submit-btn" type="button" disabled>Готово</button>
+          <div class="total">
+            <span class="total__label">Сумма</span>
+            <span class="total__value" id="basket-total">0 ₽</span>
+          </div>
+        </aside>
 
-        <div class="timer" role="progressbar" aria-label="Остаток времени на заказ">
-          <div class="timer__fill" id="timer-fill"></div>
-        </div>
-        <p class="timer__text" id="timer-text">12.0 с</p>
+        <section class="panel panel--order">
+          <p class="panel__title">Заказ клиента</p>
+          <p class="speech" id="client-speech">Клиент подходит к стойке…</p>
 
-        <p class="status" id="status-text">Ждём заказ…</p>
-      </section>
+          <!-- Визуальные модели того, что заказал клиент -->
+          <div class="order-visual" id="order-visual" aria-label="Состав заказа"></div>
+          <p class="caption" id="ingredient-caption">
+            Нажмите на модель, чтобы увидеть название ингредиента.
+          </p>
 
-      <!-- Правая панель: корзина и сумма -->
-      <aside class="panel panel--basket">
-        <p class="panel__title">Собранный заказ</p>
+          <!-- Кнопка подтверждения стоит рядом с составом заказа -->
+          <button class="submit" id="submit-btn" type="button" disabled>Готово</button>
 
-        <p class="basket__empty" id="basket-empty">
-          Кликните по ингредиентам на полках
-        </p>
-        <ul class="basket" id="basket-list"></ul>
+          <div class="timer" role="progressbar" aria-label="Остаток времени на заказ">
+            <div class="timer__fill" id="timer-fill"></div>
+          </div>
+          <p class="timer__text" id="timer-text">12.0 с</p>
 
-        <div class="total">
-          <span class="total__label">Сумма</span>
-          <span class="total__value" id="basket-total">0 ₽</span>
-        </div>
-      </aside>
+          <p class="status" id="status-text">Ждём заказ…</p>
+        </section>
+      </div>
 
       <p class="hint">
         Соберите заказ так, чтобы сумма совпала со стоимостью блюд из монолога.

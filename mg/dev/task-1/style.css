@@ -99,8 +99,20 @@ body {
 
 /* ---------- Боковые панели ---------- */
 
-.panel {
+/* Левая колонка: собранный заказ сверху, заказ клиента снизу */
+.sidebar {
   position: absolute;
+  left: 28px;
+  top: 96px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, 34vw);
+  pointer-events: none;
+}
+
+.panel {
   padding: 18px 20px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -117,19 +129,15 @@ body {
   color: var(--muted);
 }
 
-.panel--order {
-  left: 28px;
-  bottom: 28px;
-  width: min(460px, 42vw);
-}
-
 .panel--basket {
-  right: 28px;
-  top: 96px;
-  width: min(320px, 30vw);
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.panel--order {
+  /* прижимается к низу колонки, под панелью собранного заказа */
+  margin-top: auto;
 }
 
 /* ---------- Монолог клиента ---------- */
@@ -269,7 +277,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 34vh;
+  max-height: 24vh;
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -437,21 +445,15 @@ body {
 }
 
 @media (max-width: 820px) {
-  .panel--order {
-    left: 16px;
-    bottom: 16px;
-    width: calc(100vw - 32px);
-  }
-
-  .panel--basket {
-    top: auto;
-    right: 16px;
-    bottom: 210px;
-    width: min(280px, 70vw);
+  .sidebar {
+    left: 12px;
+    top: 88px;
+    bottom: 12px;
+    width: min(330px, 64vw);
   }
 
   .speech {
-    font-size: 18px;
+    font-size: 17px;
   }
 
   .hud__stat {
