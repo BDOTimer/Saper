@@ -9,6 +9,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 three.js-r182.tar.gz
+push.bat
 
 # Next.js билд и кэш
 .next/

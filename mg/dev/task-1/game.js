@@ -51,7 +51,10 @@ let queue = [];
 /** Корзина: идентификаторы выбранных ингредиентов в порядке выбора. */
 let basket = [];
 
-/** Счётчики игры. */
+/**
+ * Счётчики игры. penalty — это не «сумма штрафов», а баланс:
+ * штрафы минус стоимость выполненных заказов. Отрицательное значение = заработок.
+ */
 let counters = { served: 0, errors: 0, penalty: 0 };
 
 /** Абсолютный дедлайн текущего заказа (мс по performance.now()). */
@@ -90,6 +93,8 @@ function collectElements() {
     served: document.getElementById('stat-served'),
     errors: document.getElementById('stat-errors'),
     penalty: document.getElementById('stat-penalty'),
+    penaltyLabel: document.getElementById('stat-penalty-label'),
+    penaltyBox: document.getElementById('stat-penalty-box'),
     speech: document.getElementById('client-speech'),
     orderVisual: document.getElementById('order-visual'),
     caption: document.getElementById('ingredient-caption'),
@@ -111,11 +116,26 @@ function currentSum() {
   }, 0);
 }
 
-/** Обновляет верхнюю панель со счётчиками. */
+/**
+ * Обновляет верхнюю панель со счётчиками.
+ * Третья ячейка — баланс: штрафы минус выручка. Пока он положительный,
+ * это долг и подпись «Штраф»; когда вышли в плюс (баланс отрицательный) —
+ * та же ячейка показывает «Заработано».
+ */
 function renderCounters() {
+  const balance = counters.penalty;
+  const isEarned = balance < 0;
+
   els.served.textContent = String(counters.served);
   els.errors.textContent = String(counters.errors);
-  els.penalty.textContent = formatPrice(counters.penalty);
+  els.penalty.textContent = formatPrice(Math.abs(balance));
+
+  if (els.penaltyLabel) {
+    els.penaltyLabel.textContent = isEarned ? 'Заработано' : 'Штраф';
+  }
+  if (els.penaltyBox) {
+    els.penaltyBox.classList.toggle('hud__stat--earned', isEarned);
+  }
 }
 
 /** Перерисовывает правую панель: список покупок, сумму и кнопку «Готово». */
@@ -259,7 +279,11 @@ function renderOrderPreview() {
       model.dataset.ingredientId = ingredient.id;
       model.setAttribute('aria-label', `Ингредиент: ${ingredient.name}`);
       model.innerHTML = createModelSvg(ingredient.shape, ingredient.color);
-      model.addEventListener('click', () => showIngredientName(ingredient.name, model));
+      model.addEventListener('click', () => {
+        // звук «зинь» на клик проигрывает main.js по этому событию
+        document.dispatchEvent(new CustomEvent('barista:click'));
+        showIngredientName(ingredient.name, model);
+      });
 
       models.append(model);
     });
@@ -354,7 +378,10 @@ function finishOrder(result, now, wrongSum) {
 
   if (result === STATE.SUCCESS) {
     counters.served += 1;
-    statusText = `Заказ собран: ${formatPrice(targetPrice)}. Спасибо!`;
+    // Успешный заказ списывает свою стоимость из таба штрафа:
+    // баланс может уйти в минус, и тогда он превращается в заработок
+    counters.penalty -= targetPrice;
+    statusText = `Заказ собран: +${formatPrice(targetPrice)}. Спасибо!`;
   } else if (result === STATE.FAIL_TIMEOUT) {
     counters.errors += 1;
     counters.penalty += targetPrice;

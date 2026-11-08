@@ -36,8 +36,8 @@
           <span class="hud__label">Ошибок</span>
           <span class="hud__value" id="stat-errors">0</span>
         </div>
-        <div class="hud__stat hud__stat--penalty">
-          <span class="hud__label">Штраф</span>
+        <div class="hud__stat hud__stat--penalty" id="stat-penalty-box">
+          <span class="hud__label" id="stat-penalty-label">Штраф</span>
           <span class="hud__value" id="stat-penalty">0 ₽</span>
         </div>
       </header>
@@ -53,6 +53,9 @@
           Нажмите на модель, чтобы увидеть название ингредиента.
         </p>
 
+        <!-- Кнопка подтверждения стоит рядом с составом заказа -->
+        <button class="submit" id="submit-btn" type="button" disabled>Готово</button>
+
         <div class="timer" role="progressbar" aria-label="Остаток времени на заказ">
           <div class="timer__fill" id="timer-fill"></div>
         </div>
@@ -61,7 +64,7 @@
         <p class="status" id="status-text">Ждём заказ…</p>
       </section>
 
-      <!-- Правая панель: корзина, сумма и кнопка «Готово» -->
+      <!-- Правая панель: корзина и сумма -->
       <aside class="panel panel--basket">
         <p class="panel__title">Собранный заказ</p>
 
@@ -74,8 +77,6 @@
           <span class="total__label">Сумма</span>
           <span class="total__value" id="basket-total">0 ₽</span>
         </div>
-
-        <button class="submit" id="submit-btn" type="button" disabled>Готово</button>
       </aside>
 
       <p class="hint">

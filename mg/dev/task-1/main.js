@@ -18,6 +18,64 @@ const { scene, camera, renderer } = initScene(canvas);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+/** AudioContext создаём лениво: браузер разрешает звук только после клика. */
+let audioContext = null;
+
+function getAudioContext() {
+  if (audioContext) return audioContext;
+
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtor) return null;
+
+  audioContext = new AudioCtor();
+  return audioContext;
+}
+
+/**
+ * Короткий «зинь» на клик мыши: две синусоиды с быстрым затуханием.
+ * Никаких звуковых файлов — только Web Audio API.
+ */
+function playClickSound() {
+  const context = getAudioContext();
+  if (!context) return;
+
+  if (context.state === 'suspended') {
+    context.resume();
+  }
+
+  const now = context.currentTime;
+
+  const master = context.createGain();
+  master.gain.setValueAtTime(0.0001, now);
+  master.gain.exponentialRampToValueAtTime(0.28, now + 0.006);
+  master.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+  master.connect(context.destination);
+
+  // Основной тон и октава выше — вместе звучит звонко
+  const partials = [
+    { frequency: 1567.98, level: 1, decay: 0.42 },
+    { frequency: 2093.0, level: 0.45, decay: 0.3 },
+  ];
+
+  partials.forEach(({ frequency, level, decay }) => {
+    const oscillator = context.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, now);
+
+    const envelope = context.createGain();
+    envelope.gain.setValueAtTime(level, now);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+
+    oscillator.connect(envelope);
+    envelope.connect(master);
+    oscillator.start(now);
+    oscillator.stop(now + decay + 0.02);
+  });
+}
+
+// Клики по моделям в панели заказа тоже должны «звенеть»
+document.addEventListener('barista:click', playClickSound);
+
 /**
  * Переводит координаты события в нормализованные координаты сцены (-1..1).
  * Считается по фактическому размеру canvas, поэтому корректно работает
@@ -78,12 +136,14 @@ canvas.addEventListener('click', (event) => {
   const hit = pickIngredient(event);
   if (!hit) return;
 
+  playClickSound();
   showIngredientLabel(hit);
   handleIngredientClick(hit.userData.ingredientId);
 });
 
 // Кнопка «Готово»
 document.getElementById('submit-btn').addEventListener('click', () => {
+  playClickSound();
   submitOrder();
 });
 

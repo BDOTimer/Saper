@@ -28,6 +28,17 @@ const CLIENT_SLOTS_X = [-2, -0.7, 0.7, 2];
 /** Цвета клиентов — чтобы очередь визуально различалась. */
 const CLIENT_COLORS = [0xf06292, 0x4fc3f7, 0xffd54f, 0x81c784];
 
+/** Пути к текстурам (лежат в папке res проекта). */
+const WALL_TEXTURE_PATH = 'res/wall-1.jpg';
+const SHELF_TEXTURE_PATH = 'res/shelf-1.jpg';
+
+/** Размер исходной картинки обоев и доля, занятая самими обоями (ниже — пол). */
+const WALL_IMAGE_WIDTH = 900;
+const WALL_IMAGE_HEIGHT = 720;
+const WALL_WALLPAPER_PART = 0.7;
+
+const textureLoader = new THREE.TextureLoader();
+
 let scene = null;
 let camera = null;
 let renderer = null;
@@ -118,7 +129,52 @@ function createClientObject(slotIndex) {
   return mesh;
 }
 
-/** Строит стойку с полками и задней стенкой. */
+/**
+ * Общий фон сцены — обои из res/wall-1.jpg.
+ * В картинке сверху обои, снизу деревянный пол, поэтому берём только
+ * верхнюю часть текстуры, а пол в сцене свой, трёхмерный.
+ */
+function buildWallBackground() {
+  const texture = textureLoader.load(WALL_TEXTURE_PATH);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(1, WALL_WALLPAPER_PART);
+  texture.offset.set(0, 1 - WALL_WALLPAPER_PART);
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  // Плоскость единичного размера, растянутая по пропорциям обоев.
+  // Ширины хватает даже на очень широкое окно.
+  const wallpaperRatio = (WALL_IMAGE_HEIGHT * WALL_WALLPAPER_PART) / WALL_IMAGE_WIDTH;
+  const width = 32;
+  const height = width * wallpaperRatio;
+
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: texture }),
+  );
+  backdrop.scale.set(width, height, 1);
+  backdrop.position.set(0, height / 2, -2.15);
+  scene.add(backdrop);
+}
+
+/** Материал полок — деревянная доска из res/shelf-1.jpg. */
+function createShelfMaterial() {
+  const texture = textureLoader.load(SHELF_TEXTURE_PATH);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 1);
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  return new THREE.MeshStandardMaterial({
+    map: texture,
+    roughness: 0.72,
+    metalness: 0.04,
+  });
+}
+
+/** Строит стойку с полками и общим фоном. */
 function buildCounterAndShelves() {
   // Пол кафе
   const floor = new THREE.Mesh(
@@ -129,26 +185,32 @@ function buildCounterAndShelves() {
   floor.position.y = 0;
   scene.add(floor);
 
-  // Задняя стенка, чтобы полки не висели в пустоте
-  const wall = new THREE.Mesh(
-    new THREE.BoxGeometry(10, 5, 0.2),
-    new THREE.MeshStandardMaterial({ color: 0x4b382a, roughness: 0.9, metalness: 0 }),
-  );
-  wall.position.set(0, 2.5, -2.05);
-  scene.add(wall);
+  // Обои на общем фоне
+  buildWallBackground();
 
-  // Стойка-прилавок
-  const counter = new THREE.Mesh(
-    new THREE.BoxGeometry(8, 1, 1.6),
-    new THREE.MeshStandardMaterial({ color: 0x5c4331, roughness: 0.8, metalness: 0.05 }),
-  );
+  // Стойка-прилавок: тёмно-синяя с «мокрым» блеском (clearcoat)
+  const counterMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x102a52,
+    roughness: 0.16,
+    metalness: 0.22,
+    clearcoat: 1,
+    clearcoatRoughness: 0.06,
+  });
+
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 1.6), counterMaterial);
   counter.position.set(0, 0.5, 1);
   scene.add(counter);
 
-  // Светлая столешница
+  // Глянцевая столешница — тот же синий, но с более резким блеском
   const counterTop = new THREE.Mesh(
     new THREE.BoxGeometry(8.2, 0.1, 1.7),
-    new THREE.MeshStandardMaterial({ color: 0x7a5a3e, roughness: 0.6, metalness: 0.1 }),
+    new THREE.MeshPhysicalMaterial({
+      color: 0x14346a,
+      roughness: 0.08,
+      metalness: 0.3,
+      clearcoat: 1,
+      clearcoatRoughness: 0.03,
+    }),
   );
   counterTop.position.set(0, 1.05, 1);
   scene.add(counterTop);
@@ -165,12 +227,8 @@ function buildCounterAndShelves() {
     scene.add(side);
   });
 
-  // Три полки
-  const shelfMaterial = new THREE.MeshStandardMaterial({
-    color: 0x6e5039,
-    roughness: 0.75,
-    metalness: 0.05,
-  });
+  // Три полки с деревянной текстурой
+  const shelfMaterial = createShelfMaterial();
 
   Object.values(SHELF_HEIGHTS).forEach((shelfY) => {
     const shelf = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.12, 0.7), shelfMaterial);
@@ -239,6 +297,11 @@ export function initScene(canvas) {
   const keyLight = new THREE.DirectionalLight(0xffffff, 1);
   keyLight.position.set(5, 8, 6);
   scene.add(keyLight);
+
+  // Точечный свет над прилавком — даёт яркое пятно на «мокрой» столешнице
+  const counterGlow = new THREE.PointLight(0xbfe0ff, 8, 12, 2);
+  counterGlow.position.set(0, 4.2, 2.6);
+  scene.add(counterGlow);
 
   buildCounterAndShelves();
   buildIngredients();

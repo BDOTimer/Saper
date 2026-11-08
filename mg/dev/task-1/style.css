@@ -8,6 +8,7 @@
   --text: #f5ece2;
   --muted: #b9a894;
   --danger: #ff6b5e;
+  --ok: #7fd18b;
 }
 
 * {
@@ -85,6 +86,15 @@ body {
 
 .hud__stat--penalty .hud__value {
   color: var(--accent);
+}
+
+/* В плюсе: та же ячейка показывает заработок */
+.hud__stat--earned .hud__value {
+  color: var(--ok);
+}
+
+.hud__stat--earned .hud__label {
+  color: rgba(127, 209, 139, 0.85);
 }
 
 /* ---------- Боковые панели ---------- */
@@ -323,6 +333,8 @@ body {
 }
 
 .submit {
+  width: 100%;
+  margin: 0 0 14px;
   padding: 12px 18px;
   font-family: inherit;
   font-size: 17px;
@@ -333,7 +345,7 @@ body {
   border-radius: 12px;
   cursor: pointer;
   transition: background 0.18s ease, transform 0.12s ease;
-  /* Кнопка — единственный интерактивный элемент оверлея */
+  /* Кнопка — единственный интерактивный элемент панели заказа */
   pointer-events: auto;
 }
 
