@@ -6,10 +6,17 @@
  */
 
 import * as THREE from 'three';
-import { getClientObjects, getIngredientObjects, initScene, updateCharacters } from './scene.js';
+import {
+  getClientObjects,
+  getIngredientObjects,
+  getMouseObject,
+  initScene,
+  updateCharacters,
+} from './scene.js';
 import {
   handleClientClick,
   handleIngredientClick,
+  handleMouseClick,
   pauseGame,
   resumeGame,
   startGame,
@@ -250,9 +257,24 @@ function pickClient(event) {
   return node && node.userData.isClient === true ? node : null;
 }
 
-// Курсор-указатель при наведении на ингредиент
+/**
+ * Проверяет, попали ли в пробегающую мышь.
+ * @param {PointerEvent|MouseEvent} event
+ * @returns {THREE.Group|null}
+ */
+function pickMouse(event) {
+  const mouseObject = getMouseObject();
+  if (!mouseObject || !mouseObject.visible) return null;
+
+  updatePointer(event);
+  raycaster.setFromCamera(pointer, camera);
+
+  return raycaster.intersectObject(mouseObject, true).length > 0 ? mouseObject : null;
+}
+
+// Курсор-указатель при наведении на ингредиент, мышь или клиента
 canvas.addEventListener('pointermove', (event) => {
-  const hit = pickIngredient(event) || pickClient(event);
+  const hit = pickIngredient(event) || pickMouse(event) || pickClient(event);
   canvas.style.cursor = hit ? 'pointer' : 'default';
 });
 
@@ -290,6 +312,13 @@ canvas.addEventListener('click', (event) => {
     playClickSound();
     showIngredientLabel(ingredient);
     handleIngredientClick(ingredient.userData.ingredientId);
+    return;
+  }
+
+  // Пробегающая мышь: попали — она исчезает, в доход капает 100 монет
+  if (pickMouse(event)) {
+    playClickSound();
+    handleMouseClick();
     return;
   }
 

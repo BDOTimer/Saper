@@ -129,6 +129,10 @@ const CLIENT_LEAVE_MS = 620;
 /** Стрелки и маятник часов — для покадровой анимации. */
 let clockParts = null;
 
+/** Мини-игра «пробегающая мышь». */
+let mouse = null;
+const mouseRun = { active: false, start: 0, duration: 0, curve: null };
+
 /** Приглушённый/осветлённый оттенок базового цвета (amount: -1..1). */
 function shadeColor(color, amount) {
   const base = new THREE.Color(color);
@@ -775,6 +779,7 @@ export function initScene(canvas) {
   buildCounterAndShelves();
   buildIngredients();
   buildClock();
+  buildMouse();
 
   // Стойка, полки и продукты тоже отбрасывают тени
   enableShadows(world);
@@ -783,6 +788,43 @@ export function initScene(canvas) {
   window.addEventListener('resize', handleResize);
 
   return { scene, camera, renderer };
+}
+
+/**
+ * Перемешивает продукты по полкам: после каждого заказа раскладка меняется,
+ * поэтому нужный ингредиент приходится искать заново.
+ */
+export function shuffleIngredients() {
+  // Все ячейки: 3 полки × 4 места
+  const cells = [];
+  for (let shelfIndex = 1; shelfIndex <= 3; shelfIndex += 1) {
+    for (let slot = 0; slot < 4; slot += 1) {
+      cells.push({ shelfIndex, slot });
+    }
+  }
+
+  // Перемешивание Фишера — Йетса
+  for (let i = cells.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const swap = cells[i];
+    cells[i] = cells[j];
+    cells[j] = swap;
+  }
+
+  ingredientObjects.forEach((model, index) => {
+    const cell = cells[index % cells.length];
+    if (!cell) return;
+
+    const shelfTop = SHELF_HEIGHTS[cell.shelfIndex] + 0.06;
+    const x = -2.7 + cell.slot * 1.8;
+
+    model.position.set(x, shelfTop, SHELF_Z);
+    model.rotation.y = cell.slot * 0.35;
+    model.scale.setScalar(model.userData.baseScale || 1);
+
+    // Подсветка ориентируется на новую высоту
+    model.userData.baseY = shelfTop;
+  });
 }
 
 /** @returns {THREE.Group[]} живые 3D-объекты ингредиентов */
@@ -999,7 +1041,104 @@ function updateClock(now) {
 }
 
 /**
- * Дыхание, покачивание рук и плавные повороты для одного персонажа.
+ * Строит мышь для мини-игры: сидит на полу перед стойкой, изначально спрятана.
+ */
+function buildMouse() {
+  const group = new THREE.Group();
+
+  const furMaterial = new THREE.MeshStandardMaterial({ color: 0x8d8d8d, roughness: 0.85, metalness: 0 });
+  const pinkMaterial = new THREE.MeshStandardMaterial({ color: 0xe58fa5, roughness: 0.8, metalness: 0 });
+  const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.5, metalness: 0 });
+
+  // Туловище
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), furMaterial);
+  body.scale.set(1, 0.85, 1.9);
+  body.position.set(0, 0.1, 0);
+  group.add(body);
+
+  // Голова
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), furMaterial);
+  head.position.set(0, 0.1, 0.2);
+  group.add(head);
+
+  // Уши
+  [-0.05, 0.05].forEach((x) => {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), pinkMaterial);
+    ear.position.set(x, 0.17, 0.18);
+    group.add(ear);
+  });
+
+  // Нос и глаза
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), pinkMaterial);
+  nose.position.set(0, 0.09, 0.27);
+  group.add(nose);
+
+  [-0.03, 0.03].forEach((x) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), darkMaterial);
+    eye.position.set(x, 0.13, 0.25);
+    group.add(eye);
+  });
+
+  // Хвост
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.005, 0.3, 6), pinkMaterial);
+  tail.position.set(0, 0.12, -0.28);
+  tail.rotation.x = -0.35;
+  group.add(tail);
+
+  group.scale.setScalar(1.2);
+  group.visible = false;
+  group.userData.isMouse = true;
+
+  enableShadows(group);
+  world.add(group);
+
+  mouse = group;
+}
+
+/**
+ * Запускает пробежку: мышь бежит по кривой перед стойкой слева направо
+ * или справа налево.
+ * @param {number} now
+ */
+export function startMouseRun(now) {
+  if (!mouse || mouseRun.active) return;
+
+  const direction = Math.random() < 0.5 ? 1 : -1;
+  const zStart = 1.95 + Math.random() * 0.25;
+  const zEnd = 1.95 + Math.random() * 0.25;
+  const zBow = 2.3 + Math.random() * 0.25;
+
+  mouseRun.curve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(-9.5 * direction, 0.02, zStart),
+    new THREE.Vector3(0, 0.02, zBow),
+    new THREE.Vector3(9.5 * direction, 0.02, zEnd),
+  );
+  mouseRun.start = now;
+  // Скорость вдвое ниже: пробежка занимает 6–8 секунд
+  mouseRun.duration = 6000 + Math.random() * 2000;
+  mouseRun.active = true;
+
+  mouse.visible = true;
+}
+
+/** Убирает мышь с пола (поймали или убежала). */
+export function stopMouseRun() {
+  mouseRun.active = false;
+  if (mouse) mouse.visible = false;
+}
+
+/** @returns {boolean} бежит ли мышь сейчас */
+export function isMouseRunning() {
+  return mouseRun.active;
+}
+
+/** @returns {THREE.Group|null} объект мыши для Raycaster */
+export function getMouseObject() {
+  return mouse;
+}
+
+/**
+ * Дыхание и покачивание рук для одного персонажа.
  * @param {THREE.Group} person
  * @param {number} now
  * @param {number} dt — секунды с прошлого кадра
@@ -1052,6 +1191,25 @@ function animatePerson(person, now, dt, allowTurn = false) {
  */
 export function updateCharacters(now, dt) {
   updateClock(now);
+
+  // Пробегающая мышь: движется по кривой и подпрыгивает на бегу
+  if (mouseRun.active && mouse) {
+    const t = Math.min(1, (now - mouseRun.start) / mouseRun.duration);
+    const point = mouseRun.curve.getPoint(t);
+    const bob = Math.abs(Math.sin(now * 0.018)) * 0.03;
+
+    mouse.position.set(point.x, point.y + bob, point.z);
+
+    const ahead = mouseRun.curve.getPoint(Math.min(1, t + 0.02));
+    const dx = ahead.x - point.x;
+    const dz = ahead.z - point.z;
+    if (Math.abs(dx) + Math.abs(dz) > 0.0001) {
+      // нос смотрит по направлению бега
+      mouse.rotation.y = Math.atan2(dx, dz);
+    }
+
+    if (t >= 1) stopMouseRun();
+  }
 
   clientObjects.forEach((client) => animatePerson(client, now, dt, true));
   if (baristaRef) animatePerson(baristaRef, now, dt, false);

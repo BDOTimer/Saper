@@ -49,14 +49,16 @@ export const INGREDIENTS = [
     shape: 'bowl',
   },
   {
+    // Специально сделан непохожим на «Цезарь»: другой формой (тарелка, а не чаша)
+    // и контрастным свекольно-фиолетовым цветом вместо зелёного
     id: 'salad_vegan',
     name: 'Веганский',
     category: 'salad',
     price: 90,
-    color: '#689f38',
+    color: '#9c27b0',
     shelfIndex: 1,
     slot: 2,
-    shape: 'bowl',
+    shape: 'plate',
   },
   {
     id: 'extra_bread',

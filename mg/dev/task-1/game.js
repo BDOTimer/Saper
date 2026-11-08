@@ -20,11 +20,15 @@ import {
   getClientObjects,
   getIngredientObjects,
   highlightIngredient,
+  isMouseRunning,
   removeClient,
   setBaristaLookTarget,
   setBaristaX,
   setCounterItems,
+  shuffleIngredients,
   startClientLeave,
+  startMouseRun,
+  stopMouseRun,
 } from './scene.js';
 
 /** Состояния игры. */
@@ -79,6 +83,9 @@ let resumeAt = 0;
 
 /** Момент, когда должен подойти следующий клиент (Infinity — никто не идёт). */
 let arrivalAt = Infinity;
+
+/** Момент следующей пробежки мыши. */
+let nextMouseAt = Infinity;
 
 /** Текущая позиция продавца вдоль стойки. */
 let baristaX = 0;
@@ -493,6 +500,9 @@ function finishOrder(result, now, wrongSum) {
   // Корзина очищается при любом исходе
   clearBasket();
 
+  // Полки перемешиваются — следующий заказ ищем заново
+  shuffleIngredients();
+
   // Активный клиент уходит, «сдуваясь»; следующий подойдёт отдельно
   const departed = queue.shift();
   startClientLeave(departed.mesh);
@@ -552,6 +562,12 @@ export function update(now) {
     baristaX += (0 - baristaX) * Math.min(1, 1 - Math.exp(-2 * dt));
     if (Math.abs(baristaX) < 0.01) baristaX = 0;
     setBaristaX(baristaX);
+  }
+
+  // Пробегающая мышь — примерно раз в минуту, в случайный момент
+  if (now >= nextMouseAt) {
+    if (!isMouseRunning()) startMouseRun(now);
+    nextMouseAt = now + 25000 + Math.random() * 10000;
   }
 
   // Приход нового клиента — по своему таймеру, независимо от уходов.
@@ -617,6 +633,9 @@ export function startGame() {
     entry.mesh.position.x = slotX(index, queue.length);
   });
   arrivalAt = Infinity;
+
+  // Первая мышь выбежит примерно через 20–30 секунд
+  nextMouseAt = performance.now() + 20000 + Math.random() * 10000;
 
   // Продавец возвращается на место, подход к полке сбрасываем
   walk.active = false;
@@ -705,6 +724,24 @@ export function submitOrder() {
 }
 
 /**
+ * Поймали мышь: она исчезает, играет звук радости и в доход идёт 100 монет.
+ * @returns {boolean} поймали ли
+ */
+export function handleMouseClick() {
+  if (!isMouseRunning()) return false;
+
+  stopMouseRun();
+
+  // Доход — отрицательная часть баланса, поэтому вычитаем
+  counters.penalty -= 100;
+  statusText = 'Мышь поймана! +100 ₽ в доход.';
+  renderAll();
+
+  document.dispatchEvent(new CustomEvent('barista:success'));
+  return true;
+}
+
+/**
  * Клик по клиенту: если это первый в очереди, он забирает заказ —
  * то же самое, что нажать «Готово».
  * @param {THREE.Group} clientObject
@@ -748,6 +785,7 @@ export function resumeGame() {
   resumeAt += delta;
   walk.start += delta;
   if (arrivalAt !== Infinity) arrivalAt += delta;
+  if (nextMouseAt !== Infinity) nextMouseAt += delta;
 
   lastNow = now;
   paused = false;
