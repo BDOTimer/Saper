@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Стойка бариста</title>
+
+    <!-- Иконка встроена в страницу, чтобы не было лишних запросов и 404 -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='25' font-size='24'%3E%E2%98%95%3C/text%3E%3C/svg%3E"
+    />
+
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Three.js подключается как ES-модуль, сборка не нужна -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene-canvas"></canvas>
+
+      <!-- Верхняя панель: счётчики всегда видны -->
+      <header class="hud">
+        <div class="hud__stat">
+          <span class="hud__label">Обслужено</span>
+          <span class="hud__value" id="stat-served">0</span>
+        </div>
+        <div class="hud__stat hud__stat--error">
+          <span class="hud__label">Ошибок</span>
+          <span class="hud__value" id="stat-errors">0</span>
+        </div>
+        <div class="hud__stat hud__stat--penalty">
+          <span class="hud__label">Штраф</span>
+          <span class="hud__value" id="stat-penalty">0 ₽</span>
+        </div>
+      </header>
+
+      <!-- Левая панель: монолог клиента, модели заказа и таймер -->
+      <section class="panel panel--order">
+        <p class="panel__title">Заказ клиента</p>
+        <p class="speech" id="client-speech">Клиент подходит к стойке…</p>
+
+        <!-- Визуальные модели того, что заказал клиент -->
+        <div class="order-visual" id="order-visual" aria-label="Состав заказа"></div>
+        <p class="caption" id="ingredient-caption">
+          Нажмите на модель, чтобы увидеть название ингредиента.
+        </p>
+
+        <div class="timer" role="progressbar" aria-label="Остаток времени на заказ">
+          <div class="timer__fill" id="timer-fill"></div>
+        </div>
+        <p class="timer__text" id="timer-text">12.0 с</p>
+
+        <p class="status" id="status-text">Ждём заказ…</p>
+      </section>
+
+      <!-- Правая панель: корзина, сумма и кнопка «Готово» -->
+      <aside class="panel panel--basket">
+        <p class="panel__title">Собранный заказ</p>
+
+        <p class="basket__empty" id="basket-empty">
+          Кликните по ингредиентам на полках
+        </p>
+        <ul class="basket" id="basket-list"></ul>
+
+        <div class="total">
+          <span class="total__label">Сумма</span>
+          <span class="total__value" id="basket-total">0 ₽</span>
+        </div>
+
+        <button class="submit" id="submit-btn" type="button" disabled>Готово</button>
+      </aside>
+
+      <p class="hint">
+        Соберите заказ так, чтобы сумма совпала со стоимостью блюд из монолога.
+      </p>
+
+      <!-- Всплывающая подпись над ингредиентом на полке -->
+      <div class="ingredient-label" id="ingredient-label" hidden></div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

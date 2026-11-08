@@ -1,0 +1,453 @@
+/* style.css — оформление HTML-оверлея поверх Three.js сцены. */
+
+:root {
+  --bg: #140e0a;
+  --panel: rgba(26, 18, 12, 0.82);
+  --panel-border: rgba(255, 196, 120, 0.18);
+  --accent: #ffc14d;
+  --text: #f5ece2;
+  --muted: #b9a894;
+  --danger: #ff6b5e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Сцена занимает всё окно, оверлей лежит поверх неё */
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#scene-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+
+/* ---------- Верхняя панель со счётчиками ---------- */
+
+.hud {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.hud__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 116px;
+  padding: 8px 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+}
+
+.hud__label {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hud__value {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__stat--error .hud__value {
+  color: var(--danger);
+}
+
+.hud__stat--penalty .hud__value {
+  color: var(--accent);
+}
+
+/* ---------- Боковые панели ---------- */
+
+.panel {
+  position: absolute;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.panel__title {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel--order {
+  left: 28px;
+  bottom: 28px;
+  width: min(460px, 42vw);
+}
+
+.panel--basket {
+  right: 28px;
+  top: 96px;
+  width: min(320px, 30vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Монолог клиента ---------- */
+
+.speech {
+  margin: 0 0 16px;
+  font-size: 21px;
+  line-height: 1.45;
+  min-height: 3.8em;
+}
+
+/* ---------- Визуальные модели заказа ---------- */
+
+.order-visual {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dish {
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+}
+
+.dish__name {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.dish__models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Модель ингредиента: та же форма и цвет, что и объект на полке */
+.model {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  cursor: pointer;
+  /* панель не перехватывает клики, но модель обязана */
+  pointer-events: auto;
+  transition: transform 0.12s ease, border-color 0.2s ease;
+}
+
+.model:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 193, 77, 0.6);
+}
+
+.model:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.model--active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px rgba(255, 193, 77, 0.28);
+}
+
+.caption {
+  margin: 0 0 12px;
+  min-height: 1.4em;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.caption--active {
+  color: var(--accent);
+  animation: caption-pulse 0.4s ease;
+}
+
+@keyframes caption-pulse {
+  from {
+    opacity: 0.45;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---------- Таймер ---------- */
+
+.timer {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.timer__fill {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8bd17c, #ffd166);
+  transition: width 90ms linear;
+}
+
+.timer__fill--danger {
+  background: linear-gradient(90deg, #ff8a65, #ff5252);
+}
+
+.timer__text {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  margin: 10px 0 0;
+  min-height: 1.4em;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--accent);
+}
+
+/* ---------- Корзина ---------- */
+
+.basket {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 34vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.basket__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.basket__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.basket__price {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.basket__empty {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Атрибут hidden не должен проигрывать правилу display выше */
+.basket__empty[hidden] {
+  display: none;
+}
+
+/* ---------- Итог и кнопка ---------- */
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.total__label {
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.total__value {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.submit {
+  padding: 12px 18px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  color: #2a1a0d;
+  background: var(--accent);
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.12s ease;
+  /* Кнопка — единственный интерактивный элемент оверлея */
+  pointer-events: auto;
+}
+
+.submit:hover:not(:disabled) {
+  background: #ffd27a;
+  transform: translateY(-1px);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.submit:disabled {
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  cursor: not-allowed;
+}
+
+/* ---------- Подсказка ---------- */
+
+.hint {
+  position: absolute;
+  top: 88px;
+  left: 50%;
+  max-width: 44vw;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--muted);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* ---------- Подпись над ингредиентом в 3D ---------- */
+
+.ingredient-label {
+  position: fixed;
+  z-index: 5;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #2a1a0d;
+  background: var(--accent);
+  border-radius: 8px;
+  opacity: 0;
+  transform: translate(-50%, -125%);
+  pointer-events: none;
+}
+
+.ingredient-label.is-visible {
+  animation: label-fade 1.8s ease forwards;
+}
+
+@keyframes label-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -100%) scale(0.92);
+  }
+
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -125%) scale(1);
+  }
+
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -135%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -160%) scale(1);
+  }
+}
+
+/* ---------- Узкие окна ---------- */
+
+@media (max-width: 1100px) {
+  .hint {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .panel--order {
+    left: 16px;
+    bottom: 16px;
+    width: calc(100vw - 32px);
+  }
+
+  .panel--basket {
+    top: auto;
+    right: 16px;
+    bottom: 210px;
+    width: min(280px, 70vw);
+  }
+
+  .speech {
+    font-size: 18px;
+  }
+
+  .hud__stat {
+    min-width: 92px;
+    padding: 6px 12px;
+  }
+
+  .hud__value {
+    font-size: 20px;
+  }
+}
