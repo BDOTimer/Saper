@@ -558,11 +558,11 @@ function buildCounterAndShelves() {
   backTexture.colorSpace = THREE.SRGBColorSpace;
   backTexture.wrapS = THREE.RepeatWrapping;
   backTexture.wrapT = THREE.RepeatWrapping;
-  backTexture.repeat.set(4, 2);
+  backTexture.repeat.set(4, 3);
   backTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
   const backPanel = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.3, 3.4),
+    new THREE.PlaneGeometry(7.3, 4.5),
     new THREE.MeshStandardMaterial({
       map: backTexture,
       color: 0x4a3a2c, // темнее самих полок
@@ -570,7 +570,7 @@ function buildCounterAndShelves() {
       metalness: 0,
     }),
   );
-  backPanel.position.set(0, 2.8, -1.94);
+  backPanel.position.set(0, 2.25, -1.94);
   backPanel.receiveShadow = true;
   world.add(backPanel);
 
