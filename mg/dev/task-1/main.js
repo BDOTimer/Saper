@@ -82,6 +82,26 @@ function playClickSound() {
 }
 
 /**
+ * Первый клик в окне разблокирует звук: создаём и запускаем AudioContext.
+ * Браузер разрешает старт звука только внутри пользовательского жеста.
+ */
+function unlockAudio() {
+  const context = getAudioContext();
+  if (!context) return;
+
+  if (context.state === 'suspended') {
+    context.resume();
+  }
+
+  // Дальше контекст уже живёт — обработчики больше не нужны
+  window.removeEventListener('pointerdown', unlockAudio);
+  window.removeEventListener('keydown', unlockAudio);
+}
+
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+
+/**
  * Одна нота с огибающей — основа для всех звуков игры.
  */
 function playTone(context, { frequency, start, duration, type = 'sine', level = 0.2, endFrequency = null }) {
