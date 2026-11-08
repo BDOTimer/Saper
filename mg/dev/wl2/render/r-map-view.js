@@ -8,6 +8,9 @@ import { disposeTree } from './r-units-view.js';
 import { mulberry32  } from '../core/rng.js';
 import { spawnRandomMountain } from './mesh.js';
 
+/** Средне-серый цвет крыши нейтрального города. */
+const NEUTRAL_ROOF = 0x8a8f96;
+
 export class MapView {
   constructor(world, container, players = null) {
     this.world     = world;
@@ -302,7 +305,7 @@ export class MapView {
 
       const roof = new THREE.Mesh(
         new THREE.ConeGeometry(TILE * 0.28, TILE * 0.35, 4),
-        new THREE.MeshStandardMaterial({ color: 0xd64545, roughness: 0.6 })
+        new THREE.MeshStandardMaterial({ color: this._roofColor(city.ownerId), roughness: 0.6 })
       );
       roof.position.y = baseY + 1.20;
       roof.rotation.y = Math.PI / 4;
@@ -325,7 +328,7 @@ export class MapView {
         ownerId: city.ownerId ?? null,
       };
 
-      g.userData = { type: 'city', city, flag, cityIndex };
+      g.userData = { type: 'city', city, flag, roof, cityIndex };
       this.cityGroup.add(g);
 
       this._raisedFlags.add(cityIndex);
@@ -727,6 +730,13 @@ export class MapView {
     flag.material.color.setHex(this._ownerColor(city.ownerId));
     flag.material.needsUpdate = true;
 
+    // Крыша города тоже меняет цвет на цвет нового владельца.
+    const roof = group.userData?.roof;
+    if (roof) {
+      roof.material.color.setHex(this._roofColor(city.ownerId));
+      roof.material.needsUpdate = true;
+    }
+
     return this.setCityFlag(idx, raised, duration);
   }
 
@@ -830,8 +840,14 @@ export class MapView {
   /** Палитра-фолбэк, если players не передан или у игрока нет color. */
   static DEFAULT_OWNER_PALETTE = [
     0x2e8bff, 0xd64545, 0x5bbf6a, 0xf0c040,
-    0xa46bff, 0x22b8cf, 0xff8c42, 0xb0b8c0,
+    0xa46bff, 0x22b8cf, 0xff8c42, 0x000000,
   ];
+
+  /** Цвет крыши города: нейтральный — средне-серый, иначе цвет владельца. */
+  _roofColor(ownerId) {
+    if (ownerId === null || ownerId === undefined) return NEUTRAL_ROOF;
+    return this._ownerColor(ownerId);
+  }
 
   /** Цвет флага для ownerId (null → нейтральный). */
   _ownerColor(ownerId) {

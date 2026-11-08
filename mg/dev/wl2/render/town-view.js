@@ -284,7 +284,7 @@ function buildCityMesh(colorHex, type = 'provincial') {
   const accent   = new THREE.Color(colorHex);
   const stone    = new THREE.MeshStandardMaterial({ color: 0xd9cfb6, roughness: 0.9 });
   const stoneDark= new THREE.MeshStandardMaterial({ color: 0x9a8f77, roughness: 0.95 });
-  const roof     = new THREE.MeshStandardMaterial({ color: 0xb64141, roughness: 0.6 });
+  const roof     = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
   const wood     = new THREE.MeshStandardMaterial({ color: 0x6d4a2f, roughness: 0.9 });
   const gold     = new THREE.MeshStandardMaterial({
     color: 0xffd166, metalness: 0.55, roughness: 0.35,
@@ -783,7 +783,7 @@ export class TownView {
   _ownerColor() {
     const owner = this._owner();
     if (owner && typeof owner.color === 'number') return owner.color;
-    return 0x9aa4ad;
+    return 0x8a8f96;   // нейтральный город — средне-серый
   }
 
   _ownerColorCss() {

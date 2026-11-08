@@ -174,7 +174,7 @@ export class Player {
 function defaultColor(i) {
   const palette = [
     0x2e8bff, 0xd64545, 0x5bbf6a, 0xf0c040,
-    0xa46bff, 0x22b8cf, 0xff8c42, 0xb0b8c0,
+    0xa46bff, 0x22b8cf, 0xff8c42, 0x000000,
   ];
   return palette[i % palette.length];
 }
