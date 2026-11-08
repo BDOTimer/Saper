@@ -6,8 +6,9 @@
  */
 
 import * as THREE from 'three';
-import { getIngredientObjects, initScene, updateCharacters } from './scene.js';
+import { getClientObjects, getIngredientObjects, initScene, updateCharacters } from './scene.js';
 import {
+  handleClientClick,
   handleIngredientClick,
   pauseGame,
   resumeGame,
@@ -209,9 +210,29 @@ function pickIngredient(event) {
   return node && node.userData.ingredientId !== undefined ? node : null;
 }
 
+/**
+ * Ищет клиента под курсором.
+ * @param {PointerEvent|MouseEvent} event
+ * @returns {THREE.Group|null}
+ */
+function pickClient(event) {
+  updatePointer(event);
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(getClientObjects(), true);
+  if (hits.length === 0) return null;
+
+  let node = hits[0].object;
+  while (node && node.userData.isClient !== true) {
+    node = node.parent;
+  }
+
+  return node && node.userData.isClient === true ? node : null;
+}
+
 // Курсор-указатель при наведении на ингредиент
 canvas.addEventListener('pointermove', (event) => {
-  const hit = pickIngredient(event);
+  const hit = pickIngredient(event) || pickClient(event);
   canvas.style.cursor = hit ? 'pointer' : 'default';
 });
 
@@ -244,12 +265,20 @@ function showIngredientLabel(mesh) {
 // Клик по модели на полке: показываем название ингредиента текстом,
 // а добавление/удаление из корзины делает game.js
 canvas.addEventListener('click', (event) => {
-  const hit = pickIngredient(event);
-  if (!hit) return;
+  const ingredient = pickIngredient(event);
+  if (ingredient) {
+    playClickSound();
+    showIngredientLabel(ingredient);
+    handleIngredientClick(ingredient.userData.ingredientId);
+    return;
+  }
 
-  playClickSound();
-  showIngredientLabel(hit);
-  handleIngredientClick(hit.userData.ingredientId);
+  // Клик по первому клиенту — он забирает заказ (альтернатива кнопке «Готово»)
+  const client = pickClient(event);
+  if (client) {
+    playClickSound();
+    handleClientClick(client);
+  }
 });
 
 // Кнопка «Готово»

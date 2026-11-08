@@ -55,8 +55,17 @@ const CAMERA_TARGET_X = 0.45;
 /** Во сколько раз увеличены модели продуктов на полках. */
 const INGREDIENT_SCALE = 2;
 
-/** Цвета одежды клиентов — чтобы очередь визуально различалась. */
-const CLIENT_COLORS = [0xf06292, 0x4fc3f7, 0xffd54f, 0x81c784];
+/**
+ * Случайный тёмный цвет одежды клиента: приглушённый оттенок,
+ * без ярких кислотных тонов.
+ * @returns {THREE.Color}
+ */
+function randomDarkColor() {
+  const hue = Math.random();
+  const saturation = 0.25 + Math.random() * 0.35;
+  const lightness = 0.15 + Math.random() * 0.15;
+  return new THREE.Color().setHSL(hue, saturation, lightness);
+}
 
 /** Палитра людей. */
 const SKIN_COLOR = 0xe8b98f;
@@ -101,9 +110,6 @@ const ingredientObjects = [];
 
 /** Живые 3D-объекты клиентов в порядке очереди. */
 const clientObjects = [];
-
-/** Счётчик, чтобы новые клиенты получали разные цвета. */
-let clientColorCursor = 0;
 
 /** Продавец — нужен для анимаций (ходьба вдоль стойки, поворот головы). */
 let baristaRef = null;
@@ -355,12 +361,11 @@ function createHumanoid({
 
 /** Создаёт нового клиента в очереди (позицию выставляет game.js). */
 export function createClient() {
-  const color = CLIENT_COLORS[clientColorCursor % CLIENT_COLORS.length];
-  clientColorCursor += 1;
-
-  const client = createHumanoid({ clothColor: color });
+  const client = createHumanoid({ clothColor: randomDarkColor() });
   client.position.set(0, 0, CLIENT_Z);
   client.userData.targetX = 0;
+  // Метка для Raycaster: по ней game.js понимает, что кликнули по клиенту
+  client.userData.isClient = true;
 
   world.add(client);
   clientObjects.push(client);

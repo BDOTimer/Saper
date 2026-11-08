@@ -705,6 +705,28 @@ export function submitOrder() {
 }
 
 /**
+ * Клик по клиенту: если это первый в очереди, он забирает заказ —
+ * то же самое, что нажать «Готово».
+ * @param {THREE.Group} clientObject
+ * @returns {boolean} обработан ли клик
+ */
+export function handleClientClick(clientObject) {
+  if (state !== STATE.ORDERING) return false;
+
+  const active = queue[0];
+  if (!active || active.mesh !== clientObject) return false;
+
+  if (basket.length === 0) {
+    statusText = 'Клиент ждёт заказ: сначала положите продукты на стол.';
+    renderStatus();
+    return true;
+  }
+
+  submitOrder();
+  return true;
+}
+
+/**
  * Ставит игру на паузу — пока открыты правила, заказы не сгорают.
  */
 export function pauseGame() {

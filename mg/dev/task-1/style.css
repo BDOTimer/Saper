@@ -61,15 +61,15 @@ body {
   inset: 0;
   z-index: 1;
   background: radial-gradient(
-    ellipse 78% 72% at 61% 43%,
+    ellipse 74% 68% at 61% 43%,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0) 42%,
-    rgba(0, 0, 0, 0.08) 52%,
-    rgba(0, 0, 0, 0.2) 62%,
-    rgba(0, 0, 0, 0.38) 72%,
-    rgba(0, 0, 0, 0.58) 82%,
-    rgba(0, 0, 0, 0.76) 91%,
-    rgba(0, 0, 0, 0.9) 100%
+    rgba(0, 0, 0, 0) 38%,
+    rgba(0, 0, 0, 0.12) 48%,
+    rgba(0, 0, 0, 0.3) 58%,
+    rgba(0, 0, 0, 0.5) 68%,
+    rgba(0, 0, 0, 0.72) 80%,
+    rgba(0, 0, 0, 0.9) 92%,
+    rgba(0, 0, 0, 0.98) 100%
   );
   pointer-events: none;
 }
