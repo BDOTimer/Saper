@@ -242,6 +242,76 @@ function createIngredientObject(ingredient) {
 }
 
 /**
+ * Добавляет клиенту несколько одиночных волосков на макушке.
+ * Волосок — тонкая дуга по поверхности головы: он лежит на черепе,
+ * а не торчит наружу.
+ * @param {THREE.Group} headGroup
+ * @param {number} count — сколько волосков (1..5)
+ */
+function addStrayHairs(headGroup, count) {
+  const headRadius = 0.163;
+
+  for (let i = 0; i < count; i += 1) {
+    const isRed = Math.random() < 0.5;
+    const material = new THREE.MeshStandardMaterial({
+      color: isRed ? 0xb5521f : 0x14100e,
+      roughness: 0.9,
+      metalness: 0,
+    });
+
+    // Точка на макушке: полярный угол от темени и случайный азимут
+    const theta = Math.random() * Math.PI * 0.55;
+    const phi = Math.random() * Math.PI * 2;
+
+    const normal = new THREE.Vector3(
+      Math.sin(theta) * Math.cos(phi),
+      Math.cos(theta),
+      Math.sin(theta) * Math.sin(phi),
+    ).normalize();
+
+    // Случайное касательное направление — вдоль него волосок и уложен
+    const helper = Math.abs(normal.y) > 0.9
+      ? new THREE.Vector3(1, 0, 0)
+      : new THREE.Vector3(0, 1, 0);
+
+    const tangent = new THREE.Vector3().crossVectors(normal, helper).normalize();
+    tangent.applyAxisAngle(normal, Math.random() * Math.PI * 2);
+
+    // Дуга по сфере: поворачиваем радиус-вектор вокруг оси normal × tangent
+    const axis = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+    const arcLength = 0.1 + Math.random() * 0.1;
+    const points = [];
+
+    for (let step = 0; step <= 3; step += 1) {
+      const angle = ((arcLength * step) / 3) / headRadius;
+      const point = normal.clone().applyAxisAngle(axis, angle).multiplyScalar(headRadius);
+      point.addScaledVector(normal, 0.001);
+      points.push(point);
+    }
+
+    const curve = new THREE.CatmullRomCurve3(points);
+    const hair = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.004, 5, false), material);
+
+    headGroup.add(hair);
+  }
+}
+
+/**
+ * Слегка разный оттенок кожи у клиентов: базовый тон с небольшим
+ * случайным сдвигом светлоты и тепла.
+ * @returns {THREE.Color}
+ */
+function randomSkinTone() {
+  const color = new THREE.Color(SKIN_COLOR);
+
+  // ±12 % по светлоте и лёгкий сдвиг оттенка
+  color.multiplyScalar(0.88 + Math.random() * 0.24);
+  color.offsetHSL((Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.06, 0);
+
+  return color;
+}
+
+/**
  * Собирает человекоподобную фигуру: ноги, туловище, руки, голова.
  * @param {object} options
  * @param {number} options.clothColor — цвет одежды
@@ -250,6 +320,7 @@ function createIngredientObject(ingredient) {
  * @param {number|null} [options.hairColor] — если задан, добавляются волосы
  * @param {boolean} [options.longHair] — длинные волосы до плеч
  * @param {boolean} [options.face] — глаза и алые губы
+ * @param {number} [options.strayHairs] — сколько одиночных волосков добавить
  * @returns {THREE.Group}
  */
 function createHumanoid({
@@ -259,12 +330,20 @@ function createHumanoid({
   hairColor = null,
   longHair = false,
   face = false,
+  strayHairs = 0,
 }) {
   const person = new THREE.Group();
 
   const skinMaterial = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.75, metalness: 0 });
   const clothMaterial = new THREE.MeshStandardMaterial({ color: clothColor, roughness: 0.7, metalness: 0.03 });
   const pantsMaterial = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.85, metalness: 0 });
+
+  // Руки чуть темнее туловища — та же ткань, но в тени
+  const armMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(clothColor).lerp(new THREE.Color(0x000000), 0.22),
+    roughness: 0.7,
+    metalness: 0.03,
+  });
 
   // Ноги
   [-0.11, 0.11].forEach((x) => {
@@ -282,7 +361,7 @@ function createHumanoid({
   const arms = [];
   const armBase = [];
   [-0.27, 0.27].forEach((x) => {
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.52, 8), clothMaterial);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.52, 8), armMaterial);
     arm.position.set(x, 1.05, 0);
     const base = x > 0 ? -0.16 : 0.16;
     arm.rotation.z = base;
@@ -341,6 +420,11 @@ function createHumanoid({
     }
   }
 
+  // Одиночные торчащие волоски — только у клиентов
+  if (strayHairs > 0) {
+    addStrayHairs(headGroup, strayHairs);
+  }
+
   // Данные для лёгких анимаций: постоянное дыхание и плавное покачивание рук
   person.userData.arms = arms;
   person.userData.armBase = armBase;
@@ -361,7 +445,12 @@ function createHumanoid({
 
 /** Создаёт нового клиента в очереди (позицию выставляет game.js). */
 export function createClient() {
-  const client = createHumanoid({ clothColor: randomDarkColor() });
+  const client = createHumanoid({
+    clothColor: randomDarkColor(),
+    skinColor: randomSkinTone(),
+    // от 1 до 5 одиночных волосков на макушке
+    strayHairs: 1 + Math.floor(Math.random() * 5),
+  });
   client.position.set(0, 0, CLIENT_Z);
   client.userData.targetX = 0;
   // Метка для Raycaster: по ней game.js понимает, что кликнули по клиенту
