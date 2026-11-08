@@ -15,8 +15,11 @@
 import * as THREE from 'three';
 import { INGREDIENTS } from './data.js';
 
-/** Высота каждой полки (по требованию задания). */
-const SHELF_HEIGHTS = { 1: 1.5, 2: 2.2, 3: 2.9 };
+/**
+ * Высота каждой полки. Подняты на 0.18 относительно исходных 1.5/2.2/2.9,
+ * чтобы макушка продавца не касалась нижней полки.
+ */
+const SHELF_HEIGHTS = { 1: 1.74, 2: 2.44, 3: 3.14 };
 
 /** Полки висят на задней стенке, чуть впереди неё. */
 const SHELF_Z = -1.55;
@@ -25,7 +28,7 @@ const SHELF_Z = -1.55;
 const CLIENT_Z = 2.45;
 
 /** Продавец стоит за стойкой, с обратной стороны от клиентов. */
-const BARISTA_Z = -0.2;
+const BARISTA_Z = 0.05;
 
 /**
  * Вся стойка сдвинута вправо: на экране она должна занимать свободную
@@ -37,7 +40,14 @@ const WORLD_OFFSET_X = 2.4;
  * Точка, на которую смотрит камера. Подобрана так, чтобы ступни клиентов
  * оказались в ~25 px от нижнего края окна.
  */
-const CAMERA_TARGET_Y = 2.28;
+const CAMERA_TARGET_Y = 2.45;
+
+/** Камера чуть сдвинута влево и смотрит правее — продавец в центре кадра. */
+const CAMERA_POSITION = { x: -0.5, y: 4, z: 8 };
+const CAMERA_TARGET_X = 0.45;
+
+/** Во сколько раз увеличены модели продуктов на полках. */
+const INGREDIENT_SCALE = 2;
 
 /** Цвета одежды клиентов — чтобы очередь визуально различалась. */
 const CLIENT_COLORS = [0xf06292, 0x4fc3f7, 0xffd54f, 0x81c784];
@@ -133,16 +143,16 @@ function createIngredientObject(ingredient) {
 
     // Стакан сока: прозрачное стекло + жидкость
     case 'glass': {
-      part(new THREE.CylinderGeometry(0.1, 0.078, 0.34, 16), accentMaterial, 0, 0.17, 0);
-      part(new THREE.CylinderGeometry(0.088, 0.072, 0.22, 16), mainMaterial, 0, 0.14, 0);
+      part(new THREE.CylinderGeometry(0.1, 0.078, 0.27, 16), accentMaterial, 0, 0.135, 0);
+      part(new THREE.CylinderGeometry(0.088, 0.072, 0.18, 16), mainMaterial, 0, 0.115, 0);
       break;
     }
 
     // Соус: бутылочка с горлышком и крышкой
     case 'bottle': {
-      part(new THREE.CylinderGeometry(0.085, 0.085, 0.22, 14), mainMaterial, 0, 0.11, 0);
-      part(new THREE.CylinderGeometry(0.04, 0.055, 0.09, 12), accentMaterial, 0, 0.265, 0);
-      part(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 12), accentMaterial, 0, 0.325, 0);
+      part(new THREE.CylinderGeometry(0.085, 0.085, 0.18, 14), mainMaterial, 0, 0.09, 0);
+      part(new THREE.CylinderGeometry(0.04, 0.055, 0.07, 12), accentMaterial, 0, 0.215, 0);
+      part(new THREE.CylinderGeometry(0.045, 0.045, 0.025, 12), accentMaterial, 0, 0.2625, 0);
       break;
     }
 
@@ -249,9 +259,9 @@ function createHumanoid({
 
     if (longHair) {
       // Длинные волосы сзади, до плеч
-      const locks = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.32, 6, 12), hairMaterial);
-      locks.position.set(0, 1.3, -0.1);
-      locks.scale.set(1, 1, 0.62);
+      const locks = new THREE.Mesh(new THREE.CapsuleGeometry(0.145, 0.46, 6, 12), hairMaterial);
+      locks.position.set(0, 1.24, -0.11);
+      locks.scale.set(1, 1, 0.6);
       person.add(locks);
     }
   }
@@ -440,7 +450,7 @@ function buildCounterAndShelves() {
   });
   [-3.3, 3.3].forEach((x) => {
     const side = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.2, 0.9), sideMaterial);
-    side.position.set(x, 2.15, -1.6);
+    side.position.set(x, 2.33, -1.6);
     world.add(side);
   });
 
@@ -457,7 +467,7 @@ function buildCounterAndShelves() {
   const barista = createHumanoid({
     clothColor: 0xe9dcc8,
     skinColor: 0xf0c4a0,
-    hairColor: 0x3a2418,
+    hairColor: 0xf2d67a,
     longHair: true,
   });
   barista.position.set(0, 0, BARISTA_Z);
@@ -476,11 +486,14 @@ function buildIngredients() {
 
     model.position.set(-2.7 + ingredient.slot * 1.8, shelfTop, SHELF_Z);
     model.rotation.y = ingredient.slot * 0.35;
+    // Продукты вдвое крупнее задуманного размера примитивов
+    model.scale.setScalar(INGREDIENT_SCALE);
 
     // Связь 3D-объекта с данными: по нему Raycaster находит ингредиент
     model.userData.ingredientId = ingredient.id;
     model.userData.ingredientName = ingredient.name;
     model.userData.baseY = shelfTop;
+    model.userData.baseScale = INGREDIENT_SCALE;
 
     world.add(model);
     ingredientObjects.push(model);
@@ -509,8 +522,8 @@ export function initScene(canvas) {
   scene.background = new THREE.Color(0x17100b);
 
   camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 4, 8);
-  camera.lookAt(0, CAMERA_TARGET_Y, 0);
+  camera.position.set(CAMERA_POSITION.x, CAMERA_POSITION.y, CAMERA_POSITION.z);
+  camera.lookAt(CAMERA_TARGET_X, CAMERA_TARGET_Y, 0);
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -598,11 +611,13 @@ export function highlightIngredient(model, isSelected) {
     child.material.emissiveIntensity = intensity;
   });
 
+  const baseScale = model.userData.baseScale || 1;
+
   if (isSelected) {
-    model.scale.setScalar(1.15);
+    model.scale.setScalar(baseScale * 1.15);
     model.position.y = model.userData.baseY + 0.12;
   } else {
-    model.scale.setScalar(1);
+    model.scale.setScalar(baseScale);
     model.position.y = model.userData.baseY;
   }
 }

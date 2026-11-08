@@ -2,8 +2,10 @@
 
 :root {
   --bg: #140e0a;
-  --panel: rgba(26, 18, 12, 0.82);
-  --panel-border: rgba(255, 196, 120, 0.18);
+  --panel: rgba(6, 17, 38, 0.88);
+  --panel-border: rgba(76, 140, 235, 0.45);
+  /* Панели заказа и корзины: от сильно тёмно-синего к тёмно-синему */
+  --panel-gradient: linear-gradient(160deg, #020a1c 0%, #071731 52%, #0d2a55 100%);
   --accent: #ffc14d;
   --text: #f5ece2;
   --muted: #b9a894;
@@ -122,9 +124,10 @@ body {
 
 .panel {
   padding: 18px 20px;
-  background: var(--panel);
+  background: var(--panel-gradient);
   border: 1px solid var(--panel-border);
   border-radius: 18px;
+  box-shadow: inset 0 0 30px rgba(40, 100, 210, 0.16);
   backdrop-filter: blur(8px);
   pointer-events: none;
 }

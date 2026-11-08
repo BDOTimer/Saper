@@ -127,7 +127,8 @@ function showIngredientLabel(mesh) {
   // Ингредиенты лежат внутри сдвинутой группы, поэтому берём мировые координаты
   const point = new THREE.Vector3();
   mesh.getWorldPosition(point);
-  point.y += 0.42;
+  // Продукты на полках вдвое крупнее, подпись поднимаем выше макушки модели
+  point.y += 0.78;
   point.project(camera);
 
   ingredientLabel.textContent = mesh.userData.ingredientName;
