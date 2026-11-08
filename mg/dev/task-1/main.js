@@ -73,8 +73,76 @@ function playClickSound() {
   });
 }
 
+/**
+ * Одна нота с огибающей — основа для всех звуков игры.
+ */
+function playTone(context, { frequency, start, duration, type = 'sine', level = 0.2, endFrequency = null }) {
+  const oscillator = context.createOscillator();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, start);
+  if (endFrequency) {
+    oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
+  }
+
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(level, start + Math.min(0.03, duration / 4));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.03);
+}
+
+/** Клиент получил заказ: короткое восходящее арпеджио. */
+function playJoySound() {
+  const context = getAudioContext();
+  if (!context) return;
+  if (context.state === 'suspended') context.resume();
+
+  const start = context.currentTime + 0.01;
+  [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+    playTone(context, {
+      frequency,
+      start: start + index * 0.085,
+      duration: 0.32,
+      level: 0.16,
+    });
+  });
+}
+
+/** Клиент не получил заказ: две нисходящие ноты. */
+function playFailSound() {
+  const context = getAudioContext();
+  if (!context) return;
+  if (context.state === 'suspended') context.resume();
+
+  const start = context.currentTime + 0.01;
+  playTone(context, {
+    frequency: 349.23,
+    start,
+    duration: 0.3,
+    type: 'triangle',
+    level: 0.18,
+    endFrequency: 261.63,
+  });
+  playTone(context, {
+    frequency: 261.63,
+    start: start + 0.24,
+    duration: 0.55,
+    type: 'triangle',
+    level: 0.18,
+    endFrequency: 174.61,
+  });
+}
+
 // Клики по моделям в панели заказа тоже должны «звенеть»
 document.addEventListener('barista:click', playClickSound);
+
+// Реакция клиента на итог заказа
+document.addEventListener('barista:success', playJoySound);
+document.addEventListener('barista:fail', playFailSound);
 
 /**
  * Переводит координаты события в нормализованные координаты сцены (-1..1).

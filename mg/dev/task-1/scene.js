@@ -16,10 +16,16 @@ import * as THREE from 'three';
 import { INGREDIENTS } from './data.js';
 
 /**
- * Высота каждой полки. Подняты на 0.18 относительно исходных 1.5/2.2/2.9,
- * чтобы макушка продавца не касалась нижней полки.
+ * Высота каждой полки. Зазоры между полками увеличены на 20 % (0.70 → 0.84),
+ * нижняя полка осталась на месте, вторая и третья подняты.
  */
-const SHELF_HEIGHTS = { 1: 1.74, 2: 2.44, 3: 3.14 };
+const SHELF_HEIGHTS = { 1: 1.74, 2: 2.58, 3: 3.42 };
+
+/** Верхняя плоскость столешницы — сюда ставим выбранные продукты. */
+const COUNTER_TOP_Y = 1.1;
+
+/** Ряд выбранных продуктов выставляется ближе к продавцу. */
+const COUNTER_ITEM_Z = 0.45;
 
 /** Полки висят на задней стенке, чуть впереди неё. */
 const SHELF_Z = -1.55;
@@ -77,6 +83,18 @@ let renderer = null;
  * Сдвигая одну группу, двигаем по экрану всю сцену целиком.
  */
 const world = new THREE.Group();
+
+/** Выбранные продукты, выставленные на стойку перед продавцом. */
+const counterItems = new THREE.Group();
+
+/** Включает отбрасывание и приём тени у всех мешей объекта. */
+function enableShadows(object) {
+  object.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+  });
+}
 
 /** Живые 3D-объекты ингредиентов (по одному на ингредиент). */
 const ingredientObjects = [];
@@ -195,6 +213,7 @@ function createIngredientObject(ingredient) {
     }
   }
 
+  enableShadows(group);
   return group;
 }
 
@@ -266,6 +285,7 @@ function createHumanoid({
     }
   }
 
+  enableShadows(person);
   return person;
 }
 
@@ -307,6 +327,7 @@ function buildFloor() {
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0;
+  floor.receiveShadow = true; // сюда падают тени клиентов
   scene.add(floor);
 }
 
@@ -530,18 +551,34 @@ export function initScene(canvas) {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+  // Тени клиентов и предметов на полу
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
   // Мягкий заполняющий свет
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambient);
 
-  // Направленный свет сверху-сбоку (тени выключены — приоритет производительности)
+  // Направленный свет сверху-сбоку — он же отбрасывает тени
   const keyLight = new THREE.DirectionalLight(0xffffff, 1);
   keyLight.position.set(5, 8, 6);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(1024, 1024);
+  keyLight.shadow.camera.left = -12;
+  keyLight.shadow.camera.right = 12;
+  keyLight.shadow.camera.top = 12;
+  keyLight.shadow.camera.bottom = -12;
+  keyLight.shadow.camera.near = 0.5;
+  keyLight.shadow.camera.far = 40;
+  keyLight.shadow.bias = -0.0008;
+  keyLight.shadow.normalBias = 0.02;
+  keyLight.shadow.camera.updateProjectionMatrix();
   scene.add(keyLight);
 
   // Вся стойка живёт в отдельной группе и сдвинута вправо
   world.position.set(WORLD_OFFSET_X, 0, 0);
   scene.add(world);
+  world.add(counterItems);
 
   // Точечный свет над прилавком — яркое пятно на «мокрой» столешнице
   const counterGlow = new THREE.PointLight(0xcfe4ff, 14, 16, 2);
@@ -555,6 +592,9 @@ export function initScene(canvas) {
 
   buildCounterAndShelves();
   buildIngredients();
+
+  // Стойка, полки и продукты тоже отбрасывают тени
+  enableShadows(world);
 
   // Корректная работа Raycaster при изменении размера окна
   window.addEventListener('resize', handleResize);
@@ -591,6 +631,40 @@ export function removeClient(clientObject) {
     if (!child.isMesh) return;
     child.geometry.dispose();
     child.material.dispose();
+  });
+}
+
+/**
+ * Выставляет выбранные продукты на стойку перед продавцом.
+ * Вызывается из game.js при каждом изменении корзины.
+ * @param {string[]} ingredientIds
+ */
+export function setCounterItems(ingredientIds) {
+  // Убираем прежний ряд
+  counterItems.children.slice().forEach((child) => {
+    counterItems.remove(child);
+    child.traverse((node) => {
+      if (!node.isMesh) return;
+      node.geometry.dispose();
+      node.material.dispose();
+    });
+  });
+
+  const count = ingredientIds.length;
+  if (count === 0) return;
+
+  // Ряд центрируется на столе; при большом заказе продукты стоят плотнее
+  const spacing = Math.min(0.62, 4.2 / count);
+  const startX = -((count - 1) * spacing) / 2;
+
+  ingredientIds.forEach((ingredientId, index) => {
+    const ingredient = INGREDIENTS.find((item) => item.id === ingredientId);
+    if (!ingredient) return;
+
+    const model = createIngredientObject(ingredient);
+    model.position.set(startX + index * spacing, COUNTER_TOP_Y, COUNTER_ITEM_Z);
+    model.rotation.y = (index % 2 === 0 ? 1 : -1) * 0.18;
+    counterItems.add(model);
   });
 }
 

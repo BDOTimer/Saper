@@ -21,6 +21,7 @@ import {
   getIngredientObjects,
   highlightIngredient,
   removeClient,
+  setCounterItems,
 } from './scene.js';
 
 /** Состояния игры. */
@@ -340,6 +341,8 @@ function clearBasket() {
     if (mesh) highlightIngredient(mesh, false);
   });
   basket = [];
+  // стол продавца тоже освобождается
+  setCounterItems([]);
 }
 
 /**
@@ -466,6 +469,11 @@ function finishOrder(result, now, wrongSum) {
 
   state = result;
 
+  // Клиент реагирует на итог: радость или разочарование
+  document.dispatchEvent(
+    new CustomEvent(result === STATE.SUCCESS ? 'barista:success' : 'barista:fail'),
+  );
+
   // Корзина очищается при любом исходе
   clearBasket();
 
@@ -589,6 +597,8 @@ export function handleIngredientClick(ingredientId) {
     highlightIngredient(mesh, false);
   }
 
+  // Выбранные продукты выставляем на синий стол продавца
+  setCounterItems(basket);
   renderBasket();
 }
 
