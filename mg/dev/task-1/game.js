@@ -16,6 +16,7 @@
 
 import { INGREDIENTS, generateOrder } from './data.js';
 import {
+  createClient,
   getClientObjects,
   getIngredientObjects,
   highlightIngredient,
@@ -37,11 +38,20 @@ const ORDER_TIME_MS = 12000;
 /** Пауза между заказами: клиент ушёл, следующий ещё не начал говорить. */
 const PAUSE_MS = 800;
 
-/** Горизонтальные позиции клиентов в очереди слева направо. */
-const CLIENT_SLOTS_X = [-1.35, -0.45, 0.45, 1.35];
+/** Горизонтальные позиции клиентов в очереди (очередь центрируется у стойки). */
+const CLIENT_SPACING = 0.9;
 
-/** Сколько клиентов одновременно стоит в очереди. */
-const QUEUE_SIZE = 4;
+/** Очередь переменной длины: от одного клиента до четырёх. */
+const MIN_CLIENTS = 1;
+const MAX_CLIENTS = 4;
+const INITIAL_CLIENTS = 3;
+
+/** Задержка перед приходом следующего клиента — не синхронно с уходом. */
+const ARRIVAL_MIN_MS = 500;
+const ARRIVAL_MAX_MS = 2200;
+
+/** Новый клиент появляется чуть сбоку и «подходит» к очереди. */
+const ARRIVAL_OFFSET_X = 1.6;
 
 let state = STATE.IDLE;
 
@@ -62,6 +72,9 @@ let deadline = 0;
 
 /** Момент, когда можно начинать следующий заказ. */
 let resumeAt = 0;
+
+/** Момент, когда должен подойти следующий клиент (Infinity — никто не идёт). */
+let arrivalAt = Infinity;
 
 /** Текстовая подсказка в оверлее. */
 let statusText = '';
@@ -186,45 +199,59 @@ function renderStatus() {
   els.status.textContent = statusText;
 }
 
+/** Осветляет (amount > 0) или затемняет (amount < 0) цвет вида #rrggbb. */
+function shadeHex(hex, amount) {
+  const value = parseInt(hex.slice(1), 16);
+  const target = amount > 0 ? 255 : 0;
+  const k = Math.min(1, Math.abs(amount));
+  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) =>
+    Math.round(channel + (target - channel) * k),
+  );
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 /**
- * Рисует мини-модель ингредиента: та же форма и цвет, что и объект на полке,
+ * Рисует мини-модель ингредиента: та же форма и цвет, что и модель на полке,
  * только в виде SVG, чтобы продавец видел состав заказа без 3D-рендера.
- * @param {string} shape — 'box' | 'cylinder' | 'sphere'
+ * @param {string} shape — 'bowl' | 'cup' | 'glass' | 'bottle' | 'loaf' | 'plate' | 'burger' | 'dessert'
  * @param {string} color — цвет ингредиента
  * @returns {string} SVG-разметка
  */
 function createModelSvg(shape, color) {
   const frame =
     'width="38" height="38" viewBox="0 0 40 40" aria-hidden="true" focusable="false"';
+  const light = shadeHex(color, 0.35);
+  const dark = shadeHex(color, -0.3);
 
-  if (shape === 'cylinder') {
-    return (
-      `<svg ${frame}>` +
-      `<rect x="10" y="9" width="20" height="22" fill="${color}"></rect>` +
-      `<ellipse cx="20" cy="31" rx="10" ry="4" fill="${color}"></ellipse>` +
-      `<ellipse cx="20" cy="9" rx="10" ry="4" fill="${color}"></ellipse>` +
-      `<ellipse cx="20" cy="9" rx="10" ry="4" fill="#ffffff" opacity="0.25"></ellipse>` +
-      '</svg>'
-    );
+  switch (shape) {
+    case 'bowl':
+      return `<svg ${frame}><ellipse cx="20" cy="16" rx="14" ry="4.5" fill="${light}"></ellipse><path d="M6 16 Q20 36 34 16 Z" fill="${color}"></path><ellipse cx="20" cy="16" rx="8" ry="2.4" fill="${dark}"></ellipse></svg>`;
+
+    case 'cup':
+      return `<svg ${frame}><path d="M11 13 L29 13 L26 33 L14 33 Z" fill="${color}"></path><rect x="10" y="9" width="20" height="4.5" rx="2" fill="${light}"></rect></svg>`;
+
+    case 'glass':
+      return `<svg ${frame}><path d="M13 8 L27 8 L25 34 L15 34 Z" fill="${light}"></path><path d="M14.6 14 L25.4 14 L24.1 31 L15.9 31 Z" fill="${color}"></path></svg>`;
+
+    case 'bottle':
+      return `<svg ${frame}><rect x="14" y="16" width="12" height="18" rx="3" fill="${color}"></rect><rect x="17" y="9" width="6" height="8" fill="${light}"></rect><rect x="15.5" y="6" width="9" height="4" rx="2" fill="${light}"></rect></svg>`;
+
+    case 'loaf':
+      return `<svg ${frame}><rect x="6" y="14" width="28" height="14" rx="7" fill="${color}"></rect><path d="M13 17 L17 25 M20 16 L24 24 M27 17 L30 23" stroke="${light}" stroke-width="2" stroke-linecap="round" fill="none"></path></svg>`;
+
+    case 'plate':
+      return `<svg ${frame}><ellipse cx="20" cy="27" rx="15" ry="5" fill="${light}"></ellipse><ellipse cx="20" cy="19" rx="9" ry="5" fill="${color}"></ellipse></svg>`;
+
+    case 'burger':
+      return `<svg ${frame}><path d="M9 17 Q20 6 31 17 Z" fill="${light}"></path><rect x="9" y="17" width="22" height="5" rx="2" fill="${dark}"></rect><rect x="8.5" y="22" width="23" height="5" rx="2.5" fill="${light}"></rect></svg>`;
+
+    case 'dessert':
+      return `<svg ${frame}><path d="M13 22 L27 22 L24 12 L16 12 Z" fill="${color}"></path><circle cx="20" cy="10" r="3.2" fill="#e53935"></circle><rect x="10" y="22" width="20" height="5" rx="2.5" fill="${light}"></rect></svg>`;
+
+    default:
+      // Запасной вариант — куб в изометрии
+      return `<svg ${frame}><polygon points="20,4 34,11 20,18 6,11" fill="${light}"></polygon><polygon points="6,11 20,18 20,35 6,28" fill="${color}"></polygon><polygon points="34,11 20,18 20,35 34,28" fill="${dark}"></polygon></svg>`;
   }
-
-  if (shape === 'sphere') {
-    return (
-      `<svg ${frame}>` +
-      `<circle cx="20" cy="21" r="13" fill="${color}"></circle>` +
-      `<circle cx="15" cy="16" r="4.5" fill="#ffffff" opacity="0.3"></circle>` +
-      '</svg>'
-    );
-  }
-
-  // Куб в изометрии: три грани разной яркости
-  return (
-    `<svg ${frame}>` +
-    `<polygon points="20,4 34,11 20,18 6,11" fill="${color}" opacity="0.95"></polygon>` +
-    `<polygon points="6,11 20,18 20,35 6,28" fill="${color}" opacity="0.66"></polygon>` +
-    `<polygon points="34,11 20,18 20,35 34,28" fill="${color}" opacity="0.45"></polygon>` +
-    '</svg>'
-  );
 }
 
 /** Показывает название ингредиента текстом под моделями заказа. */
@@ -316,9 +343,20 @@ function clearBasket() {
 }
 
 /**
+ * Позиция клиента в очереди: очередь всегда центрируется у стойки,
+ * поэтому и один клиент, и четверо стоят красиво.
+ * @param {number} index
+ * @param {number} count
+ */
+function slotX(index, count) {
+  const offset = ((count - 1) * CLIENT_SPACING) / 2;
+  return -offset + index * CLIENT_SPACING;
+}
+
+/**
  * Создаёт запись очереди для 3D-объекта клиента.
  * Заказ генерируется сразу — клиент «знает», что хочет заказать.
- * @param {THREE.Mesh} mesh
+ * @param {THREE.Group} mesh
  */
 function createQueueEntry(mesh) {
   clientSeq += 1;
@@ -329,12 +367,46 @@ function createQueueEntry(mesh) {
   };
 }
 
+/**
+ * Подводит к стойке нового клиента. Появляется чуть сбоку
+ * и «подходит» к своему месту в очереди.
+ */
+function spawnClient() {
+  if (queue.length >= MAX_CLIENTS) return;
+
+  const mesh = createClient();
+  const entry = createQueueEntry(mesh);
+
+  // Стартовая точка — сбоку от будущего места, чтобы был виден подход
+  mesh.position.x = slotX(queue.length, queue.length + 1) + ARRIVAL_OFFSET_X;
+  queue.push(entry);
+}
+
+/**
+ * Решает, подойдёт ли следующий клиент и через сколько.
+ * Вызывается заново после каждого изменения очереди — поэтому
+ * приход и уход рассинхронизированы.
+ * @param {number} now
+ */
+function scheduleArrival(now) {
+  if (queue.length >= MAX_CLIENTS) {
+    arrivalAt = Infinity;
+    return;
+  }
+
+  const willArrive = Math.random() < 0.55;
+  arrivalAt = willArrive
+    ? now + ARRIVAL_MIN_MS + Math.random() * (ARRIVAL_MAX_MS - ARRIVAL_MIN_MS)
+    : Infinity;
+}
+
 /** Плавно сдвигает клиентов к их позициям в очереди (лерп по кадрам). */
 function updateClients(dt) {
   const factor = 1 - Math.exp(-9 * dt);
+  const count = queue.length;
 
   queue.forEach((entry, index) => {
-    const targetX = CLIENT_SLOTS_X[Math.min(index, CLIENT_SLOTS_X.length - 1)];
+    const targetX = slotX(index, count);
     entry.mesh.userData.targetX = targetX;
     entry.mesh.position.x += (targetX - entry.mesh.position.x) * factor;
   });
@@ -397,13 +469,17 @@ function finishOrder(result, now, wrongSum) {
   // Корзина очищается при любом исходе
   clearBasket();
 
-  // Активный клиент уходит, очередь сдвигается,
-  // в конец встаёт новый клиент (removeClient создаёт его сам).
+  // Активный клиент уходит; следующий подойдёт отдельно, со своей задержкой
   const departed = queue.shift();
-  const freshClient = removeClient(departed.mesh);
-  if (freshClient) {
-    queue.push(createQueueEntry(freshClient));
+  removeClient(departed.mesh);
+
+  // В кафе всегда должен оставаться хотя бы один посетитель
+  if (queue.length < MIN_CLIENTS) {
+    spawnClient();
   }
+
+  // Приход следующего никак не привязан к уходу текущего
+  scheduleArrival(now);
 
   // Короткая пауза перед следующим заказом — состояние остаётся терминальным
   resumeAt = now + PAUSE_MS;
@@ -423,6 +499,13 @@ export function update(now) {
   lastNow = now;
 
   updateClients(dt);
+
+  // Приход нового клиента — по своему таймеру, независимо от уходов.
+  // Пустая очередь недопустима: кто-то должен стоять у стойки всегда.
+  if (now >= arrivalAt || queue.length === 0) {
+    spawnClient();
+    scheduleArrival(now);
+  }
 
   if (state === STATE.ORDERING) {
     const remaining = deadline - now;
@@ -469,12 +552,17 @@ export function startGame() {
   deadline = 0;
   lastResult = '';
 
-  // Стартовая очередь: четыре клиента, уже стоящие за стойкой
-  const clients = getClientObjects().slice(0, QUEUE_SIZE);
-  clients.forEach((mesh, index) => {
-    mesh.position.x = CLIENT_SLOTS_X[index];
-    queue.push(createQueueEntry(mesh));
+  // Убираем клиентов прошлой партии, если игра перезапускается
+  getClientObjects().slice().forEach((mesh) => removeClient(mesh));
+
+  // Стартовая очередь: несколько клиентов уже стоят у стойки
+  for (let i = 0; i < INITIAL_CLIENTS; i += 1) {
+    spawnClient();
+  }
+  queue.forEach((entry, index) => {
+    entry.mesh.position.x = slotX(index, queue.length);
   });
+  arrivalAt = Infinity;
 
   beginOrder(performance.now());
 }

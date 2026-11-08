@@ -4,12 +4,12 @@
  * Отвечает за:
  *   - инициализацию сцены, камеры, рендерера и света;
  *   - текстурированные пол, обои, полки и «мокрую» синюю стойку;
- *   - 12 кликабельных объектов ингредиентов;
- *   - очередь клиентов перед стойкой (туловище, голова, руки, ноги);
+ *   - 12 кликабельных моделей продуктов на полках;
+ *   - очередь клиентов перед стойкой и продавца за стойкой;
  *   - подсветку выбранного ингредиента.
  *
- * Экспорт: initScene, getIngredientObjects, getClientObjects, removeClient,
- * highlightIngredient.
+ * Экспорт: initScene, getIngredientObjects, getClientObjects, createClient,
+ * removeClient, highlightIngredient.
  */
 
 import * as THREE from 'three';
@@ -23,7 +23,9 @@ const SHELF_Z = -1.55;
 
 /** Клиенты стоят ПЕРЕД стойкой, ближе к зрителю, чем прилавок. */
 const CLIENT_Z = 2.45;
-const CLIENT_SLOTS_X = [-1.35, -0.45, 0.45, 1.35];
+
+/** Продавец стоит за стойкой, с обратной стороны от клиентов. */
+const BARISTA_Z = -0.2;
 
 /**
  * Вся стойка сдвинута вправо: на экране она должна занимать свободную
@@ -31,13 +33,17 @@ const CLIENT_SLOTS_X = [-1.35, -0.45, 0.45, 1.35];
  */
 const WORLD_OFFSET_X = 2.4;
 
+/**
+ * Точка, на которую смотрит камера. Подобрана так, чтобы ступни клиентов
+ * оказались в ~25 px от нижнего края окна.
+ */
+const CAMERA_TARGET_Y = 2.28;
+
 /** Цвета одежды клиентов — чтобы очередь визуально различалась. */
 const CLIENT_COLORS = [0xf06292, 0x4fc3f7, 0xffd54f, 0x81c784];
 
-/** Цвет кожи клиентов. */
+/** Палитра людей. */
 const SKIN_COLOR = 0xe8b98f;
-
-/** Цвет брюк клиентов. */
 const PANTS_COLOR = 0x2b3242;
 
 /** Пути к текстурам (лежат в папке res проекта). */
@@ -71,125 +77,199 @@ const clientObjects = [];
 /** Счётчик, чтобы новые клиенты получали разные цвета. */
 let clientColorCursor = 0;
 
-/**
- * Создаёт 3D-объект ингредиента нужной формы и ставит его на полку.
- * @param {object} ingredient — запись из INGREDIENTS
- * @param {number} shelfTop — мировая высота верхней плоскости полки
- * @returns {THREE.Mesh}
- */
-function createIngredientObject(ingredient, shelfTop) {
-  let geometry;
-  switch (ingredient.shape) {
-    case 'cylinder':
-      geometry = new THREE.CylinderGeometry(0.21, 0.21, 0.42, 20);
-      break;
-    case 'sphere':
-      geometry = new THREE.SphereGeometry(0.23, 22, 16);
-      break;
-    default:
-      geometry = new THREE.BoxGeometry(0.38, 0.38, 0.38);
-  }
+/** Приглушённый/осветлённый оттенок базового цвета (amount: -1..1). */
+function shadeColor(color, amount) {
+  const base = new THREE.Color(color);
+  const target = new THREE.Color(amount > 0 ? 0xffffff : 0x000000);
+  return base.clone().lerp(target, Math.min(1, Math.abs(amount)));
+}
 
-  // Материал создаётся отдельно для каждого ингредиента,
-  // иначе подсветка одного объекта «зажгла» бы все остальные.
-  const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(ingredient.color),
-    roughness: 0.55,
-    metalness: 0.08,
+/** Материал продукта: свой emissive, чтобы работала подсветка выбора. */
+function createProductMaterial(color, roughness = 0.58) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0.06,
     emissive: new THREE.Color(0x000000),
     emissiveIntensity: 1,
   });
-
-  const mesh = new THREE.Mesh(geometry, material);
-
-  // Ставим объект так, чтобы он лежал на полке ровно.
-  geometry.computeBoundingBox();
-  const height = geometry.boundingBox.max.y - geometry.boundingBox.min.y;
-
-  const x = -2.7 + ingredient.slot * 1.8;
-  const y = shelfTop + height / 2;
-
-  mesh.position.set(x, y, SHELF_Z);
-  mesh.rotation.y = ingredient.slot * 0.35; // лёгкий поворот — так виднее форму
-
-  // Связь 3D-объекта с данными: по нему Raycaster находит ингредиент.
-  mesh.userData.ingredientId = ingredient.id;
-  mesh.userData.baseY = y;
-  mesh.userData.ingredientName = ingredient.name;
-
-  return mesh;
 }
 
 /**
- * Собирает человекоподобную фигуру клиента: ноги, туловище, руки, голова.
- * @param {number} color — цвет одежды
+ * Собирает модель продукта из нескольких простых примитивов.
+ * Низ модели — на y = 0: так её легко поставить на полку.
+ *
+ * @param {object} ingredient — запись из INGREDIENTS
  * @returns {THREE.Group}
  */
-function createHumanoid(color) {
-  const client = new THREE.Group();
+function createIngredientObject(ingredient) {
+  const group = new THREE.Group();
 
-  const skinMaterial = new THREE.MeshStandardMaterial({
-    color: SKIN_COLOR,
-    roughness: 0.75,
-    metalness: 0,
-  });
-  const clothMaterial = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.7,
-    metalness: 0.03,
-  });
-  const pantsMaterial = new THREE.MeshStandardMaterial({
-    color: PANTS_COLOR,
-    roughness: 0.85,
-    metalness: 0,
-  });
+  const mainMaterial = createProductMaterial(new THREE.Color(ingredient.color));
+  const accentMaterial = createProductMaterial(shadeColor(ingredient.color, 0.35), 0.5);
+
+  const part = (geometry, material, x, y, z) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+    return mesh;
+  };
+
+  switch (ingredient.shape) {
+    // Салат или суп: чаша + «горка» содержимого
+    case 'bowl': {
+      part(new THREE.CylinderGeometry(0.22, 0.15, 0.13, 18), mainMaterial, 0, 0.065, 0);
+      const filling = part(new THREE.SphereGeometry(0.17, 18, 12), accentMaterial, 0, 0.145, 0);
+      filling.scale.set(1, 0.5, 1);
+      break;
+    }
+
+    // Чашка кофе: конусное тело + ободок
+    case 'cup': {
+      part(new THREE.CylinderGeometry(0.12, 0.09, 0.24, 16), mainMaterial, 0, 0.12, 0);
+      part(new THREE.CylinderGeometry(0.126, 0.126, 0.03, 16), accentMaterial, 0, 0.252, 0);
+      break;
+    }
+
+    // Стакан сока: прозрачное стекло + жидкость
+    case 'glass': {
+      part(new THREE.CylinderGeometry(0.1, 0.078, 0.34, 16), accentMaterial, 0, 0.17, 0);
+      part(new THREE.CylinderGeometry(0.088, 0.072, 0.22, 16), mainMaterial, 0, 0.14, 0);
+      break;
+    }
+
+    // Соус: бутылочка с горлышком и крышкой
+    case 'bottle': {
+      part(new THREE.CylinderGeometry(0.085, 0.085, 0.22, 14), mainMaterial, 0, 0.11, 0);
+      part(new THREE.CylinderGeometry(0.04, 0.055, 0.09, 12), accentMaterial, 0, 0.265, 0);
+      part(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 12), accentMaterial, 0, 0.325, 0);
+      break;
+    }
+
+    // Хлеб: лежащий батон
+    case 'loaf': {
+      const loaf = part(new THREE.CapsuleGeometry(0.1, 0.2, 4, 12), mainMaterial, 0, 0.1, 0);
+      loaf.rotation.z = Math.PI / 2;
+      break;
+    }
+
+    // Паста: тарелка + горка
+    case 'plate': {
+      part(new THREE.CylinderGeometry(0.24, 0.2, 0.035, 20), accentMaterial, 0, 0.018, 0);
+      const heap = part(new THREE.SphereGeometry(0.15, 18, 12), mainMaterial, 0, 0.11, 0);
+      heap.scale.set(1, 0.5, 1);
+      break;
+    }
+
+    // Бургер: нижняя булка, котлета, верхняя булка
+    case 'burger': {
+      part(new THREE.CylinderGeometry(0.17, 0.15, 0.07, 18), accentMaterial, 0, 0.035, 0);
+      part(new THREE.CylinderGeometry(0.165, 0.165, 0.05, 18), mainMaterial, 0, 0.095, 0);
+      const top = part(new THREE.SphereGeometry(0.17, 18, 12), accentMaterial, 0, 0.185, 0);
+      top.scale.set(1, 0.5, 1);
+      break;
+    }
+
+    // Десерт: корзинка, крем, вишенка
+    case 'dessert': {
+      part(new THREE.CylinderGeometry(0.13, 0.15, 0.09, 16), accentMaterial, 0, 0.045, 0);
+      const cream = part(new THREE.SphereGeometry(0.11, 16, 12), mainMaterial, 0, 0.135, 0);
+      cream.scale.set(1, 0.7, 1);
+      part(new THREE.SphereGeometry(0.05, 12, 10), createProductMaterial(new THREE.Color(0xe53935)), 0, 0.21, 0);
+      break;
+    }
+
+    // Запасной вариант — простой куб
+    default: {
+      part(new THREE.BoxGeometry(0.38, 0.38, 0.38), mainMaterial, 0, 0.19, 0);
+    }
+  }
+
+  return group;
+}
+
+/**
+ * Собирает человекоподобную фигуру: ноги, туловище, руки, голова.
+ * @param {object} options
+ * @param {number} options.clothColor — цвет одежды
+ * @param {number} [options.skinColor]
+ * @param {number} [options.pantsColor]
+ * @param {number|null} [options.hairColor] — если задан, добавляются волосы
+ * @param {boolean} [options.longHair] — длинные волосы до плеч
+ * @returns {THREE.Group}
+ */
+function createHumanoid({
+  clothColor,
+  skinColor = SKIN_COLOR,
+  pantsColor = PANTS_COLOR,
+  hairColor = null,
+  longHair = false,
+}) {
+  const person = new THREE.Group();
+
+  const skinMaterial = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.75, metalness: 0 });
+  const clothMaterial = new THREE.MeshStandardMaterial({ color: clothColor, roughness: 0.7, metalness: 0.03 });
+  const pantsMaterial = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.85, metalness: 0 });
 
   // Ноги
   [-0.11, 0.11].forEach((x) => {
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.62, 10), pantsMaterial);
     leg.position.set(x, 0.31, 0);
-    client.add(leg);
+    person.add(leg);
   });
 
   // Туловище
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.42, 6, 14), clothMaterial);
   torso.position.set(0, 1.03, 0);
-  client.add(torso);
+  person.add(torso);
 
   // Руки
   [-0.27, 0.27].forEach((x) => {
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.52, 8), clothMaterial);
     arm.position.set(x, 1.05, 0);
     arm.rotation.z = x > 0 ? -0.16 : 0.16;
-    client.add(arm);
+    person.add(arm);
   });
 
   // Голова
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), skinMaterial);
   head.position.set(0, 1.52, 0);
-  client.add(head);
+  person.add(head);
 
-  return client;
+  if (hairColor !== null) {
+    const hairMaterial = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0 });
+
+    // Шапка волос на макушке
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.168, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      hairMaterial,
+    );
+    cap.position.set(0, 1.53, -0.01);
+    person.add(cap);
+
+    if (longHair) {
+      // Длинные волосы сзади, до плеч
+      const locks = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.32, 6, 12), hairMaterial);
+      locks.position.set(0, 1.3, -0.1);
+      locks.scale.set(1, 1, 0.62);
+      person.add(locks);
+    }
+  }
+
+  return person;
 }
 
-/**
- * Создаёт клиента и ставит его в указанный слот очереди перед стойкой.
- * @param {number} slotIndex — 0..3
- * @returns {THREE.Group}
- */
-function createClientObject(slotIndex) {
+/** Создаёт нового клиента в очереди (позицию выставляет game.js). */
+export function createClient() {
   const color = CLIENT_COLORS[clientColorCursor % CLIENT_COLORS.length];
   clientColorCursor += 1;
 
-  // Страховка: слот всегда существует, даже если очередь окажется длиннее
-  const safeSlot = Math.min(slotIndex, CLIENT_SLOTS_X.length - 1);
-
-  const client = createHumanoid(color);
-  client.position.set(CLIENT_SLOTS_X[safeSlot], 0, CLIENT_Z);
-  client.userData.slotIndex = safeSlot;
-  client.userData.targetX = CLIENT_SLOTS_X[safeSlot];
+  const client = createHumanoid({ clothColor: color });
+  client.position.set(0, 0, CLIENT_Z);
+  client.userData.targetX = 0;
 
   world.add(client);
+  clientObjects.push(client);
   return client;
 }
 
@@ -234,8 +314,6 @@ function buildWallBackground() {
   texture.offset.set(0, 1 - WALL_WALLPAPER_PART);
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-  // Плоскость единичного размера, растянутая по пропорциям обоев.
-  // Ширины хватает даже на очень широкое окно.
   const wallpaperRatio = (WALL_IMAGE_HEIGHT * WALL_WALLPAPER_PART) / WALL_IMAGE_WIDTH;
   const width = 32;
   const height = width * wallpaperRatio;
@@ -268,20 +346,11 @@ function createShelfMaterial() {
 
 /**
  * Материал стойки: тёмно-синий PBR с clearcoat («мокрый» блеск).
- * В вершинный/фрагментный шейдер добавлен вертикальный градиент:
- * низ стола заметно темнее верха.
- *
- * @param {object} options
- * @param {number} options.topColor — цвет верхней кромки
- * @param {number} options.bottomColor — цвет низа
- * @param {number} options.height — высота геометрии (для нормировки градиента)
- * @param {number} options.roughness
- * @param {number} options.clearcoatRoughness
- * @returns {THREE.MeshPhysicalMaterial}
+ * В шейдер добавлен вертикальный градиент: низ стола заметно темнее верха.
  */
 function createCounterMaterial({ topColor, bottomColor, height, roughness, clearcoatRoughness }) {
   const material = new THREE.MeshPhysicalMaterial({
-    // Запасной цвет: если шейдер почему-то не применится, стол останется синим
+    // Запасной цвет: если шейдер не применится, стол останется синим
     color: new THREE.Color(topColor),
     roughness,
     metalness: 0.28,
@@ -321,25 +390,18 @@ function createCounterMaterial({ topColor, bottomColor, height, roughness, clear
       )
       .replace(
         '#include <color_fragment>',
-        [
-          '#include <color_fragment>',
-          'diffuseColor.rgb = mix(uBottomColor, uTopColor, vHeightRatio);',
-        ].join('\n'),
+        ['#include <color_fragment>', 'diffuseColor.rgb = mix(uBottomColor, uTopColor, vHeightRatio);'].join('\n'),
       );
   };
 
-  // Код градиента одинаковый — скомпилированную программу можно делить
   material.customProgramCacheKey = () => 'counter-wet-gradient';
 
   return material;
 }
 
-/** Строит стойку с полками и общим фоном. */
+/** Строит стойку, полки, фон и продавца. */
 function buildCounterAndShelves() {
-  // Пол кафе
   buildFloor();
-
-  // Обои на общем фоне
   buildWallBackground();
 
   // Стойка-прилавок: тёмно-синяя, низ темнее верха (шейдер), сверху «мокрый» блеск
@@ -390,26 +452,38 @@ function buildCounterAndShelves() {
     shelf.position.set(0, shelfY, SHELF_Z);
     world.add(shelf);
   });
+
+  // Продавец за стойкой: девушка с длинными волосами, лицом к клиентам
+  const barista = createHumanoid({
+    clothColor: 0xe9dcc8,
+    skinColor: 0xf0c4a0,
+    hairColor: 0x3a2418,
+    longHair: true,
+  });
+  barista.position.set(0, 0, BARISTA_Z);
+  world.add(barista);
 }
 
-/** Раскладывает 12 ингредиентов по полкам. */
+/** Раскладывает 12 моделей продуктов по полкам. */
 function buildIngredients() {
   INGREDIENTS.forEach((ingredient) => {
     const shelfY = SHELF_HEIGHTS[ingredient.shelfIndex];
     if (shelfY === undefined) return;
 
     // Полка — бокс толщиной 0.12, её верхняя плоскость выше центра на 0.06.
-    const mesh = createIngredientObject(ingredient, shelfY + 0.06);
-    world.add(mesh);
-    ingredientObjects.push(mesh);
-  });
-}
+    const shelfTop = shelfY + 0.06;
+    const model = createIngredientObject(ingredient);
 
-/** Создаёт стартовую очередь из четырёх клиентов. */
-function buildClients() {
-  CLIENT_SLOTS_X.forEach((_, slotIndex) => {
-    const mesh = createClientObject(slotIndex);
-    clientObjects.push(mesh);
+    model.position.set(-2.7 + ingredient.slot * 1.8, shelfTop, SHELF_Z);
+    model.rotation.y = ingredient.slot * 0.35;
+
+    // Связь 3D-объекта с данными: по нему Raycaster находит ингредиент
+    model.userData.ingredientId = ingredient.id;
+    model.userData.ingredientName = ingredient.name;
+    model.userData.baseY = shelfTop;
+
+    world.add(model);
+    ingredientObjects.push(model);
   });
 }
 
@@ -434,10 +508,9 @@ export function initScene(canvas) {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x17100b);
 
-  // Фиксированный ракурс: видим стойку, три полки за ней и очередь клиентов
   camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.set(0, 4, 8);
-  camera.lookAt(0, 1, 0);
+  camera.lookAt(0, CAMERA_TARGET_Y, 0);
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -469,7 +542,6 @@ export function initScene(canvas) {
 
   buildCounterAndShelves();
   buildIngredients();
-  buildClients();
 
   // Корректная работа Raycaster при изменении размера окна
   window.addEventListener('resize', handleResize);
@@ -477,7 +549,7 @@ export function initScene(canvas) {
   return { scene, camera, renderer };
 }
 
-/** @returns {THREE.Mesh[]} живые 3D-объекты ингредиентов */
+/** @returns {THREE.Group[]} живые 3D-объекты ингредиентов */
 export function getIngredientObjects() {
   return ingredientObjects;
 }
@@ -488,13 +560,11 @@ export function getClientObjects() {
 }
 
 /**
- * Убирает ушедшего клиента со сцены и создаёт нового в конце очереди.
- * Возвращает 3D-объект нового клиента, чтобы вызвавший код поставил его в слот.
+ * Убирает клиента со сцены (нового создаёт game.js в нужный момент).
  * @param {THREE.Group} clientObject
- * @returns {THREE.Group|null}
  */
 export function removeClient(clientObject) {
-  if (!clientObject) return null;
+  if (!clientObject) return;
 
   const index = clientObjects.indexOf(clientObject);
   if (index !== -1) {
@@ -509,31 +579,30 @@ export function removeClient(clientObject) {
     child.geometry.dispose();
     child.material.dispose();
   });
-
-  // Новый клиент подходит с конца очереди
-  const freshClient = createClientObject(clientObjects.length);
-  clientObjects.push(freshClient);
-
-  return freshClient;
 }
 
 /**
- * Подсвечивает выбранный ингредиент: поднимает, увеличивает и включает emissive.
- * @param {THREE.Mesh} mesh
+ * Подсвечивает выбранный продукт: поднимает, увеличивает и включает emissive.
+ * @param {THREE.Group} model
  * @param {boolean} isSelected
  */
-export function highlightIngredient(mesh, isSelected) {
-  if (!mesh) return;
+export function highlightIngredient(model, isSelected) {
+  if (!model) return;
+
+  const emissive = isSelected ? 0xffc14d : 0x000000;
+  const intensity = isSelected ? 0.85 : 1;
+
+  model.traverse((child) => {
+    if (!child.isMesh) return;
+    child.material.emissive.setHex(emissive);
+    child.material.emissiveIntensity = intensity;
+  });
 
   if (isSelected) {
-    mesh.scale.setScalar(1.15);
-    mesh.position.y = mesh.userData.baseY + 0.12;
-    mesh.material.emissive.setHex(0xffc14d);
-    mesh.material.emissiveIntensity = 0.85;
+    model.scale.setScalar(1.15);
+    model.position.y = model.userData.baseY + 0.12;
   } else {
-    mesh.scale.setScalar(1);
-    mesh.position.y = mesh.userData.baseY;
-    mesh.material.emissive.setHex(0x000000);
-    mesh.material.emissiveIntensity = 1;
+    model.scale.setScalar(1);
+    model.position.y = model.userData.baseY;
   }
 }

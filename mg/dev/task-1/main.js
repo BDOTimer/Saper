@@ -97,8 +97,17 @@ function pickIngredient(event) {
   updatePointer(event);
   raycaster.setFromCamera(pointer, camera);
 
-  const hits = raycaster.intersectObjects(getIngredientObjects(), false);
-  return hits.length > 0 ? hits[0].object : null;
+  // Модель продукта — это группа из нескольких мешей, поэтому проверяем
+  // вложенные объекты и поднимаемся до группы с ingredientId
+  const hits = raycaster.intersectObjects(getIngredientObjects(), true);
+  if (hits.length === 0) return null;
+
+  let node = hits[0].object;
+  while (node && node.userData.ingredientId === undefined) {
+    node = node.parent;
+  }
+
+  return node && node.userData.ingredientId !== undefined ? node : null;
 }
 
 // Курсор-указатель при наведении на ингредиент

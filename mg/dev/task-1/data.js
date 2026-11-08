@@ -21,7 +21,7 @@ export const SHELF_COUNT = 3;
  *   color      — цвет 3D-объекта;
  *   shelfIndex — номер полки (1..3);
  *   slot       — позиция на полке слева направо (0..3);
- *   shape      — форма 3D-объекта: 'box' | 'cylinder' | 'sphere'.
+ *   shape      — форма модели: 'bowl' | 'cup' | 'glass' | 'bottle' | 'loaf' | 'plate' | 'burger' | 'dessert'.
  *
  * Раскладка: полка 1 — салаты + хлеб, полка 2 — напитки + соус,
  * полка 3 — основные блюда + десерт.
@@ -36,7 +36,7 @@ export const INGREDIENTS = [
     color: '#8bc34a',
     shelfIndex: 1,
     slot: 0,
-    shape: 'box',
+    shape: 'bowl',
   },
   {
     id: 'salad_greek',
@@ -46,7 +46,7 @@ export const INGREDIENTS = [
     color: '#26c6da',
     shelfIndex: 1,
     slot: 1,
-    shape: 'cylinder',
+    shape: 'bowl',
   },
   {
     id: 'salad_vegan',
@@ -56,7 +56,7 @@ export const INGREDIENTS = [
     color: '#689f38',
     shelfIndex: 1,
     slot: 2,
-    shape: 'sphere',
+    shape: 'bowl',
   },
   {
     id: 'extra_bread',
@@ -66,7 +66,7 @@ export const INGREDIENTS = [
     color: '#d7a86e',
     shelfIndex: 1,
     slot: 3,
-    shape: 'box',
+    shape: 'loaf',
   },
 
   // --- Полка 2: напитки + соус ---
@@ -78,7 +78,7 @@ export const INGREDIENTS = [
     color: '#4e342e',
     shelfIndex: 2,
     slot: 0,
-    shape: 'cylinder',
+    shape: 'cup',
   },
   {
     id: 'drink_latte',
@@ -88,7 +88,7 @@ export const INGREDIENTS = [
     color: '#e8dcc8',
     shelfIndex: 2,
     slot: 1,
-    shape: 'cylinder',
+    shape: 'cup',
   },
   {
     id: 'drink_orange',
@@ -98,7 +98,7 @@ export const INGREDIENTS = [
     color: '#ffa726',
     shelfIndex: 2,
     slot: 2,
-    shape: 'sphere',
+    shape: 'glass',
   },
   {
     id: 'extra_sauce',
@@ -108,7 +108,7 @@ export const INGREDIENTS = [
     color: '#e53935',
     shelfIndex: 2,
     slot: 3,
-    shape: 'box',
+    shape: 'bottle',
   },
 
   // --- Полка 3: основные блюда + десерт ---
@@ -120,7 +120,7 @@ export const INGREDIENTS = [
     color: '#fdd835',
     shelfIndex: 3,
     slot: 0,
-    shape: 'box',
+    shape: 'plate',
   },
   {
     id: 'main_burger',
@@ -130,7 +130,7 @@ export const INGREDIENTS = [
     color: '#a1887f',
     shelfIndex: 3,
     slot: 1,
-    shape: 'box',
+    shape: 'burger',
   },
   {
     id: 'main_soup',
@@ -140,7 +140,7 @@ export const INGREDIENTS = [
     color: '#ff7043',
     shelfIndex: 3,
     slot: 2,
-    shape: 'cylinder',
+    shape: 'bowl',
   },
   {
     id: 'extra_dessert',
@@ -150,7 +150,7 @@ export const INGREDIENTS = [
     color: '#ec407a',
     shelfIndex: 3,
     slot: 3,
-    shape: 'sphere',
+    shape: 'dessert',
   },
 ];
 

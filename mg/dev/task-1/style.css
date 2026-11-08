@@ -99,17 +99,25 @@ body {
 
 /* ---------- Боковые панели ---------- */
 
-/* Левая колонка: собранный заказ сверху, заказ клиента снизу */
+/* Левая колонка: собранный заказ сверху, заказ клиента снизу.
+   Верх панели совпадает с верхом блока ОБСЛУЖЕНО / ОШИБОК / ШТРАФ */
 .sidebar {
   position: absolute;
   left: 28px;
-  top: 96px;
+  top: 16px;
   bottom: 28px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: min(420px, 34vw);
   pointer-events: none;
+}
+
+/* На узких окнах HUD смещается левее — опускаем колонку под него */
+@media (max-width: 1270px) {
+  .sidebar {
+    top: 96px;
+  }
 }
 
 .panel {
@@ -382,8 +390,8 @@ body {
 .hint {
   position: absolute;
   top: 88px;
-  left: 50%;
-  max-width: 44vw;
+  left: 65%;
+  max-width: 40vw;
   margin: 0;
   font-size: 13px;
   line-height: 1.4;
@@ -391,6 +399,38 @@ body {
   color: var(--muted);
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+/* ---------- Кнопка «В отдельной вкладке» ---------- */
+
+.newtab {
+  position: absolute;
+  top: 16px;
+  right: 28px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+
+.newtab:hover {
+  background: rgba(255, 193, 77, 0.16);
+  border-color: rgba(255, 193, 77, 0.55);
+  transform: translateY(-1px);
+}
+
+.newtab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
 /* ---------- Подпись над ингредиентом в 3D ---------- */
