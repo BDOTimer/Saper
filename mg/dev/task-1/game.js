@@ -86,6 +86,10 @@ let baristaX = 0;
 /** Анимация подхода продавца к полке. */
 const walk = { active: false, fromX: 0, toX: 0, start: 0, duration: 0, onArrive: null };
 
+/** Пауза — пока открыты правила, таймеры не идут. */
+let paused = false;
+let pausedAt = 0;
+
 /** Текстовая подсказка в оверлее. */
 let statusText = '';
 
@@ -519,6 +523,11 @@ function finishOrder(result, now, wrongSum) {
  * @param {number} now — performance.now() текущего кадра
  */
 export function update(now) {
+  if (paused) {
+    lastNow = now;
+    return;
+  }
+
   const dt = lastNow === null ? 0 : Math.min((now - lastNow) / 1000, 0.1);
   lastNow = now;
 
@@ -693,6 +702,38 @@ export function submitOrder() {
   } else {
     finishOrder(STATE.FAIL_WRONG, now, sum);
   }
+}
+
+/**
+ * Ставит игру на паузу — пока открыты правила, заказы не сгорают.
+ */
+export function pauseGame() {
+  if (paused) return;
+  paused = true;
+  pausedAt = performance.now();
+}
+
+/**
+ * Снимает паузу и сдвигает все игровые таймеры на длительность паузы.
+ */
+export function resumeGame() {
+  if (!paused) return;
+
+  const now = performance.now();
+  const delta = now - pausedAt;
+
+  deadline += delta;
+  resumeAt += delta;
+  walk.start += delta;
+  if (arrivalAt !== Infinity) arrivalAt += delta;
+
+  lastNow = now;
+  paused = false;
+}
+
+/** @returns {boolean} идёт ли сейчас пауза */
+export function isPaused() {
+  return paused;
 }
 
 /**

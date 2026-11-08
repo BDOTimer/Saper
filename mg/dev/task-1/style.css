@@ -1,5 +1,14 @@
 /* style.css — оформление HTML-оверлея поверх Three.js сцены. */
 
+/* Основной шрифт игры */
+@font-face {
+  font-family: 'Gothic';
+  src: url('res/gothic-2.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #140e0a;
   --panel: rgba(6, 17, 38, 0.88);
@@ -24,7 +33,7 @@ body {
 }
 
 body {
-  font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Gothic', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
@@ -46,18 +55,21 @@ body {
 
 /* ---------- Постобработка: виньетка ---------- */
 
-/* Края окна затемнены, максимальная яркость — на полках и продавце */
+/* Края окна плавно затемнены, максимум света — на полках и продавце */
 .vignette {
   position: absolute;
   inset: 0;
   z-index: 1;
   background: radial-gradient(
-    118% 92% at 62% 44%,
+    ellipse 78% 72% at 61% 43%,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0) 30%,
-    rgba(0, 0, 0, 0.34) 58%,
-    rgba(0, 0, 0, 0.66) 82%,
-    rgba(0, 0, 0, 0.86) 100%
+    rgba(0, 0, 0, 0) 42%,
+    rgba(0, 0, 0, 0.08) 52%,
+    rgba(0, 0, 0, 0.2) 62%,
+    rgba(0, 0, 0, 0.38) 72%,
+    rgba(0, 0, 0, 0.58) 82%,
+    rgba(0, 0, 0, 0.76) 91%,
+    rgba(0, 0, 0, 0.9) 100%
   );
   pointer-events: none;
 }
@@ -89,14 +101,14 @@ body {
 }
 
 .hud__label {
-  font-size: 11px;
+  font-size: 13.2px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .hud__value {
-  font-size: 24px;
+  font-size: 28.8px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -143,7 +155,7 @@ body {
 }
 
 .panel {
-  padding: 18px 20px;
+  padding: 14px 18px;
   background: var(--panel-gradient);
   border: 1px solid var(--panel-border);
   border-radius: 18px;
@@ -154,7 +166,7 @@ body {
 
 .panel__title {
   margin: 0 0 12px;
-  font-size: 12px;
+  font-size: 14.4px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -175,9 +187,9 @@ body {
 
 .speech {
   margin: 0 0 16px;
-  font-size: 21px;
+  font-size: 25.2px;
   line-height: 1.45;
-  min-height: 3.8em;
+  min-height: 3em;
 }
 
 /* ---------- Визуальные модели заказа ---------- */
@@ -198,7 +210,7 @@ body {
 
 .dish__name {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: 15.6px;
   font-weight: 600;
   line-height: 1.25;
   color: var(--text);
@@ -244,7 +256,7 @@ body {
 .caption {
   margin: 0 0 12px;
   min-height: 1.4em;
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1.35;
   color: var(--muted);
 }
@@ -289,7 +301,7 @@ body {
 
 .timer__text {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: 16.8px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -297,7 +309,7 @@ body {
 .status {
   margin: 10px 0 0;
   min-height: 1.4em;
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1.35;
   color: var(--accent);
 }
@@ -308,7 +320,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 24vh;
+  max-height: 18vh;
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -322,7 +334,7 @@ body {
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 18px;
 }
 
 .basket__name {
@@ -338,7 +350,7 @@ body {
 
 .basket__empty {
   margin: 0;
-  font-size: 14px;
+  font-size: 16.8px;
   line-height: 1.4;
   color: var(--muted);
 }
@@ -359,14 +371,14 @@ body {
 }
 
 .total__label {
-  font-size: 13px;
+  font-size: 15.6px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .total__value {
-  font-size: 26px;
+  font-size: 31.2px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -376,7 +388,7 @@ body {
   margin: 0 0 14px;
   padding: 12px 18px;
   font-family: inherit;
-  font-size: 17px;
+  font-size: 20.4px;
   font-weight: 700;
   color: #2a1a0d;
   background: var(--accent);
@@ -410,19 +422,174 @@ body {
 
 /* ---------- Подсказка ---------- */
 
-.hint {
+/* ---------- Кнопка правил ---------- */
+
+.help-btn {
   position: absolute;
-  top: 88px;
-  left: 65%;
+  top: 62px;
+  right: 28px;
   z-index: 2;
-  max-width: 40vw;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 21.6px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+
+.help-btn:hover {
+  background: rgba(255, 193, 77, 0.16);
+  border-color: rgba(255, 193, 77, 0.55);
+  transform: translateY(-1px);
+}
+
+.help-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* ---------- Панель правил ---------- */
+
+.modal {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 7, 18, 0.72);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+/* Панель: 60 % ширины и 80 % высоты окна */
+.modal__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 60vw;
+  height: 80vh;
+  padding: 28px 32px;
+  overflow-y: auto;
+  /* от тёмно-синего к почти чёрному */
+  background: linear-gradient(165deg, #01040d 0%, #030b1e 42%, #051227 72%, #071a35 100%);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(40, 100, 210, 0.18);
+}
+
+.modal__title {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-  text-align: center;
-  color: var(--muted);
-  transform: translateX(-50%);
-  pointer-events: none;
+  font-size: 31.2px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal__text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 19.2px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.modal__text p {
+  margin: 0;
+}
+
+.modal__text strong {
+  color: var(--accent);
+}
+
+.modal__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* Объёмные кнопки: светлая кромка сверху, толстая «подошва» снизу */
+.modal__btn {
+  flex: 1;
+  padding: 14px 18px;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 100%);
+  border: 1px solid rgba(110, 165, 255, 0.55);
+  border-radius: 14px;
+  cursor: pointer;
+  transform: translateY(0);
+  box-shadow:
+    0 6px 0 #0a1730,
+    0 10px 18px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.18s ease;
+}
+
+.modal__btn:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.1) 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 0 #0a1730,
+    0 14px 22px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.modal__btn:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 #0a1730,
+    0 4px 10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.modal__btn--primary {
+  color: #2a1a0d;
+  background: linear-gradient(180deg, #ffdb92 0%, #f0a92c 100%);
+  border-color: #ffe3a8;
+  box-shadow:
+    0 6px 0 #8a5a10,
+    0 10px 18px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.modal__btn--primary:hover {
+  background: linear-gradient(180deg, #ffe5a8 0%, #ffb43c 100%);
+  box-shadow:
+    0 8px 0 #8a5a10,
+    0 14px 22px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.modal__btn--primary:active {
+  box-shadow:
+    0 2px 0 #8a5a10,
+    0 4px 10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.modal__btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
 /* ---------- Кнопка «В отдельной вкладке» ---------- */
@@ -433,7 +600,7 @@ body {
   right: 28px;
   z-index: 2;
   padding: 10px 16px;
-  font-size: 12px;
+  font-size: 14.4px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -464,7 +631,7 @@ body {
   position: fixed;
   z-index: 5;
   padding: 6px 12px;
-  font-size: 14px;
+  font-size: 16.8px;
   font-weight: 600;
   white-space: nowrap;
   color: #2a1a0d;
@@ -503,12 +670,6 @@ body {
 
 /* ---------- Узкие окна ---------- */
 
-@media (max-width: 1100px) {
-  .hint {
-    display: none;
-  }
-}
-
 @media (max-width: 820px) {
   .sidebar {
     left: 12px;
@@ -518,7 +679,7 @@ body {
   }
 
   .speech {
-    font-size: 17px;
+    font-size: 20.4px;
   }
 
   .hud__stat {
@@ -527,6 +688,6 @@ body {
   }
 
   .hud__value {
-    font-size: 20px;
+    font-size: 24px;
   }
 }

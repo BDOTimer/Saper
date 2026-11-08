@@ -83,17 +83,51 @@
         </section>
       </div>
 
-      <p class="hint">
-        Соберите заказ так, чтобы сумма совпала со стоимостью блюд из монолога.
-      </p>
-
       <!-- Кнопка открытия игры в отдельной вкладке -->
       <a class="newtab" href="index.html" target="_blank" rel="noopener">
         В отдельной вкладке
       </a>
 
+      <!-- Маленькая квадратная кнопка правил -->
+      <button class="help-btn" id="help-btn" type="button" aria-label="Правила игры">?</button>
+
       <!-- Всплывающая подпись над ингредиентом на полке -->
       <div class="ingredient-label" id="ingredient-label" hidden></div>
+
+      <!-- Правила игры -->
+      <div class="modal" id="rules-modal" hidden>
+        <div class="modal__panel">
+          <h2 class="modal__title">Стойка бариста</h2>
+
+          <div class="modal__text">
+            <p>
+              Вы — бариста. Клиент называет заказ: 2–3 блюда из меню, а на всё
+              даётся <strong>12 секунд</strong>.
+            </p>
+            <p>
+              Под монологом показаны модели ингредиентов, из которых состоят эти
+              блюда — по ним видно, что нужно положить на стол.
+            </p>
+            <p>
+              Кликните по продукту на полке: продавец подойдёт к нему, и только
+              после этого продукт встанет на синюю стойку. Повторный клик убирает
+              его обратно.
+            </p>
+            <p>
+              Соберите заказ так, чтобы его сумма совпала со стоимостью блюд, и
+              нажмите «Готово». Успешный заказ списывает свою сумму из счётчика
+              штрафа — когда уйдёте в минус, он покажет «Заработано».
+            </p>
+          </div>
+
+          <div class="modal__actions">
+            <button class="modal__btn modal__btn--primary" id="new-game-btn" type="button">
+              Новая игра
+            </button>
+            <button class="modal__btn" id="resume-btn" type="button">Продолжить</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="main.js"></script>

@@ -19,7 +19,7 @@ import { INGREDIENTS } from './data.js';
  * Высота каждой полки. Зазоры между полками увеличены на 20 % (0.70 → 0.84),
  * нижняя полка осталась на месте, вторая и третья подняты.
  */
-const SHELF_HEIGHTS = { 1: 1.74, 2: 2.58, 3: 3.42 };
+const SHELF_HEIGHTS = { 1: 1.74, 2: 2.75, 3: 3.76 };
 
 /** Верхняя плоскость столешницы — сюда ставим выбранные продукты. */
 const COUNTER_TOP_Y = 1.1;
@@ -119,6 +119,9 @@ const leavingClients = [];
 
 /** Сколько миллисекунд клиент сдувается перед исчезновением. */
 const CLIENT_LEAVE_MS = 620;
+
+/** Стрелки и маятник часов — для покадровой анимации. */
+let clockParts = null;
 
 /** Приглушённый/осветлённый оттенок базового цвета (amount: -1..1). */
 function shadeColor(color, amount) {
@@ -332,15 +335,18 @@ function createHumanoid({
     }
   }
 
-  // Данные для лёгких анимаций: покачивание рук и «вздохи»
+  // Данные для лёгких анимаций: постоянное дыхание и плавное покачивание рук
   person.userData.arms = arms;
   person.userData.armBase = armBase;
   person.userData.torso = torso;
   person.userData.mood = {
+    phase: Math.random() * Math.PI * 2,
+    breathPhase: Math.random() * Math.PI * 2,
     nextSwayAt: performance.now() + 1200 + Math.random() * 5000,
     swayUntil: 0,
-    nextSighAt: performance.now() + 2500 + Math.random() * 7000,
-    sighUntil: 0,
+    swayDuration: 1,
+    turnTarget: 0,
+    nextTurnAt: performance.now() + 2500 + Math.random() * 6000,
   };
 
   enableShadows(person);
@@ -528,8 +534,8 @@ function buildCounterAndShelves() {
     metalness: 0,
   });
   [-3.3, 3.3].forEach((x) => {
-    const side = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.2, 0.9), sideMaterial);
-    side.position.set(x, 2.33, -1.6);
+    const side = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.6, 0.9), sideMaterial);
+    side.position.set(x, 2.55, -1.6);
     world.add(side);
   });
 
@@ -551,7 +557,7 @@ function buildCounterAndShelves() {
   backTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
   const backPanel = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.3, 2.9),
+    new THREE.PlaneGeometry(7.3, 3.4),
     new THREE.MeshStandardMaterial({
       map: backTexture,
       color: 0x4a3a2c, // темнее самих полок
@@ -559,7 +565,7 @@ function buildCounterAndShelves() {
       metalness: 0,
     }),
   );
-  backPanel.position.set(0, 2.65, -1.94);
+  backPanel.position.set(0, 2.8, -1.94);
   backPanel.receiveShadow = true;
   world.add(backPanel);
 
@@ -674,6 +680,7 @@ export function initScene(canvas) {
 
   buildCounterAndShelves();
   buildIngredients();
+  buildClock();
 
   // Стойка, полки и продукты тоже отбрасывают тени
   enableShadows(world);
@@ -805,36 +812,155 @@ export function startClientLeave(clientObject) {
 }
 
 /**
- * Покадровая анимация персонажей: покачивание рук и «вздохи» клиентов,
- * поворот головы продавца и сдувание уходящих клиентов.
+ * Строит стенные часы с маятником справа от полок.
+ * Стрелки показывают системное время, маятник качается с тактом раз в секунду.
+ */
+function buildClock() {
+  const clockGroup = new THREE.Group();
+
+  const x = 5.7;
+  const y = 3.9;
+  const z = -2.0;
+
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2a1d14, roughness: 0.8, metalness: 0.1 });
+  const faceMaterial = new THREE.MeshStandardMaterial({ color: 0xf1e8d4, roughness: 0.7, metalness: 0 });
+  const handMaterial = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.6, metalness: 0.25 });
+  const goldMaterial = new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.35, metalness: 0.65 });
+
+  // Корпус и циферблат
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.12, 32), bodyMaterial);
+  body.rotation.x = Math.PI / 2;
+  body.position.set(x, y, z);
+  clockGroup.add(body);
+
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.54, 0.04, 32), faceMaterial);
+  face.rotation.x = Math.PI / 2;
+  face.position.set(x, y, z + 0.07);
+  clockGroup.add(face);
+
+  // Метки на 12, 3, 6 и 9 часов
+  for (let i = 0; i < 12; i += 3) {
+    const angle = (i / 12) * Math.PI * 2;
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.1, 0.02), goldMaterial);
+    mark.position.set(x + Math.sin(angle) * 0.42, y + Math.cos(angle) * 0.42, z + 0.1);
+    mark.rotation.z = -angle;
+    clockGroup.add(mark);
+  }
+
+  // Стрелки: ось вращения в центре циферблата, сама стрелка смещена вверх
+  const createHand = (length, width, material) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, z + 0.11);
+
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(width, length, 0.02), material);
+    hand.position.y = length / 2;
+    pivot.add(hand);
+    clockGroup.add(pivot);
+
+    return pivot;
+  };
+
+  const hourHand = createHand(0.26, 0.05, handMaterial);
+  const minuteHand = createHand(0.38, 0.032, handMaterial);
+  const secondHand = createHand(0.42, 0.014, goldMaterial);
+
+  // Маятник: ось сверху, стержень и груз вниз
+  const pendulum = new THREE.Group();
+  pendulum.position.set(x, y - 0.62, z + 0.02);
+
+  const rod = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.72, 0.03), goldMaterial);
+  rod.position.y = -0.36;
+  pendulum.add(rod);
+
+  const bob = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), goldMaterial);
+  bob.position.y = -0.76;
+  pendulum.add(bob);
+
+  clockGroup.add(pendulum);
+
+  enableShadows(clockGroup);
+  world.add(clockGroup);
+
+  clockParts = { hourHand, minuteHand, secondHand, pendulum };
+}
+
+/**
+ * Часы: стрелки по системному времени, маятник — такт раз в секунду.
+ * @param {number} now — performance.now() текущего кадра
+ */
+function updateClock(now) {
+  if (!clockParts) return;
+
+  const date = new Date();
+  const seconds = date.getSeconds() + date.getMilliseconds() / 1000;
+  const minutes = date.getMinutes() + seconds / 60;
+  const hours = (date.getHours() % 12) + minutes / 60;
+
+  clockParts.secondHand.rotation.z = -(seconds / 60) * Math.PI * 2;
+  clockParts.minuteHand.rotation.z = -(minutes / 60) * Math.PI * 2;
+  clockParts.hourHand.rotation.z = -(hours / 12) * Math.PI * 2;
+
+  // Период 2 секунды: маятник проходит центр ровно раз в секунду
+  clockParts.pendulum.rotation.z = Math.sin((now / 1000) * Math.PI) * 0.28;
+}
+
+/**
+ * Дыхание, покачивание рук и плавные повороты для одного персонажа.
+ * @param {THREE.Group} person
+ * @param {number} now
+ * @param {number} dt — секунды с прошлого кадра
+ * @param {boolean} allowTurn — разрешены ли повороты вокруг Y (±15°)
+ */
+function animatePerson(person, now, dt, allowTurn = false) {
+  const data = person.userData;
+  if (!data || !data.torso || !data.mood) return;
+
+  // Постоянное глубокое дыхание — заметные ±5 %
+  const breath = Math.sin(now * 0.0014 + data.mood.breathPhase) * 0.05;
+  data.torso.scale.set(1 + breath * 0.6, 1 + breath, 1 + breath * 0.6);
+
+  // Редкие плавные повороты вокруг Y: ±15°, без рывков
+  if (allowTurn) {
+    if (now >= data.mood.nextTurnAt) {
+      data.mood.turnTarget = (Math.random() * 2 - 1) * 0.262;
+      data.mood.nextTurnAt = now + 5000 + Math.random() * 9000;
+    }
+    const turnFactor = Math.min(1, 1 - Math.exp(-1.2 * dt));
+    person.rotation.y += (data.mood.turnTarget - person.rotation.y) * turnFactor;
+  }
+
+  if (!data.arms) return;
+
+  if (now >= data.mood.nextSwayAt) {
+    data.mood.swayDuration = 2200 + Math.random() * 1400;
+    data.mood.swayUntil = now + data.mood.swayDuration;
+    data.mood.nextSwayAt = now + 6000 + Math.random() * 8000;
+  }
+
+  // Плавная огибающая: плавно нарастает и гаснет — никаких рывков
+  let sway = 0;
+  if (now < data.mood.swayUntil) {
+    const progress = 1 - (data.mood.swayUntil - now) / data.mood.swayDuration;
+    const envelope = Math.sin(Math.PI * Math.min(1, Math.max(0, progress)));
+    sway = Math.sin(now * 0.0032 + data.mood.phase) * 0.09 * envelope;
+  }
+
+  data.arms.forEach((arm, index) => {
+    arm.rotation.z = data.armBase[index] + sway;
+  });
+}
+
+/**
+ * Покадровая анимация персонажей: дыхание и покачивание рук, поворот головы
+ * продавца и сдувание уходящих клиентов.
  * @param {number} now — performance.now() текущего кадра
  * @param {number} dt — секунды с прошлого кадра
  */
 export function updateCharacters(now, dt) {
-  // Клиенты: редкое покачивание рук и «вздохи»
-  clientObjects.forEach((client) => {
-    const data = client.userData;
-    if (!data || !data.arms || !data.mood) return;
+  updateClock(now);
 
-    if (now >= data.mood.nextSwayAt) {
-      data.mood.swayUntil = now + 900 + Math.random() * 900;
-      data.mood.nextSwayAt = now + 3500 + Math.random() * 6500;
-    }
-    const sway = now < data.mood.swayUntil ? Math.sin(now * 0.006) * 0.22 : 0;
-    data.arms.forEach((arm, index) => {
-      arm.rotation.z = data.armBase[index] + sway;
-    });
-
-    if (now >= data.mood.nextSighAt) {
-      data.mood.sighUntil = now + 1500;
-      data.mood.nextSighAt = now + 5000 + Math.random() * 8000;
-    }
-    const breath =
-      now < data.mood.sighUntil
-        ? Math.sin(((data.mood.sighUntil - now) / 1500) * Math.PI) * 0.045
-        : 0;
-    data.torso.scale.set(1 + breath * 0.6, 1 + breath, 1 + breath * 0.6);
-  });
+  clientObjects.forEach((client) => animatePerson(client, now, dt, true));
+  if (baristaRef) animatePerson(baristaRef, now, dt, false);
 
   // Уходящие клиенты сдуваются и исчезают
   for (let i = leavingClients.length - 1; i >= 0; i -= 1) {

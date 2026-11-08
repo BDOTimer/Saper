@@ -7,7 +7,14 @@
 
 import * as THREE from 'three';
 import { getIngredientObjects, initScene, updateCharacters } from './scene.js';
-import { handleIngredientClick, startGame, submitOrder, update } from './game.js';
+import {
+  handleIngredientClick,
+  pauseGame,
+  resumeGame,
+  startGame,
+  submitOrder,
+  update,
+} from './game.js';
 
 const canvas = document.getElementById('scene-canvas');
 const ingredientLabel = document.getElementById('ingredient-label');
@@ -93,6 +100,30 @@ function playTone(context, { frequency, start, duration, type = 'sine', level = 
   gain.connect(context.destination);
   oscillator.start(start);
   oscillator.stop(start + duration + 0.03);
+}
+
+/** Слабый тик часов — короткий щелчок раз в секунду. */
+function playTickSound() {
+  // До первого клика пользователя звук браузером запрещён
+  if (!audioContext || audioContext.state !== 'running') return;
+
+  const context = audioContext;
+  const start = context.currentTime;
+
+  const oscillator = context.createOscillator();
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(1900, start);
+  oscillator.frequency.exponentialRampToValueAtTime(900, start + 0.03);
+
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.045, start + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.045);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + 0.06);
 }
 
 /** Клиент получил заказ: короткое восходящее арпеджио. */
@@ -227,9 +258,29 @@ document.getElementById('submit-btn').addEventListener('click', () => {
   submitOrder();
 });
 
+// Правила игры: пока панель открыта, заказы не сгорают
+const rulesModal = document.getElementById('rules-modal');
+
+document.getElementById('help-btn').addEventListener('click', () => {
+  rulesModal.hidden = false;
+  pauseGame();
+});
+
+document.getElementById('resume-btn').addEventListener('click', () => {
+  rulesModal.hidden = true;
+  resumeGame();
+});
+
+document.getElementById('new-game-btn').addEventListener('click', () => {
+  rulesModal.hidden = true;
+  resumeGame();
+  startGame();
+});
+
 startGame();
 
 let previousFrame = performance.now();
+let lastTickSecond = Math.floor(previousFrame / 1000);
 
 /**
  * Игровой цикл. Время берём из performance.now() — таймер заказа
@@ -239,6 +290,13 @@ function frame() {
   const now = performance.now();
   const dt = Math.min((now - previousFrame) / 1000, 0.1);
   previousFrame = now;
+
+  // Тик часов — ровно раз в секунду, синхронно с маятником
+  const currentSecond = Math.floor(now / 1000);
+  if (currentSecond !== lastTickSecond) {
+    lastTickSecond = currentSecond;
+    playTickSound();
+  }
 
   update(now);
   updateCharacters(now, dt);
