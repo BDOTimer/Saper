@@ -301,6 +301,45 @@ function addStrayHairs(headGroup, count) {
 }
 
 /**
+ * «Чистый» цвет одежды для женских персонажей: насыщенные тёплые
+ * и розово-красные оттенки. Синий диапазон исключён.
+ * @returns {THREE.Color}
+ */
+function randomCleanColor() {
+  // 0–0.16 — красный, оранжевый, жёлтый; 0.78–1 — малиновый и розовый
+  const hue = Math.random() < 0.55
+    ? Math.random() * 0.16
+    : 0.78 + Math.random() * 0.22;
+
+  const saturation = 0.5 + Math.random() * 0.25;
+  const lightness = 0.38 + Math.random() * 0.16;
+
+  return new THREE.Color().setHSL(hue, saturation, lightness);
+}
+
+/**
+ * Цвет юбки: к «чистым» цветам добавлен голубой.
+ * @returns {THREE.Color}
+ */
+function randomSkirtColor() {
+  const roll = Math.random();
+  let hue;
+
+  if (roll < 0.35) {
+    hue = 0.5 + Math.random() * 0.09; // голубой
+  } else if (roll < 0.7) {
+    hue = 0.78 + Math.random() * 0.22; // малиновый, розовый, красный
+  } else {
+    hue = Math.random() * 0.16; // оранжевый, жёлтый
+  }
+
+  const saturation = 0.45 + Math.random() * 0.3;
+  const lightness = 0.42 + Math.random() * 0.16;
+
+  return new THREE.Color().setHSL(hue, saturation, lightness);
+}
+
+/**
  * Слегка разный оттенок кожи у клиентов: базовый тон с небольшим
  * случайным сдвигом светлоты и тепла.
  * @returns {THREE.Color}
@@ -325,6 +364,8 @@ function randomSkinTone() {
  * @param {boolean} [options.longHair] — длинные волосы до плеч
  * @param {boolean} [options.face] — глаза и алые губы
  * @param {number} [options.strayHairs] — сколько одиночных волосков добавить
+ * @param {boolean} [options.skirt] — юбка вместо брюк (женский персонаж)
+ * @param {THREE.Color} [options.skirtColor] — свой цвет юбки
  * @returns {THREE.Group}
  */
 function createHumanoid({
@@ -335,6 +376,8 @@ function createHumanoid({
   longHair = false,
   face = false,
   strayHairs = 0,
+  skirt = false,
+  skirtColor = null,
 }) {
   const person = new THREE.Group();
 
@@ -349,12 +392,30 @@ function createHumanoid({
     metalness: 0.03,
   });
 
-  // Ноги
-  [-0.11, 0.11].forEach((x) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.62, 10), pantsMaterial);
-    leg.position.set(x, 0.31, 0);
-    person.add(leg);
-  });
+  if (skirt) {
+    // Женский силуэт: открытые ноги и расклешённая юбка вместо брюк
+    [-0.1, 0.1].forEach((x) => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.5, 10), skinMaterial);
+      leg.position.set(x, 0.25, 0);
+      person.add(leg);
+    });
+
+    const skirtMaterial = new THREE.MeshStandardMaterial({
+      color: skirtColor || clothColor,
+      roughness: 0.7,
+      metalness: 0.03,
+    });
+    const skirtMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.3, 0.36, 18), skirtMaterial);
+    skirtMesh.position.set(0, 0.62, 0);
+    person.add(skirtMesh);
+  } else {
+    // Мужской силуэт: прямые брюки
+    [-0.11, 0.11].forEach((x) => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.62, 10), pantsMaterial);
+      leg.position.set(x, 0.31, 0);
+      person.add(leg);
+    });
+  }
 
   // Туловище
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.42, 6, 14), clothMaterial);
@@ -449,9 +510,14 @@ function createHumanoid({
 
 /** Создаёт нового клиента в очереди (позицию выставляет game.js). */
 export function createClient() {
+  // Примерно треть посетителей — девушки: юбка и более чистые цвета одежды
+  const isWoman = Math.random() < 0.4;
+
   const client = createHumanoid({
-    clothColor: randomDarkColor(),
+    clothColor: isWoman ? randomCleanColor() : randomDarkColor(),
     skinColor: randomSkinTone(),
+    skirt: isWoman,
+    skirtColor: isWoman ? randomSkirtColor() : null,
     // от 1 до 5 одиночных волосков на макушке
     strayHairs: 1 + Math.floor(Math.random() * 5),
   });
