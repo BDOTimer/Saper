@@ -105,6 +105,21 @@ const clientObjects = [];
 /** Счётчик, чтобы новые клиенты получали разные цвета. */
 let clientColorCursor = 0;
 
+/** Продавец — нужен для анимаций (ходьба вдоль стойки, поворот головы). */
+let baristaRef = null;
+
+/** К какому клиенту продавец поворачивает голову. */
+let baristaLookTargetX = 0;
+
+/** Текущий угол поворота головы продавца. */
+let baristaHeadYaw = 0;
+
+/** Уходящие клиенты: [{ client, startAt }] — «сдуваются» и затем удаляются. */
+const leavingClients = [];
+
+/** Сколько миллисекунд клиент сдувается перед исчезновением. */
+const CLIENT_LEAVE_MS = 620;
+
 /** Приглушённый/осветлённый оттенок базового цвета (amount: -1..1). */
 function shadeColor(color, amount) {
   const base = new THREE.Color(color);
@@ -225,6 +240,7 @@ function createIngredientObject(ingredient) {
  * @param {number} [options.pantsColor]
  * @param {number|null} [options.hairColor] — если задан, добавляются волосы
  * @param {boolean} [options.longHair] — длинные волосы до плеч
+ * @param {boolean} [options.face] — глаза и алые губы
  * @returns {THREE.Group}
  */
 function createHumanoid({
@@ -233,6 +249,7 @@ function createHumanoid({
   pantsColor = PANTS_COLOR,
   hairColor = null,
   longHair = false,
+  face = false,
 }) {
   const person = new THREE.Group();
 
@@ -252,38 +269,79 @@ function createHumanoid({
   torso.position.set(0, 1.03, 0);
   person.add(torso);
 
-  // Руки
+  // Руки — ссылки сохраняем для лёгкого покачивания
+  const arms = [];
+  const armBase = [];
   [-0.27, 0.27].forEach((x) => {
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.52, 8), clothMaterial);
     arm.position.set(x, 1.05, 0);
-    arm.rotation.z = x > 0 ? -0.16 : 0.16;
+    const base = x > 0 ? -0.16 : 0.16;
+    arm.rotation.z = base;
     person.add(arm);
+    arms.push(arm);
+    armBase.push(base);
   });
 
-  // Голова
+  // Голова — отдельная группа, чтобы продавец мог поворачивать её к клиентам
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 1.52, 0);
+  person.add(headGroup);
+  person.userData.head = headGroup;
+
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), skinMaterial);
-  head.position.set(0, 1.52, 0);
-  person.add(head);
+  headGroup.add(head);
+
+  // Глаза и алые губы
+  if (face) {
+    const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x2a1a12, roughness: 0.35, metalness: 0 });
+
+    [-0.055, 0.055].forEach((x) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), eyeMaterial);
+      eye.position.set(x, 0.028, 0.141);
+      headGroup.add(eye);
+    });
+
+    const lipMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd81b3a,
+      roughness: 0.3,
+      metalness: 0.06,
+    });
+    const lips = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 10), lipMaterial);
+    lips.position.set(0, -0.052, 0.146);
+    lips.scale.set(1, 0.4, 0.45);
+    headGroup.add(lips);
+  }
 
   if (hairColor !== null) {
     const hairMaterial = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0 });
 
-    // Шапка волос на макушке
+    // Шапка волос: открывает лицо, поэтому «натянута» только до 75°
     const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.168, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      new THREE.SphereGeometry(0.168, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
       hairMaterial,
     );
-    cap.position.set(0, 1.53, -0.01);
-    person.add(cap);
+    cap.position.set(0, 0.012, -0.015);
+    headGroup.add(cap);
 
     if (longHair) {
-      // Длинные волосы сзади, до плеч
+      // Длинные волосы сзади, до плеч (поворачиваются вместе с головой)
       const locks = new THREE.Mesh(new THREE.CapsuleGeometry(0.145, 0.46, 6, 12), hairMaterial);
-      locks.position.set(0, 1.24, -0.11);
+      locks.position.set(0, -0.28, -0.11);
       locks.scale.set(1, 1, 0.6);
-      person.add(locks);
+      headGroup.add(locks);
     }
   }
+
+  // Данные для лёгких анимаций: покачивание рук и «вздохи»
+  person.userData.arms = arms;
+  person.userData.armBase = armBase;
+  person.userData.torso = torso;
+  person.userData.mood = {
+    nextSwayAt: performance.now() + 1200 + Math.random() * 5000,
+    swayUntil: 0,
+    nextSighAt: performance.now() + 2500 + Math.random() * 7000,
+    sighUntil: 0,
+  };
 
   enableShadows(person);
   return person;
@@ -484,15 +542,39 @@ function buildCounterAndShelves() {
     world.add(shelf);
   });
 
+  // Задняя стенка полок — та же доска, но заметно темнее
+  const backTexture = textureLoader.load(SHELF_TEXTURE_PATH);
+  backTexture.colorSpace = THREE.SRGBColorSpace;
+  backTexture.wrapS = THREE.RepeatWrapping;
+  backTexture.wrapT = THREE.RepeatWrapping;
+  backTexture.repeat.set(4, 2);
+  backTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const backPanel = new THREE.Mesh(
+    new THREE.PlaneGeometry(7.3, 2.9),
+    new THREE.MeshStandardMaterial({
+      map: backTexture,
+      color: 0x4a3a2c, // темнее самих полок
+      roughness: 0.9,
+      metalness: 0,
+    }),
+  );
+  backPanel.position.set(0, 2.65, -1.94);
+  backPanel.receiveShadow = true;
+  world.add(backPanel);
+
   // Продавец за стойкой: девушка с длинными волосами, лицом к клиентам
   const barista = createHumanoid({
     clothColor: 0xe9dcc8,
     skinColor: 0xf0c4a0,
     hairColor: 0xf2d67a,
     longHair: true,
+    face: true,
   });
   barista.position.set(0, 0, BARISTA_Z);
   world.add(barista);
+
+  baristaRef = barista;
 }
 
 /** Раскладывает 12 моделей продуктов по полкам. */
@@ -693,5 +775,88 @@ export function highlightIngredient(model, isSelected) {
   } else {
     model.scale.setScalar(baseScale);
     model.position.y = model.userData.baseY;
+  }
+}
+
+/**
+ * Двигает продавца вдоль стойки (локальная координата внутри группы мира).
+ * @param {number} x
+ */
+export function setBaristaX(x) {
+  if (baristaRef) baristaRef.position.x = x;
+}
+
+/**
+ * Задаёт, к какому клиенту продавец повернёт голову.
+ * @param {number} x — локальная X клиента
+ */
+export function setBaristaLookTarget(x) {
+  baristaLookTargetX = x;
+}
+
+/**
+ * Запускает анимацию ухода: клиент «сдувается» и затем удаляется со сцены.
+ * @param {THREE.Group} clientObject
+ */
+export function startClientLeave(clientObject) {
+  if (!clientObject) return;
+  if (leavingClients.some((item) => item.client === clientObject)) return;
+  leavingClients.push({ client: clientObject, startAt: performance.now() });
+}
+
+/**
+ * Покадровая анимация персонажей: покачивание рук и «вздохи» клиентов,
+ * поворот головы продавца и сдувание уходящих клиентов.
+ * @param {number} now — performance.now() текущего кадра
+ * @param {number} dt — секунды с прошлого кадра
+ */
+export function updateCharacters(now, dt) {
+  // Клиенты: редкое покачивание рук и «вздохи»
+  clientObjects.forEach((client) => {
+    const data = client.userData;
+    if (!data || !data.arms || !data.mood) return;
+
+    if (now >= data.mood.nextSwayAt) {
+      data.mood.swayUntil = now + 900 + Math.random() * 900;
+      data.mood.nextSwayAt = now + 3500 + Math.random() * 6500;
+    }
+    const sway = now < data.mood.swayUntil ? Math.sin(now * 0.006) * 0.22 : 0;
+    data.arms.forEach((arm, index) => {
+      arm.rotation.z = data.armBase[index] + sway;
+    });
+
+    if (now >= data.mood.nextSighAt) {
+      data.mood.sighUntil = now + 1500;
+      data.mood.nextSighAt = now + 5000 + Math.random() * 8000;
+    }
+    const breath =
+      now < data.mood.sighUntil
+        ? Math.sin(((data.mood.sighUntil - now) / 1500) * Math.PI) * 0.045
+        : 0;
+    data.torso.scale.set(1 + breath * 0.6, 1 + breath, 1 + breath * 0.6);
+  });
+
+  // Уходящие клиенты сдуваются и исчезают
+  for (let i = leavingClients.length - 1; i >= 0; i -= 1) {
+    const item = leavingClients[i];
+    const t = Math.min(1, (now - item.startAt) / CLIENT_LEAVE_MS);
+
+    item.client.scale.setScalar(Math.max(0.02, 1 - t));
+    item.client.position.y = -0.25 * t;
+
+    if (t >= 1) {
+      leavingClients.splice(i, 1);
+      removeClient(item.client);
+    }
+  }
+
+  // Продавец поворачивает голову к активному клиенту
+  if (baristaRef && baristaRef.userData.head) {
+    const dx = baristaLookTargetX - baristaRef.position.x;
+    const dz = CLIENT_Z - BARISTA_Z;
+    const targetYaw = Math.max(-0.7, Math.min(0.7, Math.atan2(dx, dz)));
+
+    baristaHeadYaw += (targetYaw - baristaHeadYaw) * Math.min(1, 1 - Math.exp(-2.5 * dt));
+    baristaRef.userData.head.rotation.y = baristaHeadYaw;
   }
 }

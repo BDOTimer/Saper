@@ -44,6 +44,24 @@ body {
   cursor: default;
 }
 
+/* ---------- Постобработка: виньетка ---------- */
+
+/* Края окна затемнены, максимальная яркость — на полках и продавце */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: radial-gradient(
+    118% 92% at 62% 44%,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0) 30%,
+    rgba(0, 0, 0, 0.34) 58%,
+    rgba(0, 0, 0, 0.66) 82%,
+    rgba(0, 0, 0, 0.86) 100%
+  );
+  pointer-events: none;
+}
+
 /* ---------- Верхняя панель со счётчиками ---------- */
 
 .hud {
@@ -54,6 +72,7 @@ body {
   display: flex;
   gap: 10px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .hud__stat {
@@ -113,6 +132,7 @@ body {
   gap: 12px;
   width: min(420px, 34vw);
   pointer-events: none;
+  z-index: 2;
 }
 
 /* На узких окнах HUD смещается левее — опускаем колонку под него */
@@ -394,6 +414,7 @@ body {
   position: absolute;
   top: 88px;
   left: 65%;
+  z-index: 2;
   max-width: 40vw;
   margin: 0;
   font-size: 13px;
@@ -410,6 +431,7 @@ body {
   position: absolute;
   top: 16px;
   right: 28px;
+  z-index: 2;
   padding: 10px 16px;
   font-size: 12px;
   font-weight: 700;

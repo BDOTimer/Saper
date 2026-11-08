@@ -21,7 +21,10 @@ import {
   getIngredientObjects,
   highlightIngredient,
   removeClient,
+  setBaristaLookTarget,
+  setBaristaX,
   setCounterItems,
+  startClientLeave,
 } from './scene.js';
 
 /** Состояния игры. */
@@ -76,6 +79,12 @@ let resumeAt = 0;
 
 /** Момент, когда должен подойти следующий клиент (Infinity — никто не идёт). */
 let arrivalAt = Infinity;
+
+/** Текущая позиция продавца вдоль стойки. */
+let baristaX = 0;
+
+/** Анимация подхода продавца к полке. */
+const walk = { active: false, fromX: 0, toX: 0, start: 0, duration: 0, onArrive: null };
 
 /** Текстовая подсказка в оверлее. */
 let statusText = '';
@@ -426,6 +435,9 @@ function beginOrder(now) {
   state = STATE.ORDERING;
   els.speech.textContent = active.order.monolog;
 
+  // Продавец поворачивает голову к клиенту (иногда смотрит прямо)
+  setBaristaLookTarget(Math.random() < 0.75 ? active.mesh.position.x : 0);
+
   // Визуальные модели того, что заказал клиент
   renderOrderPreview();
 
@@ -477,9 +489,13 @@ function finishOrder(result, now, wrongSum) {
   // Корзина очищается при любом исходе
   clearBasket();
 
-  // Активный клиент уходит; следующий подойдёт отдельно, со своей задержкой
+  // Активный клиент уходит, «сдуваясь»; следующий подойдёт отдельно
   const departed = queue.shift();
-  removeClient(departed.mesh);
+  startClientLeave(departed.mesh);
+
+  // Подход к полке прерываем — заказ уже завершён
+  walk.active = false;
+  walk.onArrive = null;
 
   // В кафе всегда должен оставаться хотя бы один посетитель
   if (queue.length < MIN_CLIENTS) {
@@ -507,6 +523,27 @@ export function update(now) {
   lastNow = now;
 
   updateClients(dt);
+
+  // Продавец идёт к полке; продукт берётся только после подхода
+  if (walk.active) {
+    const t = Math.min(1, (now - walk.start) / walk.duration);
+    const eased = t * t * (3 - 2 * t); // плавный старт и остановка
+
+    baristaX = walk.fromX + (walk.toX - walk.fromX) * eased;
+    setBaristaX(baristaX);
+
+    if (t >= 1) {
+      walk.active = false;
+      const onArrive = walk.onArrive;
+      walk.onArrive = null;
+      if (onArrive) onArrive();
+    }
+  } else if (state !== STATE.ORDERING && baristaX !== 0) {
+    // Между заказами продавец возвращается на место
+    baristaX += (0 - baristaX) * Math.min(1, 1 - Math.exp(-2 * dt));
+    if (Math.abs(baristaX) < 0.01) baristaX = 0;
+    setBaristaX(baristaX);
+  }
 
   // Приход нового клиента — по своему таймеру, независимо от уходов.
   // Пустая очередь недопустима: кто-то должен стоять у стойки всегда.
@@ -572,20 +609,24 @@ export function startGame() {
   });
   arrivalAt = Infinity;
 
+  // Продавец возвращается на место, подход к полке сбрасываем
+  walk.active = false;
+  walk.onArrive = null;
+  baristaX = 0;
+  setBaristaX(0);
+  setBaristaLookTarget(0);
+
   beginOrder(performance.now());
 }
 
 /**
- * Клик по ингредиенту в 3D-сцене.
- * Работает только в состоянии ORDERING; повторный клик убирает ингредиент.
+ * Добавляет или убирает продукт в корзине и выставляет его на стол.
+ * Вызывается после того, как продавец подошёл к полке.
  * @param {string} ingredientId
  */
-export function handleIngredientClick(ingredientId) {
-  if (state !== STATE.ORDERING) return;
-
-  const ingredient = ingredientById.get(ingredientId);
+function toggleBasketItem(ingredientId) {
   const mesh = meshById.get(ingredientId);
-  if (!ingredient || !mesh) return;
+  if (!mesh) return;
 
   const index = basket.indexOf(ingredientId);
 
@@ -600,6 +641,39 @@ export function handleIngredientClick(ingredientId) {
   // Выбранные продукты выставляем на синий стол продавца
   setCounterItems(basket);
   renderBasket();
+
+  statusText = 'Соберите заказ и нажмите «Готово».';
+  renderStatus();
+}
+
+/**
+ * Клик по ингредиенту в 3D-сцене.
+ * Работает только в состоянии ORDERING: сначала продавец подходит к полке,
+ * и лишь после этого продукт попадает на стол. Повторный клик убирает его.
+ * @param {string} ingredientId
+ */
+export function handleIngredientClick(ingredientId) {
+  if (state !== STATE.ORDERING) return;
+  if (walk.active) return; // продавец ещё идёт к предыдущему продукту
+
+  const ingredient = ingredientById.get(ingredientId);
+  const mesh = meshById.get(ingredientId);
+  if (!ingredient || !mesh) return;
+
+  const targetX = Math.max(-2.9, Math.min(2.9, mesh.position.x));
+
+  walk.active = true;
+  walk.fromX = baristaX;
+  walk.toX = targetX;
+  walk.start = performance.now();
+  walk.duration = 240 + Math.abs(targetX - baristaX) * 190;
+  walk.onArrive = () => {
+    // если заказ успел закончиться, корзину уже не трогаем
+    if (state === STATE.ORDERING) toggleBasketItem(ingredientId);
+  };
+
+  statusText = 'Продавец идёт к полке…';
+  renderStatus();
 }
 
 /**

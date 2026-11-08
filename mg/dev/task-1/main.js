@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import { getIngredientObjects, initScene } from './scene.js';
+import { getIngredientObjects, initScene, updateCharacters } from './scene.js';
 import { handleIngredientClick, startGame, submitOrder, update } from './game.js';
 
 const canvas = document.getElementById('scene-canvas');
@@ -229,13 +229,19 @@ document.getElementById('submit-btn').addEventListener('click', () => {
 
 startGame();
 
+let previousFrame = performance.now();
+
 /**
  * Игровой цикл. Время берём из performance.now() — таймер заказа
  * не «плывёт» даже при потере фокуса вкладки.
  */
 function frame() {
   const now = performance.now();
+  const dt = Math.min((now - previousFrame) / 1000, 0.1);
+  previousFrame = now;
+
   update(now);
+  updateCharacters(now, dt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
