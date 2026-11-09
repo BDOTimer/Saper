@@ -38,9 +38,7 @@ export class MapView {
       getPlayers: () => this.players,
     });
     this.unitsView.rebuild();
-    this.routeView = new RouteView(this, {
-      onlyActiveOwner: false,   // true — только маршрут активного игрока
-    });
+    this.routeView = new RouteView(this);
 
     this._buildBoard();
     this._buildOverlays();
@@ -109,9 +107,7 @@ export class MapView {
     this.unitsView.rebuild();
 
     this.routeView?.destroy();
-    this.routeView = new RouteView(this, {
-      onlyActiveOwner: false,
-    });
+    this.routeView = new RouteView(this);
     // routeView.rebuild() вызовется ниже, после того как появятся армии
     this.routeView.rebuild();
   }
@@ -870,6 +866,11 @@ export class MapView {
 /* =========================================================
    RouteView — визуализация маршрутов армий.
    Читает army.route (Cell[]) и рисует маркеры на клетках.
+
+   Правила видимости:
+    - маршруты армий компьютера не рисуются вообще;
+    - у армии человека маршрут виден только когда она выбрана
+      (клик по армии или её очередь хода / планирование маршрута).
    ========================================================= */
 export class RouteView {
   /**
@@ -877,7 +878,6 @@ export class RouteView {
    * @param {object} [opts]
    * @param {number} [opts.markerSize=0.28]
    * @param {number} [opts.markerColor=0xff3333]
-   * @param {boolean} [opts.onlyActiveOwner=true] — рисовать только маршрут активного игрока
    */
   constructor(mapView, opts = {}) {
     this.mapView = mapView;
@@ -885,7 +885,6 @@ export class RouteView {
 
     this.markerSize  = opts.markerSize  ?? 0.28;
     this.markerColor = opts.markerColor ?? 0xff3333;
-    this.onlyActiveOwner = opts.onlyActiveOwner !== false;
 
     this.group = new THREE.Group();
     this.group.name = 'RouteLayer';
@@ -893,22 +892,14 @@ export class RouteView {
 
     /** Map<army, { root, cells }> — что нарисовано сейчас */
     this._nodes = new Map();
-    /** Текущий активный ownerId (для фильтра) */
-    this._activeOwner = null;
-    /** Если задан — рисуем маршрут ТОЛЬКО этой армии (выбор человека). */
+    /** Если задан — рисуем маршрут ТОЛЬКО этой армии (выбор человека).
+     *  null — не рисуем маршруты вообще. */
     this._armyFilter = null;
-  }
-
-  /** Установить активного игрока — рисовать будем только его маршруты */
-  setActiveOwner(idOwner) {
-    if (this._activeOwner === idOwner) return;
-    this._activeOwner = idOwner;
-    this.rebuild();
   }
 
   /**
    * Показывать маршрут только одной армии (выбранной игроком-человеком).
-   * null — снять фильтр (рисовать все доступные маршруты).
+   * null — скрыть все маршруты.
    */
   setArmyFilter(army) {
     const next = army ?? null;
@@ -917,30 +908,37 @@ export class RouteView {
     this.rebuild();
   }
 
+  /** Владелец армии — человек? */
+  _isHumanArmy(army) {
+    const players = this.mapView.players;
+    const player = players?.get?.(army?.idOwner)
+                ?? players?.list?.[army?.idOwner]
+                ?? null;
+    return player?.isHuman === true;
+  }
+
+  /** Рисовать ли маршрут этой армии по текущим правилам. */
+  _shouldDraw(army) {
+    if (!army?.route?.length) return false;
+    if (army.alive === false) return false;
+    if (!this._isHumanArmy(army)) return false;   // боты — без маршрутов
+    return army === this._armyFilter;             // только выбранная
+  }
+
   /** Полная перерисовка всех маршрутов */
   rebuild() {
     this.clear();
 
     const armies = this.mapView._collectArmies?.() ?? [];
     for (const army of armies) {
-      if (!army.route?.length) continue;
-      if (this._armyFilter && army !== this._armyFilter) continue;
-      if (this.onlyActiveOwner
-          && this._activeOwner !== null
-          && army.idOwner !== this._activeOwner) continue;
-
-      this._buildRoute(army);
+      if (this._shouldDraw(army)) this._buildRoute(army);
     }
   }
 
   /** Обновить маршрут одной армии (после пересчёта) */
   updateArmy(army) {
     this._removeArmy(army);
-    if (!army.route?.length) return;
-    if (this._armyFilter && army !== this._armyFilter) return;
-    if (this.onlyActiveOwner
-        && this._activeOwner !== null
-        && army.idOwner !== this._activeOwner) return;
+    if (!this._shouldDraw(army)) return;
     this._buildRoute(army);
   }
 
