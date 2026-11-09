@@ -446,8 +446,9 @@ export class UnitsView {
     const colorHex = player?.color ?? 0x9aa4ad;
     const skin = skinForPlayer(army.idOwner);
 
-    // 2) фигурка армии = первая модель юнита в массиве армии (ТЗ)
-    const top = army.units.find(u => u.alive) ?? army.units[0];
+    // 2) фигурка армии: герой (в любой позиции массива), иначе первый юнит
+    const hero = army.units.find(u => u.isHero && u.alive);
+    const top  = hero ?? army.units.find(u => u.alive) ?? army.units[0];
     if (!top) return null;
 
     // 3) строим меш юнита

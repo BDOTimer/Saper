@@ -212,10 +212,14 @@ export class ArmyView {
     this._mouse     = new THREE.Vector2();
 
     /** открыто ли сейчас */
-    this._open   = false;
-    this._army   = null;
-    this._raf    = null;
-    this._selIdx = -1;
+    this._open      = false;
+    this._army      = null;
+    this._raf       = null;
+    this._selHolder = null;
+
+    /** анимация обмена двух юнитов (1.5 c) */
+    this._anim      = null;
+    this._animating = false;
 
     ensureStyles();
     this._buildPanel(opts.container ?? document.body);
@@ -366,9 +370,11 @@ export class ArmyView {
   show(army) {
     if (!army || !army.units?.length) return;
     this.close();
-    this._army   = army;
-    this._open   = true;
-    this._selIdx = -1;
+    this._army      = army;
+    this._open      = true;
+    this._selHolder = null;
+    this._anim      = null;
+    this._animating = false;
     this._root.classList.add('open');
 
     this._buildRowScene();
@@ -385,6 +391,9 @@ export class ArmyView {
       this._open = false;
     }
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    this._anim      = null;
+    this._animating = false;
+    this._selHolder = null;
     if (this._rowScene) {
       // диспоузим только прямых детей сцены, _selRing не трогаем —
       // он переиспользуется между открытиями панели
@@ -424,18 +433,22 @@ export class ArmyView {
     const colorHex = player?.color ?? 0x9aa4ad;
     const skin = skinForPlayer(army.idOwner);
 
-    const units = army.units.filter(u => u.alive);
+    const units = army.units;
+    const aliveCount = units.filter(u => u.alive).length;
     this._rowNodes = [];
 
-    units.forEach((u, i) => {
+    let slot = 0;
+    units.forEach((u, realIndex) => {
+      if (!u.alive) return;
       const mesh = skin.build(u.typeKey, colorHex);
       const holder = new THREE.Group();
       holder.add(mesh);
-       holder.scale.setScalar(0.7); 
-      holder.position.x = (i - (units.length - 1) / 2) * ROW_SPACING;
-      holder.userData = { type: 'unit', unit: u, index: i };
+      holder.scale.setScalar(0.7);
+      holder.position.x = (slot - (aliveCount - 1) / 2) * ROW_SPACING;
+      holder.userData = { type: 'unit', unit: u, index: realIndex, slot };
       this._rowScene.add(holder);
       this._rowNodes.push(holder);
+      slot++;
     });
 
     this._rowCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
@@ -472,6 +485,7 @@ export class ArmyView {
   _startLoop() {
     const loop = () => {
       if (!this._open) return;
+      this._updateSwapAnim(performance.now());
       this._fitRowCamera();
       this._rowRenderer.render(this._rowScene, this._rowCam);
       this._raf = requestAnimationFrame(loop);
@@ -483,6 +497,8 @@ export class ArmyView {
      Клик по модельке юнита в панели
      ========================================================= */
   _onRowClick(e) {
+    if (this._animating) return;
+
     const r = this._canvas.getBoundingClientRect();
     this._mouse.x =  ((e.clientX - r.left) / r.width)  * 2 - 1;
     this._mouse.y = -((e.clientY - r.top)  / r.height) * 2 + 1;
@@ -495,18 +511,114 @@ export class ArmyView {
     while (o && o.userData?.type !== 'unit') o = o.parent;
     if (!o) return;
 
-    this._selectUnit(o);
+    this._onUnitClicked(o);
+  }
+
+  /** Первый клик — выбор; второй по другой фигурке — обмен местами. */
+  _onUnitClicked(holder) {
+    if (this._animating) return;
+
+    if (!this._selHolder) {
+      this._selectUnit(holder);
+      return;
+    }
+    if (this._selHolder === holder) {
+      this._clearSelection();
+      return;
+    }
+    this._swapUnits(this._selHolder, holder);
   }
 
   _selectUnit(holder) {
-    const { unit, index } = holder.userData;
-    this._selIdx = index;
+    const { unit, slot } = holder.userData;
+    this._selHolder = holder;
     SND.clickUnit.play();   // клик по юниту
 
     this._selRing.visible = true;
     this._selRing.position.set(holder.position.x, 0.05, 0);
 
-    this._showUnitStats(unit, index);
+    this._showUnitStats(unit, slot);
+  }
+
+  _clearSelection() {
+    this._selHolder = null;
+    this._selRing.visible = false;
+    this._showHint();
+  }
+
+  /* =========================================================
+     Обмен двух юнитов местами с анимацией 1.5 с
+     ========================================================= */
+  _swapUnits(holderA, holderB) {
+    if (this._animating || holderA === holderB) return;
+    SND.clickUnit.play();   // клик по второму юниту
+
+    const slotA = holderA.userData.slot;
+    const slotB = holderB.userData.slot;
+    const idxA  = holderA.userData.index;
+    const idxB  = holderB.userData.index;
+    const arr   = this._army.units;
+
+    // меняем самих юнитов в массиве армии (единый источник правды)
+    const tmp = arr[idxA];
+    arr[idxA] = arr[idxB];
+    arr[idxB] = tmp;
+
+    // меняем реальные индексы и слоты отображения
+    holderA.userData.index = idxB;
+    holderB.userData.index = idxA;
+    holderA.userData.slot  = slotB;
+    holderB.userData.slot  = slotA;
+    this._rowNodes[slotA]  = holderB;
+    this._rowNodes[slotB]  = holderA;
+
+    this._animating = true;
+    this._anim = {
+      t0: performance.now(),
+      dur: 1500,
+      items: [
+        { h: holderA, from: holderA.position.x, to: this._slotX(slotB) },
+        { h: holderB, from: holderB.position.x, to: this._slotX(slotA) },
+      ],
+    };
+
+    this._clearSelection();
+  }
+
+  _slotX(slot) {
+    const n = this._rowNodes.length;
+    return (slot - (n - 1) / 2) * ROW_SPACING;
+  }
+
+  _updateSwapAnim(now) {
+    const a = this._anim;
+    if (!a) return;
+
+    let t = (now - a.t0) / a.dur;
+    if (t > 1) t = 1;
+    // easeInOutQuad
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    for (const it of a.items) {
+      it.h.position.x = it.from + (it.to - it.from) * e;
+      it.h.position.y = Math.sin(Math.PI * t) * 0.55; // дуга над рядом
+    }
+
+    if (t >= 1) {
+      for (const it of a.items) {
+        it.h.position.x = it.to;
+        it.h.position.y = 0;
+      }
+      this._anim = null;
+      this._animating = false;
+      this._afterSwap();
+    }
+  }
+
+  /** После обмена: обновляем фигурку армии на карте и заголовок. */
+  _afterSwap() {
+    this.mapView.unitsView?.updateArmy?.(this._army);
+    this._refreshTitle();
   }
 
   /* =========================================================
@@ -575,7 +687,8 @@ export class ArmyView {
 
   _showHint() {
     this._unitStatsEl.innerHTML =
-      `<div class="muted">Кликните по фигурке юнита, чтобы увидеть его статы.</div>`;
+      `<div class="muted">Кликните по фигурке юнита, чтобы увидеть его статы. ` +
+      `Клик по второй фигурке меняет юнитов местами.</div>`;
     this._selRing.visible = false;
   }
 
