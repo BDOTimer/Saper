@@ -50,6 +50,8 @@ export class Game {
       onArmyStart: (army, cellsPlanned) => {
         if (cellsPlanned > 0)
           this._log(`Армия #${army.id} выступила: маршрут ${cellsPlanned} кл.`);
+        // Армия, которая делает ход, автоматически попадает в фокус.
+        this._focusArmy(army);
       },
       // Каждый шаг армии на одну клетку.
       onArmyStep: (army) => {
@@ -137,6 +139,8 @@ export class Game {
       log:       (msg, hl) => this._log(msg, hl),
       requestFinish: () => this._finishPlayerTurn(),
       refreshHud:    () => this._refreshHud(),
+      // Программный выбор клетки армии, которая сейчас в фокусе.
+      focusArmy:     (army) => this._focusArmy(army),
       ui: {
         panel:   this.el.querySelector('#humanTurnPanel'),
         title:   this.el.querySelector('#htpTitle'),
@@ -304,9 +308,23 @@ export class Game {
     // Ход человека: клик выбирает свою армию или строит ей маршрут.
     this.humanBrain?.handleTileClick?.(tile);
 
+    this._showTileInfo(tile, { sound: true });
+  }
+
+  /**
+   * Обновить панель «Выбрано» и запомнить выбранную клетку.
+   * @param {Cell} tile
+   * @param {Object} [opts]
+   * @param {boolean} [opts.sound=false] — проигрывать звук клика по клетке
+   */
+  _showTileInfo(tile, { sound = false } = {}) {
+    if (!tile) return;
+
     this.selected = tile;
 
     const info = this.el.querySelector('#selInfo');
+    if (!info) return;
+
     const meta = tile.meta;
     const owner = tile.ownerIndex != null
       ? this.judge.playerByIndex(tile.ownerIndex)
@@ -314,8 +332,10 @@ export class Game {
 
     const city = this.worldMap.getCityAt(tile.x, tile.y);
 
-    if (city) SND.clickTown.play();   // клик по клетке с городом
-    else      SND.clickCell.play();   // клик по клетке без города
+    if (sound) {
+      if (city) SND.clickTown.play();   // клик по клетке с городом
+      else      SND.clickCell.play();   // клик по клетке без города
+    }
 
     const cityTypeLabel = city
       ? ({
@@ -359,6 +379,21 @@ export class Game {
       ${cellOwnerLine}
       ${cityOwnerLine}
     `;
+  }
+
+  /**
+   * Программно выбрать клетку армии, которая сейчас в фокусе
+   * (очередь хода / выбор игрока / старт хода бота):
+   * кольцо выбора, плавный перелёт камеры и панель «Выбрано».
+   * @param {Army} army
+   */
+  _focusArmy(army) {
+    if (!army) return;
+    const cell = this.worldMap?.get?.(army.x, army.y);
+    if (!cell) return;
+
+    this._showTileInfo(cell);
+    this.mapView?.selectTile?.(cell, { notify: false, soft: true });
   }
 
   _clearSelection() {

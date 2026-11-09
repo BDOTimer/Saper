@@ -23,6 +23,8 @@ export class MapView {
     this._raycaster = new THREE.Raycaster();
     this._mouse = new THREE.Vector2();
     this._onTileClick = null;
+    /** Отложенный фокус, если камера ещё проигрывает вступительный подлёт. */
+    this._pendingFocus = null;
     this._keys = {};
 
     // инерционный зум (состояние пружины)
@@ -84,6 +86,7 @@ export class MapView {
     }
     if (this.selRing) this.selRing.visible = false;
     if (this.hoverRing) this.hoverRing.visible = false;
+    this._pendingFocus = null;
     this.renderer._focusAnim = null;
 
     this._raisedFlags = new Set();
@@ -154,6 +157,39 @@ export class MapView {
       this._worldZ(tile.y),
       duration,
     );
+  }
+
+  /**
+   * Программный выбор клетки: кольцо выбора + плавный перелёт камеры.
+   *
+   * @param {Cell} tile
+   * @param {Object} [opts]
+   * @param {boolean} [opts.focus=true]      — двигать камеру к клетке
+   * @param {number}  [opts.duration=1500]   — длительность перелёта, мс
+   * @param {boolean} [opts.notify=true]     — звать _onTileClick (как при клике)
+   * @param {boolean} [opts.soft=false]      — не прерывать вступительный подлёт:
+   *                                           отложить фокус до его окончания
+   */
+  selectTile(tile, { focus = true, duration = 1500, notify = true, soft = false } = {}) {
+    if (!tile) return;
+
+    // кольцо выбора
+    this.selRing.visible = true;
+    this.selRing.position.x = this._worldX(tile.x);
+    this.selRing.position.z = this._worldZ(tile.y);
+    this.selRing.position.y = this._worldY(tile) + 0.22;
+
+    if (focus) {
+      if (soft && this.renderer._focusAnim?.kind === 'fly') {
+        // камера ещё летит на карту — не сбиваем интро, сфокусируемся после
+        this._pendingFocus = { tile, duration };
+      } else {
+        this._pendingFocus = null;
+        this._focusOnTile(tile, duration);
+      }
+    }
+
+    if (notify) this._onTileClick?.(tile);
   }
 
   _buildBoard() {
@@ -566,23 +602,20 @@ export class MapView {
     const tile = this._pickTile();
     if (!tile) return;
 
-    // кольцо выбора
-    this.selRing.visible = true;
-    this.selRing.position.x = this._worldX(tile.x);
-    this.selRing.position.z = this._worldZ(tile.y);
-    this.selRing.position.y = this._worldY(tile) + 0.22;
-
-    // плавно центрируем на клетке (в орбите это ещё и смена pivot)
-    this._focusOnTile(tile);
-
-    // внешний обработчик
-    this._onTileClick?.(tile);
+    this.selectTile(tile);
   }
 
   update(dt) {
     // сначала двигаем камеру анимацией фокуса/подлёта,
     // затем применяем зум — чтобы колесо работало и во время движения.
     this.renderer._stepFocusAnim(dt);
+
+    // отложенный программный фокус: ждём конца вступительного подлёта
+    if (!this.renderer._focusAnim && this._pendingFocus) {
+      const { tile, duration } = this._pendingFocus;
+      this._pendingFocus = null;
+      this._focusOnTile(tile, duration);
+    }
 
     if (this.renderer.mode === 'top') {
       this._updateTopZoom(dt);
@@ -665,6 +698,7 @@ export class MapView {
 
   destroy() {
     this._unbindEvents();
+    this._pendingFocus = null;
 
     this.routeView?.destroy();
     this.routeView = null;
