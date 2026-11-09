@@ -500,8 +500,8 @@ function finishOrder(result, now, wrongSum) {
   // Корзина очищается при любом исходе
   clearBasket();
 
-  // Полки перемешиваются — следующий заказ ищем заново
-  shuffleIngredients();
+  // Полки переставляются с анимацией — следующий заказ ищем заново
+  const shuffleMs = shuffleIngredients(now);
 
   // Активный клиент уходит, «сдуваясь»; следующий подойдёт отдельно
   const departed = queue.shift();
@@ -519,8 +519,8 @@ function finishOrder(result, now, wrongSum) {
   // Приход следующего никак не привязан к уходу текущего
   scheduleArrival(now);
 
-  // Короткая пауза перед следующим заказом — состояние остаётся терминальным
-  resumeAt = now + PAUSE_MS;
+  // Пауза перед следующим заказом: успевает доехать самая дальняя перестановка
+  resumeAt = now + Math.max(PAUSE_MS, shuffleMs) + 150;
   lastResult = result;
 
   renderTimer(0);

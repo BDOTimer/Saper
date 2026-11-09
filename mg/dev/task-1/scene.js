@@ -133,6 +133,12 @@ let clockParts = null;
 let mouse = null;
 const mouseRun = { active: false, start: 0, duration: 0, curve: null };
 
+/** Продукты, которые сейчас едут на новое место после заказа. */
+const ingredientMoves = [];
+
+/** Предельное время перестановки всех продуктов, мс. */
+const SHUFFLE_MAX_MS = 1800;
+
 /** Приглушённый/осветлённый оттенок базового цвета (amount: -1..1). */
 function shadeColor(color, amount) {
   const base = new THREE.Color(color);
@@ -859,8 +865,15 @@ export function initScene(canvas) {
 /**
  * Перемешивает продукты по полкам: после каждого заказа раскладка меняется,
  * поэтому нужный ингредиент приходится искать заново.
+ *
+ * Продукты не телепортируются, а едут на новые места с постоянной скоростью:
+ * скорость общая для всех, поэтому дальние едут дольше, а весь переезд
+ * укладывается в SHUFFLE_MAX_MS.
+ *
+ * @param {number} now — performance.now(), от которого стартует анимация
+ * @returns {number} сколько миллисекунд идёт самый долгий переезд
  */
-export function shuffleIngredients() {
+export function shuffleIngredients(now = performance.now()) {
   // Все ячейки: 3 полки × 4 места
   const cells = [];
   for (let shelfIndex = 1; shelfIndex <= 3; shelfIndex += 1) {
@@ -877,20 +890,43 @@ export function shuffleIngredients() {
     cells[j] = swap;
   }
 
-  ingredientObjects.forEach((model, index) => {
+  // Куда должен попасть каждый продукт
+  const targets = ingredientObjects.map((model, index) => {
     const cell = cells[index % cells.length];
-    if (!cell) return;
-
-    const shelfTop = SHELF_HEIGHTS[cell.shelfIndex] + 0.06;
-    const x = -2.7 + cell.slot * 1.8;
-
-    model.position.set(x, shelfTop, SHELF_Z);
-    model.rotation.y = cell.slot * 0.35;
-    model.scale.setScalar(model.userData.baseScale || 1);
-
-    // Подсветка ориентируется на новую высоту
-    model.userData.baseY = shelfTop;
+    return {
+      model,
+      to: new THREE.Vector3(-2.7 + cell.slot * 1.8, SHELF_HEIGHTS[cell.shelfIndex] + 0.06, SHELF_Z),
+      toRotation: cell.slot * 0.35,
+    };
   });
+
+  // Самое длинное перемещение задаёт общую скорость
+  const maxDistance = targets.reduce(
+    (max, item) => Math.max(max, item.model.position.distanceTo(item.to)),
+    0.0001,
+  );
+
+  // Прежние переезды отменяем, чтобы не спорили друг с другом
+  ingredientMoves.length = 0;
+
+  let longest = 0;
+  targets.forEach(({ model, to, toRotation }) => {
+    const distance = model.position.distanceTo(to);
+    const duration = (distance / maxDistance) * SHUFFLE_MAX_MS;
+
+    longest = Math.max(longest, duration);
+    ingredientMoves.push({
+      model,
+      from: model.position.clone(),
+      to,
+      fromRotation: model.rotation.y,
+      toRotation,
+      start: now,
+      duration,
+    });
+  });
+
+  return longest;
 }
 
 /** @returns {THREE.Group[]} живые 3D-объекты ингредиентов */
@@ -1257,6 +1293,22 @@ function animatePerson(person, now, dt, allowTurn = false) {
  */
 export function updateCharacters(now, dt) {
   updateClock(now);
+
+  // Перестановка продуктов: движение с постоянной скоростью, без ускорений.
+  // У дальних продуктов путь длиннее, поэтому едут они дольше.
+  for (let i = ingredientMoves.length - 1; i >= 0; i -= 1) {
+    const move = ingredientMoves[i];
+    const t = move.duration <= 1 ? 1 : Math.min(1, (now - move.start) / move.duration);
+
+    move.model.position.lerpVectors(move.from, move.to, t);
+    move.model.rotation.y = move.fromRotation + (move.toRotation - move.fromRotation) * t;
+
+    if (t >= 1) {
+      move.model.position.copy(move.to);
+      move.model.userData.baseY = move.to.y;
+      ingredientMoves.splice(i, 1);
+    }
+  }
 
   // Пробегающая мышь: движется по кривой и подпрыгивает на бегу
   if (mouseRun.active && mouse) {
