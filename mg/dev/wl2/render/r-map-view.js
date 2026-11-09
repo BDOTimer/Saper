@@ -25,6 +25,8 @@ export class MapView {
     this._onTileClick = null;
     /** Отложенный фокус, если камера ещё проигрывает вступительный подлёт. */
     this._pendingFocus = null;
+    /** Текстура подложки (грузится один раз на MapView). */
+    this._baseTexture = null;
     this._keys = {};
 
     // инерционный зум (состояние пружины)
@@ -42,6 +44,7 @@ export class MapView {
     this.unitsView.rebuild();
     this.routeView = new RouteView(this);
 
+    this._buildBase();
     this._buildBoard();
     this._buildOverlays();
     this._buildMountains();
@@ -68,6 +71,7 @@ export class MapView {
   rebuild(world, players = this.players) {
     this.world   = world;
     this.players = players;
+    this._disposeMesh('baseMesh');
     this._disposeMesh('tileMesh');
     this._disposeMesh('pickMesh');
     this._disposeMesh('roadMesh');
@@ -92,6 +96,7 @@ export class MapView {
     this._raisedFlags = new Set();
     this._flagAnims?.clear();
 
+    this._buildBase();
     this._buildBoard();
     this._buildOverlays();
     this._buildMountains();
@@ -190,6 +195,83 @@ export class MapView {
     }
 
     if (notify) this._onTileClick?.(tile);
+  }
+
+  /* =========================================================
+     Подложка под карту: каменный параллелепипед, выступающий
+     за края карты на 2 клетки с каждой стороны. Толщина — 2 клетки.
+     ========================================================= */
+  _baseTextureMap() {
+    if (this._baseTexture) return this._baseTexture;
+
+    const tex = new THREE.TextureLoader().load('./res/img/bg2.jpg');
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+
+    this._baseTexture = tex;
+    return tex;
+  }
+
+  _buildBase() {
+    this._disposeMesh('baseMesh');
+
+    const world = this.world;
+    if (!world?.w || !world?.h) return;
+
+    // 2 клетки выступа с каждой стороны + толщина 2 клетки.
+    const pad = 2 * TILE;
+    const width = world.w * TILE + pad * 2;
+    const depth = world.h * TILE + pad * 2;
+    const height = 2 * TILE;
+
+    // Верх подложки — на уровне низа самой низкой клетки карты,
+    // чтобы ни одна клетка не «утопала» в подложке.
+    let minBottom = Infinity;
+    for (const cell of world.cells) {
+      if (!cell) continue;
+      minBottom = Math.min(minBottom, this._worldY(cell) - 0.15);
+    }
+    if (!Number.isFinite(minBottom)) minBottom = 0;
+
+    const tex = this._baseTextureMap();
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      color: 0xffffff,
+      roughness: 0.95,
+      metalness: 0.02,
+    });
+
+    const geo = new THREE.BoxGeometry(width, height, depth);
+
+    // Масштабируем UV отдельно по каждой грани, чтобы каменная фактура
+    // не растягивалась: примерно один тайл текстуры на 6 клеток.
+    const tile = 6 * TILE;
+    const faceRepeats = [
+      [depth / tile, height / tile],   // +X
+      [depth / tile, height / tile],   // -X
+      [width / tile, depth / tile],    // +Y
+      [width / tile, depth / tile],    // -Y
+      [width / tile, height / tile],   // +Z
+      [width / tile, height / tile],   // -Z
+    ];
+    const uv = geo.getAttribute('uv');
+    for (let f = 0; f < 6; f++) {
+      const [ru, rv] = faceRepeats[f];
+      for (let i = 0; i < 4; i++) {
+        const n = f * 4 + i;
+        uv.setXY(n, uv.getX(n) * ru, uv.getY(n) * rv);
+      }
+    }
+    uv.needsUpdate = true;
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'MapBase';
+    mesh.position.set(0, minBottom - height / 2, 0);
+    this.baseMesh = mesh;
+    this.scene.add(mesh);
   }
 
   _buildBoard() {
@@ -711,10 +793,14 @@ export class MapView {
       this.mountainGroup = null;
     }
 
+    this._disposeMesh('baseMesh');
     this._disposeMesh('tileMesh');
     this._disposeMesh('pickMesh');
     this._disposeMesh('roadMesh');
     this._disposeMesh('riverMesh');
+
+    this._baseTexture?.dispose?.();
+    this._baseTexture = null;
 
     if (this.cityGroup) {
       this.scene.remove(this.cityGroup);
