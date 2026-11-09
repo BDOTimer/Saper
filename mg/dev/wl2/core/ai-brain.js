@@ -7,17 +7,21 @@
 //  moveArmyAlong(world, army, path, steps)      вспомогательное: шаг по маршруту
 //
 // Приоритеты find():
-//   1) ближайший нейтральный город
-//   2) ближайший вражеский город
-//   3) ближайшая вражеская армия (по клеткам)
+//   1) ближайший по стамине нейтральный город
+//   2) ближайший по стамине вражеский город
+//   3) ближайшая по стамине вражеская армия (по клеткам)
 //
 // Стоимость прохода берётся из Cell.staminaCost (дорога = 1).
-// Непроходимые клетки (вода/горы) в маршрут не попадают.
+// Непроходимые клетки (вода/горы, которые не тянет самый медленный юнит)
+// в маршрут не попадают.
 //
-// Медленные армии (в стеке есть юнит с move < 3):
-//   маршрут ищется только по дорогам и полям (staminaCost <= 2),
-//   кратчайшим числом клеток; целевая клетка разрешена любой —
-//   армия войдёт в неё, потратив весь остаток хода.
+// Маршрут минимизирует СУММУ стамины, а не число клеток:
+//   дорога/город = 1, поле = 2, лес/холмы = 3, горы = 4.
+// Шаг дороже минимального move юнита в армии считается непроходимым:
+// даже с полным запасом хода такой юнит не сможет его оплатить.
+//
+// Цели ИИ (find) тоже выбираются по минимальной стоимости стамины,
+// а не по манхэттенскому расстоянию.
 
 // class Army имеет кеш маршрута this.rote = [];
 // class Player имеет метод doStep() работающий с AiBrainHelper
@@ -75,9 +79,14 @@ export class AiBrainHelper {
 
     const preferCities = opts.preferCities !== false;
 
+    // Одно поле минимальных стоимостей стамины от старта:
+    // по нему же выбираем и достижимую цель, и её приоритет.
+    const { costs } = this._search(world, army);
+
     // ── 1. Нейтральный город ────────────────────────────────
     if (preferCities) {
-      const neutral = this._nearestCity(world, army, (city) => city.ownerId == null);
+      const neutral = this._nearestCity(
+        world, army, (city) => city.ownerId == null, costs);
       if (neutral) return neutral;
     }
 
@@ -85,13 +94,14 @@ export class AiBrainHelper {
     if (preferCities) {
       const enemyCity = this._nearestCity(
         world, army,
-        (city) => city.ownerId != null && city.ownerId !== army.idOwner
+        (city) => city.ownerId != null && city.ownerId !== army.idOwner,
+        costs,
       );
       if (enemyCity) return enemyCity;
     }
 
     // ── 3. Вражеская армия (клетка, где она стоит) ──────────
-    const enemyArmyCell = this._nearestEnemyArmyCell(world, army);
+    const enemyArmyCell = this._nearestEnemyArmyCell(world, army, costs);
     if (enemyArmyCell) return enemyArmyCell;
 
     return null;
@@ -104,6 +114,8 @@ export class AiBrainHelper {
    * Если маршрут недостижим — пустой массив.
    * Если cellGoal совпадает со стартом — пустой массив.
    *
+   * Маршрут минимизирует суммарную стоимость стамины (A*).
+   *
    * @param {WorldMap} world
    * @param {object}   army
    * @param {Cell}     cellGoal
@@ -115,23 +127,37 @@ export class AiBrainHelper {
   static buildRoute(world, army, cellGoal, opts = {}) {
     if (!world || !army || !cellGoal) return [];
     const start = world.get(army.x, army.y);
-    if (!start) return [];
+    if (!start || start === cellGoal) return [];
+    return this._search(world, army, cellGoal, opts).path;
+  }
 
-    if (start === cellGoal) return [];
+  /**
+   * Общий поиск по стоимости стамины.
+   *
+   * Если goal задан — A* до цели, иначе Dijkstra по всем достижимым клеткам
+   * (нужно find() для выбора оптимальной цели).
+   *
+   * @param {WorldMap} world
+   * @param {object}   army
+   * @param {Cell|null} [goal=null]
+   * @param {object}   [opts]
+   * @returns {{costs: Map<Cell,{cost:number,prev:Cell|null}>, path: Cell[]}}
+   */
+  static _search(world, army, goal = null, opts = {}) {
+    const start = world.get?.(army.x, army.y);
+    if (!start) return { costs: new Map(), path: [] };
 
     const maxCost = opts.maxCost ?? Infinity;
     const allowGoalOnWater = opts.allowGoalOnWater === true;
+    const minMove = this._armyMinMove(army);
 
-    // Медленная армия (есть юнит с move < 3) → только дороги и поля,
-    // путь — наикратчайший по числу клеток (шаг = 1 независимо от stamina).
-    const slowArmy     = this._armyMinMove(army) < 3;
-    const maxStepCost  = slowArmy ? 2 : Infinity;   // дорога=1, поле=2
-
-    // Dijkstra. Ключ — cell; value — { cost, prev }
-    const open   = new MinHeap((a, b) => a.cost - b.cost);
-    const costs  = new Map();  // cell -> { cost, prev }
+    // Ключ — cell; value — { cost, prev }
+    const costs = new Map();
     costs.set(start, { cost: 0, prev: null });
-    open.push({ cell: start, cost: 0 });
+
+    const open = new MinHeap((a, b) => (a.f - b.f) || (a.cost - b.cost));
+    const h0 = goal ? this._heuristic(start.x, start.y, goal.x, goal.y) : 0;
+    open.push({ cell: start, cost: 0, f: h0 });
 
     while (open.size) {
       const { cell, cost } = open.pop();
@@ -140,43 +166,47 @@ export class AiBrainHelper {
       const rec = costs.get(cell);
       if (!rec || cost > rec.cost) continue;
 
-      if (cell === cellGoal) break;      // нашли
+      if (goal && cell === goal) break;      // нашли
       if (cost > maxCost) continue;
 
       for (const nb of world.neighbors4(cell.x, cell.y)) {
         if (!nb) continue;
 
         // Проходимость
-        if (this._isImpassable(nb) && !(allowGoalOnWater && nb === cellGoal)) continue;
+        if (this._isImpassable(nb) && !(allowGoalOnWater && nb === goal)) continue;
 
         const step = this._stepCost(nb);
 
-        // Медленная армия: промежуточные клетки — только дороги/поля
-        // (целевая клетка разрешена любой — войдёт, потратив весь остаток хода)
-        if (step > maxStepCost && nb !== cellGoal) continue;
+        // Самый медленный юнит армии не оплатит такой шаг даже
+        // с полным запасом хода — клетка для армии непроходима.
+        if (step > minMove) continue;
 
-        const nc = cost + (slowArmy ? 1 : step);
+        const nc = cost + step;
         if (nc > maxCost) continue;
 
         const existing = costs.get(nb);
-        if (!existing || nc < existing.cost) {
-          costs.set(nb, { cost: nc, prev: cell });
-          open.push({ cell: nb, cost: nc });
-        }
+        if (existing && nc >= existing.cost) continue;
+
+        costs.set(nb, { cost: nc, prev: cell });
+        const f = nc + (goal
+          ? this._heuristic(nb.x, nb.y, goal.x, goal.y)
+          : 0);
+        open.push({ cell: nb, cost: nc, f });
       }
     }
 
     // Восстанавливаем путь
-    if (!costs.has(cellGoal)) return [];
-
     const path = [];
-    let cur = cellGoal;
-    while (cur && cur !== start) {
-      path.push(cur);
-      cur = costs.get(cur)?.prev ?? null;
+    if (goal && costs.has(goal)) {
+      let cur = goal;
+      while (cur && cur !== start) {
+        path.push(cur);
+        cur = costs.get(cur)?.prev ?? null;
+      }
+      path.reverse();
     }
-    path.reverse();
-    return path;
+
+    return { costs, path };
   }
 
   /**
@@ -219,7 +249,7 @@ export class AiBrainHelper {
      Внутренние помощники
      ========================================================= */
 
-  /** Минимальный запас хода среди живых юнитов армии. */
+  /** Минимальный move среди живых юнитов — скорость всего стека. */
   static _armyMinMove(army) {
     let min = Infinity;
     for (const u of army?.units ?? []) {
@@ -236,16 +266,24 @@ export class AiBrainHelper {
     return this.IMPASSABLE.has(cell.type);
   }
 
-  /** Стоимость входа в клетку (в единицах стамины). */
+  /** Стоимость входа в клетку в единицах стамины. Дорога/город всегда 1. */
   static _stepCost(cell) {
     if (!cell) return this.MAX_STEP_COST;
-    // Cell.staminaCost уже учитывает дорогу (=1)
+
+    // Дорога и город всегда стоят 1 стамину, независимо от рельефа.
+    if (cell.hasRoad || (cell.city ?? -1) >= 0) return 1;
+
     const s = cell.staminaCost;
     return Number.isFinite(s) ? s : this.MAX_STEP_COST;
   }
 
-  /** Ближайший город, удовлетворяющий предикату (по манхэттену/Евклиду). */
-  static _nearestCity(world, army, predicate) {
+  /**
+   * Ближайший город, удовлетворяющий предикату.
+   *
+   * @param {Map<Cell,{cost:number}>} [costs] — поле стоимостей из _search().
+   *        Без него используется манхэттенская эвристика (запасной путь).
+   */
+  static _nearestCity(world, army, predicate, costs = null) {
     const cities = world.cities ?? world.cityList?.list ?? [];
     let best = null;
     let bestD = Infinity;
@@ -257,7 +295,14 @@ export class AiBrainHelper {
       // иначе buildRoute() вернёт пустой маршрут и армия «застынет».
       if (city.x === army.x && city.y === army.y) continue;
 
-      const d = this._heuristic(army.x, army.y, city.x, city.y);
+      const cell = world.get(city.x, city.y);
+      if (!cell) continue;
+
+      const d = costs
+        ? (costs.get(cell)?.cost ?? Infinity)
+        : this._heuristic(army.x, army.y, city.x, city.y);
+
+      if (!Number.isFinite(d)) continue;
       if (d < bestD) {
         bestD = d;
         best = city;
@@ -269,8 +314,8 @@ export class AiBrainHelper {
     return world.get(best.x, best.y);
   }
 
-  /** Ближайшая клетка, на которой стоит вражеская армия. */
-  static _nearestEnemyArmyCell(world, army) {
+  /** Ближайшая по стоимости стамины клетка с вражеской армией. */
+  static _nearestEnemyArmyCell(world, army, costs = null) {
     // Проходим по всем клеткам. Для больших карт это дорого —
     // но find() вызывается раз на армию в ход, а не на кадр.
     let best = null;
@@ -284,7 +329,11 @@ export class AiBrainHelper {
         if (enemy.idOwner === army.idOwner) continue;
         if (enemy.alive === false) continue;
 
-        const d = this._heuristic(army.x, army.y, cell.x, cell.y);
+        const d = costs
+          ? (costs.get(cell)?.cost ?? Infinity)
+          : this._heuristic(army.x, army.y, cell.x, cell.y);
+
+        if (!Number.isFinite(d)) continue;
         if (d < bestD) {
           bestD = d;
           best = cell;
@@ -294,7 +343,7 @@ export class AiBrainHelper {
     return best;
   }
 
-  /** Эвристика (манхэттен). Для 4-связного Dijkstra это консистентно. */
+  /** Манхэттен; каждый шаг стоит >= 1, поэтому эвристика допустима для A*. */
   static _heuristic(x1, y1, x2, y2) {
     return Math.abs(x1 - x2) + Math.abs(y1 - y2);
   }
