@@ -8,6 +8,11 @@
 //      -   все модельки юнитов (ряд слева направо как в массиве)
 //      -   общие статы армии
 //      -   при клике на модель юнита, отображаются статы этого юнита.
+//      -   клик увеличивает фигурку в 1.5 раза с анимацией скейла
+//          и раскручивает её; повторный клик возвращает масштаб
+//          и доворачивает фигурку лицом к камере.
+//      -   клик по другой фигурке — обмен юнитов местами (как раньше),
+//          с анимацией перелёта.
 //
 // Визуал: тёмная модальная панель 80vw×70vh по центру экрана,
 // кнопка ✕ и Esc закрывают. Стили инжектятся один раз в <head>.
@@ -18,6 +23,18 @@ import { SND } from '../res/snd/--sound-lib.js';
 
 /** Шаг сетки между юнитами в панели (мировые единицы мини-сцены) */
 const ROW_SPACING = 1.0;
+
+/** Базовый масштаб фигурки в ряду. */
+const ROW_SCALE = 0.7;
+
+/** Масштаб выбранной фигурки: 1.5× от базового. */
+const SELECTED_SCALE = ROW_SCALE * 1.5;
+
+/** Скорость вращения выбранной фигурки, рад/с. */
+const SPIN_SPEED = 1.6;
+
+/** Длительность анимации скейла и доворота к камере, мс. */
+const SELECT_ANIM_MS = 280;
 
 const STYLE_ID = 'army-view-styles';
 
@@ -215,6 +232,7 @@ export class ArmyView {
     this._open      = false;
     this._army      = null;
     this._raf       = null;
+    /** выбранная (увеличенная и вращающаяся) фигурка */
     this._selHolder = null;
 
     /** анимация обмена двух юнитов (1.5 c) */
@@ -443,9 +461,13 @@ export class ArmyView {
       const mesh = skin.build(u.typeKey, colorHex);
       const holder = new THREE.Group();
       holder.add(mesh);
-      holder.scale.setScalar(0.7);
+      holder.scale.setScalar(ROW_SCALE);
       holder.position.x = (slot - (aliveCount - 1) / 2) * ROW_SPACING;
-      holder.userData = { type: 'unit', unit: u, index: realIndex, slot };
+      holder.userData = {
+        type: 'unit', unit: u, index: realIndex, slot,
+        // анимация выбора: масштаб, вращение, «крутится ли сейчас»
+        spin: false, scaleAnim: null, rotAnim: null,
+      };
       this._rowScene.add(holder);
       this._rowNodes.push(holder);
       slot++;
@@ -465,7 +487,8 @@ export class ArmyView {
     if (size.x !== w || size.y !== h) this._rowRenderer.setSize(w, h, false);
 
     const aspect  = w / h;
-    const halfRow = (this._rowNodes.length * ROW_SPACING) / 2 + 0.15;
+    // запас по краям: выбранная фигурка увеличена в 1.5 раза
+    const halfRow = (this._rowNodes.length * ROW_SPACING) / 2 + 0.55;
 
     // Фрустум ортокамеры обязан повторять аспект канваса (halfW/halfH === aspect),
     // иначе фигурки растягиваются/зауживаются. Если ряд не влезает по ширине —
@@ -483,9 +506,16 @@ export class ArmyView {
   }
 
   _startLoop() {
-    const loop = () => {
+    let last = performance.now();
+
+    const loop = (now = performance.now()) => {
       if (!this._open) return;
-      this._updateSwapAnim(performance.now());
+
+      const dt = Math.min(50, Math.max(0, now - last));
+      last = now;
+
+      this._updateSwapAnim(now);
+      this._updateSelectionAnim(now, dt);
       this._fitRowCamera();
       this._rowRenderer.render(this._rowScene, this._rowCam);
       this._raf = requestAnimationFrame(loop);
@@ -493,11 +523,46 @@ export class ArmyView {
     loop();
   }
 
+  /**
+   * Анимация выбора: плавный масштаб, непрерывное вращение выбранной
+   * фигурки и доворот к камере после снятия выбора.
+   */
+  _updateSelectionAnim(now, dt) {
+    for (const holder of this._rowNodes) {
+      const ud = holder.userData;
+      if (!ud) continue;
+
+      const sa = ud.scaleAnim;
+      if (sa) {
+        const k = Math.min(1, (now - sa.t0) / sa.dur);
+        const e = 1 - Math.pow(1 - k, 3);   // easeOutCubic
+        holder.scale.setScalar(sa.from + (sa.to - sa.from) * e);
+        if (k >= 1) {
+          holder.scale.setScalar(sa.to);
+          ud.scaleAnim = null;
+        }
+      }
+
+      const ra = ud.rotAnim;
+      if (ra) {
+        const k = Math.min(1, (now - ra.t0) / ra.dur);
+        const e = 1 - Math.pow(1 - k, 3);
+        holder.rotation.y = ra.from + (ra.to - ra.from) * e;
+        if (k >= 1) {
+          holder.rotation.y = ra.to;
+          ud.rotAnim = null;
+        }
+      } else if (ud.spin) {
+        holder.rotation.y += (dt / 1000) * SPIN_SPEED;
+      }
+    }
+  }
+
   /* =========================================================
      Клик по модельке юнита в панели
      ========================================================= */
   _onRowClick(e) {
-    if (this._animating) return;
+    if (this._animating || e.button !== 0) return;
 
     const r = this._canvas.getBoundingClientRect();
     this._mouse.x =  ((e.clientX - r.left) / r.width)  * 2 - 1;
@@ -514,7 +579,12 @@ export class ArmyView {
     this._onUnitClicked(o);
   }
 
-  /** Первый клик — выбор; второй по другой фигурке — обмен местами. */
+  /**
+   * Клик по фигурке:
+   *  - первая — увеличить и раскрутить;
+   *  - повторный клик по ней же — вернуть и повернуть лицом к камере;
+   *  - клик по другой — обмен юнитов местами (как раньше).
+   */
   _onUnitClicked(holder) {
     if (this._animating) return;
 
@@ -526,24 +596,66 @@ export class ArmyView {
       this._clearSelection();
       return;
     }
+
     this._swapUnits(this._selHolder, holder);
   }
 
   _selectUnit(holder) {
     const { unit, slot } = holder.userData;
+    const ud = holder.userData;
+
     this._selHolder = holder;
     SND.clickUnit.play();   // клик по юниту
 
     this._selRing.visible = true;
     this._selRing.position.set(holder.position.x, 0.05, 0);
 
+    // Увеличиваем фигурку в 1.5 раза и запускаем вращение.
+    ud.spin = true;
+    ud.rotAnim = null;
+    ud.scaleAnim = {
+      from: holder.scale.x,
+      to: SELECTED_SCALE,
+      t0: performance.now(),
+      dur: SELECT_ANIM_MS,
+    };
+
     this._showUnitStats(unit, slot);
   }
 
   _clearSelection() {
+    const holder = this._selHolder;
+
     this._selHolder = null;
     this._selRing.visible = false;
     this._showHint();
+
+    if (holder) this._releaseHolder(holder);
+  }
+
+  /**
+   * Вернуть фигурку к базовому масштабу и довернуть лицом к камере.
+   * Вращение останавливается на ближайшем полном обороте: модель
+   * смотрит в +Z, а камера панели стоит перед ней.
+   */
+  _releaseHolder(holder) {
+    const ud = holder.userData;
+    if (!ud) return;
+
+    ud.spin = false;
+
+    const now = performance.now();
+    ud.scaleAnim = {
+      from: holder.scale.x,
+      to: ROW_SCALE,
+      t0: now,
+      dur: SELECT_ANIM_MS,
+    };
+
+    const turn = Math.PI * 2;
+    const from = holder.rotation.y;
+    const to = Math.round(from / turn) * turn;   // ближайший «лицом к камере»
+    ud.rotAnim = { from, to, t0: now, dur: SELECT_ANIM_MS };
   }
 
   /* =========================================================
@@ -687,8 +799,9 @@ export class ArmyView {
 
   _showHint() {
     this._unitStatsEl.innerHTML =
-      `<div class="muted">Кликните по фигурке юнита, чтобы увидеть его статы. ` +
-      `Клик по второй фигурке меняет юнитов местами.</div>`;
+      `<div class="muted">Клик — увеличить и раскрутить фигурку, ` +
+      `повторный клик — вернуть. Клик по другой фигурке ` +
+      `меняет юнитов местами.</div>`;
     this._selRing.visible = false;
   }
 

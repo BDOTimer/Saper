@@ -245,37 +245,207 @@ function buildGenericUnit(typeKey, colorHex) {
 
     /* --- Дракон --- */
     case 'DRAGON': {
-      // корпус — вытянутое брюшко
-      const body = add(new THREE.SphereGeometry(0.24, 12, 10), matAccent, 0, 0.42, -0.02);
-      body.scale.set(0.9, 0.85, 1.9);
-      // шея из дуг + голова с мордой
-      add(new THREE.CylinderGeometry(0.09, 0.13, 0.3, 8), matAccent, 0.12, 0.56, 0.3, -0.9, 0, -0.2);
-      add(new THREE.SphereGeometry(0.11, 10, 10), matAccent, 0.2, 0.64, 0.42);
-      add(new THREE.BoxGeometry(0.1, 0.08, 0.16), matAccent, 0.24, 0.6, 0.53);
-      // рога и шипы — светлый костяной оттенок
-      add(new THREE.ConeGeometry(0.03, 0.16, 6), matGold, 0.16, 0.78, 0.38, -0.25, 0, 0.35);
-      add(new THREE.ConeGeometry(0.03, 0.16, 6), matGold, 0.23, 0.78, 0.38, -0.25, 0, -0.35);
-      // глаза светящиеся
-      add(new THREE.SphereGeometry(0.018, 6, 6),
-        std({ color: 0xffd166, emissive: 0xff8800, emissiveIntensity: 1.2, roughness: 0.3 }),
-        0.28, 0.66, 0.47);
-      // шипы на хребте
+      // Классический дракон: вытянутое тело, S-образная шея, рогатая
+      // голова с пастью и клыками, широкие перепончатые крылья,
+      // четыре лапы с когтями, длинный хвост со спинными шипами
+      // и наконечником-острием.
+
+      const matBelly = std({ color: accentHex, roughness: 0.82 });
+      const matBone  = std({ color: 0xe9dcc2, roughness: 0.55 });
+      const matClaw  = std({ color: 0x2c2c30, roughness: 0.45, metalness: 0.15 });
+      const matEye   = std({
+        color: 0xffd24a, emissive: 0xff5a00,
+        emissiveIntensity: 1.4, roughness: 0.25,
+      });
+      const matWing = std({
+        color: color.clone().lerp(new THREE.Color(0x120a14), 0.35),
+        roughness: 0.62, metalness: 0.05,
+        side: THREE.DoubleSide, transparent: true, opacity: 0.92,
+        emissive: color.clone().multiplyScalar(0.18),
+        emissiveIntensity: 0.35,
+      });
+
+      const UP = new THREE.Vector3(0, 1, 0);
+      const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+      // Сегмент-конус между двумя точками (шея, хвост, лапы, кости крыльев).
+      const segment = (parent, a, b, r1, r2, mat, seg = 6) => {
+        const dir = new THREE.Vector3().subVectors(b, a);
+        const len = dir.length();
+        const m = new THREE.Mesh(
+          new THREE.CylinderGeometry(r2, r1, len, seg, 1), mat);
+        m.position.copy(a).addScaledVector(dir, 0.5);
+        m.quaternion.setFromUnitVectors(UP, dir.normalize());
+        parent.add(m);
+        return m;
+      };
+
+      // Эллипсоид — тело, суставы, голова.
+      const blob = (x, y, z, sx, sy, sz, mat, seg = 10) => {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(1, seg, Math.max(6, seg - 2)), mat);
+        m.position.set(x, y, z);
+        m.scale.set(sx, sy, sz);
+        g.add(m);
+        return m;
+      };
+
+      // ── тело ──────────────────────────────────────────────
+      blob(0, 0.44, 0.04, 0.27, 0.23, 0.40, matBody, 12);
+      blob(0, 0.49, 0.25, 0.24, 0.21, 0.20, matBody, 10);   // грудь
+      blob(0, 0.42, -0.23, 0.23, 0.20, 0.24, matBody, 10);  // таз
+      blob(0, 0.31, 0.02, 0.19, 0.09, 0.33, matBelly, 10);  // брюхо
+
+      // ── шея ──────────────────────────────────────────────
+      const neck = [
+        [V(0, 0.56, 0.28), V(0, 0.68, 0.36), 0.115, 0.095],
+        [V(0, 0.68, 0.36), V(0, 0.80, 0.43), 0.095, 0.080],
+        [V(0, 0.80, 0.43), V(0, 0.88, 0.51), 0.080, 0.068],
+      ];
+      for (const [a, b, r1, r2] of neck) segment(g, a, b, r1, r2, matBody, 8);
+      blob(0, 0.68, 0.36, 0.095, 0.095, 0.095, matBody, 8);
+      blob(0, 0.80, 0.43, 0.080, 0.080, 0.080, matBody, 8);
+
+      // ── голова ────────────────────────────────────────────
+      blob(0, 0.90, 0.58, 0.115, 0.100, 0.135, matBody, 12); // череп
+      add(new THREE.BoxGeometry(0.145, 0.075, 0.19), matBody, 0, 0.865, 0.70, 0.06, 0, 0);
+      add(new THREE.BoxGeometry(0.120, 0.045, 0.16), matShade, 0, 0.795, 0.69, -0.05, 0, 0);
+      blob(0, 0.88, 0.80, 0.055, 0.035, 0.035, matBody, 8);  // кончик носа
+      // хищные надбровья
+      add(new THREE.BoxGeometry(0.075, 0.026, 0.11), matShade, -0.075, 0.965, 0.63, -0.2,  0.15, 0);
+      add(new THREE.BoxGeometry(0.075, 0.026, 0.11), matShade,  0.075, 0.965, 0.63, -0.2, -0.15, 0);
+      // светящиеся глаза
+      blob(-0.095, 0.935, 0.645, 0.030, 0.022, 0.018, matEye, 8);
+      blob( 0.095, 0.935, 0.645, 0.030, 0.022, 0.018, matEye, 8);
+      // ноздри
+      blob(-0.032, 0.895, 0.805, 0.012, 0.010, 0.010, matClaw, 6);
+      blob( 0.032, 0.895, 0.805, 0.012, 0.010, 0.010, matClaw, 6);
+      // клыки верхней челюсти
       for (let i = 0; i < 3; i++) {
-        add(new THREE.ConeGeometry(0.035, 0.11, 5), matGold, -0.04 * i, 0.62 - i * 0.02, 0.14 - i * 0.16);
+        for (const s of [-1, 1]) {
+          add(new THREE.ConeGeometry(0.012, 0.045, 4), matBone,
+              s * 0.052, 0.833, 0.655 + i * 0.045, Math.PI, 0, 0);
+        }
       }
-      // хвост с концом-молодкой
-      add(new THREE.CylinderGeometry(0.03, 0.1, 0.5, 6), matAccent, -0.06, 0.36, -0.42, 1.2, 0, 0.15);
-      add(new THREE.ConeGeometry(0.045, 0.12, 6), matGold, -0.1, 0.58, -0.62, 1.2, 0, 0.15);
-      // два перепончатых крыла (плоские конусы-тетраэдры)
-      const wingL = add(new THREE.ConeGeometry(0.34, 0.06, 4), matShade, -0.28, 0.52, 0.02, 0, -0.5, 1.25);
-      wingL.scale.set(1, 1, 1.1);
-      const wingR = add(new THREE.ConeGeometry(0.34, 0.06, 4), matShade, 0.28, 0.52, 0.02, 0, -0.5, -1.25);
-      wingR.scale.set(1, 1, 1.1);
-      // лапы (4 коротких)
-      add(new THREE.CylinderGeometry(0.04, 0.035, 0.18, 6), matShade, -0.1, 0.1,  0.14);
-      add(new THREE.CylinderGeometry(0.04, 0.035, 0.18, 6), matShade,  0.1, 0.1,  0.14);
-      add(new THREE.CylinderGeometry(0.038, 0.032, 0.18, 6), matShade, -0.09, 0.1, -0.22);
-      add(new THREE.CylinderGeometry(0.038, 0.032, 0.18, 6), matShade,  0.09, 0.1, -0.22);
+      // рога: основная пара назад и вверх + вторая пара и щёчные шипы
+      for (const s of [-1, 1]) {
+        segment(g, V(s * 0.055, 0.96, 0.56), V(s * 0.130, 1.09, 0.40), 0.035, 0.003, matBone, 6);
+        segment(g, V(s * 0.090, 0.915, 0.55), V(s * 0.190, 0.96, 0.43), 0.022, 0.002, matBone, 5);
+        segment(g, V(s * 0.100, 0.860, 0.58), V(s * 0.190, 0.81, 0.49), 0.018, 0.002, matBone, 5);
+      }
+
+      // ── шипы на хребте ────────────────────────────────────
+      const backSpikes = [
+        [0.66, 0.30, 0.075], [0.67, 0.20, 0.090], [0.68, 0.10, 0.100],
+        [0.675, 0.00, 0.105], [0.66, -0.10, 0.100], [0.635, -0.20, 0.090],
+        [0.605, -0.30, 0.080], [0.565, -0.40, 0.070], [0.52, -0.50, 0.055],
+      ];
+      for (const [y, z, h] of backSpikes) {
+        add(new THREE.ConeGeometry(h * 0.42, h, 4), matBone,
+            0, y, z, -0.35, Math.PI / 4, 0);
+      }
+
+      // ── крылья ────────────────────────────────────────────
+      const buildWing = (sign) => {
+        const wing = new THREE.Group();
+        wing.position.set(sign * 0.17, 0.60, 0.04);
+        wing.rotation.y = -sign * 0.15;  // чуть вперёд, чтобы крыло было видно сбоку
+
+        // Контур перепонки в плоскости XZ, с подъёмом к концам.
+        const pts = [
+          [0.00, 0.00, 0.00],
+          [0.10, 0.03, 0.16],
+          [0.30, 0.09, 0.24],
+          [0.52, 0.17, 0.26],   // первый палец
+          [0.42, 0.13, 0.10],
+          [0.56, 0.19, 0.02],   // второй палец
+          [0.44, 0.12, -0.10],
+          [0.50, 0.17, -0.22],  // третий палец
+          [0.36, 0.10, -0.16],
+          [0.30, 0.07, -0.30],  // четвёртый палец
+          [0.18, 0.03, -0.20],
+          [0.05, 0.00, -0.10],
+        ].map(([x, y, z]) => V(sign * x, y + 0.90 * Math.abs(x), z));
+
+        const pos = [];
+        const root = pts[0];
+        for (let i = 1; i < pts.length - 1; i++) {
+          const a = pts[i], b = pts[i + 1];
+          pos.push(root.x, root.y, root.z, a.x, a.y, a.z, b.x, b.y, b.z);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.computeVertexNormals();
+        wing.add(new THREE.Mesh(geo, matWing));
+
+        // Костяные «пальцы» поверх перепонки.
+        for (const idx of [3, 5, 7, 9]) {
+          segment(wing, root, pts[idx], 0.012, 0.004, matBone, 5);
+        }
+        // коготь на запястье
+        segment(wing, pts[3], pts[3].clone().add(V(sign * 0.03, 0.03, 0.10)),
+                0.018, 0.002, matClaw, 5);
+
+        g.add(wing);
+      };
+      buildWing(1);
+      buildWing(-1);
+
+      // ── хвост ─────────────────────────────────────────────
+      const tailPts = [
+        V(0, 0.42, -0.30),
+        V(0, 0.38, -0.44),
+        V(0, 0.33, -0.57),
+        V(0, 0.27, -0.69),
+        V(0, 0.21, -0.79),
+        V(0, 0.16, -0.87),
+      ];
+      const tailR = [0.105, 0.085, 0.065, 0.048, 0.032, 0.018];
+      for (let i = 0; i < tailPts.length - 1; i++) {
+        segment(g, tailPts[i], tailPts[i + 1], tailR[i], tailR[i + 1], matBody, 8);
+      }
+      for (let i = 1; i < tailPts.length - 1; i++) {
+        const p = tailPts[i], r = tailR[i];
+        blob(p.x, p.y, p.z, r, r, r, matBody, 8);
+      }
+      // наконечник-острие
+      const tailEnd = tailPts[tailPts.length - 1];
+      const spade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.085, 0.20, 4), matWing);
+      spade.position.copy(tailEnd).add(V(0, -0.02, -0.10));
+      spade.quaternion.setFromUnitVectors(UP, V(0, -0.15, -1).normalize());
+      spade.scale.set(1, 1, 0.35);
+      g.add(spade);
+
+      // ── четыре лапы с когтями ─────────────────────────────
+      const buildLeg = (sign, front) => {
+        const hip   = V(sign * (front ? 0.16 : 0.17), 0.42, front ? 0.22 : -0.18);
+        const knee  = V(sign * (front ? 0.21 : 0.22), 0.25, front ? 0.27 : -0.10);
+        const ankle = V(sign * 0.20, 0.10, front ? 0.33 : -0.19);
+        const toe   = V(sign * 0.20, 0.035, front ? 0.41 : -0.10);
+
+        segment(g, hip, knee, 0.070, 0.052, matBody, 7);
+        segment(g, knee, ankle, 0.052, 0.038, matShade, 7);
+        segment(g, ankle, toe, 0.040, 0.028, matBody, 7);
+        blob(knee.x, knee.y, knee.z, 0.055, 0.055, 0.055, matBody, 8);
+        blob(ankle.x, ankle.y, ankle.z, 0.040, 0.040, 0.040, matShade, 8);
+
+        for (const dx of [-0.045, 0, 0.045]) {
+          const a = V(toe.x + dx * 0.4, 0.035, toe.z);
+          const b = V(toe.x + dx, 0.012, toe.z + (front ? 0.07 : 0.06));
+          segment(g, a, b, 0.016, 0.002, matClaw, 4);
+        }
+      };
+      buildLeg(-1, true);
+      buildLeg(1, true);
+      buildLeg(-1, false);
+      buildLeg(1, false);
+
+      // Дракон крупнее прочих — увеличиваем тень под ним.
+      // Общий масштаб чуть уменьшаем, чтобы размах крыльев не выходил
+      // далеко за клетку карты.
+      shadow.scale.setScalar(2.6);
+      g.scale.setScalar(0.85);
       break;
     }
 
