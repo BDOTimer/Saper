@@ -309,16 +309,18 @@
 }
 
 /* ---- Панель хода игрока-человека ---------------------------------------- */
+/* Верхний правый угол, под верхней панелью (Завершить ход + камеры). */
 .game-screen #humanTurnPanel {
   position: absolute;
   top: 70px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 10px;
+  left: auto;
+  transform: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 300px;
-  max-width: 560px;
+  min-width: 280px;
+  max-width: 380px;
   box-sizing: border-box;
   background: rgba(3, 28, 60, 0.6);
   padding: 10px 12px;

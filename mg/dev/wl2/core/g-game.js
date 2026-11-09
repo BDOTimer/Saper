@@ -53,6 +53,8 @@ export class Game {
       },
       // Каждый шаг армии на одну клетку.
       onArmyStep: (army) => {
+        // Армия вошла в город — отдельный звук.
+        if (this.worldMap?.getCityAt?.(army.x, army.y)) SND.clickTownArmy.play();
         SND.stepUnit.play();   // движение юнита по 1 клетке
       },
       onArmyArrive: (army, stepsDone) => {
@@ -124,6 +126,7 @@ export class Game {
       mover:     this.mover,
       log:       (msg, hl) => this._log(msg, hl),
       requestFinish: () => this._finishPlayerTurn(),
+      refreshHud:    () => this._refreshHud(),
       ui: {
         panel:   this.el.querySelector('#humanTurnPanel'),
         title:   this.el.querySelector('#htpTitle'),
@@ -192,7 +195,7 @@ export class Game {
     });
     this.el.querySelector('#btnEndTurn').addEventListener('click', () => {
       SND.clickBtn.play();   // клик по кнопкам в игре
-      this._onNextCircle();   // зелёная кнопка: запустить следующий круг
+      this._onEndTurnAction();
     });
 
     const btnOrbit = this.el.querySelector('#btnCamOrbit');
@@ -212,10 +215,28 @@ export class Game {
     this._onKey = (e) => {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (e.code === 'Space') { e.preventDefault(); this._onNextCircle(); }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        this._onEndTurnAction();
+      }
+      // Enter дублирует клик по «Завершить ход» (когда кнопка активна).
+      if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+        if (this.judge.isAwaitingNextCircle || this.humanBrain?.isPlanning) {
+          e.preventDefault();
+          this._onEndTurnAction();
+        }
+      }
       if (e.code === 'Escape') { this._clearSelection(); }
     };
     window.addEventListener('keydown', this._onKey);
+  }
+
+  /** Действие кнопки «Завершить ход» (клик и Enter/Space). */
+  _onEndTurnAction() {
+    // Между кругами — запустить следующий круг.
+    if (this.judge.isAwaitingNextCircle) { this._onNextCircle(); return; }
+    // В фазе планирования хода человека — завершить ход.
+    if (this.humanBrain?.isPlanning) { this.humanBrain.finishTurn(); return; }
   }
 
   _refreshHud() {
@@ -237,13 +258,19 @@ export class Game {
       return;
     }
 
+    // Ход человека: после того как все армии сходили, включается фаза
+    // планирования — игрок может перестроить маршруты и завершить ход.
+    const humanPlanning = p.isHuman &&
+      this.humanBrain?.isActive && this.humanBrain?.isPlanning;
+
     btn.classList.remove('ready');
     btn.textContent = 'Завершить ход';
-    btn.disabled    = true;   // ходы идут автоматически (по анимациям)
+    btn.disabled    = !humanPlanning;
 
     const role = p.isHuman ? 'Человек' : `ИИ (${p.aiMeta?.name ?? '—'})`;
     label.innerHTML =
-      `${this._playerDot(p, 10)} Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}`;
+      `${this._playerDot(p, 10)} Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}` +
+      (humanPlanning ? ' · <b>планирование маршрутов</b>' : '');
   }
 
   _log(msg, hl = false) {

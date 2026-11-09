@@ -164,16 +164,17 @@
 // ============================================================
 const Vol = 0.3; // Settings.volume;
 const kit = window.SND.createSoundKit({
-    clickMenu   : { src: "./res/snd/s/dzin-1.mp3", volume: Vol, pool: 4 }, // клик по кнопкам меню
-    clickBtn    : { src: "./res/snd/s/dzin-2.mp3", volume: Vol, pool: 4 }, // клик по кнопкам в игре и генератора карт
-    clickUnit   : { src: "./res/snd/s/dzin-3.mp3", volume: Vol, pool: 4 }, // клик по юниту
-    startBattle : { src: "./res/snd/s/st-b1.mp3" , volume: Vol, pool: 4 }, // начать битву
-    deathUnit   : { src: "./res/snd/s/d-u-1.mp3" , volume: Vol, pool: 4 }, // смерть юнита
-    winClose    : { src: "./res/snd/s/winclose-3.mp3", volume: Vol, pool: 4 }, // звук закрыть окно
+    clickMenu    : { src: "./res/snd/s/dzin-1.mp3", volume: Vol, pool: 3 }, // клик по кнопкам меню
+    clickBtn     : { src: "./res/snd/s/dzin-2.mp3", volume: Vol, pool: 3 }, // клик по кнопкам в игре и генератора карт
+    clickUnit    : { src: "./res/snd/s/dzin-3.mp3", volume: Vol, pool: 3 }, // клик по юниту
+    startBattle  : { src: "./res/snd/s/st-b1.mp3" , volume: Vol, pool: 1 }, // начать битву
+    deathUnit    : { src: "./res/snd/s/d-u-1.mp3" , volume: Vol, pool: 4 }, // смерть юнита
+    winClose     : { src: "./res/snd/s/winclose-3.mp3", volume: Vol, pool: 2 }, // звук закрыть окно
 
-    stepUnit    : { src: "./res/snd/s/step-1.mp3" , volume: Vol, pool: 4 }, // дввижение юнита по 1 клетке
-    clickTown   : { src: "./res/snd/s/town-1.mp3" , volume: Vol, pool: 4 }, // клик по клетке с городом
-    clickCell   : { src: "./res/snd/s/clickCell-1.mp3", volume: Vol, pool: 4 }, // клик по клетке без города 
+    stepUnit     : { src: "./res/snd/s/step-1.mp3"     , volume: Vol, pool: 4 }, // дввижение юнита по 1 клетке
+    clickTown    : { src: "./res/snd/s/town-1.mp3"     , volume: Vol, pool: 2 }, // клик по клетке с городом
+    clickTownArmy: { src: "./res/snd/s/town-army.mp3"  , volume: Vol, pool: 1 }, // армия входит в город!
+    clickCell    : { src: "./res/snd/s/clickCell-1.mp3", volume: Vol, pool: 4 }, // клик по клетке без города 
 });
 
 kit.autoUnlock();

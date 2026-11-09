@@ -56,8 +56,10 @@ export class HumanBrain {
 
     this._moving = false;      // армия сейчас идёт по маршруту
     this._inBattle = false;    // идёт бой, ход приостановлен
+    this._autoArmy = null;     // армия, идущая по СОХРАНЁННОМУ маршруту
     this._acted = new Set();   // армии, уже завершившие свой ход
     this._armies = [];         // армии текущего игрока
+    this._planning = false;    // все армии сходили — можно менять маршруты
 
     this.deps = null;          // { world, routeView, mover, requestFinish, log, ... }
     this._ui = null;           // { panel, title, sub, btnGo, btnSkip }
@@ -70,6 +72,7 @@ export class HumanBrain {
   get isActive()  { return this.active; }
   get isMoving()  { return this._moving; }
   get isInBattle(){ return this._inBattle; }
+  get isPlanning(){ return this._planning; }
 
   /* =========================================================
      Подключение / отключение к игровому экрану
@@ -103,8 +106,9 @@ export class HumanBrain {
      ========================================================= */
 
   /**
-   * Начать ход человека. Маршруты и очки движения уже сброшены
-   * в Player.doStep() (ветка isHuman).
+   * Начать ход человека. Очки движения сброшены в Player.doStep(),
+   * а сохранённые маршруты армий остаются — армии пройдут по ним
+   * автоматически, затем управление получает игрок.
    * @param {object} player
    */
   begin(player) {
@@ -115,10 +119,12 @@ export class HumanBrain {
     this.selected = null;
     this._moving = false;
     this._inBattle = false;
+    this._autoArmy = null;
     this._acted.clear();
     this._armies = (player?.army ?? []).filter(a => a && a.alive);
 
     this._refreshUI();
+    this.deps?.refreshHud?.();
 
     if (!this._armies.length) {
       this._log(`Ход человека: у ${player?.name ?? 'игрока'} нет армий — ход пропущен.`);
@@ -126,17 +132,25 @@ export class HumanBrain {
       return;
     }
 
-    this._selectFirstUnacted();
-    if (this.selected) {
-      this._log(`Ход человека: армия #${this.selected.id} — кликните по карте, ` +
-                `чтобы проложить маршрут.`);
-    }
+    // Армии обрабатываются по порядку: если у армии сохранён маршрут —
+    // она идёт по нему автоматически, иначе управление получает игрок.
+    this._advance();
   }
 
   /** Завершить ход человека (вызывается из Game при передаче хода). */
   endTurn() {
     if (!this.active) return false;
     this._endTurn();
+    return true;
+  }
+
+  /**
+   * Игрок нажал «Завершить ход» в HUD (фаза планирования).
+   * Завершает ход и передаёт управление следующему игроку.
+   */
+  finishTurn() {
+    if (!this.active || !this._planning) return false;
+    this._finish();
     return true;
   }
 
@@ -155,8 +169,12 @@ export class HumanBrain {
     const own = this._findOwnArmyAt(tile);
 
     // Клик по своей армии — выбрать её (чужие армии не выбираются).
+    // В фазе планирования можно выбрать и уже сходившую армию,
+    // чтобы перестроить её маршрут на следующий круг.
     if (own) {
-      if (own !== this.selected && !this._acted.has(own)) this._select(own);
+      if (own !== this.selected && (this._planning || !this._acted.has(own))) {
+        this._select(own);
+      }
       return true;
     }
 
@@ -186,7 +204,7 @@ export class HumanBrain {
 
   /** «Идти по маршруту» — отправить выбранную армию в путь. */
   go() {
-    if (!this.active || this._moving || this._inBattle || !this.selected) return false;
+    if (!this.active || this._moving || this._inBattle || this._planning || !this.selected) return false;
 
     const army = this.selected;
     if (!army.alive) { this._complete(army); return false; }
@@ -208,7 +226,7 @@ export class HumanBrain {
 
   /** Пропустить выбранную армию (маршрут сбрасывается). */
   skip() {
-    if (!this.active || this._moving || this._inBattle || !this.selected) return false;
+    if (!this.active || this._moving || this._inBattle || this._planning || !this.selected) return false;
 
     const army = this.selected;
     this._setRoute(army, [], null);
@@ -224,6 +242,13 @@ export class HumanBrain {
   /** Армия закончила движение. */
   onArmyArrive(army) {
     if (!this.active || this._inBattle) return;
+
+    // Автоматический проход по сохранённому маршруту завершён.
+    if (this._autoArmy === army) {
+      this._finishAutoArmy(army);
+      return;
+    }
+
     if (!this._moving || army !== this.selected) return;
 
     this._moving = false;
@@ -240,8 +265,11 @@ export class HumanBrain {
     if (this._inBattle) return true;         // ждём окончания боя
 
     if (this._moving && this.selected) {     // страховка, если onArmyArrive не пришёл
-      this._moving = false;
-      this._complete(this.selected);
+      if (this._autoArmy === this.selected) this._finishAutoArmy(this.selected);
+      else {
+        this._moving = false;
+        this._complete(this.selected);
+      }
     }
     return true;
   }
@@ -251,6 +279,7 @@ export class HumanBrain {
     if (!this.active) return;
     this._inBattle = true;
     this._moving = false;
+    this._autoArmy = null;
     this._refreshUI();
   }
 
@@ -259,12 +288,13 @@ export class HumanBrain {
     if (!this.active) return;
     const wasBattle = this._inBattle;
     this._inBattle = false;
+    this._autoArmy = null;
 
     if (!wasBattle) { this._refreshUI(); return; }
 
     const army = this.selected;
     if (army) this._complete(army);
-    else this._selectFirstUnacted();
+    else this._advance();
   }
 
   /* =========================================================
@@ -276,14 +306,87 @@ export class HumanBrain {
     if (army) this._acted.add(army);
     this._moving = false;
     this._inBattle = false;
-    this._selectFirstUnacted();
+    this._autoArmy = null;
+    this._advance();
   }
 
-  /** Выбрать первую армию, которая ещё не ходила. */
-  _selectFirstUnacted() {
+  /**
+   * Перейти к следующей армии, которая ещё не ходила.
+   * Если у армии сохранён маршрут — она идёт по нему автоматически.
+   * Иначе управление получает игрок (меню «Идти по маршруту»).
+   */
+  _advance() {
     const next = this._armies.find(a => a?.alive && !this._acted.has(a));
-    if (next) { this._select(next); return; }
-    this._finish();
+    if (!next) {
+      // Живых армий не осталось — ход завершается сам.
+      if (!this._armies.some(a => a?.alive)) { this._finish(); return; }
+      this._enterPlanning();
+      return;
+    }
+
+    this._planning = false;
+    this._select(next);
+
+    if (this._canAutoMove(next)) {
+      this._startAutoMove(next);
+    } else {
+      this._autoArmy = null;
+      this._moving = false;
+      this._log(`Армия #${next.id}: кликните по карте, чтобы задать маршрут.`);
+    }
+  }
+
+  /**
+   * Все армии сделали ход. Не завершаем ход сразу: игрок может
+   * ПЕРЕСТРОИТЬ маршруты любой своей армии на следующий круг,
+   * после чего нажимает «Завершить ход» в HUD.
+   */
+  _enterPlanning() {
+    this._planning = true;
+    this._moving = false;
+    this._inBattle = false;
+    this._autoArmy = null;
+    this.selected = null;
+    this.deps?.routeView?.setArmyFilter?.(null);
+    this._refreshUI();
+    this.deps?.refreshHud?.();
+    this._log('Все армии сделали ход. Можно изменить маршруты и завершить ход.', true);
+  }
+
+  /** Есть ли сохранённый маршрут и очки хода, чтобы по нему идти. */
+  _canAutoMove(army) {
+    return !!army?.route?.length && army.movePoints > 0;
+  }
+
+  /** Автоматический проход армии по сохранённому маршруту. */
+  _startAutoMove(army) {
+    this._autoArmy = army;
+    this._moving = true;
+    this._refreshUI();
+    this._log(`Армия #${army.id}: автоматический ход по маршруту ` +
+              `(${army.route.length} кл.).`);
+    this.deps?.mover?.enqueue?.([army]);
+  }
+
+  /**
+   * Автопроход завершён. Если у армии остались очки хода — показываем
+   * меню «Идти по маршруту», где игрок может задать/перестроить маршрут.
+   * Если ходов не осталось — передаём управление следующей армии.
+   */
+  _finishAutoArmy(army) {
+    this._autoArmy = null;
+    this._moving = false;
+
+    if (army?.alive && army.movePoints > 0) {
+      this._select(army);
+      this._log(`Армия #${army.id}: автопроход завершён, осталось ` +
+                `${army.movePoints} оч. хода — можно задать новый маршрут.`);
+      this._refreshUI();
+      return;
+    }
+
+    if (army) this._complete(army);
+    else this._advance();
   }
 
   _select(army) {
@@ -324,11 +427,14 @@ export class HumanBrain {
     this.selected = null;
     this._moving = false;
     this._inBattle = false;
+    this._autoArmy = null;
+    this._planning = false;
     this._acted.clear();
     this._armies = [];
 
     this.deps?.routeView?.setArmyFilter?.(null);
     this._refreshUI();
+    this.deps?.refreshHud?.();
     return wasActive;
   }
 
@@ -390,14 +496,24 @@ export class HumanBrain {
     const a = this.selected;
 
     if (ui.title) {
-      ui.title.textContent = a
-        ? `Армия #${a.id} · (${a.x}, ${a.y})`
-        : 'Выберите армию';
+      ui.title.textContent = this._planning
+        ? 'Планирование маршрутов'
+        : (a ? `Армия #${a.id} · (${a.x}, ${a.y})` : 'Выберите армию');
     }
 
     if (ui.sub) {
       if (this._inBattle) {
         ui.sub.textContent = 'Идёт бой…';
+      } else if (this._planning) {
+        if (a) {
+          const steps = a.route?.length ?? 0;
+          const goal  = a.cellGoal ? `(${a.cellGoal.x}, ${a.cellGoal.y})` : '—';
+          ui.sub.textContent =
+            `Армия #${a.id}: маршрут ${steps} кл. · цель ${goal}. ` +
+            `Задайте новый маршрут на следующий круг.`;
+        } else {
+          ui.sub.textContent = 'Все армии сходили — выберите армию и перестройте маршрут.';
+        }
       } else if (!a) {
         ui.sub.textContent = 'Нет доступных армий';
       } else {
@@ -410,14 +526,14 @@ export class HumanBrain {
     }
 
     if (ui.btnGo) {
-      const canGo = !!a && !this._moving && !this._inBattle &&
+      const canGo = !!a && !this._moving && !this._inBattle && !this._planning &&
                     (a.route?.length > 0);
       ui.btnGo.disabled = !canGo;
       ui.btnGo.textContent = this._moving ? 'Идёт…' : 'Идти по маршруту';
     }
 
     if (ui.btnSkip) {
-      ui.btnSkip.disabled = !a || this._moving || this._inBattle;
+      ui.btnSkip.disabled = !a || this._moving || this._inBattle || this._planning;
     }
   }
 }

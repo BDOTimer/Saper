@@ -60,9 +60,11 @@ export class Player {
 
   /**
    * Игрок делает ход.
-   *  - Компьютер: для КАЖДОЙ армии строится маршрут (army.route) до цели.
+   *  - Компьютер: если у армии уже есть сохранённый маршрут — он остаётся
+   *    (армия продолжит его автоматически), иначе строится новый.
    *  - Человек: армии готовятся к ручному ходу — сбрасываются очки движения,
-   *    маршруты очищаются (их построит HumanBrain по кликам игрока).
+   *    а построенные ранее маршруты СОХРАНЯЮТСЯ, чтобы армия автоматически
+   *    прошла по ним в начале своего хода.
    */
   doStep()
   {
@@ -72,15 +74,15 @@ export class Player {
         return;
     }
 
-    // ── Человек: ход делает HumanBrain, ИИ-маршруты не строим ──────
+    // ── Человек: ход делает HumanBrain ────────────────────────────
     if (this.isHuman)
     {
       for (const army of this.army)
       {
         if (!army?.alive) continue;
         army.resetTurn();
-        army.route = [];
-        army.cellGoal = null;
+        // army.route НЕ очищаем — армия помнит маршрут прошлого круга
+        // и пройдёт по нему автоматически (см. HumanBrain).
       }
       return;
     }
@@ -90,6 +92,17 @@ export class Player {
       if (!army?.alive) continue;
 
       army.resetTurn();   // новые очки движения всем юнитам стека
+
+      // Маршрут уже построен в прошлом круге и ещё проходим —
+      // не пересчитываем, армия продолжит движение по нему.
+      if (army.route?.length) {
+        const next = army.route[0];
+        const cost = Number.isFinite(next?.staminaCost) ? next.staminaCost : Infinity;
+        if (army.canMoveTo(cost)) continue;
+        // Первую клетку пройти не может — маршрут бесполезен, строим заново.
+        army.route = [];
+        army.cellGoal = null;
+      }
 
       const cellGoal = AiBrainHelper.find(world, army);
       if  (!cellGoal) continue;

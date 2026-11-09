@@ -106,9 +106,9 @@ export class ArmyMover {
       const next = army.route[0];
       const cost = next?.staminaCost ?? 1;
 
-      // очков движения не хватает даже на первую клетку
+      // очков движения не хватает даже на первую клетку.
+      // Маршрут НЕ сбрасываем — армия продолжит его в следующем круге.
       if (!next || !army.canMoveTo(cost)) {
-        ctx.routeView.consumeSteps(army, Infinity); // снять маркеры остатка
         this.onArmyArrive(army, 0);
         continue;
       }
@@ -198,8 +198,8 @@ export class ArmyMover {
       return;
     }
 
-    // очки кончились / маршрут исчерпан — армия остановилась
-    if (army.route?.length) ctx.routeView.consumeSteps(army, Infinity);
+    // очки кончились — армия остановилась, но маршрут СОХРАНЯЕТСЯ,
+    // чтобы она продолжила его в следующем круге.
     this.onArmyArrive(army, done);
   }
 
