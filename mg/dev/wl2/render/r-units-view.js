@@ -3,6 +3,22 @@ import * as THREE      from 'three';
 import { TILE        } from './renderer.js';
 import { UNIT_TYPES  } from '../core/units.js';
 
+/**
+ * Углы квадрата ячейки (смещения по X/Z в долях TILE) для армий,
+ * стоящих в городе. В городе может стоять до 4 армий — каждая на своём углу.
+ * Первый угол (юго-восточный) совпадает с прежним одиночным смещением,
+ * поэтому одна армия выглядит как раньше.
+ */
+const CITY_CORNERS = [
+  { x:  1, z:  1 },   // юго-восток
+  { x: -1, z:  1 },   // юго-запад
+  { x:  1, z: -1 },   // северо-восток
+  { x: -1, z: -1 },   // северо-запад
+];
+
+/** Отступ угла от центра клетки (в долях TILE). */
+const CITY_CORNER_OFFSET = 0.32;
+
 /* =========================================================
    РЕЕСТР НАБОРОВ (скинов) для юнитов.
    Каждый скин — функция, возвращающая THREE.Group для типа юнита.
@@ -347,7 +363,19 @@ export class UnitsView {
   updateArmyPosition(army) {
     const node = this._armyNodes.find(n => n.army === army);
     if (!node) return;
-    this._placeAt(node.root, army.x, army.y);
+    this._placeAt(node.root, army.x, army.y, army);
+  }
+
+  /**
+   * Переставить все армии клетки по углам.
+   * Нужно после входа/выхода армии: при 1 армии она занимает первый угол,
+   * при 2 — два первых и т.д. (до 4 армий в городе).
+   */
+  relayoutCell(x, y) {
+    for (const n of this._armyNodes) {
+      const a = n.army;
+      if (a.x === x && a.y === y) this._placeAt(n.root, x, y, a);
+    }
   }
 
   /** Узел армии (для аниматоров: ArmyMover двигает node.root). */
@@ -475,12 +503,12 @@ export class UnitsView {
     root.add(selRing);
     root.userData = { type: 'army', army };
 
-    this._placeAt(root, army.x, army.y);
+    this._placeAt(root, army.x, army.y, army);
 
     return { army, root, badge, selRing };
   }
 
-  _placeAt(root, x, y) {
+  _placeAt(root, x, y, army = null) {
     const wx = this.mapView._worldX(x);
     const wz = this.mapView._worldZ(y);
     const cell = this.mapView.world.get(x, y);
@@ -490,12 +518,15 @@ export class UnitsView {
     let ox = 0, oz = 0;
     const city = this.mapView.world.getCityAt?.(x, y);
     if (city) {
-      // сдвигаем к «дальнему» углу клетки.
-      // 0.32 * TILE — гарантированно вне башни (башня ~0.35*TILE в ширину),
-      // но внутри клетки.
-      const d = TILE * 0.32;
-      ox = +d;   // +X — «восточный» угол
-      oz = +d;   // +Z — «южный» угол
+      // В городе до 4 армий — каждая на своём углу квадрата ячейки.
+      // Индекс армии в клетке задаёт угол; при >4 армиях углы повторяются.
+      const idx = Array.isArray(cell?.army) && army
+        ? cell.army.indexOf(army)
+        : 0;
+      const corner = CITY_CORNERS[(idx < 0 ? 0 : idx) % CITY_CORNERS.length];
+      const d = TILE * CITY_CORNER_OFFSET;
+      ox = corner.x * d;
+      oz = corner.z * d;
     }
 
     root.position.set(wx + ox, wy, wz + oz);

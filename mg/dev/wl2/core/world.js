@@ -44,6 +44,12 @@ export class City {
     this.name = '';
     this.type = CITY_TYPE.PROVINCIAL;
     this.ownerId = null;
+    // Производство юнитов (см. core/production.js):
+    // выбранный тип, счётчик оставшихся кругов и полная цена.
+    this.production = null;
+    this.productionOwner = null;
+    this.productionTurnsLeft = 0;
+    this.productionTurnsTotal = 0;
     // w/h/seed сохранены для обратной совместимости (не используются логикой).
     this._w = w ?? 0;
     this._h = h ?? 0;
@@ -62,6 +68,10 @@ export class City {
     this.name = data.name ?? `City (${x},${y})`;
     this.type = CITY_TYPE_SET.has(data.type) ? data.type : CITY_TYPE.PROVINCIAL;
     this.ownerId = data.ownerId ?? null;
+    this.production = data.production ?? null;
+    this.productionOwner = data.productionOwner ?? this.ownerId;
+    this.productionTurnsLeft = data.productionTurnsLeft ?? 0;
+    this.productionTurnsTotal = data.productionTurnsTotal ?? 0;
     return this;
   }
 
@@ -103,6 +113,10 @@ export class City {
   normalize() {
     if (!CITY_TYPE_SET.has(this.type)) this.type = CITY_TYPE.PROVINCIAL;
     if (this.ownerId === undefined) this.ownerId = null;
+    if (this.production === undefined) this.production = null;
+    if (this.productionOwner === undefined) this.productionOwner = this.ownerId ?? null;
+    if (!Number.isFinite(this.productionTurnsLeft)) this.productionTurnsLeft = 0;
+    if (!Number.isFinite(this.productionTurnsTotal)) this.productionTurnsTotal = 0;
     return this;
   }
 
@@ -114,6 +128,10 @@ export class City {
       name: this.name,
       type: this.type,
       ownerId: this.ownerId,
+      production: this.production,
+      productionOwner: this.productionOwner,
+      productionTurnsLeft: this.productionTurnsLeft,
+      productionTurnsTotal: this.productionTurnsTotal,
     };
   }
 }

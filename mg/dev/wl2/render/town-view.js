@@ -9,21 +9,30 @@
 //  -   у каждого юнита должна быть стоимость производства
 //  -   стоимость производства юнита зависит от статов дамага+защита
 //  -   игрок кликом может выбрать юнита из набора в текущее производство
+//  -   у выбранного юнита включается счётчик кругов; когда он дошёл до нуля,
+//      юнит появляется В СОСТАВЕ АРМИИ в клетке города
+//  -   если армии ещё нет — сначала создаётся армия, затем в неё кладётся юнит
+//  -   в армии не больше MAX_ARMY_SIZE юнитов, в городе — до 4 армий
+//      (визуально по углам квадрата ячейки, см. UnitsView)
 //  -   окно по ширине 0.7 по высоте 0.9
 //  -   объект class TownView существует в 1 экземпляре релоцируется 1 раз
 //  -   стиль аналогичный с render/army-view.js внутри town-view.js
 //  -   ...
 
 import * as THREE from 'three';
-import { UNIT_TYPES } from '../core/units.js';
+import {
+  UNIT_TYPES,
+  MAX_ARMIES_PER_CITY,
+  MAX_ARMY_SIZE,
+} from '../core/units.js';
+import {
+  productionOptions,
+  productionTurns,
+  ensureCityProduction,
+  setCityProduction,
+} from '../core/production.js';
 import { skinForPlayer, disposeTree } from './r-units-view.js';
 import { SND } from '../res/snd/--sound-lib.js';
-
-/** Стоимость в золоте за единицу (damage + defense). */
-const COST_PER_POINT = 5;
-
-/** Максимум моделей, которые город может производить. */
-const MAX_PRODUCTION_OPTIONS = 4;
 
 /** Шаг между слотами в мини-сцене юнитов. */
 const SLOT_SPACING = 1.30;
@@ -40,13 +49,7 @@ const CITY_TYPE_LABEL = {
   backwater:  'Захолустье',
 };
 
-/** Набор производимых юнитов зависит от типа города. */
-const CITY_PRODUCTION = {
-  capital:    ['HEAVY_INF', 'HEAVY_CAV', 'MAGE', 'DRAGON'],
-  fortress:   ['CROSSBOW', 'HEAVY_INF', 'CATAPULT', 'HEAVY_CAV'],
-  provincial: ['LIGHT_INF', 'ARCHERS', 'MEDIUM_INF', 'LIGHT_CAV'],
-  backwater:  ['LIGHT_INF', 'ARCHERS', 'LIGHT_CAV'],
-};
+/** Набор производимых юнитов зависит от типа города — см. core/production.js. */
 
 const CSS = `
 .tv-backdrop * {
@@ -248,32 +251,9 @@ function ensureStyles() {
 }
 
 /* =========================================================
-   Расчёт производства: цена зависит от (damage + defense).
+   Производство: цена в кругах, выбор слота и счётчик живут
+   в core/production.js (общие правила для панели и Judge).
    ========================================================= */
-function productionCost(typeKey) {
-  const t = UNIT_TYPES[typeKey];
-  if (!t) return 0;
-  const pts = (t.damage ?? 1) + (t.defense ?? 1);
-  return Math.max(1, Math.round(pts * COST_PER_POINT));
-}
-
-function productionTurns(typeKey) {
-  const t = UNIT_TYPES[typeKey];
-  if (!t) return 1;
-  const pts = (t.damage ?? 1) + (t.defense ?? 1);
-  return Math.max(1, Math.ceil(pts / 4));
-}
-
-function optionsForCity(city) {
-  const list = CITY_PRODUCTION[city?.type] ?? CITY_PRODUCTION.provincial;
-  return list.slice(0, MAX_PRODUCTION_OPTIONS);
-}
-
-function currentProduction(city, options) {
-  const key = city?.production;
-  if (key && UNIT_TYPES[key] && options.includes(key)) return key;
-  return options[0] ?? null;
-}
 
 /* =========================================================
    Модель города для верхней части панели.
@@ -501,6 +481,9 @@ export class TownView {
     this._boundDom = null;
     this._onDomDown = null;
     this._selType = null;
+    // Кеш состояния производства для лёгкого обновления панели в цикле.
+    this._prodKey = null;
+    this._lastProdRefresh = 0;
 
     ensureStyles();
     this._buildPanel(opts.container ?? document.body);
@@ -738,6 +721,7 @@ export class TownView {
     this.close();
     this._city = city;
     this._selType = null;
+    this._prodKey = null;
     this._open = true;
     this._root.classList.add('open');
 
@@ -815,16 +799,36 @@ export class TownView {
     const ownerName = owner?.name
       ?? (city.ownerId == null ? 'Нейтральный' : `Игрок ${city.ownerId}`);
 
-    const options = optionsForCity(city);
-    const current = currentProduction(city, options);
+    const options = productionOptions(city);
+    const current = ensureCityProduction(city);
     const curType = UNIT_TYPES[current];
-    const cost = productionCost(current);
-    const turns = productionTurns(current);
+    const price = current ? productionTurns(current) : 0;
+    const left = current ? Math.max(0, city.productionTurnsLeft ?? 0) : 0;
+    const garrison = this._cityArmyStats();
 
     const available = options
       .map(k => UNIT_TYPES[k]?.name)
       .filter(Boolean)
       .join(', ');
+
+    // Состояние счётчика кругов: у нейтрального города производство стоит.
+    let progressClass = 'good';
+    let progressText;
+    if (!current) {
+      progressClass = 'warn';
+      progressText = '—';
+    } else if (city.ownerId == null) {
+      progressClass = 'warn';
+      progressText = 'нейтральный город';
+    } else if (garrison.armies >= MAX_ARMIES_PER_CITY && garrison.freeSlots === 0) {
+      progressClass = 'warn';
+      progressText = 'ждёт места в армии';
+    } else if (left === 0) {
+      progressText = 'готов к выходу';
+    } else {
+      progressClass = 'warn';
+      progressText = `${left} из ${price} кр.`;
+    }
 
     this._statsEl.innerHTML = `
       <div class="tv-section">
@@ -857,35 +861,87 @@ export class TownView {
           <span class="v">${escapeHtml(curType?.name ?? '—')}</span>
         </div>
         <div class="tv-row">
-          <span class="k">Стоимость</span>
-          <span class="v good">${cost} зол.</span>
+          <span class="k">Цена</span>
+          <span class="v">${price} кр.</span>
         </div>
         <div class="tv-row">
-          <span class="k">Срок</span>
-          <span class="v warn">${turns} ход.</span>
+          <span class="k">Счётчик</span>
+          <span class="v ${progressClass}">${progressText}</span>
         </div>
         <div class="tv-row">
           <span class="k">Доступно</span>
           <span class="v">${escapeHtml(available || '—')}</span>
         </div>
       </div>
+
+      <div class="tv-section">
+        <h4>Гарнизон</h4>
+        <div class="tv-row">
+          <span class="k">Армий в городе</span>
+          <span class="v">${garrison.armies} / ${MAX_ARMIES_PER_CITY}</span>
+        </div>
+        <div class="tv-row">
+          <span class="k">Юнитов в армиях</span>
+          <span class="v">${garrison.units}</span>
+        </div>
+        <div class="tv-row">
+          <span class="k">Лимит армии</span>
+          <span class="v">${MAX_ARMY_SIZE} юнитов</span>
+        </div>
+      </div>
     `;
+  }
+
+  /** Армии и юниты владельца, стоящие в клетке города. */
+  _cityArmyStats() {
+    const city = this._city;
+    const cell = this.mapView?.world?.get?.(city.x, city.y);
+    const ownerId = city.ownerId ?? null;
+
+    const armies = (cell?.army ?? []).filter(a =>
+      a && a.idOwner === ownerId && a.alive !== false
+    );
+
+    const units = armies.reduce((n, a) =>
+      n + (a.units?.filter(u => u?.alive !== false).length ?? 0), 0);
+    const freeSlots = armies.reduce((n, a) =>
+      n + Math.max(0, MAX_ARMY_SIZE - (a.units?.length ?? 0)), 0);
+
+    return { armies: armies.length, units, freeSlots };
   }
 
   _refreshProductionBar() {
     const city = this._city;
-    const options = optionsForCity(city);
-    const current = currentProduction(city, options);
+    const current = ensureCityProduction(city);
     const type = UNIT_TYPES[current];
     if (!type) {
       this._prodBarEl.textContent = 'Нет доступных юнитов';
       return;
     }
 
+    const price = productionTurns(current);
+    const left = Math.max(0, city.productionTurnsLeft ?? 0);
+    const garrison = this._cityArmyStats();
+
+    let progress;
+    if (city.ownerId == null) {
+      progress = 'город нейтрален — производство стоит';
+    } else if (left === 0
+        && garrison.armies >= MAX_ARMIES_PER_CITY
+        && garrison.freeSlots === 0) {
+      progress = 'ждёт места в армии (4 армии полны)';
+    } else if (left === 0) {
+      progress = 'готов — появится в конце круга';
+    } else {
+      progress = `осталось <span class="cost">${left}</span> из ` +
+                 `<span class="cost">${price}</span> кр.`;
+    }
+
     this._prodBarEl.innerHTML = `
-      <span>Сейчас в производстве: <b>${escapeHtml(type.name)}</b></span>
-      <span>цена: <span class="cost">${productionCost(current)}</span> зол.</span>
-      <span>срок: <span class="cost">${productionTurns(current)}</span> ход.</span>
+      <span>В производстве: <b>${escapeHtml(type.name)}</b></span>
+      <span>цена: <span class="cost">${price}</span> кр.</span>
+      <span>${progress}</span>
+      <span>армий: <span class="cost">${garrison.armies}</span> / ${MAX_ARMIES_PER_CITY}</span>
     `;
   }
 
@@ -916,10 +972,8 @@ export class TownView {
     this._unitNodes = [];
 
     const city = this._city;
-    const options = optionsForCity(city);
-    let current = currentProduction(city, options);
-    if (current && city.production !== current) city.production = current;
-
+    const options = productionOptions(city);
+    const current = ensureCityProduction(city);
     const colorHex = this._ownerColor();
     const skin = skinForPlayer(city.ownerId);
 
@@ -949,7 +1003,7 @@ export class TownView {
     if (current) {
       const label = makeUnitLabel(
         UNIT_TYPES[current]?.name ?? current,
-        `${productionCost(current)} зол.`
+        `${productionTurns(current)} кр.`
       );
       label.position.set(currentX, 1.62, 0);
       this._unitsRoot.add(label);
@@ -967,7 +1021,7 @@ export class TownView {
 
       const label = makeUnitLabel(
         UNIT_TYPES[typeKey]?.name ?? typeKey,
-        `${productionCost(typeKey)} зол.`
+        `${productionTurns(typeKey)} кр.`
       );
       label.position.set(holder.position.x, 1.52, 0);
       this._unitsRoot.add(label);
@@ -1041,8 +1095,9 @@ export class TownView {
 
     this._selType = typeKey;
 
+    // Новый тип в слоте — счётчик кругов начинается заново.
     if (this._city.production !== typeKey) {
-      this._city.production = typeKey;
+      if (!setCityProduction(this._city, typeKey)) return;
       SND.clickUnit.play();
     }
 
@@ -1105,6 +1160,34 @@ export class TownView {
     this._unitsCam.updateProjectionMatrix();
   }
 
+  /**
+   * Пока панель открыта, счётчик кругов может измениться (например,
+   * игрок завершил ход клавишей). Обновляем статы только при изменении,
+   * чтобы не дёргать DOM каждый кадр.
+   */
+  _maybeRefreshProduction(now) {
+    if (!this._city) return;
+    if (now - this._lastProdRefresh < 400) return;
+    this._lastProdRefresh = now;
+
+    const city = this._city;
+    const garrison = this._cityArmyStats();
+    const key = [
+      city.production,
+      city.productionTurnsLeft,
+      city.productionTurnsTotal,
+      city.ownerId,
+      garrison.armies,
+      garrison.units,
+    ].join('|');
+
+    if (key === this._prodKey) return;
+    this._prodKey = key;
+
+    this._refreshStats();
+    this._refreshProductionBar();
+  }
+
   _startLoop() {
     const loop = () => {
       if (!this._open) return;
@@ -1116,6 +1199,8 @@ export class TownView {
 
       this._cityRenderer.render(this._cityScene, this._cityCam);
       this._unitsRenderer.render(this._unitsScene, this._unitsCam);
+
+      this._maybeRefreshProduction(performance.now());
 
       this._raf = requestAnimationFrame(loop);
     };

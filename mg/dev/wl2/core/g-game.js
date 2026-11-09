@@ -110,6 +110,16 @@ export class Game {
       getTurnIndex: () => this.judge.currentPlayer?.index ?? -1,
     });
 
+    // Город выпустил юнита (см. Judge._doCities): обновляем модель армии
+    // на карте (новая армия или изменившийся состав) и пишем в лог.
+    this.judge.onCityProduced = (res) => {
+      this.mapView?.unitsView?.updateArmy?.(res.army);
+      this.mapView?.unitsView?.relayoutCell?.(res.army.x, res.army.y);
+      this._log(
+        `🏰 ${res.city.name}: произведён «${res.unit.name}»` +
+        (res.created ? ' — создана новая армия' : ''), true);
+    };
+
     this._moveCtx = {
       world:     worldMap,
       mapView:   this.mapView,
@@ -431,6 +441,8 @@ export class Game {
     if (loser) {
       // меш исчезающей армии — снятие с карты (модель чистится в Battle)
       this.mapView.unitsView.removeArmy?.(loser);
+      // Остальные армии в клетке сдвигаются на свободные углы.
+      this.mapView.unitsView.relayoutCell?.(loser.x, loser.y);
       const lp = this.judge.playerByIndex(loser.idOwner);
       this._log(
         `☠ Армия #${loser.id} уничтожена; победила армия #${winner.id}` +

@@ -6,6 +6,7 @@ import { WorldMap        } from './world.js';
 import { STATE, TICK     } from './g-state.js';
 import { NAME            } from './gen-name.js';
 import { UNIT_TYPES, Unit, Army } from './units.js';
+import { tickCityProduction } from './production.js';
 
 ///----------------------------------------------------------------------------|
 /// Судья знающий правила игры...
@@ -39,6 +40,13 @@ export class Judge {
     // Колбэк Game: (player) => void — игрок вступил в ход
     // (маршруты построены, можно показывать их и запускать армии).
     this.onTurnStart = null;
+
+    // Колбэк Game: (result) => void — в городе выпущен юнит.
+    // result = { army, unit, city, typeKey, created } (см. core/production.js).
+    this.onCityProduced = null;
+
+    // Счётчик кругов производства не должен тикать до первого круга.
+    STATE.isTurnCircle = false;
 
     this._citiesStart();
   }
@@ -105,7 +113,7 @@ export class Judge {
 
   update(dt) {
 
-    // Конец круга: города (доход, спавн и т.п. — пока заготовка).
+    // Конец круга: производство в городах (счётчики кругов и выпуск юнитов).
     if (STATE.isTurnCircle)
     {   this._doCities();
     }
@@ -125,8 +133,21 @@ export class Judge {
 
   _doCities()
   {
-    const cities = this.world.cities;
-    const player = this.currentPlayer;
+    const cities = this.world?.cities ?? [];
+
+    for (const city of cities)
+    {
+      // Нейтральные города не производят.
+      if ((city.ownerId ?? null) === null) continue;
+
+      const owner = this.playerByIndex(city.ownerId);
+      if (!owner) continue;
+
+      // В конце полного круга: счётчик -1; на нуле — выпуск юнита в армию
+      // (армия создаётся автоматически, если её ещё нет).
+      const produced = tickCityProduction(this.world, owner, city);
+      if (produced) this.onCityProduced?.(produced);
+    }
   }
 
   // В столицах спавнить героев...

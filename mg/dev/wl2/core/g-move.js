@@ -154,6 +154,7 @@ export class ArmyMover {
 
     if (army.canMoveTo(cost)) {
       army.spendMoveAll(cost);                       // тратим очки стека
+      const fromX = army.x, fromY = army.y;          // откуда уходит армия
       ctx.world.moveArmy(army, a.cell.x, a.cell.y);  // перенос в модели
       ctx.routeView.consumeSteps(army, 1);           // снять красный маркер
 
@@ -173,6 +174,10 @@ export class ArmyMover {
       }
 
       ctx.unitsView.updateArmyPosition(army);        // точная посадка в клетку
+      // Переставляем армии по углам: из старой клетки армия ушла,
+      // в новой — могла занять следующий свободный угол.
+      ctx.unitsView.relayoutCell?.(fromX, fromY);
+      ctx.unitsView.relayoutCell?.(army.x, army.y);
       this.onArmyStep(army);
 
       // ── встреча с врагом: бой (и город-гарнизон, и пустая клетка) ──

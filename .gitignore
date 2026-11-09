@@ -10,6 +10,7 @@ yarn.lock
 pnpm-lock.yaml
 three.js-r182.tar.gz
 push.bat
+\!acl-repair/
 
 # Next.js билд и кэш
 .next/
