@@ -202,6 +202,54 @@ to {
   to   { opacity: 1; transform: none; }
 }
 
+/*--- Кнопка "На весь экран" (тонкая, сверху справа) ----------------*/
+.menu-fullscreen-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: min(220px, calc(100% - 28px));
+  padding: 6px 18px;
+  background: linear-gradient(180deg,
+    #1a2530 0%,
+    #2a3a4d 50%,
+    #000000 100%
+  );
+  border: 1px solid #3a4a5e;
+  border-radius: 8px;
+  color: #96b3cd;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s ease;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, .4),
+    inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+.menu-fullscreen-btn:hover {
+  color: #cfe3f5;
+  border-color: #5a7a9a;
+  background: linear-gradient(180deg,
+    #1e2d3d 0%,
+    #324a63 50%,
+    #1e2d3d 100%
+  );
+  box-shadow:
+    0 6px 18px rgba(46, 139, 255, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+.menu-fullscreen-btn:active {
+  transform: translateY(1px);
+}
+.menu-fullscreen-btn:focus-visible {
+  outline: none;
+  border-color: #2e8bff;
+  box-shadow: 0 0 0 3px rgba(46, 139, 255, .3);
+}
+
 /*--- Кнопки меню (выпуклые, блестящие) ----------------------------*/
 .menu-nav {
 display: flex; flex-direction: column; gap: 10px;

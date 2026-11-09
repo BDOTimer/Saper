@@ -1,4 +1,4 @@
-/// menu.js
+/// ui/menu.js
 ///----------------------------------------------------------------------------|
 /// Экран "Главное меню."
 ///----------------------------------------------------------------------------:
@@ -19,6 +19,8 @@ const VERSION = 'v-0.0.7.2';
 
 const GAME_NAME   = 'МИР ХОЛМОВ';
 const GAME_ACCENT = 'ХОЛМОВ';
+
+const FULLSCREEN_PARAM = 'fullscreen';
 
 const MENU_ITEMS = [
   { id: 'new-game', label: 'В игру'   , hint: 'Не скоро ...', enabled: true },
@@ -42,10 +44,15 @@ export class MenuScreen {
     this.version = opts.version ?? VERSION;
     this.parent = opts.parent ?? document.body;
 
+    this.fullscreenTab = new URLSearchParams(location.search)
+      .get(FULLSCREEN_PARAM) === '1';
+
     this.el = this.#render();
     this.parent.appendChild(this.el);
 
     this.#bindKeys();
+
+    if (this.fullscreenTab) this.#setupFullscreen();
   }
 
   //--- Разметка ---------------------------------------------------------|
@@ -138,7 +145,53 @@ export class MenuScreen {
     card.appendChild(footer);
 
     screen.appendChild(card);
+
+    if (!this.fullscreenTab) {
+      screen.appendChild(this.#renderFullscreenBtn());
+    }
+
     return screen;
+  }
+
+  #renderFullscreenBtn() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'menu-fullscreen-btn';
+    btn.textContent = 'НА ВЕСЬ ЭКРАН';
+    btn.addEventListener('click', () => {
+      SND.clickMenu.play();
+      this.#openFullscreenTab();
+    });
+    return btn;
+  }
+
+  #openFullscreenTab() {
+    const url = new URL(location.href);
+    url.searchParams.set(FULLSCREEN_PARAM, '1');
+
+    const win = window.open(
+      url.toString(),
+      '_blank',
+      `width=${screen.availWidth},height=${screen.availHeight},` +
+      'left=0,top=0,fullscreen=yes'
+    );
+
+    if (win) win.focus();
+    else location.href = url.toString();   // всплывающее окно заблокировано
+  }
+
+  #setupFullscreen() {
+    const request = () => {
+      if (document.fullscreenElement) return;
+      const p = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+      if (p?.catch) p.catch(() => {});
+    };
+
+    request();   // может быть отклонён без жеста пользователя
+
+    // Первый жест в новой вкладке включает полноэкранный режим.
+    document.addEventListener('pointerdown', request, { once: true });
+    document.addEventListener('keydown', request, { once: true });
   }
 
   #renderLogoText() {
