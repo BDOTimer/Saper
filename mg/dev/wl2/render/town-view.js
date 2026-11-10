@@ -32,6 +32,7 @@ import {
   setCityProduction,
 } from '../core/production.js';
 import { skinForPlayer, disposeTree } from './r-units-view.js';
+import { createTownMesh } from './town-mesh.js';
 import { SND } from '../res/snd/--sound-lib.js';
 
 /** Шаг между слотами в мини-сцене юнитов. */
@@ -47,6 +48,7 @@ const CITY_TYPE_LABEL = {
   capital:    'Столица',
   fortress:   'Крепость',
   backwater:  'Захолустье',
+  ruins:      'Руины',
 };
 
 /** Набор производимых юнитов зависит от типа города — см. core/production.js. */
@@ -256,82 +258,9 @@ function ensureStyles() {
    ========================================================= */
 
 /* =========================================================
-   Модель города для верхней части панели.
+   Модель города для верхней части панели берётся из
+   render/town-mesh.js (createTownMesh по типу города).
    ========================================================= */
-function buildCityMesh(colorHex, type = 'provincial') {
-  const g = new THREE.Group();
-
-  const accent   = new THREE.Color(colorHex);
-  const stone    = new THREE.MeshStandardMaterial({ color: 0xd9cfb6, roughness: 0.9 });
-  const stoneDark= new THREE.MeshStandardMaterial({ color: 0x9a8f77, roughness: 0.95 });
-  const roof     = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
-  const wood     = new THREE.MeshStandardMaterial({ color: 0x6d4a2f, roughness: 0.9 });
-  const gold     = new THREE.MeshStandardMaterial({
-    color: 0xffd166, metalness: 0.55, roughness: 0.35,
-    emissive: 0x3a2a10, emissiveIntensity: 0.35,
-  });
-  const flagMat  = new THREE.MeshBasicMaterial({ color: accent, side: THREE.DoubleSide });
-  const winMat   = new THREE.MeshStandardMaterial({
-    color: 0xffd166, emissive: 0xffa02a, emissiveIntensity: 0.6, roughness: 0.4,
-  });
-
-  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.rotation.set(rx, ry, rz);
-    g.add(m);
-    return m;
-  };
-
-  add(new THREE.CylinderGeometry(1.05, 1.15, 0.16, 28), stoneDark, 0, 0.08, 0);
-
-  const seg = 14, r = 0.92;
-  for (let i = 0; i < seg; i++) {
-    const a = (i / seg) * Math.PI * 2;
-    add(
-      new THREE.BoxGeometry(0.34, 0.18, 0.16), stone,
-      Math.cos(a) * r, 0.25, Math.sin(a) * r,
-      0, -a, 0,
-    );
-    add(
-      new THREE.BoxGeometry(0.16, 0.10, 0.16), stoneDark,
-      Math.cos(a) * r, 0.39, Math.sin(a) * r,
-      0, -a, 0,
-    );
-  }
-
-  const towers = [
-    Math.PI * 0.25, Math.PI * 0.75,
-    Math.PI * 1.25, Math.PI * 1.75,
-  ];
-  for (const a of towers) {
-    const x = Math.cos(a) * 0.70;
-    const z = Math.sin(a) * 0.70;
-    add(new THREE.CylinderGeometry(0.17, 0.20, 0.55, 10), stone, x, 0.38, z);
-    add(new THREE.ConeGeometry(0.22, 0.28, 4), roof, x, 0.78, z, 0, Math.PI / 4, 0);
-  }
-
-  add(new THREE.BoxGeometry(0.70, 0.72, 0.70), stone, 0, 0.52, 0);
-  add(new THREE.BoxGeometry(0.78, 0.08, 0.78), stoneDark, 0, 0.90, 0);
-  add(new THREE.ConeGeometry(0.56, 0.50, 4), roof, 0, 1.18, 0, 0, Math.PI / 4, 0);
-  add(new THREE.BoxGeometry(0.20, 0.34, 0.05), wood, 0, 0.35, 0.36);
-
-  add(new THREE.BoxGeometry(0.07, 0.12, 0.03), winMat, -0.18, 0.62, 0.36);
-  add(new THREE.BoxGeometry(0.07, 0.12, 0.03), winMat,  0.18, 0.62, 0.36);
-  add(new THREE.BoxGeometry(0.03, 0.12, 0.07), winMat, -0.36, 0.62, 0);
-  add(new THREE.BoxGeometry(0.03, 0.12, 0.07), winMat,  0.36, 0.62, 0);
-
-  add(new THREE.CylinderGeometry(0.015, 0.015, 0.55, 6), gold, 0, 1.65, 0);
-  add(new THREE.PlaneGeometry(0.30, 0.18), flagMat, 0.16, 1.80, 0);
-
-  const scale =
-    type === 'capital'   ? 1.12 :
-    type === 'fortress'  ? 1.06 :
-    type === 'backwater' ? 0.90 : 1.0;
-  g.scale.setScalar(scale);
-
-  return g;
-}
 
 /* =========================================================
    Подложка текущего производства:
@@ -956,7 +885,7 @@ export class TownView {
     }
 
     this._cityRoot = new THREE.Group();
-    this._cityRoot.add(buildCityMesh(this._ownerColor(), this._city.type));
+    this._cityRoot.add(createTownMesh(this._city.type, { colorHex: this._ownerColor() }));
     this._cityRoot.rotation.y = -0.5;
     this._cityScene.add(this._cityRoot);
   }

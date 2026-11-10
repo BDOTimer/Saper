@@ -364,6 +364,7 @@ export class Game {
           capital:    'столица',
           fortress:   'крепость',
           backwater:  'захолустье',
+          ruins:      'руины',
         }[city.type] ?? city.type)
       : '';
 

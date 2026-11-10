@@ -7,6 +7,7 @@ import { UnitsView   } from './r-units-view.js';
 import { disposeTree } from './r-units-view.js';
 import { mulberry32  } from '../core/rng.js';
 import { spawnRandomMountain } from './mesh.js';
+import { createTownMesh, TOWN_MAP_SCALE } from './town-mesh.js';
 
 /** Средне-серый цвет крыши нейтрального города. */
 const NEUTRAL_ROOF = 0x8a8f96;
@@ -400,30 +401,22 @@ export class MapView {
       const cell = this.world.get(city.x, city.y);
       const baseY = cell ? this._worldY(cell) : 0.15;
 
-      const raisedY   = baseY + 1.40; // Флаг поднят
-      const loweredY  = baseY + 0.55;
+      // Модель соответствует типу города (см. render/town-mesh.js).
+      const model = createTownMesh(city.type, {
+        colorHex: this._roofColor(city.ownerId),
+        withFlag: false,
+      });
+      model.position.y = baseY;
+      model.scale.setScalar(TOWN_MAP_SCALE);
+      g.add(model);
 
-      const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(TILE * 0.32, TILE * 0.38, 0.25, 12),
-        new THREE.MeshStandardMaterial({ color: 0x8f6d4a, roughness: 0.8 })
-      );
-      base.position.y = baseY + 0.30;
-      g.add(base);
+      const anchor = model.userData.flagAnchor;
+      const ax = anchor ? anchor.x * TOWN_MAP_SCALE : TILE * 0.25;
+      const ay = anchor ? anchor.y * TOWN_MAP_SCALE : TILE * 0.90;
+      const az = anchor ? anchor.z * TOWN_MAP_SCALE : 0;
 
-      const tower = new THREE.Mesh(
-        new THREE.BoxGeometry(TILE * 0.35, TILE * 0.5, TILE * 0.35),
-        new THREE.MeshStandardMaterial({ color: 0xe6dbb8, roughness: 0.9 })
-      );
-      tower.position.y = baseY + 0.75;
-      g.add(tower);
-
-      const roof = new THREE.Mesh(
-        new THREE.ConeGeometry(TILE * 0.28, TILE * 0.35, 4),
-        new THREE.MeshStandardMaterial({ color: this._roofColor(city.ownerId), roughness: 0.6 })
-      );
-      roof.position.y = baseY + 1.20;
-      roof.rotation.y = Math.PI / 4;
-      g.add(roof);
+      const raisedY   = baseY + ay + 0.04; // Флаг поднят
+      const loweredY  = baseY + Math.max(0.15, ay * 0.45);
 
       const flagColor = this._ownerColor(city.ownerId);
 
@@ -431,18 +424,16 @@ export class MapView {
         new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
         new THREE.MeshBasicMaterial({ color: flagColor, side: THREE.DoubleSide })
       );
-      flag.position.set(TILE * 0.25, raisedY, 0);
-      flag.userData = { raisedY, loweredY, cityIndex, raised: true };
-      g.add(flag);
-
-      g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
+      flag.position.set(ax, raisedY, az);
       flag.userData = {
         raisedY, loweredY, cityIndex, raised: true,
         // сохраняем «текущий» ownerId, чтобы уметь детектить изменения
         ownerId: city.ownerId ?? null,
       };
+      g.add(flag);
 
-      g.userData = { type: 'city', city, flag, roof, cityIndex };
+      g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
+      g.userData = { type: 'city', city, flag, model, cityIndex };
       this.cityGroup.add(g);
 
       this._raisedFlags.add(cityIndex);
@@ -846,11 +837,10 @@ export class MapView {
     flag.material.color.setHex(this._ownerColor(city.ownerId));
     flag.material.needsUpdate = true;
 
-    // Крыша города тоже меняет цвет на цвет нового владельца.
-    const roof = group.userData?.roof;
-    if (roof) {
-      roof.material.color.setHex(this._roofColor(city.ownerId));
-      roof.material.needsUpdate = true;
+    // Модель города тоже меняет акцентный цвет на цвет нового владельца.
+    const model = group.userData?.model;
+    if (model?.userData?.setAccent) {
+      model.userData.setAccent(this._roofColor(city.ownerId));
     }
 
     return this.setCityFlag(idx, raised, duration);
