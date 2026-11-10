@@ -67,6 +67,7 @@ class App {
     this.screen = new Game(this.world, this.players, {
       parent: this.root,
       onExit: () => this._showMenu(),
+      waterShader: TUNE.waterShader,
     });
     gameLoop.setScreen(this.screen);
     gameLoop.start();
@@ -98,7 +99,16 @@ class App {
         this._showPlayers();
         break;
       case 'settings':
-        TunePanel.open();
+        TunePanel.open({
+          checks: [
+            { label: 'Тест битвы', key: 'isTestButtle' },
+            {
+              label: 'Шейдер воды',
+              key: 'waterShader',
+              onChange: (enabled) => this.screen?.setWaterEnabled?.(enabled),
+            },
+          ],
+        });
         break;
       case 'about':
         this._playMusic();

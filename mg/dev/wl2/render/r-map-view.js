@@ -8,6 +8,7 @@ import { disposeTree } from './r-units-view.js';
 import { mulberry32  } from '../core/rng.js';
 import { spawnRandomMountain } from './mesh.js';
 import { createTownMesh, TOWN_MAP_SCALE } from './town-mesh.js';
+import { WaterView } from './r-water-view.js';
 
 /** Средне-серый цвет крыши нейтрального города. */
 const NEUTRAL_ROOF = 0x8a8f96;
@@ -37,6 +38,7 @@ export class MapView {
 
     this._raisedFlags = new Set();
     this._flagAnims = new Map();
+    this._waterEnabled = true;
 
     this.unitsView = new UnitsView(this, { /// +
       getArmies:  () => this._collectArmies(),
@@ -47,6 +49,8 @@ export class MapView {
 
     this._buildBase();
     this._buildBoard();
+    this.waterView = new WaterView(this);
+    this.waterView.rebuild();
     this._buildOverlays();
     this._buildMountains();
     this._buildCities();
@@ -77,6 +81,8 @@ export class MapView {
     this._disposeMesh('pickMesh');
     this._disposeMesh('roadMesh');
     this._disposeMesh('riverMesh');
+    this.waterView?.destroy();
+    this.waterView = null;
 
     if (this.mountainGroup) {
       this.scene.remove(this.mountainGroup);
@@ -99,6 +105,9 @@ export class MapView {
 
     this._buildBase();
     this._buildBoard();
+    this.waterView = new WaterView(this);
+    this.waterView.rebuild();
+    this.waterView.setEnabled(this._waterEnabled);
     this._buildOverlays();
     this._buildMountains();
     this._buildCities();
@@ -124,6 +133,11 @@ export class MapView {
   setCameraMode(mode) {
     this.renderer.setCameraMode(mode);
     if (mode === 'top') this.renderer._fitTopCamera(this.world.w, this.world.h);
+  }
+
+  setWaterEnabled(enabled) {
+    this._waterEnabled = enabled !== false;
+    this.waterView?.setEnabled(this._waterEnabled);
   }
 
   /**
@@ -729,6 +743,7 @@ export class MapView {
 
     this._stepFlagAnims(dt);
     this.unitsView?.update?.(dt);
+    this.waterView?.update?.(dt);
 
     // если армии двигаются — обновляем позиции узлов
     // (можно вызывать точечно из логики движения, см. ниже)
@@ -789,6 +804,8 @@ export class MapView {
     this.routeView = null;
     this.unitsView?.destroy();
     this.unitsView = null;
+    this.waterView?.destroy();
+    this.waterView = null;
 
     if (this.mountainGroup) {
       this.scene.remove(this.mountainGroup);

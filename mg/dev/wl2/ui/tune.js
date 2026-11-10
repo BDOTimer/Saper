@@ -20,6 +20,7 @@ import { SND } from '../res/snd/--sound-lib.js';
 // ---------- состояние настроек ----------
 export let TUNE = {
   isTestButtle: false, // Тест битвы
+  waterShader: true,   // Шейдер воды
 };
 
 // ---------- панель ----------
@@ -214,8 +215,11 @@ export const TunePanel = (() => {
     const title  = opts.title  ?? "НАСТРОЙКИ";
     const sub    = opts.sub    ?? "TUNE";
     const text   = opts.text   ?? "";
-    // флажок по умолчанию — «Тест битвы», пишущий TUNE.isTestButtle
-    const checks = opts.checks ?? [{ label: "Тест битвы", key: "isTestButtle" }];
+    // флажки по умолчанию
+    const checks = opts.checks ?? [
+      { label: "Тест битвы", key: "isTestButtle" },
+      { label: "Шейдер воды", key: "waterShader" },
+    ];
 
     elTitle.textContent = title;
     elSub.textContent   = sub;

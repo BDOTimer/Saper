@@ -91,6 +91,7 @@ export class Game {
     // карта — вся техника управления живёт в MapView
     this.mapView = new MapView(
       worldMap, this.el.querySelector('#app'), playersModel);
+    this.mapView.setWaterEnabled(opts.waterShader !== false);
 
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
     this.mapView.lowerAllFlags(600); // Опустить все флаги...
@@ -587,11 +588,14 @@ export class Game {
                         vertical-align:middle;margin-right:6px;"></span>`;
   }
 
+  setWaterEnabled(enabled) {
+    this.mapView?.setWaterEnabled?.(enabled);
+  }
+
   //---------------------------|
   // Обновление Логики.        |
   //---------------------------:
   update(dt) {
-
     // Судья: старт хода игрока / передача хода (после всех анимаций).
     this.judge.update(dt);
 
