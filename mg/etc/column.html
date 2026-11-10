@@ -114,12 +114,37 @@
         .j5 { color: #08f; background: #08f; }
         .j6 { color: #fff; background: #fff; }
 
+        /* Магический камень — пульсация */
         .jewel.magic {
             animation: magicPulse 0.7s ease-in-out infinite;
+            position: relative;
+        }
+        .jewel.magic::after {
+            content: '★';
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+            color: #000;
+            text-shadow: 0 0 6px #fff;
+            pointer-events: none;
         }
         @keyframes magicPulse {
             0%, 100% { box-shadow: inset 0 0 12px #fff, 0 0 10px #fff; transform: scale(1); }
             50%      { box-shadow: inset 0 0 18px #fff, 0 0 22px #fff; transform: scale(1.08); }
+        }
+
+        /* Подсветка целевого цвета (камни, которые будут уничтожены) */
+        .jewel.magic-target {
+            outline: 2px solid #fff;
+            outline-offset: -2px;
+            animation: targetPulse 0.5s ease-in-out infinite;
+        }
+        @keyframes targetPulse {
+            0%, 100% { filter: brightness(1); }
+            50%      { filter: brightness(1.6); }
         }
 
         .jewel.flash {
@@ -332,7 +357,7 @@
     const NUM_COLORS = 5;        // сколько цветов использовать
     const MAGIC_CHANCE = 0.08;   // шанс магического камня
 
-    const DEFAULT_STATUS = 'Стрелки: ← →, ↑ : смена, ↓ : ускорить';
+    const DEFAULT_STATUS = '← →: движение · ↑: смена · ↓: сброс · ★ — магия';
 
     const COLORS = [
         { cls: 'j0' }, { cls: 'j1' }, { cls: 'j2' }, { cls: 'j3' }, { cls: 'j4' },
@@ -368,11 +393,14 @@
     let lines = 0;
     let level = 1;
 
-    let falling = null;          // { col, colors: [c0, c1, c2] (сверху вниз), magicIdx }
+    let falling = null;          // { col, row, colors: [c0, c1, c2], magicIdx }
     let fallTimer = null;
     let gameOver = false;
-    let paused = false;          // на время анимации/обработки
+    let paused = false;
     let animLock = false;
+
+    // подсветка целевого цвета для магического камня
+    let magicTargetColor = -1;
 
     // ============================================================
     //                       ПОЛЕ
@@ -394,9 +422,10 @@
         }
     }
 
-    function makeJewelEl(color, magic) {
+    function makeJewelEl(color, magic, isTarget) {
         const j = document.createElement('div');
         j.className = 'jewel ' + COLORS[color].cls + (magic ? ' magic' : '');
+        if (magic && isTarget) j.classList.add('magic-target');
         return j;
     }
 
@@ -407,7 +436,8 @@
                 cell.innerHTML = '';
                 const g = grid[r][c];
                 if (g) {
-                    cell.appendChild(makeJewelEl(g.color, g.magic));
+                    const j = makeJewelEl(g.color, g.magic, g.magic && magicTargetColor === g.color);
+                    cell.appendChild(j);
                 }
             }
         }
@@ -429,9 +459,8 @@
     function updateFallingEl() {
         if (!fallingEl || !falling) return;
         fallingEl.innerHTML = '';
-        const cellW = cells[0][0].getBoundingClientRect().width + 2; // gap
+        const cellW = cells[0][0].getBoundingClientRect().width + 2;
         const cellH = cells[0][0].getBoundingClientRect().height + 2;
-        // Позиция: колонка falling.col, верх на row = falling.row (виртуальная)
         const rect = boardEl.getBoundingClientRect();
         const cell0 = cells[0][falling.col].getBoundingClientRect();
         const top = cell0.top - rect.top + (falling.row * cellH);
@@ -439,16 +468,52 @@
         fallingEl.style.top = top + 'px';
         fallingEl.style.width = cellW + 'px';
         fallingEl.style.height = (cellH * FALL_COL) + 'px';
+
+        // определяем целевой цвет для магического камня
+        let targetColor = -1;
+        if (falling.magicIdx >= 0) {
+            const magicRow = falling.row + falling.magicIdx;
+            for (let r = magicRow + 1; r < ROWS; r++) {
+                if (grid[r][falling.col]) { targetColor = grid[r][falling.col].color; break; }
+            }
+        }
+        magicTargetColor = targetColor;
+
         for (let i = 0; i < FALL_COL; i++) {
-            const j = makeJewelEl(falling.colors[i], falling.magicIdx === i);
+            const isMagic = falling.magicIdx === i;
+            const j = makeJewelEl(falling.colors[i], isMagic, isMagic && targetColor >= 0);
             j.style.width = '100%';
             j.style.height = (cellH - 4) + 'px';
             fallingEl.appendChild(j);
+        }
+
+        // подсвечиваем камни целевого цвета на поле
+        highlightTargetColor(targetColor);
+    }
+
+    // подсветка камней заданного цвета на поле (для цели магии)
+    function highlightTargetColor(color) {
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const j = cells[r][c].querySelector('.jewel');
+                if (j) j.classList.remove('magic-target');
+            }
+        }
+        if (color < 0) return;
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const g = grid[r][c];
+                if (g && g.color === color) {
+                    const j = cells[r][c].querySelector('.jewel');
+                    if (j) j.classList.add('magic-target');
+                }
+            }
         }
     }
 
     function removeFallingEl() {
         if (fallingEl) { fallingEl.remove(); fallingEl = null; }
+        highlightTargetColor(-1);
     }
 
     // ============================================================
@@ -456,7 +521,6 @@
     // ============================================================
     function spawnFalling() {
         if (gameOver) return;
-        // верхние 3 строки должны быть свободны
         for (let r = 0; r < FALL_COL; r++) {
             if (grid[r][FALL_COL]) {
                 endGame();
@@ -473,7 +537,7 @@
         }
         falling = {
             col: Math.floor(COLS / 2),
-            row: 0,             // виртуальная верхняя позиция (0 = верх поля)
+            row: 0,
             colors,
             magicIdx
         };
@@ -492,15 +556,12 @@
 
     function stepDown() {
         if (!falling) return;
-        // проверяем, можно ли сдвинуть вниз
         const nextRow = falling.row + 1;
-        // колонна занимает виртуальные строки nextRow .. nextRow+FALL_COL-1
         const bottomRow = nextRow + FALL_COL - 1;
         if (bottomRow >= ROWS) {
             land();
             return;
         }
-        // проверяем, свободна ли нижняя клетка
         if (grid[bottomRow][falling.col]) {
             land();
             return;
@@ -527,7 +588,6 @@
         if (!falling || gameOver || paused || animLock) return;
         const nc = falling.col + dc;
         if (nc < 0 || nc >= COLS) return;
-        // проверим, что в целевой колонке нет камней на виртуальных строках
         for (let r = 0; r < FALL_COL; r++) {
             const gr = falling.row + r;
             if (gr >= 0 && gr < ROWS && grid[gr][nc]) return;
@@ -539,10 +599,8 @@
 
     function cycleFalling() {
         if (!falling || gameOver || paused || animLock) return;
-        // сдвиг вниз: [a,b,c] -> [c,a,b]
         const last = falling.colors.pop();
         falling.colors.unshift(last);
-        // magicIdx тоже сдвигается
         if (falling.magicIdx >= 0) {
             falling.magicIdx = (falling.magicIdx + 1) % FALL_COL;
         }
@@ -551,103 +609,104 @@
     }
 
     // ============================================================
-    //                  ПРИЗЕМЛЕНИЕ И ЛИНИИ
+    //                  ПРИЗЕМЛЕНИЕ
     // ============================================================
     function land() {
         if (!falling) return;
         removeFallingEl();
         const col = falling.col;
 
-        // Определяем, куда встаёт каждый камень
-        // Верх колонны = falling.row, занимает строки falling.row .. falling.row+FALL_COL-1
-        // Находим для каждого камня (сверху вниз) первую свободную клетку снизу
-        // На самом деле все 3 камня падают в колонку: верхний камень встаёт выше,
-        // нижний — ниже. Ищем базовую строку (низ колонны).
+        // Находим baseRow — самую нижнюю свободную клетку
         let baseRow = ROWS - 1;
-        // Найдём самый низ, где ещё можно разместить
         for (let r = ROWS - 1; r >= 0; r--) {
             if (!grid[r][col]) { baseRow = r; break; }
         }
-        // Камни займут строки baseRow, baseRow-1, baseRow-2 (снизу вверх)
-        // falling.colors[0] — верхний, [1] — средний, [2] — нижний
+
+        // Проверяем, что все 3 клетки свободны (защита от перезаписи)
         const positions = [];
         for (let i = 0; i < FALL_COL; i++) {
             const r = baseRow - (FALL_COL - 1 - i);
-            if (r < 0) {
-                // не помещается — game over
-                endGame();
-                return;
-            }
+            if (r < 0) { endGame(); return; }
+            if (grid[r][col]) { endGame(); return; }
             positions.push({ r, c: col, color: falling.colors[i], magic: falling.magicIdx === i });
         }
 
-        // магия: если есть магический камень, уничтожаем все камни того цвета,
-        // с которым он соприкоснулся снизу (или на поле — по ТЗ: «того цвета,
-        // с которым соприкоснулся снизу»). Если снизу пусто — ничего не делает.
-        let magicColorToClear = -1;
-        for (let i = 0; i < positions.length; i++) {
-            const p = positions[i];
-            if (p.magic) {
-                // смотрим, что под ним (в момент приземления)
-                // Сначала разместим остальные, потом проверим
-                // Найдём первый камень ниже p.r в этой колонке
-                // (учитывая только те, что уже стоят или встанут)
-                // Проще: сначала размещаем все, потом смотрим
-                // Запомним индекс
-                p._isMagic = true;
-            }
-        }
-
-        // Размещаем камни
+        // размещаем камни
         for (const p of positions) {
             grid[p.r][p.c] = { color: p.color, magic: p.magic };
         }
 
-        // Магия: ищем под магическим камнем первый непустой — его цвет уничтожаем
-        for (let i = 0; i < positions.length; i++) {
-            const p = positions[i];
-            if (!p.magic) continue;
-            // ищем ниже
-            for (let r = p.r + 1; r < ROWS; r++) {
-                if (grid[r][p.c]) {
-                    magicColorToClear = grid[r][p.c].color;
+        // определяем магический камень
+        const magicPos = positions.find(p => p.magic);
+        let targetColor = -1;
+
+        if (magicPos) {
+            // ищем первый непустой камень ниже магического
+            for (let r = magicPos.r + 1; r < ROWS; r++) {
+                if (grid[r][magicPos.c]) {
+                    targetColor = grid[r][magicPos.c].color;
                     break;
                 }
             }
-            break; // максимум один магический за колонну
+            // если под ним пусто — магический камень становится обычным
+            if (targetColor < 0) {
+                grid[magicPos.r][magicPos.c].magic = false;
+            }
         }
 
         falling = null;
+        magicTargetColor = -1;
         renderGrid();
 
-        if (magicColorToClear >= 0) {
-            // вспышка и удаление всех камней этого цвета
-            flashAndClearColor(magicColorToClear);
+        if (targetColor >= 0) {
+            // собираем все камни целевого цвета + все камни цвета магического камня
+            const magicColor = grid[magicPos.r][magicPos.c].color;
+            const toClear = new Set();
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const g = grid[r][c];
+                    if (g && (g.color === targetColor || g.color === magicColor)) {
+                        toClear.add(r + ',' + c);
+                    }
+                }
+            }
+            flashAndClearCells(toClear, '★ Магия!');
         } else {
             processMatches();
         }
     }
 
-    function flashAndClearColor(color) {
+    // ============================================================
+    //                  МАГИЧЕСКОЕ ОЧИЩЕНИЕ
+    // ============================================================
+    function flashAndClearCells(cellSet, statusText) {
         animLock = true;
         paused = true;
-        const toClear = [];
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                const g = grid[r][c];
-                if (g && g.color === color) {
-                    toClear.push({ r, c });
-                    const j = cells[r][c].querySelector('.jewel');
-                    if (j) j.classList.add('flash');
-                }
-            }
+
+        for (const key of cellSet) {
+            const [r, c] = key.split(',').map(Number);
+            const j = cells[r][c].querySelector('.jewel');
+            if (j) j.classList.add('flash');
         }
+
+        // очки и линии за магию
+        const base = cellSet.size * 10;
+        score += base;
+        lines += Math.floor(cellSet.size / 3);
+        scoreEl.textContent = score;
+        linesEl.textContent = lines;
+
+        if (statusText) showStatus(statusText, 1200);
+
         setTimeout(() => {
-            for (const { r, c } of toClear) grid[r][c] = null;
+            for (const key of cellSet) {
+                const [r, c] = key.split(',').map(Number);
+                grid[r][c] = null;
+            }
+            magicTargetColor = -1;
             renderGrid();
             applyGravity();
-            // после гравитации — обычная проверка
-            processMatches();
+            processMatches(0);
         }, 380);
     }
 
@@ -673,7 +732,7 @@
     // ============================================================
     //                  ПОИСК СОВПАДЕНИЙ
     // ============================================================
-    // Возвращает Set индексов "r,c" всех камней в линиях >=3
+    // Магические камни теперь участвуют в линиях как обычные
     function findMatches() {
         const matched = new Set();
 
@@ -682,11 +741,10 @@
             let runStart = 0;
             for (let c = 1; c <= COLS; c++) {
                 const same = c < COLS && grid[r][c] && grid[r][runStart] &&
-                             grid[r][c].color === grid[r][runStart].color &&
-                             !(grid[r][c].magic || grid[r][runStart].magic);
+                             grid[r][c].color === grid[r][runStart].color;
                 if (!same) {
                     const len = c - runStart;
-                    if (len >= 3 && grid[r][runStart] && !grid[r][runStart].magic) {
+                    if (len >= 3 && grid[r][runStart]) {
                         for (let k = runStart; k < c; k++) matched.add(r + ',' + k);
                     }
                     runStart = c;
@@ -699,11 +757,10 @@
             let runStart = 0;
             for (let r = 1; r <= ROWS; r++) {
                 const same = r < ROWS && grid[r][c] && grid[runStart][c] &&
-                             grid[r][c].color === grid[runStart][c].color &&
-                             !(grid[r][c].magic || grid[runStart][c].magic);
+                             grid[r][c].color === grid[runStart][c].color;
                 if (!same) {
                     const len = r - runStart;
-                    if (len >= 3 && grid[runStart][c] && !grid[runStart][c].magic) {
+                    if (len >= 3 && grid[runStart][c]) {
                         for (let k = runStart; k < r; k++) matched.add(k + ',' + c);
                     }
                     runStart = r;
@@ -714,11 +771,11 @@
         // диагонали ↘
         for (let r = 0; r < ROWS; r++) {
             for (let c = 0; c < COLS; c++) {
-                if (!grid[r][c] || grid[r][c].magic) continue;
+                if (!grid[r][c]) continue;
                 const col = grid[r][c].color;
                 let len = 1;
                 while (r + len < ROWS && c + len < COLS &&
-                       grid[r + len][c + len] && !grid[r + len][c + len].magic &&
+                       grid[r + len][c + len] &&
                        grid[r + len][c + len].color === col) len++;
                 if (len >= 3) {
                     for (let k = 0; k < len; k++) matched.add((r + k) + ',' + (c + k));
@@ -729,11 +786,11 @@
         // диагонали ↙
         for (let r = 0; r < ROWS; r++) {
             for (let c = 0; c < COLS; c++) {
-                if (!grid[r][c] || grid[r][c].magic) continue;
+                if (!grid[r][c]) continue;
                 const col = grid[r][c].color;
                 let len = 1;
                 while (r - len >= 0 && c + len < COLS &&
-                       grid[r - len][c + len] && !grid[r - len][c + len].magic &&
+                       grid[r - len][c + len] &&
                        grid[r - len][c + len].color === col) len++;
                 if (len >= 3) {
                     for (let k = 0; k < len; k++) matched.add((r - k) + ',' + (c + k));
@@ -748,7 +805,6 @@
         chain = chain || 0;
         const matched = findMatches();
         if (matched.size === 0) {
-            // всё устоялось — спавним новую колонну
             animLock = false;
             paused = false;
             checkLevelUp();
@@ -759,14 +815,12 @@
         animLock = true;
         paused = true;
 
-        // подсветка
         for (const key of matched) {
             const [r, c] = key.split(',').map(Number);
             const j = cells[r][c].querySelector('.jewel');
             if (j) j.classList.add('flash');
         }
 
-        // очки
         const base = matched.size * 10 * Math.pow(2, chain);
         score += base;
         lines += Math.floor(matched.size / 3);
@@ -780,7 +834,6 @@
             }
             renderGrid();
             applyGravity();
-            // каскад
             setTimeout(() => processMatches(chain + 1), 120);
         }, 260);
     }
@@ -815,6 +868,7 @@
         paused = false;
         animLock = false;
         falling = null;
+        magicTargetColor = -1;
         grid = [];
         for (let r = 0; r < ROWS; r++) {
             grid.push(new Array(COLS).fill(null));
@@ -857,7 +911,6 @@
     }
     document.addEventListener('keydown', onKey);
 
-    // кнопки для мобильных
     const btnLeft  = document.getElementById('btnLeft');
     const btnRight = document.getElementById('btnRight');
     const btnCycle = document.getElementById('btnCycle');
@@ -868,7 +921,7 @@
     btnCycle.addEventListener('click', cycleFalling);
     btnDown.addEventListener('click', hardDrop);
 
-    // свайпы (минимально)
+    // свайпы
     let touchStartX = null, touchStartY = null;
     boardEl.addEventListener('touchstart', e => {
         const t = e.touches[0];
@@ -962,7 +1015,6 @@
     // ============================================================
     //                  ОБНОВЛЕНИЕ ПРИ РЕСАЙЗЕ
     // ============================================================
-    // При изменении размера окна нужно пересчитать позицию падающей колонны
     window.addEventListener('resize', () => {
         if (falling) updateFallingEl();
     });
