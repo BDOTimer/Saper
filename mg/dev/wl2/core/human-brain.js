@@ -58,6 +58,7 @@ export class HumanBrain {
 
     this._moving = false;      // армия сейчас идёт по маршруту
     this._inBattle = false;    // идёт бой, ход приостановлен
+    this._inEncounter = false; // открыта панель обмена юнитами
     this._autoArmy = null;     // армия, идущая по СОХРАНЁННОМУ маршруту
     this._acted = new Set();   // армии, уже завершившие свой ход
     this._armies = [];         // армии текущего игрока
@@ -74,6 +75,7 @@ export class HumanBrain {
   get isActive()  { return this.active; }
   get isMoving()  { return this._moving; }
   get isInBattle(){ return this._inBattle; }
+  get isInEncounter() { return this._inEncounter; }
   get isPlanning(){ return this._planning; }
 
   /* =========================================================
@@ -121,6 +123,7 @@ export class HumanBrain {
     this.selected = null;
     this._moving = false;
     this._inBattle = false;
+    this._inEncounter = false;
     this._autoArmy = null;
     this._acted.clear();
     this._armies = (player?.army ?? []).filter(a => a && a.alive);
@@ -166,7 +169,7 @@ export class HumanBrain {
    */
   handleTileClick(tile) {
     if (!this.active || !tile) return false;
-    if (this._moving || this._inBattle) return true; // во время анимации/боя ждём
+    if (this._moving || this._inBattle || this._inEncounter) return true; // ждём
 
     const own = this._findOwnArmyAt(tile);
 
@@ -206,7 +209,7 @@ export class HumanBrain {
 
   /** «Идти по маршруту» — отправить выбранную армию в путь. */
   go() {
-    if (!this.active || this._moving || this._inBattle || this._planning || !this.selected) return false;
+    if (!this.active || this._moving || this._inBattle || this._inEncounter || this._planning || !this.selected) return false;
 
     const army = this.selected;
     if (!army.alive) { this._complete(army); return false; }
@@ -228,7 +231,7 @@ export class HumanBrain {
 
   /** Пропустить выбранную армию (маршрут сбрасывается). */
   skip() {
-    if (!this.active || this._moving || this._inBattle || this._planning || !this.selected) return false;
+    if (!this.active || this._moving || this._inBattle || this._inEncounter || this._planning || !this.selected) return false;
 
     const army = this.selected;
     this._setRoute(army, [], null);
@@ -244,6 +247,16 @@ export class HumanBrain {
   /** Армия закончила движение. */
   onArmyArrive(army) {
     if (!this.active || this._inBattle) return;
+
+    // Панель обмена закрыта: армия завершает ход на текущей клетке.
+    if (this._inEncounter) {
+      this._inEncounter = false;
+      this._moving = false;
+      this._autoArmy = null;
+      this._refreshUI();
+      this._complete(army);
+      return;
+    }
 
     // Автоматический проход по сохранённому маршруту завершён.
     if (this._autoArmy === army) {
@@ -264,7 +277,7 @@ export class HumanBrain {
    */
   onQueueEmpty() {
     if (!this.active) return false;
-    if (this._inBattle) return true;         // ждём окончания боя
+    if (this._inBattle || this._inEncounter) return true; // ждём окончания
 
     if (this._moving && this.selected) {     // страховка, если onArmyArrive не пришёл
       if (this._autoArmy === this.selected) this._finishAutoArmy(this.selected);
@@ -280,9 +293,26 @@ export class HumanBrain {
   onBattleStart(army) {
     if (!this.active) return;
     this._inBattle = true;
+    this._inEncounter = false;
     this._moving = false;
     this._autoArmy = null;
     this._refreshUI();
+  }
+
+  /**
+   * Армия встретила свою армию — открыта панель обмена.
+   * Движение приостановлено до onArmyArrive (после закрытия панели).
+   * @param {Army} army
+   */
+  onEncounterStart(army) {
+    if (!this.active) return false;
+    this._inEncounter = true;
+    this._inBattle = false;
+    this._moving = false;
+    this._autoArmy = null;
+    if (army) this.selected = army;
+    this._refreshUI();
+    return true;
   }
 
   /** Бой завершён. Армия текущего хода своё действие закончила. */
@@ -290,6 +320,7 @@ export class HumanBrain {
     if (!this.active) return;
     const wasBattle = this._inBattle;
     this._inBattle = false;
+    this._inEncounter = false;
     this._autoArmy = null;
 
     if (!wasBattle) { this._refreshUI(); return; }
@@ -308,6 +339,7 @@ export class HumanBrain {
     if (army) this._acted.add(army);
     this._moving = false;
     this._inBattle = false;
+    this._inEncounter = false;
     this._autoArmy = null;
     this._advance();
   }
@@ -434,6 +466,7 @@ export class HumanBrain {
     this.selected = null;
     this._moving = false;
     this._inBattle = false;
+    this._inEncounter = false;
     this._autoArmy = null;
     this._planning = false;
     this._acted.clear();
@@ -509,7 +542,9 @@ export class HumanBrain {
     }
 
     if (ui.sub) {
-      if (this._inBattle) {
+      if (this._inEncounter) {
+        ui.sub.textContent = 'Идёт обмен юнитами…';
+      } else if (this._inBattle) {
         ui.sub.textContent = 'Идёт бой…';
       } else if (this._planning) {
         if (a) {
@@ -533,14 +568,15 @@ export class HumanBrain {
     }
 
     if (ui.btnGo) {
-      const canGo = !!a && !this._moving && !this._inBattle && !this._planning &&
-                    (a.route?.length > 0);
+      const canGo = !!a && !this._moving && !this._inBattle && !this._inEncounter &&
+                    !this._planning && (a.route?.length > 0);
       ui.btnGo.disabled = !canGo;
       ui.btnGo.textContent = this._moving ? 'Идёт…' : 'Идти по маршруту';
     }
 
     if (ui.btnSkip) {
-      ui.btnSkip.disabled = !a || this._moving || this._inBattle || this._planning;
+      ui.btnSkip.disabled = !a || this._moving || this._inBattle ||
+                            this._inEncounter || this._planning;
     }
   }
 }

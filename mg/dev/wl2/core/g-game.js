@@ -16,6 +16,7 @@ import { HumanBrain  } from './human-brain.js';
 import { ArmyView    } from '../render/army-view.js';
 import { TownView    } from '../render/town-view.js';
 import { BattleView  } from '../render/battle-view.js';
+import { ArmyChangeView } from '../render/army-change-view.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -67,6 +68,8 @@ export class Game {
       },
       // Встреча с врагом: окно боя (армия текущего хода останавливается).
       onBattleRequest: (army, enemies) => this._onBattleRequest(army, enemies),
+      // Встреча со своей армией на не-городской клетке: панель обмена.
+      onFriendlyRequest: (army, friendly) => this._onFriendlyRequest(army, friendly),
       // Очередь анимаций опустела. Ход человека сам решает, что делать;
       // у ИИ — это сигнал «передать ход следующему игроку».
       onQueueEmpty: () => {
@@ -77,6 +80,9 @@ export class Game {
 
     // Контекст для аниматора — заполнится после создания MapView.
     this._moveCtx = null;
+
+    // Текущая встреча своих армий (панель обмена открыта).
+    this._pendingEncounter = null;
 
     // DOM
     this.el = this._render();
@@ -110,6 +116,21 @@ export class Game {
     this.battleView = new BattleView({
       getPlayers:   () => this.playersModel,
       getTurnIndex: () => this.judge.currentPlayer?.index ?? -1,
+    });
+
+    // Панель обмена юнитами между своими армиями при встрече на маршруте.
+    this.armyChangeView = new ArmyChangeView({
+      mapView:    this.mapView,
+      getPlayers: () => this.playersModel,
+      onTransfer: ({ unit, from, to, cost }) => {
+        this._log(
+          `Обмен: «${unit.name}» перешёл из Армии #${from.id} ` +
+          `в Армию #${to.id} (−${cost} стамины).`);
+      },
+      onArmyEmpty: (army) => {
+        this._log(`Армия #${army.id} опустела и расформирована.`);
+      },
+      onClose: (res) => this._onArmyChangeClosed(res),
     });
 
     // Город выпустил юнита (см. Judge._doCities): обновляем модель армии
@@ -443,6 +464,52 @@ export class Game {
     }
   }
 
+  /* ---------------- встречи своих армий ---------------- */
+
+  /**
+   * Идущая армия встретила свою армию на не-городской клетке
+   * (зовёт ArmyMover через onFriendlyRequest).
+   * Панель открывается только игроку-человеку; ИИ просто останавливается.
+   * @param {Army} army     — армия, которая делает ход
+   * @param {Army} friendly — своя армия, стоящая на следующей клетке
+   */
+  _onFriendlyRequest(army, friendly) {
+    const p = this.judge.playerByIndex(army.idOwner);
+    const human = p?.isHuman === true;
+
+    this._log(
+      `🤝 Армия #${army.id} встретила свою армию #${friendly.id}` +
+      (p ? ` (${p.name})` : '') +
+      (human ? ' — обмен юнитами.' : ' — армия остановлена.'), true);
+
+    if (!human) return;
+
+    const opened = this.armyChangeView.show(army, friendly);
+    if (!opened) {
+      this._log(`Армия #${army.id}: панель обмена не открылась — армия остановлена.`);
+      return;
+    }
+
+    this.mover.pauseForEncounter(army);
+    this.humanBrain?.onEncounterStart?.(army);
+    this._pendingEncounter = { army, friendly };
+  }
+
+  /** Панель обмена закрыта: снять паузу и завершить ход армии. */
+  _onArmyChangeClosed(res) {
+    const pending = this._pendingEncounter;
+    this._pendingEncounter = null;
+    if (!pending) return;
+
+    this._log(
+      res?.changed
+        ? `Обмен завершён: Армия #${pending.army.id} ⇄ Армия #${pending.friendly.id}.`
+        : `Обмен отменён: Армия #${pending.army.id} ⇄ Армия #${pending.friendly.id}.`,
+      res?.changed);
+
+    this.mover.resumeFromEncounter();
+  }
+
   /* ---------------- битвы армий ---------------- */
 
   /**
@@ -552,6 +619,8 @@ export class Game {
     this.armyView?.destroy?.();
     this.townView?.destroy?.();
     this.battleView?.destroy?.();
+    this.armyChangeView?.destroy?.();
+    this._pendingEncounter = null;
     this.mapView?.destroy?.();
     this.el.remove();
   }

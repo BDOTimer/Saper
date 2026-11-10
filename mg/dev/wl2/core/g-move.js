@@ -29,6 +29,9 @@ export class ArmyMover {
    * @param {Function} [opts.onArmyArrive]   — (army, stepsDone)
    * @param {Function} [opts.onBattleRequest]— (army, enemies) — встречен враг;
    *   движение останавливается до конца битвы
+   * @param {Function} [opts.onFriendlyRequest] — (army, friendly) — на следующей
+   *   клетке стоит своя армия (не город); движение останавливается до
+   *   закрытия панели обмена (mover.pauseForEncounter / resumeFromEncounter)
    * @param {Function} [opts.onQueueEmpty]   — все армии очереди закончили ход
    */
   constructor(opts = {}) {
@@ -38,6 +41,7 @@ export class ArmyMover {
     this.onArmyStep   = opts.onArmyStep   ?? (() => {});
     this.onArmyArrive = opts.onArmyArrive ?? (() => {});
     this.onBattleRequest = opts.onBattleRequest ?? (() => {});
+    this.onFriendlyRequest = opts.onFriendlyRequest ?? (() => {});
     this.onQueueEmpty = opts.onQueueEmpty ?? (() => {});
 
     /** @type {Array<Army>} — ожидающие хода (порядок сохранён) */
@@ -45,11 +49,16 @@ export class ArmyMover {
     /** Текущий сегмент движения: { army, cell, from, to, k, dur, steps } */
     this.active = null;
 
+    /** Пауза на время модальной панели обмена юнитами. */
+    this.paused = false;
+    this._encounterArmy = null;
+    this._encounterSteps = 0;
+
     this._done = true;   // «пустое» событие onQueueEmpty уже отправлено
   }
 
   /** Двигается ли сейчас хоть одна армия / есть ли очередь. */
-  get busy() { return !!this.active || this.queue.length > 0; }
+  get busy() { return this.paused || !!this.active || this.queue.length > 0; }
 
   /**
    * Поставить армии в очередь хода (порядок сохраняется).
@@ -65,7 +74,37 @@ export class ArmyMover {
   clear() {
     this.queue.length = 0;
     this.active = null;
+    this.paused = false;
+    this._encounterArmy = null;
+    this._encounterSteps = 0;
     this._done = true;
+  }
+
+  /**
+   * Поставить движение на паузу до закрытия панели обмена.
+   * Вызывается из onFriendlyRequest, если панель действительно открыта.
+   * @param {Army} army — армия, остановленная перед своей армией
+   */
+  pauseForEncounter(army) {
+    this.paused = true;
+    this._encounterArmy = army ?? null;
+    return true;
+  }
+
+  /**
+   * Снять паузу и завершить ход остановленной армии.
+   * Вызывается после закрытия панели обмена.
+   * @returns {boolean}
+   */
+  resumeFromEncounter() {
+    if (!this.paused) return false;
+    const army = this._encounterArmy;
+    const steps = this._encounterSteps;
+    this.paused = false;
+    this._encounterArmy = null;
+    this._encounterSteps = 0;
+    if (army) this.onArmyArrive(army, steps);
+    return true;
   }
 
   /**
@@ -74,6 +113,7 @@ export class ArmyMover {
    * @param {Object} ctx — { world, mapView, routeView, unitsView }
    */
   update(dt, ctx) {
+    if (this.paused) return;
     if (!this.active && this.queue.length) this._startNext(ctx);
 
     if (this.active) {
@@ -93,7 +133,7 @@ export class ArmyMover {
 
   /** Взять следующую армию из очереди. */
   _startNext(ctx) {
-    while (this.queue.length && !this.active) {
+    while (this.queue.length && !this.active && !this.paused) {
       const army = this.queue.shift();
       if (!army) continue;
 
@@ -113,9 +153,35 @@ export class ArmyMover {
         continue;
       }
 
+      // На следующей клетке стоит своя армия, и это не город:
+      // дальше не идём, открываем панель обмена (армия остаётся на месте).
+      const friendly = this._friendlyArmyAt(next, army);
+      if (friendly && !this._isCityCell(ctx.world, next)) {
+        this._stopForFriendly(army, friendly, ctx, 0);
+        if (this.paused) return;
+        continue;
+      }
+
       this._beginSegment(army, next, ctx);
       this.onArmyStart(army, army.route.length);
     }
+  }
+
+  /**
+   * Остановить армию перед своей армией и запустить панель обмена.
+   * Если панель не открылась (ИИ/ошибка), сразу завершаем ход армии.
+   * @returns {boolean} всегда true — движение этой армии остановлено
+   */
+  _stopForFriendly(army, friendly, ctx, steps) {
+    ctx.routeView?.consumeSteps?.(army, Infinity);
+    army.route = [];
+    army.cellGoal = null;
+
+    this._encounterSteps = steps;
+    this.onFriendlyRequest(army, friendly);
+
+    if (!this.paused) this.onArmyArrive(army, steps);
+    return true;
   }
 
   /** Начать анимацию одного сегмента (перемащение на одну клетку). */
@@ -199,6 +265,11 @@ export class ArmyMover {
     // ── продолжать маршрут той же армией? ─────────────────
     const next = army.route?.[0];
     if (next && army.canMoveTo(next.staminaCost ?? 1)) {
+      const friendly = this._friendlyArmyAt(next, army);
+      if (friendly && !this._isCityCell(ctx.world, next)) {
+        this._stopForFriendly(army, friendly, ctx, done);
+        return;
+      }
       this._beginSegment(army, next, ctx, done);
       return;
     }
@@ -225,6 +296,30 @@ export class ArmyMover {
       Array.isArray(a.units) &&
       a.units.some(u => u && u.alive !== false)
     );
+  }
+
+  /**
+   * Своя армия, стоящая в клетке cell (с живыми юнитами).
+   * @param {Cell} cell — следующая клетка маршрута
+   * @param {Army} army — идущая армия (исключаем из проверки)
+   * @returns {Army|null}
+   */
+  _friendlyArmyAt(cell, army) {
+    if (!cell?.army?.length) return null;
+    return cell.army.find(a =>
+      a && a !== army &&
+      a.idOwner === army.idOwner &&
+      a.alive !== false &&
+      Array.isArray(a.units) &&
+      a.units.some(u => u && u.alive !== false)
+    ) ?? null;
+  }
+
+  /** Городская ли клетка (в городе несколько армий могут стоять вместе). */
+  _isCityCell(world, cell) {
+    if (!cell) return false;
+    if ((cell.city ?? -1) >= 0) return true;
+    return !!world?.getCityAt?.(cell.x, cell.y);
   }
 
   /** Мировая позиция клетки на сцене (верх плитки). */
