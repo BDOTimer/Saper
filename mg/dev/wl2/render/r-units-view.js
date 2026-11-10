@@ -549,7 +549,8 @@ export class UnitsView {
     this._armyNodes = [];     // { army, root, badge, hpBar? }
 
     this._selectedArmy = null;
-    this._spin = null;        // { root, t, dur, turns } — выбор армии
+    this._selectedNode = null;
+    this._selectSpinSpeed = Math.PI / 4;   // 45°/сек — оборот за 8 секунд
   }
 
   /* ---------- публичный API ---------- */
@@ -638,55 +639,37 @@ export class UnitsView {
 
     if (this._selectedArmy === army) {
       this._selectedArmy = null;
-      this._spin = null;
+      this._selectedNode = null;
     }
   }
 
-  /** Подсветка выбранной армии (рамка вокруг стека) + вращение вокруг Y */
+  /** Подсветка выбранной армии + вращение её юнита вокруг Y */
   setSelected(army, { spin = true } = {}) {
     this._selectedArmy = army ?? null;
-    this._spin = null;
+    this._selectedNode = null;
 
     for (const n of this._armyNodes) {
       const isSel = n.army === army;
       n.selRing.visible = isSel;
-      // Сбрасываем поворот у всех, кроме выбранной.
-      if (!isSel && n.root) n.root.rotation.y = 0;
+      if (isSel) {
+        this._selectedNode = n;
+      } else if (n.unitMesh) {
+        n.unitMesh.rotation.y = 0;
+      }
     }
 
-    if (!army) return;
-
-    const node = this._armyNodes.find(n => n.army === army);
-    if (!node?.root) return;
-
-    node.root.rotation.y = 0;
-    if (spin) {
-      // Полный оборот вокруг Y: заметно, какая армия сейчас в фокусе.
-      this._spin = { root: node.root, t: 0, dur: 900, turns: 1 };
+    if (this._selectedNode && spin) {
+      this._selectedNode.unitMesh.rotation.y = 0;
     }
   }
 
-  /** Покадровая анимация выбора армии. @param {number} dt — мс */
+  /** Покадровое вращение выбранного юнита. @param {number} dt — мс */
   update(dt) {
-    this._stepSelectSpin(dt);
-  }
+    const node = this._selectedNode;
+    if (!node?.unitMesh) return;
 
-  _stepSelectSpin(dt) {
-    const spin = this._spin;
-    if (!spin) return;
-
-    spin.t += dt;
-    const k = Math.min(1, spin.t / spin.dur);
-    const e = k < 0.5
-      ? 4 * k * k * k
-      : 1 - Math.pow(-2 * k + 2, 3) / 2;   // easeInOutCubic
-
-    spin.root.rotation.y = spin.turns * Math.PI * 2 * e;
-
-    if (k >= 1) {
-      spin.root.rotation.y = 0;
-      this._spin = null;
-    }
+    const turn = this._selectSpinSpeed * dt / 1000;
+    node.unitMesh.rotation.y = (node.unitMesh.rotation.y + turn) % (Math.PI * 2);
   }
 
   /** Подсветка армий игрока, чей сейчас ход */
@@ -748,7 +731,7 @@ export class UnitsView {
       new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.9 })
     );
     selRing.visible = false;
-    selRing.position.y = 0.05;
+    selRing.position.y = 0.11;
 
     // 6) контейнер
     const root = new THREE.Group();
@@ -759,7 +742,7 @@ export class UnitsView {
 
     this._placeAt(root, army.x, army.y, army);
 
-    return { army, root, badge, selRing };
+    return { army, root, badge, selRing, unitMesh };
   }
 
   _placeAt(root, x, y, army = null) {
@@ -789,10 +772,6 @@ export class UnitsView {
     // бейдж — чуть выше модели юнита (без учёта сдвига, он локальный)
     const badge = root.children.find(c => c.isSprite);
     if (badge) badge.position.y = 1.35;
-
-    // кольцо выбора — на уровне земли, но тоже под сдвиг (в локальных координатах 0)
-    const ring = root.children.find(c => c.isMesh && c.geometry?.type === 'RingGeometry');
-    if (ring) ring.position.y = 0.05;
   }
 
   _makeBadge(count, strength) {
