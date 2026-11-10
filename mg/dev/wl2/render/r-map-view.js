@@ -166,6 +166,7 @@ export class MapView {
     // Горы стоят на общем уровне земли — без «подставки» под горой.
          if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
     else if (cell.type === 'mount') h = 0.15 + cell.elevation * 0.15;
+    else if (cell.type === 'water') h = -0.15;
     return h + 0.15;
   }
 
@@ -245,7 +246,7 @@ export class MapView {
     // чтобы ни одна клетка не «утопала» в подложке.
     let minBottom = Infinity;
     for (const cell of world.cells) {
-      if (!cell) continue;
+      if (!cell || cell.meta?.isWater) continue;
       minBottom = Math.min(minBottom, this._worldY(cell) - 0.15);
     }
     if (!Number.isFinite(minBottom)) minBottom = 0;
