@@ -36,17 +36,33 @@ export const TOWN_MODEL_TYPES = Object.values(TOWN_MODEL);
 /** Масштаб моделей на карте относительно панельного вида. */
 export const TOWN_MAP_SCALE = 0.5;
 
+/** Текстура каменных стен (общая для всех моделей). */
+const WALL_TEXTURE_URL = './res/img/walls-def.jpg';
+let _wallTexture = null;
+
+function getWallTexture() {
+  if (_wallTexture) return _wallTexture;
+
+  const tex = new THREE.TextureLoader().load(WALL_TEXTURE_URL);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  _wallTexture = tex;
+  return tex;
+}
+
 /* =========================================================
    Палитра
    ========================================================= */
 function makePalette(colorHex) {
   const accent = new THREE.Color(colorHex ?? 0xd9c9a3);
+  const wallTex = getWallTexture();
 
   const mats = {
-    stone:     new THREE.MeshStandardMaterial({ color: 0xd9cfb6, roughness: 0.90 }),
-    stoneDark: new THREE.MeshStandardMaterial({ color: 0x9a8f77, roughness: 0.95 }),
-    stoneWarm: new THREE.MeshStandardMaterial({ color: 0xc8b89a, roughness: 0.92 }),
-    stoneCool: new THREE.MeshStandardMaterial({ color: 0xb7bcc4, roughness: 0.94 }),
+    stone:     new THREE.MeshStandardMaterial({ map: wallTex, color: 0xd9cfb6, roughness: 0.90 }),
+    stoneDark: new THREE.MeshStandardMaterial({ map: wallTex, color: 0x9a8f77, roughness: 0.95 }),
+    stoneWarm: new THREE.MeshStandardMaterial({ map: wallTex, color: 0xc8b89a, roughness: 0.92 }),
+    stoneCool: new THREE.MeshStandardMaterial({ map: wallTex, color: 0xb7bcc4, roughness: 0.94 }),
     wood:      new THREE.MeshStandardMaterial({ color: 0x6d4a2f, roughness: 0.90 }),
     woodDark:  new THREE.MeshStandardMaterial({ color: 0x4e3420, roughness: 0.95 }),
     thatch:    new THREE.MeshStandardMaterial({ color: 0xb08b4f, roughness: 0.95 }),
