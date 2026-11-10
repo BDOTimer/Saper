@@ -249,7 +249,7 @@ export class MapView {
 
     // Масштабируем UV отдельно по каждой грани, чтобы каменная фактура
     // не растягивалась: примерно один тайл текстуры на 6 клеток.
-    const tile = 6 * TILE;
+    const tile = depth * TILE; // было: 6 * TILE;
     const faceRepeats = [
       [depth / tile, height / tile],   // +X
       [depth / tile, height / tile],   // -X
@@ -399,7 +399,8 @@ export class MapView {
     this.world.cities.forEach((city, cityIndex) => {
       const g = new THREE.Group();
       const cell = this.world.get(city.x, city.y);
-      const baseY = cell ? this._worldY(cell) : 0.15;
+      // _worldY — центр плитки; модели стоят на её верхней грани (+0.15).
+      const baseY = cell ? this._worldY(cell) + 0.15 : 0.15;
 
       // Модель соответствует типу города (см. render/town-mesh.js).
       const model = createTownMesh(city.type, {
