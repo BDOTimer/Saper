@@ -682,7 +682,8 @@ export class UnitsView {
     const wx = this.mapView._worldX(x);
     const wz = this.mapView._worldZ(y);
     const cell = this.mapView.world.get(x, y);
-    const wy = cell ? this.mapView._worldY(cell) : 0.15;
+    // _worldY — центр плитки (высота 0.3), юнит стоит на её верхней грани.
+    const wy = cell ? this.mapView._worldY(cell) + 0.15 : 0.15;
 
     // ---- сдвиг, если на клетке город ----
     let ox = 0, oz = 0;

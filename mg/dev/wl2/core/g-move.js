@@ -328,7 +328,8 @@ export class ArmyMover {
     const cell = ctx.world.get(x, y);
     return {
       x: mv._worldX(x),
-      y: cell ? mv._worldY(cell) : 0.15,
+      // _worldY — центр плитки (высота 0.3); армия идёт по её верхней грани.
+      y: cell ? mv._worldY(cell) + 0.15 : 0.15,
       z: mv._worldZ(y),
     };
   }
