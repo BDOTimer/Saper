@@ -4,16 +4,17 @@ import { mulberry32 } from '../core/rng.js';
 
 const TREE_COUNT_MIN = 1;
 const TREE_COUNT_MAX = 4;
-const TREE_HEIGHT_MIN = 0.1;
+const TREE_HEIGHT_MIN = 0.3;
 const TREE_HEIGHT_MAX = 0.6;
-const CORNER_INSET = 0.25;
+const CORNER_INSET_MIN = 0.1;
+const CORNER_INSET_MAX = 0.3;
 const TREE_BASE_LIFT = 0.002;
 
 const CORNERS = [
-  { x: -CORNER_INSET, z: -CORNER_INSET },
-  { x:  CORNER_INSET, z: -CORNER_INSET },
-  { x: -CORNER_INSET, z:  CORNER_INSET },
-  { x:  CORNER_INSET, z:  CORNER_INSET },
+  { x: -1, z: -1 },
+  { x:  1, z: -1 },
+  { x: -1, z:  1 },
+  { x:  1, z:  1 },
 ];
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -121,11 +122,14 @@ export class ForestView {
         const type = rng() < 0.5 ? 0 : 1;
         const height = TREE_HEIGHT_MIN +
           rng() * (TREE_HEIGHT_MAX - TREE_HEIGHT_MIN);
+        const inset = CORNER_INSET_MIN +
+          rng() * (CORNER_INSET_MAX - CORNER_INSET_MIN);
+        const edge = TILE * 0.5 - inset * TILE;
 
         trees[type].push({
-          x: baseX + corner.x * TILE,
+          x: baseX + corner.x * edge,
           y: baseY,
-          z: baseZ + corner.z * TILE,
+          z: baseZ + corner.z * edge,
           rotation: rng() * Math.PI * 2,
           scale: height,
         });
