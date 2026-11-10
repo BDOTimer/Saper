@@ -137,6 +137,8 @@ export class Judge {
 
     for (const city of cities)
     {
+      // Руины не производят и не имеют владельца.
+      if (city.type === 'ruins') continue; // !!
       // Нейтральные города не производят.
       if ((city.ownerId ?? null) === null) continue;
 

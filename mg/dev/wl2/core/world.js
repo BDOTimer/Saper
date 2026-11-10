@@ -16,6 +16,7 @@ export const CITY_TYPE = Object.freeze({
   CAPITAL:    'capital',
   FORTRESS:   'fortress',
   BACKWATER:  'backwater',
+  RUINS:      'ruins',      // нейтральные руины — захватить нельзя
 });
 
 const CITY_TYPE_SET = new Set(Object.values(CITY_TYPE));
@@ -44,6 +45,9 @@ export class City {
     this.name = '';
     this.type = CITY_TYPE.PROVINCIAL;
     this.ownerId = null;
+    // Тип сгенерированной «точки» (fortress/backwater/ruins) или null.
+    // Нужен, чтобы при повторной раздаче убрать старые точки, а не плодить дубли.
+    this.site = null;
     // Производство юнитов (см. core/production.js):
     // выбранный тип, счётчик оставшихся кругов и полная цена.
     this.production = null;
@@ -68,6 +72,7 @@ export class City {
     this.name = data.name ?? `City (${x},${y})`;
     this.type = CITY_TYPE_SET.has(data.type) ? data.type : CITY_TYPE.PROVINCIAL;
     this.ownerId = data.ownerId ?? null;
+    this.site = data.site ?? null;
     this.production = data.production ?? null;
     this.productionOwner = data.productionOwner ?? this.ownerId;
     this.productionTurnsLeft = data.productionTurnsLeft ?? 0;
@@ -113,6 +118,7 @@ export class City {
   normalize() {
     if (!CITY_TYPE_SET.has(this.type)) this.type = CITY_TYPE.PROVINCIAL;
     if (this.ownerId === undefined) this.ownerId = null;
+    if (this.site === undefined) this.site = null;
     if (this.production === undefined) this.production = null;
     if (this.productionOwner === undefined) this.productionOwner = this.ownerId ?? null;
     if (!Number.isFinite(this.productionTurnsLeft)) this.productionTurnsLeft = 0;
@@ -128,6 +134,7 @@ export class City {
       name: this.name,
       type: this.type,
       ownerId: this.ownerId,
+      site: this.site,
       production: this.production,
       productionOwner: this.productionOwner,
       productionTurnsLeft: this.productionTurnsLeft,
@@ -498,6 +505,36 @@ export class WorldMap {
     return this.cityList.normalize();
   }
 
+  /**
+   * Убрать города-«точки», добавленные distributeTerritoriesAndCapitals
+   * (крепости/захолустья/руины). Нужно для идемпотентного повторного запуска.
+   * @returns {number} сколько удалено
+   */
+  removeGeneratedSites() {
+    const list = this.cityList.list;
+    if (!Array.isArray(list) || !list.some(c => c && c.site)) return 0;
+
+    const keep = [];
+    for (const city of list) {
+      if (city && city.site) {
+        const cell = this.get(city.x, city.y);
+        if (cell && cell.city >= 0) cell.city = -1;
+      } else {
+        keep.push(city);
+      }
+    }
+
+    this.cities = keep;
+
+    // Индексы в клетках должны снова совпадать с позициями в массиве.
+    this.cities.forEach((city, idx) => {
+      const cell = this.get(city.x, city.y);
+      if (cell) cell.city = idx;
+    });
+
+    return list.length - keep.length;
+  }
+
   _resolveCity(cityOrCoord) {
     return this.cityList._resolve(cityOrCoord);
   }
@@ -583,6 +620,229 @@ export class WorldMap {
   }
 
   /**
+   * Дистанция в шагах от каждой клетки до ближайшей дороги.
+   * @returns {Int32Array} -1, если дорог на карте нет
+   */
+  static _roadDistanceMap(world) {
+    const w = world.w | 0;
+    const h = world.h | 0;
+    const dist = new Int32Array(w * h).fill(-1);
+    const queue = [];
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const cell = world.get(x, y);
+        if (cell && cell.hasRoad) {
+          dist[y * w + x] = 0;
+          queue.push(x, y);
+        }
+      }
+    }
+
+    const dirs = [1, 0, -1, 0, 0, 1, 0, -1];
+    for (let head = 0; head < queue.length; head += 2) {
+      const x = queue[head];
+      const y = queue[head + 1];
+      const d = dist[y * w + x];
+
+      for (let k = 0; k < 8; k += 2) {
+        const nx = x + dirs[k];
+        const ny = y + dirs[k + 1];
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+
+        const idx = ny * w + nx;
+        if (dist[idx] !== -1) continue;
+
+        dist[idx] = d + 1;
+        queue.push(nx, ny);
+      }
+    }
+
+    return dist;
+  }
+
+  /**
+   * Добавить каждому игроку по одной крепости, захолустью и руинам.
+   * Крепость и захолустье принадлежат игроку; руины нейтральны и стоят
+   * на холмах/горах вдали от дорог.
+   *
+   * @returns {{ owned: Map<number, object[]>, ruins: object[] }}
+   */
+  static _addPlayerSites(world, records, opts = {}, nameGen = null) {
+    const owned = new Map();
+    const ruins = [];
+    if (!Array.isArray(records) || records.length === 0) {
+      return { owned, ruins };
+    }
+
+    const w = world.w | 0;
+    const h = world.h | 0;
+    const seed = world.seed | 0;
+    const roadDist = WorldMap._roadDistanceMap(world);
+    const center = { x: w >> 1, y: h >> 1 };
+
+    const LAND = new Set(['plain', 'forest', 'hills']);
+    const isLand = (cell) => LAND.has(cell.type);
+    const isHillOrMount = (cell) =>
+      cell.type === 'hills' || cell.type === 'mount';
+
+    const occupied = new Set();
+    const siteCells = [];
+    for (const city of world.cities) {
+      if (city) occupied.add(`${city.x},${city.y}`);
+    }
+
+    const key = (x, y) => `${x},${y}`;
+    const manhattan = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+
+    const isFree = (cell) => {
+      if (!cell) return false;
+      if (cell.city >= 0) return false;
+      if (occupied.has(key(cell.x, cell.y))) return false;
+      return true;
+    };
+
+    const farEnough = (cell, minDist) =>
+      siteCells.every(s => manhattan(cell, s) >= minDist);
+
+    const pick = (scoreFn) => {
+      let best = null;
+      let bestScore = Infinity;
+      let bestHash = Infinity;
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const cell = world.get(x, y);
+          if (!isFree(cell)) continue;
+
+          const score = scoreFn(cell);
+          if (score == null || !Number.isFinite(score)) continue;
+
+          const hash = hashIdx(x + y * w, seed);
+          if (score < bestScore || (score === bestScore && hash < bestHash)) {
+            best = cell;
+            bestScore = score;
+            bestHash = hash;
+          }
+        }
+      }
+
+      return best;
+    };
+
+    const place = (cell, type, ownerId, name) => {
+      const city = world.addCity({
+        x: cell.x,
+        y: cell.y,
+        type,
+        ownerId,
+        name,
+        site: type,
+      });
+      if (!city) return null;
+
+      city.site = type;
+      occupied.add(key(cell.x, cell.y));
+      siteCells.push({ x: cell.x, y: cell.y });
+      return city;
+    };
+
+    let nameIdx = (opts.nameStartIdx | 0) + world.cities.length;
+    const makeName = (type) => {
+      const idx = nameIdx++;
+      if (!nameGen) {
+        const base = type === 'fortress'   ? 'Крепость'
+          : type === 'backwater' ? 'Захолустье'
+          : 'Руины';
+        return `${base} ${idx + 1}`;
+      }
+      if (type === 'ruins') return `Руины: ${nameGen.name(idx, 'city')}`;
+      return nameGen.name(idx, type);
+    };
+
+    const anchorOf = (rec) => rec?.capital ?? rec?.cities?.[0] ?? center;
+
+    // Крепость: недалеко от столицы, желательно на холме.
+    for (const rec of records) {
+      const anchor = anchorOf(rec);
+      let cell = null;
+
+      for (const [lo, hi] of [[2, 9], [1, 14], [1, 999]]) {
+        cell = pick(c => {
+          if (!isLand(c) || !farEnough(c, 2)) return null;
+          const d = manhattan(c, anchor);
+          if (d < lo || d > hi) return null;
+
+          const road = roadDist[c.y * w + c.x];
+          return (c.type === 'hills' ? 0 : 1.5)
+            + Math.abs(d - 4) * 0.5
+            + (road >= 0 ? road * 0.02 : 0);
+        });
+        if (cell) break;
+      }
+
+      if (!cell) continue;
+      const city = place(cell, 'fortress', rec.ownerId, makeName('fortress'));
+      if (city) {
+        if (!owned.has(rec.ownerId)) owned.set(rec.ownerId, []);
+        owned.get(rec.ownerId).push(city);
+      }
+    }
+
+    // Захолустье: вдали от дорог, но в окрестностях столицы.
+    for (const rec of records) {
+      const anchor = anchorOf(rec);
+      let cell = null;
+
+      for (const [lo, hi] of [[4, 12], [2, 16], [1, 999]]) {
+        cell = pick(c => {
+          if (!isLand(c) || !farEnough(c, 2)) return null;
+          const d = manhattan(c, anchor);
+          if (d < lo || d > hi) return null;
+
+          const road = roadDist[c.y * w + c.x];
+          const remote = road < 0 ? 30 : road;
+          return -remote * 2 + Math.abs(d - 7) * 0.5;
+        });
+        if (cell) break;
+      }
+
+      if (!cell) continue;
+      const city = place(cell, 'backwater', rec.ownerId, makeName('backwater'));
+      if (city) {
+        if (!owned.has(rec.ownerId)) owned.set(rec.ownerId, []);
+        owned.get(rec.ownerId).push(city);
+      }
+    }
+
+    // Руины: нейтральны, только холмы/горы и как можно дальше от дорог.
+    for (const rec of records) {
+      const anchor = anchorOf(rec);
+      let cell = null;
+
+      for (const minRoad of [5, 4, 3, 2, 0]) {
+        cell = pick(c => {
+          if (!isHillOrMount(c) || !farEnough(c, 3)) return null;
+          if (manhattan(c, anchor) < 2) return null;
+
+          const road = roadDist[c.y * w + c.x];
+          const rd = road < 0 ? 99 : road;
+          if (rd < minRoad) return null;
+
+          return (c.type === 'mount' ? 0 : 1) - rd;
+        });
+        if (cell) break;
+      }
+
+      if (!cell) continue;
+      const city = place(cell, 'ruins', null, makeName('ruins'));
+      if (city) ruins.push(city);
+    }
+
+    return { owned, ruins };
+  }
+
+  /**
    * Разделить города на равные «территории» (зоны влияния) по числу
    * активных игроков и выбрать по одной столице на игрока.
    *
@@ -608,6 +868,11 @@ export class WorldMap {
   static distributeTerritoriesAndCapitals(world, players, opts = {}) {
     if (!world || !Array.isArray(world.cities) || world.cities.length === 0) {
       return { players: [], capitals: [], byOwner: {} };
+    }
+
+    // Повторный запуск на той же карте не должен плодить дубли точек.
+    if (typeof world.removeGeneratedSites === 'function') {
+      world.removeGeneratedSites();
     }
 
     // ── 0. Активные игроки ─────────────────────────────────────────
@@ -681,10 +946,13 @@ export class WorldMap {
 
     // ── 4.5. Имена городам (опционально) ───────────────────────────
     // Если явно попросили — раздаём детерминированные имена.
-    if (opts.nameCities) {
-      const gen = opts.nameGen instanceof NameGenerator
-        ? opts.nameGen
-        : new NameGenerator({ seed: world.seed });
+    const nameGen = opts.nameCities
+      ? (opts.nameGen instanceof NameGenerator
+          ? opts.nameGen
+          : new NameGenerator({ seed: world.seed }))
+      : null;
+
+    if (nameGen) {
       const startIdx = opts.nameStartIdx | 0;
 
       for (let k = 0; k < n; k++) {
@@ -696,7 +964,18 @@ export class WorldMap {
           city.type === 'fortress'  ? 'fortress'  :
           city.type === 'backwater' ? 'backwater' :
                                       'city';
-        city.name = gen.name(startIdx + k, style);
+        city.name = nameGen.name(startIdx + k, style);
+      }
+    }
+
+    // ── 4.6. По одной крепости, захолустью и руинам на игрока ──────
+    if (opts.addPlayerSites !== false) {
+      const sites = WorldMap._addPlayerSites(world, resultPlayers, opts, nameGen);
+      for (const rec of resultPlayers) {
+        const extra = sites.owned.get(rec.ownerId) ?? [];
+        if (extra.length === 0) continue;
+        rec.cities.push(...extra);
+        byOwner[rec.ownerId] = (byOwner[rec.ownerId] ?? []).concat(extra);
       }
     }
 

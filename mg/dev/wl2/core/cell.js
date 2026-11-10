@@ -115,6 +115,9 @@ export class Cell {
               ?? null;
     if (!city) return false;
 
+    // Руины — нейтральный объект карты: захватить нельзя.
+    if (city.type === 'ruins') return false;
+
     const owner = city.ownerId ?? null;
 
     // ── 1. Нейтральный город → просто захват ─────────────────────

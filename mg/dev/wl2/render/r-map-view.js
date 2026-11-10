@@ -418,25 +418,29 @@ export class MapView {
       const raisedY   = baseY + ay + 0.04; // Флаг поднят
       const loweredY  = baseY + Math.max(0.15, ay * 0.45);
 
-      const flagColor = this._ownerColor(city.ownerId);
+      // У руин нет владельца и флага.
+      let flag = null;
+      if (city.type !== CITY_TYPE.RUINS) {
+        const flagColor = this._ownerColor(city.ownerId);
 
-      const flag = new THREE.Mesh(
-        new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
-        new THREE.MeshBasicMaterial({ color: flagColor, side: THREE.DoubleSide })
-      );
-      flag.position.set(ax, raisedY, az);
-      flag.userData = {
-        raisedY, loweredY, cityIndex, raised: true,
-        // сохраняем «текущий» ownerId, чтобы уметь детектить изменения
-        ownerId: city.ownerId ?? null,
-      };
-      g.add(flag);
+        flag = new THREE.Mesh(
+          new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
+          new THREE.MeshBasicMaterial({ color: flagColor, side: THREE.DoubleSide })
+        );
+        flag.position.set(ax, raisedY, az);
+        flag.userData = {
+          raisedY, loweredY, cityIndex, raised: true,
+          // сохраняем «текущий» ownerId, чтобы уметь детектить изменения
+          ownerId: city.ownerId ?? null,
+        };
+        g.add(flag);
+      }
 
       g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
       g.userData = { type: 'city', city, flag, model, cityIndex };
       this.cityGroup.add(g);
 
-      this._raisedFlags.add(cityIndex);
+      if (flag) this._raisedFlags.add(cityIndex);
     });
   }
 
