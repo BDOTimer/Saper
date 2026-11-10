@@ -422,12 +422,15 @@ export class MapView {
       let flag = null;
       if (city.type !== CITY_TYPE.RUINS) {
         const flagColor = this._ownerColor(city.ownerId);
+        const flagW = TILE * 0.3;
+        const flagH = TILE * 0.18;
 
         flag = new THREE.Mesh(
-          new THREE.PlaneGeometry(TILE * 0.3, TILE * 0.18),
+          new THREE.PlaneGeometry(flagW, flagH),
           new THREE.MeshBasicMaterial({ color: flagColor, side: THREE.DoubleSide })
         );
-        flag.position.set(ax, raisedY, az);
+        // Полотнище крепится к флагштоку левым краем, а не центром.
+        flag.position.set(ax + flagW / 2, raisedY, az);
         flag.userData = {
           raisedY, loweredY, cityIndex, raised: true,
           // сохраняем «текущий» ownerId, чтобы уметь детектить изменения

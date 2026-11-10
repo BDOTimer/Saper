@@ -202,10 +202,10 @@ function buildProvincial(g, m, withFlag) {
 
   add(g, new THREE.CylinderGeometry(0.015, 0.015, 0.55, 6), m.gold, 0, 1.65, 0);
   if (withFlag) {
-    add(g, new THREE.PlaneGeometry(0.30, 0.18), m.flag, 0.16, 1.80, 0);
+    add(g, new THREE.PlaneGeometry(0.30, 0.18), m.flag, 0.15, 1.80, 0);
   }
 
-  return { height: 1.45, anchor: { x: 0.16, y: 1.80, z: 0 } };
+  return { height: 1.45, anchor: { x: 0, y: 1.80, z: 0 } };
 }
 
 /* =========================================================
@@ -261,7 +261,7 @@ function buildCapital(g, m, withFlag) {
     add(g, new THREE.BoxGeometry(0.06, 0.11, 0.03), m.win, x, 0.96, 0.43);
   }
 
-  return { height: 2.16, anchor: { x: 0.13, y: 2.18, z: 0 } };
+  return { height: 2.16, anchor: { x: 0, y: 2.18, z: 0 } };
 }
 
 /* =========================================================
@@ -308,7 +308,7 @@ function buildFortress(g, m, withFlag) {
     add(g, new THREE.PlaneGeometry(0.22, 0.13), m.flag, 0.74, 1.14, -0.62);
   }
 
-  return { height: 1.22, anchor: { x: 0.74, y: 1.14, z: -0.62 } };
+  return { height: 1.22, anchor: { x: 0.62, y: 1.14, z: -0.62 } };
 }
 
 /* =========================================================
@@ -355,7 +355,7 @@ function buildBackwater(g, m, withFlag) {
     add(g, new THREE.PlaneGeometry(0.18, 0.11), m.flag, 0.69, 0.50, 0.45);
   }
 
-  return { height: 0.62, anchor: { x: 0.69, y: 0.50, z: 0.45 } };
+  return { height: 0.62, anchor: { x: 0.60, y: 0.50, z: 0.45 } };
 }
 
 /* =========================================================
