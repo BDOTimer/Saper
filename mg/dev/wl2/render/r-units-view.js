@@ -454,7 +454,7 @@ function buildGenericUnit(typeKey, colorHex) {
       // плащ сзади со сборкой
       const cape = add(new THREE.PlaneGeometry(0.34, 0.5), matShade, 0, 0.42, -0.11, -0.12);
       cape.material = std({ color: color.clone().lerp(new THREE.Color(0x000000), 0.2), roughness: 0.6, side: THREE.DoubleSide });
-      cape.rotation.y = -Math.PI / 2;
+      //cape.rotation.y = -Math.PI / 2;
       // ноги в сапогах и торс
       add(new THREE.CylinderGeometry(0.05, 0.055, 0.28, 6), matDark, -0.075, 0.14, 0);
       add(new THREE.CylinderGeometry(0.05, 0.055, 0.28, 6), matDark,  0.075, 0.14, 0);
@@ -547,6 +547,9 @@ export class UnitsView {
 
     // реестр бейджей (спрайты) — пересоздаются при rebuild
     this._armyNodes = [];     // { army, root, badge, hpBar? }
+
+    this._selectedArmy = null;
+    this._spin = null;        // { root, t, dur, turns } — выбор армии
   }
 
   /* ---------- публичный API ---------- */
@@ -560,6 +563,9 @@ export class UnitsView {
       this._armyNodes.push(node);
       this.group.add(node.root);
     }
+
+    // После пересборки восстанавливаем подсветку без повторного вращения.
+    if (this._selectedArmy) this.setSelected(this._selectedArmy, { spin: false });
   }
 
   /** Точечное обновление позиции без полного rebuild (на каждый шаг армии) */
@@ -629,12 +635,57 @@ export class UnitsView {
     this.group.remove(node.root);
     disposeTree(node.root);
     this._armyNodes.splice(idx, 1);
+
+    if (this._selectedArmy === army) {
+      this._selectedArmy = null;
+      this._spin = null;
+    }
   }
 
-  /** Подсветка выбранной армии (рамка вокруг стека) */
-  setSelected(army) {
+  /** Подсветка выбранной армии (рамка вокруг стека) + вращение вокруг Y */
+  setSelected(army, { spin = true } = {}) {
+    this._selectedArmy = army ?? null;
+    this._spin = null;
+
     for (const n of this._armyNodes) {
-      n.selRing.visible = (n.army === army);
+      const isSel = n.army === army;
+      n.selRing.visible = isSel;
+      // Сбрасываем поворот у всех, кроме выбранной.
+      if (!isSel && n.root) n.root.rotation.y = 0;
+    }
+
+    if (!army) return;
+
+    const node = this._armyNodes.find(n => n.army === army);
+    if (!node?.root) return;
+
+    node.root.rotation.y = 0;
+    if (spin) {
+      // Полный оборот вокруг Y: заметно, какая армия сейчас в фокусе.
+      this._spin = { root: node.root, t: 0, dur: 900, turns: 1 };
+    }
+  }
+
+  /** Покадровая анимация выбора армии. @param {number} dt — мс */
+  update(dt) {
+    this._stepSelectSpin(dt);
+  }
+
+  _stepSelectSpin(dt) {
+    const spin = this._spin;
+    if (!spin) return;
+
+    spin.t += dt;
+    const k = Math.min(1, spin.t / spin.dur);
+    const e = k < 0.5
+      ? 4 * k * k * k
+      : 1 - Math.pow(-2 * k + 2, 3) / 2;   // easeInOutCubic
+
+    spin.root.rotation.y = spin.turns * Math.PI * 2 * e;
+
+    if (k >= 1) {
+      spin.root.rotation.y = 0;
+      this._spin = null;
     }
   }
 

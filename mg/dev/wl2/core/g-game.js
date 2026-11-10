@@ -416,12 +416,14 @@ export class Game {
 
     this._showTileInfo(cell);
     this.mapView?.selectTile?.(cell, { notify: false, soft: true });
+    this.mapView?.unitsView?.setSelected?.(army);
   }
 
   _clearSelection() {
     this.selected = null;
     this.el.querySelector('#selInfo').textContent = 'Кликни по клетке';
     if (this.mapView.selRing) this.mapView.selRing.visible = false;
+    this.mapView?.unitsView?.setSelected?.(null);
   }
 
   /* ---------------- ход: автоматика + зелёная кнопка ---------------- */

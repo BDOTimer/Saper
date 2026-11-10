@@ -728,6 +728,7 @@ export class MapView {
     }
 
     this._stepFlagAnims(dt);
+    this.unitsView?.update?.(dt);
 
     // если армии двигаются — обновляем позиции узлов
     // (можно вызывать точечно из логики движения, см. ниже)

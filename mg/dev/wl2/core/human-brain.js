@@ -382,6 +382,7 @@ export class HumanBrain {
     this._autoArmy = null;
     this.selected = null;
     this.deps?.routeView?.setArmyFilter?.(null);
+    this.deps?.unitsView?.setSelected?.(null);
     this._refreshUI();
     this.deps?.refreshHud?.();
     this._log('Все армии сделали ход. Можно изменить маршруты и завершить ход.', true);
@@ -473,9 +474,9 @@ export class HumanBrain {
     this._armies = [];
 
     this.deps?.routeView?.setArmyFilter?.(null);
+    this.deps?.unitsView?.setSelected?.(null);
     this._refreshUI();
     this.deps?.refreshHud?.();
-    return wasActive;
   }
 
   _log(msg, hl = false) {
