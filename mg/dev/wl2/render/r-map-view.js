@@ -9,6 +9,7 @@ import { mulberry32  } from '../core/rng.js';
 import { spawnRandomMountain } from './mesh.js';
 import { createTownMesh, TOWN_MAP_SCALE } from './town-mesh.js';
 import { WaterView } from './r-water-view.js';
+import { ForestView } from './forest-mesh.js';
 
 /** Средне-серый цвет крыши нейтрального города. */
 const NEUTRAL_ROOF = 0x8a8f96;
@@ -39,6 +40,7 @@ export class MapView {
     this._raisedFlags = new Set();
     this._flagAnims = new Map();
     this._waterEnabled = true;
+    this.forestView = null;
 
     this.unitsView = new UnitsView(this, { /// +
       getArmies:  () => this._collectArmies(),
@@ -52,6 +54,8 @@ export class MapView {
     this.waterView = new WaterView(this);
     this.waterView.rebuild();
     this._buildOverlays();
+    this.forestView = new ForestView(this);
+    this.forestView.rebuild();
     this._buildMountains();
     this._buildCities();
 
@@ -83,6 +87,8 @@ export class MapView {
     this._disposeMesh('riverMesh');
     this.waterView?.destroy();
     this.waterView = null;
+    this.forestView?.destroy();
+    this.forestView = null;
 
     if (this.mountainGroup) {
       this.scene.remove(this.mountainGroup);
@@ -109,6 +115,8 @@ export class MapView {
     this.waterView.rebuild();
     this.waterView.setEnabled(this._waterEnabled);
     this._buildOverlays();
+    this.forestView = new ForestView(this);
+    this.forestView.rebuild();
     this._buildMountains();
     this._buildCities();
     this.renderer._fitTopCamera(world.w, world.h);
@@ -807,6 +815,8 @@ export class MapView {
     this.unitsView = null;
     this.waterView?.destroy();
     this.waterView = null;
+    this.forestView?.destroy();
+    this.forestView = null;
 
     if (this.mountainGroup) {
       this.scene.remove(this.mountainGroup);
