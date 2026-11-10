@@ -400,7 +400,10 @@ export class MapView {
       const g = new THREE.Group();
       const cell = this.world.get(city.x, city.y);
       // _worldY — центр плитки; модели стоят на её верхней грани (+0.15).
-      const baseY = cell ? this._worldY(cell) + 0.15 : 0.15;
+      // Крепость приподнимаем на 0.01, иначе её дно совпадает с плиткой
+      // и начинается z-fighting («дрожание» текстур).
+      const baseY = (cell ? this._worldY(cell) + 0.15 : 0.15)
+        + (city.type === CITY_TYPE.FORTRESS ? 0.01 : 0);
 
       // Модель соответствует типу города (см. render/town-mesh.js).
       const model = createTownMesh(city.type, {
