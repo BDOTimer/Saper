@@ -475,6 +475,35 @@ function buildGenericUnit(typeKey, colorHex) {
       add(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6), matDark, 0.22, 0.38, 0.02, 0, 0, 0.15); // рукоять
       add(new THREE.BoxGeometry(0.02, 0.055, 0.035), matGold, 0.235, 0.46, 0.02);                  // гарда
       add(new THREE.BoxGeometry(0.02, 0.42, 0.012), matMetal, 0.24, 0.7, 0.02, 0, 0, 0.15);        // клинок
+
+      // Щит в левой руке: полотно развёрнуто на 90° и смотрит вперёд.
+      // Золотой обод и умбон + лёгкий разворот к камере, чтобы щит читался.
+      const shield = new THREE.Group();
+      shield.position.set(-0.22, 0.46, 0.19);
+      shield.rotation.y = 0.25;
+      shield.scale.set(1, 1.12, 1);
+      g.add(shield);
+
+      const shieldFace = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 0.15, 0.03, 20),
+        matAccent
+      );
+      shieldFace.rotation.x = Math.PI / 2;
+      shield.add(shieldFace);
+
+      const shieldRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.15, 0.018, 8, 24),
+        matGold
+      );
+      shieldRim.position.z = 0.015;
+      shield.add(shieldRim);
+
+      const shieldBoss = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04, 10, 8),
+        matGold
+      );
+      shieldBoss.position.z = 0.038;
+      shield.add(shieldBoss);
       break;
     }
 
