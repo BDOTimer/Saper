@@ -472,27 +472,31 @@ function buildGenericUnit(typeKey, colorHex) {
         add(new THREE.ConeGeometry(0.022, 0.09, 5), matGold, Math.cos(a) * 0.095, 0.85, Math.sin(a) * 0.095);
       }
       // меч в правой руке
-      add(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6), matDark, 0.22, 0.38, 0.02, 0, 0, 0.15); // рукоять
+      add(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6), matDark, 0.22, 0.38, 0.02, 0, 0, 0.); // рукоять
       add(new THREE.BoxGeometry(0.02, 0.055, 0.035), matGold, 0.235, 0.46, 0.02);                  // гарда
-      add(new THREE.BoxGeometry(0.02, 0.42, 0.012), matMetal, 0.24, 0.7, 0.02, 0, 0, 0.15);        // клинок
+      add(new THREE.BoxGeometry(0.02, 0.42, 0.012), matMetal, 0.24, 0.7, 0.02, 0, 0, 0.);        // клинок
 
       // Щит в левой руке: полотно развёрнуто на 90° и смотрит вперёд.
-      // Золотой обод и умбон + лёгкий разворот к камере, чтобы щит читался.
+      // Золотой обод и умбон; внешний край щита начинается на локальной
+      // оси Y героя (x = 0), а сам щит смещён к животу.
+      const shieldR = 0.15;
+      const shieldRimR = 0.018;
+      const shieldYaw = 0.25;
       const shield = new THREE.Group();
-      shield.position.set(-0.22, 0.46, 0.19);
-      shield.rotation.y = 0.25;
+      shield.position.set(-(shieldR + shieldRimR) * Math.cos(shieldYaw) + 0.07, 0.40, 0.17);
+      shield.rotation.y = shieldYaw;
       shield.scale.set(1, 1.12, 1);
       g.add(shield);
 
       const shieldFace = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.15, 0.15, 0.03, 20),
+        new THREE.CylinderGeometry(shieldR, shieldR, 0.03, 20),
         matAccent
       );
       shieldFace.rotation.x = Math.PI / 2;
       shield.add(shieldFace);
 
       const shieldRim = new THREE.Mesh(
-        new THREE.TorusGeometry(0.15, 0.018, 8, 24),
+        new THREE.TorusGeometry(shieldR, shieldRimR, 8, 24),
         matGold
       );
       shieldRim.position.z = 0.015;
