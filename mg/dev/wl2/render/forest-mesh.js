@@ -163,6 +163,7 @@ export class ForestView {
         );
         mesh.name = `Forest_${typeIndex}_${partIndex}`;
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        mesh.castShadow = true;
 
         for (let i = 0; i < list.length; i++) {
           const tree = list[i];

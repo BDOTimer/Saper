@@ -14,7 +14,7 @@ export class Renderer {
     this.container = container;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0b0f14);
+    this.scene.background = this._buildSky();
 
     this.cameraOrbit = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
     this.cameraOrbit.position.set(30, 45, 45);
@@ -26,6 +26,11 @@ export class Renderer {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.cameraOrbit, this.renderer.domElement);
@@ -62,6 +67,7 @@ export class Renderer {
   dispose() {
     this._focusAnim = null;
     this.controls?.dispose?.();
+    this.scene?.background?.dispose?.();
     this.scene?.clear?.();
     const gl = this.renderer;
     if (gl) {
@@ -73,11 +79,88 @@ export class Renderer {
     this.controls = null;
   }
 
+  /** Мягкий вертикальный градиент неба вместо плоской заливки. */
+  _buildSky() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.0, '#16283a');
+    grad.addColorStop(0.45, '#0d1622');
+    grad.addColorStop(1.0, '#05080c');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 2, 256);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
   _buildLights() {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.85);
-    dir.position.set(60, 100, 40);
-    this.scene.add(dir);
+    // Мягкий свет неба/земли — заполняет тени и добавляет объём.
+    const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x3a2a1a, 0.55);
+    this.scene.add(hemi);
+
+    // Тёплое солнце. Тень от него падает под 45° по горизонтали и
+    // поднимается под 45° над горизонтом (см. setupWorldLighting).
+    const sun = new THREE.DirectionalLight(0xfff0d0, 2.0);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0002;
+    sun.shadow.normalBias = 0.03;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 500;
+    this.scene.add(sun);
+    this.scene.add(sun.target);
+    this.sun = sun;
+
+    // Холодный контровой свет с противоположной стороны — силуэты
+    // не сливаются с фоном, но тени не отбрасывает.
+    const rim = new THREE.DirectionalLight(0x88aaff, 0.35);
+    rim.position.set(80, 60, 90);
+    this.scene.add(rim);
+
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+  }
+
+  /**
+   * Настроить солнце и его теневую камеру под размер мира.
+   * Свет ставится так, чтобы тени ложились диагонально под 45°
+   * при высоте солнца 45° над горизонтом.
+   * @param {number} worldW — ширина мира в клетках
+   * @param {number} worldH — высота мира в клетках
+   */
+  setupWorldLighting(worldW, worldH) {
+    const sun = this.sun;
+    if (!sun) return;
+
+    const span = Math.max(worldW || 1, worldH || 1) * TILE;
+    const radius = span * 0.85 + 8;
+
+    // 45° азимут (диагональ карты) + 45° высота над горизонтом.
+    const horiz = radius * 1.5;
+    const diag = Math.SQRT1_2;
+    sun.position.set(-horiz * diag, horiz, -horiz * diag);
+    sun.target.position.set(0, 0, 0);
+    sun.target.updateMatrixWorld();
+
+    const cam = sun.shadow.camera;
+    cam.left = -radius;
+    cam.right = radius;
+    cam.top = radius;
+    cam.bottom = -radius;
+    cam.near = 0.5;
+    cam.far = horiz * 2.5;
+    cam.updateProjectionMatrix();
+
+    // Крупные карты требуют большего разрешения теневой карты.
+    const size = span > 60 ? 4096 : 2048;
+    if (sun.shadow.mapSize.x !== size) {
+      sun.shadow.mapSize.set(size, size);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+    }
   }
 
   setCameraMode(mode) {

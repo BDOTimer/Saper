@@ -22,6 +22,7 @@ export class MapView {
 
     this.renderer = new Renderer(container);
     this.scene = this.renderer.scene;
+    this.renderer.setupWorldLighting(world.w, world.h);
 
     this._raycaster = new THREE.Raycaster();
     this._mouse = new THREE.Vector2();
@@ -80,6 +81,7 @@ export class MapView {
   rebuild(world, players = this.players) {
     this.world   = world;
     this.players = players;
+    this.renderer.setupWorldLighting(world.w, world.h);
     this._disposeMesh('baseMesh');
     this._disposeMesh('tileMesh');
     this._disposeMesh('pickMesh');
@@ -293,6 +295,7 @@ export class MapView {
 
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = 'MapBase';
+    mesh.receiveShadow = true;
     mesh.position.set(0, minBottom - height / 2, 0);
     this.baseMesh = mesh;
     this.scene.add(mesh);
@@ -307,6 +310,7 @@ export class MapView {
     const mat = new THREE.MeshStandardMaterial({ roughness: 1 });
     const inst = new THREE.InstancedMesh(geo, mat, count);
     inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    inst.receiveShadow = true;
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
     const pickable = new THREE.InstancedMesh(
@@ -355,6 +359,7 @@ export class MapView {
         inst.setMatrixAt(i, d.matrix);
       });
       inst.instanceMatrix.needsUpdate = true;
+      inst.receiveShadow = true;
       this.roadMesh = inst;
       this.scene.add(inst);
     }
@@ -372,6 +377,7 @@ export class MapView {
         inst.setMatrixAt(i, d.matrix);
       });
       inst.instanceMatrix.needsUpdate = true;
+      inst.receiveShadow = true;
       this.riverMesh = inst;
       this.scene.add(inst);
     }
@@ -406,6 +412,12 @@ export class MapView {
       // Лёгкая вариативность поворота, чтобы одинаковые силуэты не бросались в глаза
       g.rotation.y = rng() * Math.PI * 2;
 
+      g.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.receiveShadow = true;
+      });
+
       g.userData.cell = cell;
       this.mountainGroup.add(g);
     }
@@ -435,6 +447,11 @@ export class MapView {
       });
       model.position.y = baseY;
       model.scale.setScalar(TOWN_MAP_SCALE);
+      model.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.receiveShadow = true;
+      });
       g.add(model);
 
       const anchor = model.userData.flagAnchor;

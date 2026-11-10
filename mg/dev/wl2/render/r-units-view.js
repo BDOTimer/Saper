@@ -718,6 +718,11 @@ export class UnitsView {
 
     // 3) строим меш юнита
     const unitMesh = skin.build(top.typeKey, colorHex);
+    unitMesh.traverse(o => {
+      if (!o.isMesh || !o.material?.isMeshStandardMaterial) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
     unitMesh.userData = { type: 'army', army };
 
     // 4) бейдж с количеством юнитов в стеке
