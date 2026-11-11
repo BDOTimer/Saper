@@ -15,9 +15,11 @@ export class Judge {
   /**
    * @param {WorldMap} worldMap
    * @param {Players} playersModel
+   * @param {object|null} territories — результат distributeTerritoriesAndCapitals
    */
-  constructor(worldMap, playersModel) {
+  constructor(worldMap, playersModel, territories = null) {
     this.world  = worldMap;
+    this.territories = territories;
 
     // Мир доступен всем, кто работает через глобальное состояние
     // (Player.doStep() берёт его отсюда: STATE.world).
@@ -155,8 +157,23 @@ export class Judge {
   // В столицах спавнить героев...
   _citiesStart()
   {
-    // const player = this.currentPlayer;
-    // console.log("🔍: Signal-2", player.isTurn);
+    const records = this.territories?.players ?? [];
+
+    if (records.length > 0) {
+      for (const rec of records) {
+        const city  = rec?.capital;
+        const owner = rec?.player ?? this.playerByIndex(rec?.ownerId);
+        if (!city || !owner) continue;
+
+        const army = this._createHero(city, owner);
+        if (!army) continue;
+
+        city.ownerId = owner.index;
+        owner.addArmy(army);
+        this.world.addArmy(army);
+      }
+      return;
+    }
 
     const cities = this.world.cities;
 

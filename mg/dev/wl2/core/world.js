@@ -390,7 +390,8 @@ export class CitiesAll {
    * активных игроков и выбрать по одной столице на игрока.
    *
    * ВАЖНО: собственность НЕ раздаётся. Все города остаются нейтральными
-   * (ownerId = null), кроме столиц — у каждой столицы ownerId = player.index.
+   * (ownerId = null). Столица выбирается, но владелец назначается позже —
+   * когда в неё встаёт стартовая армия игрока.
    *
    * @param {WorldMap} world
    * @param {object|Array} players — объект Players или массив Player.
@@ -782,7 +783,7 @@ export class WorldMap {
       }
 
       if (!cell) continue;
-      const city = place(cell, 'fortress', rec.ownerId, makeName('fortress'));
+      const city = place(cell, 'fortress', null, makeName('fortress'));
       if (city) {
         if (!owned.has(rec.ownerId)) owned.set(rec.ownerId, []);
         owned.get(rec.ownerId).push(city);
@@ -808,7 +809,7 @@ export class WorldMap {
       }
 
       if (!cell) continue;
-      const city = place(cell, 'backwater', rec.ownerId, makeName('backwater'));
+      const city = place(cell, 'backwater', null, makeName('backwater'));
       if (city) {
         if (!owned.has(rec.ownerId)) owned.set(rec.ownerId, []);
         owned.get(rec.ownerId).push(city);
@@ -936,7 +937,6 @@ export class WorldMap {
       if (playerCities.length > 0) {
         capital = playerCities[0];
         capital.type = 'capital';
-        capital.ownerId = ownerId;
         capitals.push(capital);
       }
 

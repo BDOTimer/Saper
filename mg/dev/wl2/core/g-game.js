@@ -43,7 +43,7 @@ export class Game {
       { allowEmpty: true, nameCities: true, renameAll: true }
     );
 
-    this.judge = new Judge(worldMap, playersModel);
+    this.judge = new Judge(worldMap, playersModel, this.territories);
 
     // Аниматор: плавное передвижение армий по маршрутам (армия за армией).
     this.mover = new ArmyMover({
@@ -94,7 +94,6 @@ export class Game {
     this.mapView.setWaterEnabled(opts.waterShader !== false);
 
     this.mapView._onTileClick = (tile) => this._onTileClick(tile);
-    this.mapView.lowerAllFlags(600); // Опустить все флаги...
 
     // Единственный на всю игру «мозг» игрока-человека.
     this.humanBrain = HumanBrain.get();
@@ -557,6 +556,18 @@ export class Game {
 
     // Ход человека: бой завершён — армия закончила действие.
     this.humanBrain?.onBattleEnd?.(winner, loser);
+
+    // Гарнизон города уничтожен — победитель занимает город.
+    // Повторный onArmyArrive теперь не видит вражеских армий и выполняет
+    // захват; визуально поднимаем флаг цвета победителя.
+    if (winner) {
+      const cell = this.worldMap?.get?.(winner.x, winner.y);
+      const captured = cell?.onArmyArrive?.(winner);
+      if (captured) {
+        const city = this.worldMap.getCityAt(winner.x, winner.y);
+        if (city) this.mapView?.setCityOwner?.(city, winner.idOwner, { raised: true });
+      }
+    }
 
     this.mapView.unitsView.updateArmy?.(winner);
     this.mapView.routeView.rebuild();

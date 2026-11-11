@@ -216,12 +216,15 @@ function buildProvincial(g, m, withFlag) {
   add(g, new THREE.BoxGeometry(0.03, 0.12, 0.07), m.win, -0.36, 0.62, 0);
   add(g, new THREE.BoxGeometry(0.03, 0.12, 0.07), m.win,  0.36, 0.62, 0);
 
-  add(g, new THREE.CylinderGeometry(0.015, 0.015, 0.55, 6), m.gold, 0, 1.65, 0);
+  const poleY = 1.65;
+  const poleH = 0.55;
+  add(g, new THREE.CylinderGeometry(0.015, 0.015, poleH, 6), m.gold, 0, poleY, 0);
   if (withFlag) {
-    add(g, new THREE.PlaneGeometry(0.30, 0.18), m.flag, 0.15, 1.80, 0);
+    add(g, new THREE.PlaneGeometry(0.30, 0.18), m.flag,
+      0.15, poleY + poleH / 2 - 0.18 / 2, 0);
   }
 
-  return { height: 1.45, anchor: { x: 0, y: 1.80, z: 0 } };
+  return { height: 1.45, anchor: { x: 0, y: poleY + poleH / 2, z: 0 } };
 }
 
 /* =========================================================
@@ -257,9 +260,12 @@ function buildCapital(g, m, withFlag) {
   add(g, new THREE.BoxGeometry(0.64, 0.08, 0.64), m.gold, 0, 1.63, 0);
   add(g, new THREE.ConeGeometry(0.42, 0.38, 4), m.roof, 0, 1.86, 0, 0, Math.PI / 4, 0);
   add(g, new THREE.SphereGeometry(0.07, 10, 8), m.gold, 0, 2.08, 0);
-  add(g, new THREE.CylinderGeometry(0.013, 0.013, 0.26, 6), m.gold, 0, 2.24, 0);
+  const poleY = 2.24;
+  const poleH = 0.26;
+  add(g, new THREE.CylinderGeometry(0.013, 0.013, poleH, 6), m.gold, 0, poleY, 0);
   if (withFlag) {
-    add(g, new THREE.PlaneGeometry(0.26, 0.15), m.flag, 0.13, 2.18, 0);
+    add(g, new THREE.PlaneGeometry(0.26, 0.15), m.flag,
+      0.13, poleY + poleH / 2 - 0.15 / 2, 0);
   }
 
   for (const sx of [-1, 1]) {
@@ -277,7 +283,7 @@ function buildCapital(g, m, withFlag) {
     add(g, new THREE.BoxGeometry(0.06, 0.11, 0.03), m.win, x, 0.96, 0.43);
   }
 
-  return { height: 2.16, anchor: { x: 0, y: 2.18, z: 0 } };
+  return { height: 2.16, anchor: { x: 0, y: poleY + poleH / 2, z: 0 } };
 }
 
 /* =========================================================
@@ -312,6 +318,9 @@ function buildFortress(g, m, withFlag) {
     add(g, new THREE.BoxGeometry(0.12, 0.12, 0.12), m.stone, dx, 1.06, dz);
   }
 
+  // Цветной участок крыши донжона — принимает цвет владельца (setAccent).
+  add(g, new THREE.ConeGeometry(0.26, 0.20, 4), m.roof, 0, 1.14, 0, 0, Math.PI / 4, 0);
+
   add(g, new THREE.BoxGeometry(0.42, 0.52, 0.20), m.stoneDark, 0, 0.36, 0.52);
   add(g, new THREE.BoxGeometry(0.24, 0.34, 0.06), m.woodDark, 0, 0.30, 0.63);
   add(g, new THREE.BoxGeometry(0.46, 0.08, 0.24), m.stoneCool, 0, 0.66, 0.52);
@@ -319,12 +328,17 @@ function buildFortress(g, m, withFlag) {
   add(g, new THREE.BoxGeometry(0.04, 0.14, 0.03), m.win, -0.16, 0.62, 0.32);
   add(g, new THREE.BoxGeometry(0.04, 0.14, 0.03), m.win,  0.16, 0.62, 0.32);
 
-  add(g, new THREE.CylinderGeometry(0.012, 0.012, 0.42, 5), m.gold, 0.62, 1.02, -0.62);
+  // Флаг на центральном донжоне — виден с любого ракурса
+  // (раньше стоял на дальней угловой башне и прятался за донжоном).
+  const poleY = 1.42;
+  const poleH = 0.46;
+  add(g, new THREE.CylinderGeometry(0.012, 0.012, poleH, 5), m.gold, 0, poleY, 0);
   if (withFlag) {
-    add(g, new THREE.PlaneGeometry(0.22, 0.13), m.flag, 0.74, 1.14, -0.62);
+    add(g, new THREE.PlaneGeometry(0.24, 0.14), m.flag,
+      0.12, poleY + poleH / 2 - 0.14 / 2, 0);
   }
 
-  return { height: 1.22, anchor: { x: 0.62, y: 1.14, z: -0.62 } };
+  return { height: 1.50, anchor: { x: 0, y: poleY + poleH / 2, z: 0 } };
 }
 
 /* =========================================================
@@ -346,7 +360,7 @@ function buildBackwater(g, m, withFlag) {
   const hut = (x, z, s, ry) => {
     const h = 0.24 * s;
     add(g, new THREE.BoxGeometry(0.32 * s, h, 0.32 * s), m.wood, x, 0.10 + h / 2, z, 0, ry, 0);
-    add(g, new THREE.ConeGeometry(0.28 * s, 0.20 * s, 4), m.thatch,
+    add(g, new THREE.ConeGeometry(0.28 * s, 0.20 * s, 4), m.roof,
       x, 0.10 + h + 0.10 * s, z, 0, ry + Math.PI / 4, 0);
     const dx = Math.sin(ry) * 0.17 * s;
     const dz = Math.cos(ry) * 0.17 * s;
@@ -364,14 +378,17 @@ function buildBackwater(g, m, withFlag) {
   add(g, new THREE.CylinderGeometry(0.13, 0.15, 0.16, 10), m.stone, 0.02, 0.18, -0.62);
   add(g, new THREE.BoxGeometry(0.04, 0.26, 0.04), m.woodDark, -0.08, 0.38, -0.62);
   add(g, new THREE.BoxGeometry(0.04, 0.26, 0.04), m.woodDark,  0.12, 0.38, -0.62);
-  add(g, new THREE.ConeGeometry(0.17, 0.12, 4), m.thatch, 0.02, 0.56, -0.62, 0, Math.PI / 4, 0);
+  add(g, new THREE.ConeGeometry(0.17, 0.12, 4), m.roof, 0.02, 0.56, -0.62, 0, Math.PI / 4, 0);
 
-  add(g, new THREE.CylinderGeometry(0.012, 0.012, 0.44, 5), m.woodDark, 0.60, 0.32, 0.45);
+  const poleY = 0.32;
+  const poleH = 0.44;
+  add(g, new THREE.CylinderGeometry(0.012, 0.012, poleH, 5), m.woodDark, 0.60, poleY, 0.45);
   if (withFlag) {
-    add(g, new THREE.PlaneGeometry(0.18, 0.11), m.flag, 0.69, 0.50, 0.45);
+    add(g, new THREE.PlaneGeometry(0.18, 0.11), m.flag,
+      0.69, poleY + poleH / 2 - 0.11 / 2, 0.45);
   }
 
-  return { height: 0.62, anchor: { x: 0.60, y: 0.50, z: 0.45 } };
+  return { height: 0.62, anchor: { x: 0.60, y: poleY + poleH / 2, z: 0.45 } };
 }
 
 /* =========================================================

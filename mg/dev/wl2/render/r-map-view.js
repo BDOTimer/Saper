@@ -466,41 +466,92 @@ export class MapView {
       });
       g.add(model);
 
-      const anchor = model.userData.flagAnchor;
-      const ax = anchor ? anchor.x * TOWN_MAP_SCALE : TILE * 0.25;
-      const ay = anchor ? anchor.y * TOWN_MAP_SCALE : TILE * 0.90;
-      const az = anchor ? anchor.z * TOWN_MAP_SCALE : 0;
-
-      const raisedY   = baseY + ay + 0.04; // Флаг поднят
-      const loweredY  = baseY + Math.max(0.15, ay * 0.45);
-
-      // У руин нет владельца и флага.
-      let flag = null;
-      if (city.type !== CITY_TYPE.RUINS) {
-        const flagColor = this._ownerColor(city.ownerId);
-        const flagW = TILE * 0.3;
-        const flagH = TILE * 0.18;
-
-        flag = new THREE.Mesh(
-          new THREE.PlaneGeometry(flagW, flagH),
-          new THREE.MeshBasicMaterial({ color: flagColor, side: THREE.DoubleSide })
-        );
-        // Полотнище крепится к флагштоку левым краем, а не центром.
-        flag.position.set(ax + flagW / 2, raisedY, az);
-        flag.userData = {
-          raisedY, loweredY, cityIndex, raised: true,
-          // сохраняем «текущий» ownerId, чтобы уметь детектить изменения
-          ownerId: city.ownerId ?? null,
-        };
-        g.add(flag);
-      }
-
       g.position.set(this._worldX(city.x), 0, this._worldZ(city.y));
-      g.userData = { type: 'city', city, flag, model, cityIndex };
+      g.userData = { type: 'city', city, flag: null, model, cityIndex };
       this.cityGroup.add(g);
 
+      const flag = this._ensureCityFlag(g);
       if (flag) this._raisedFlags.add(cityIndex);
     });
+
+    this.refreshAllCityFlags(0);
+  }
+
+  /**
+   * Полотнище флага города. Создаётся при необходимости.
+   * У руин флага нет.
+   * @returns {THREE.Mesh|null}
+   */
+  _makeCityFlag(group, city, model, baseY) {
+    if (!group || !city) return null;
+    if (city.type === CITY_TYPE.RUINS) return null;
+    if (group.userData.flag) return group.userData.flag;
+
+    const anchor = model?.userData?.flagAnchor;
+    const ax = anchor ? anchor.x * TOWN_MAP_SCALE : TILE * 0.25;
+    const ay = anchor ? anchor.y * TOWN_MAP_SCALE : TILE * 0.90;
+    const az = anchor ? anchor.z * TOWN_MAP_SCALE : 0;
+
+    const flagW = TILE * 0.3;
+    const flagH = TILE * 0.18;
+
+    const raisedY  = baseY + ay - flagH / 2;
+    const loweredY = baseY + Math.max(0.15, ay * 0.45);
+
+    const flag = new THREE.Mesh(
+      new THREE.PlaneGeometry(flagW, flagH),
+      new THREE.MeshBasicMaterial({ color: this._ownerColor(city.ownerId), side: THREE.DoubleSide })
+    );
+    // Полотнище крепится к флагштоку левым краем, а не центром.
+    flag.position.set(ax + flagW / 2, raisedY, az);
+    flag.userData = {
+      raisedY, loweredY,
+      cityIndex: this._resolveCityIndex(city),
+      raised: true,
+      ownerId: city.ownerId ?? null,
+    };
+
+    group.add(flag);
+    group.userData.flag = flag;
+    return flag;
+  }
+
+  /** Базовая высота модели города на карте. */
+  _cityBaseY(city) {
+    const cell = this.world?.get?.(city.x, city.y);
+    return (cell ? this._worldY(cell) + 0.15 : 0.15)
+      + (city.type === CITY_TYPE.FORTRESS ? 0.01 : 0);
+  }
+
+  /** Гарантировать наличие флага у группы города. */
+  _ensureCityFlag(group) {
+    if (!group) return null;
+    const city = group.userData?.city;
+    if (!city) return null;
+    if (city.type === CITY_TYPE.RUINS) return null;
+    if (group.userData.flag) return group.userData.flag;
+
+    const model = group.userData.model;
+    const baseY = model?.position?.y ?? this._cityBaseY(city);
+    return this._makeCityFlag(group, city, model, baseY);
+  }
+
+  /** Группа города по ссылке/индексу (сверяя ссылку и координаты). */
+  _cityGroupFor(cityOrIndex) {
+    const children = this.cityGroup?.children;
+    if (!children) return null;
+
+    if (typeof cityOrIndex === 'object' && cityOrIndex) {
+      const found = children.find(g => {
+        const c = g?.userData?.city;
+        return c === cityOrIndex ||
+          (c && c.x === cityOrIndex.x && c.y === cityOrIndex.y);
+      });
+      if (found) return found;
+    }
+
+    const idx = this._resolveCityIndex(cityOrIndex);
+    return idx >= 0 ? (children[idx] ?? null) : null;
   }
 
   _buildRings() {
@@ -900,42 +951,47 @@ export class MapView {
    * @returns {boolean}
    */
   setCityOwner(cityOrIndex, ownerId, { raised = true, duration = 600 } = {}) {
-    const idx = this._resolveCityIndex(cityOrIndex);
-    if (idx < 0) return false;
-
-    const group = this.cityGroup?.children[idx];
-    const flag = group?.userData?.flag;
+    const group = this._cityGroupFor(cityOrIndex);
     const city = group?.userData?.city;
-    if (!flag || !city) return false;
+    if (!group || !city) return false;
 
-    city.ownerId = ownerId ?? null;
-    flag.userData.ownerId = city.ownerId;
+    const flag = this._ensureCityFlag(group);
+    if (!flag) return false;
 
-    flag.material.color.setHex(this._ownerColor(city.ownerId));
+    const nextOwner = ownerId ?? null;
+
+    city.ownerId = nextOwner;
+    flag.userData.ownerId = nextOwner;
+
+    flag.material.color.setHex(this._ownerColor(nextOwner));
     flag.material.needsUpdate = true;
 
     // Модель города тоже меняет акцентный цвет на цвет нового владельца.
     const model = group.userData?.model;
     if (model?.userData?.setAccent) {
-      model.userData.setAccent(this._roofColor(city.ownerId));
+      model.userData.setAccent(this._roofColor(nextOwner));
     }
 
-    return this.setCityFlag(idx, raised, duration);
+    return this.setCityFlag(city, raised, duration);
   }
 
   setCityFlag(cityOrIndex, raised = true, duration = 600) {
-    const idx = this._resolveCityIndex(cityOrIndex);
-    if (idx < 0) return false;
+    const group = this._cityGroupFor(cityOrIndex);
+    if (!group) return false;
 
-    const group = this.cityGroup?.children[idx];
-    const flag = group?.userData?.flag;
+    const flag = this._ensureCityFlag(group);
     if (!flag) return false;
 
     // ⬅️ столицу опускать нельзя
     const type = group.userData?.city?.type;
     if (!raised && type === CITY_TYPE.CAPITAL) return false;
 
-    if (flag.userData.raised === raised) return true;
+    const idx = this.cityGroup.children.indexOf(group);
+
+    if (flag.userData.raised === raised) {
+      if (raised) flag.visible = true;
+      return true;
+    }
 
     const targetY = raised ? flag.userData.raisedY : flag.userData.loweredY;
     flag.userData.raised = raised;
@@ -1015,6 +1071,34 @@ export class MapView {
         dur: duration,
         hideAtEnd: true,
       });
+    });
+
+    return changed;
+  }
+
+  /**
+   * Синхронизировать все флаги с текущими владельцами:
+   * у городов с владельцем флаг поднят и окрашен в его цвет,
+   * у нейтральных — опущен. Руины пропускаются.
+   * @param {number} [duration=0] — длительность анимации (0 = мгновенно)
+   * @returns {number}
+   */
+  refreshAllCityFlags(duration = 0) {
+    if (!this.cityGroup) return 0;
+    let changed = 0;
+
+    this.cityGroup.children.forEach((group) => {
+      const city = group?.userData?.city;
+      if (!city || city.type === CITY_TYPE.RUINS) return;
+
+      const flag = this._ensureCityFlag(group);
+      if (!flag) return;
+
+      const owner = city.ownerId ?? null;
+      flag.material.color.setHex(this._ownerColor(owner));
+      flag.material.needsUpdate = true;
+
+      if (this.setCityFlag(city, owner != null, duration)) changed++;
     });
 
     return changed;

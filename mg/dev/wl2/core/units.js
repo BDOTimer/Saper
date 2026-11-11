@@ -50,7 +50,7 @@ export const UNIT_TYPES = {
   ARCHERS:     { id: 6,  name: 'Лучники', strength: 2, damage: 3,  defense: 1, move: 4, cost: 20, build: 2, isHero: false },
   CROSSBOW:    { id: 7,  name: 'Арбалетчики', strength: 4, damage: 4,  defense: 2, move: 4, cost: 40, build: 3, isHero: false },
   // Осадные
-  CATAPULT:    { id: 8,  name: 'Катапульта', strength: 4, damage: 6,  defense: 1, move: 2, cost: 60, build: 4, isHero: false },
+  CATAPULT:    { id: 8,  name: 'Катапульта', strength: 4, damage: 6,  defense: 1, move: 3, cost: 60, build: 4, isHero: false },
   // Магия
   MAGE:        { id: 9,  name: 'Маг', strength: 3, damage: 5,  defense: 2, move: 4, cost: 80, build: 5, isHero: false },
   // Особые
