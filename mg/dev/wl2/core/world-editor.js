@@ -4,6 +4,7 @@ import { Cell, CellType }          from './cell.js';
 import { WorldMapGeneratorConfig, WorldMapGenerator } from './generator.js';
 import { STATE }                   from './g-state.js';
 import { MapView }                 from '../render/r-map-view.js';
+import { UnitsDemo }               from '../render/units-demo.js';
 import { GeneratorPanel }          from '../ui/generator-panel.js';
 import { UI }                      from '../ui/ui.js';
 import { SND }                     from '../res/snd/--sound-lib.js';
@@ -37,6 +38,18 @@ export class MapEditorScreen {
 
     this.panel = new GeneratorPanel(this.config, {
       onGenerate: (seed) => this._generate(seed),
+    });
+
+    // витрина моделей юнитов (кнопка «Юниты» в топбаре)
+    const btnUnits = this.el.querySelector('#btnUnits');
+    this.unitsDemo = new UnitsDemo({
+      parent: this.el,
+      colorHex: this.players?.list?.[0]?.color ?? 0x9aa4ad,
+      onOpenChange: (open) => btnUnits.classList.toggle('active', open),
+    });
+    btnUnits.addEventListener('click', () => {
+      SND.clickBtn.play();   // клик по кнопкам генератора карт
+      this.unitsDemo.toggle();
     });
 
     // кнопки
@@ -123,6 +136,7 @@ export class MapEditorScreen {
           <button id="btnExit">← В меню</button>
           <button id="btnGen" class="primary">Сгенерировать</button>
           <button id="btnPlay" class="primary">Играть</button>
+          <button id="btnUnits">ЮНИТЫ</button>
           <div class="status" id="statusLabel">—</div>
           <button id="btnCamOrbit" class="active">Орбита</button>
           <button id="btnCamTop">Сверху</button>
@@ -174,6 +188,7 @@ export class MapEditorScreen {
 
   destroy() {
     this.panel?.destroy?.();
+    this.unitsDemo?.destroy?.();
     this.mapView?.destroy?.();
     this.ui?.destroy?.();
     this.el.remove();
