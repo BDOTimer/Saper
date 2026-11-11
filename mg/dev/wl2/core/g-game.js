@@ -12,6 +12,7 @@ import { MapView     } from '../render/r-map-view.js';
 import { Judge       } from './g-judge.js';
 import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
+import { visitRuins  } from './ruins.js';
 import { HumanBrain  } from './human-brain.js';
 import { ArmyView    } from '../render/army-view.js';
 import { TownView    } from '../render/town-view.js';
@@ -70,6 +71,8 @@ export class Game {
       onBattleRequest: (army, enemies) => this._onBattleRequest(army, enemies),
       // Встреча со своей армией на не-городской клетке: панель обмена.
       onFriendlyRequest: (army, friendly) => this._onFriendlyRequest(army, friendly),
+      // Армия вошла в клетку с руинами: пробуждение монстров.
+      onRuinsVisit: (army, city) => this._onRuinsVisit(army, city),
       // Очередь анимаций опустела. Ход человека сам решает, что делать;
       // у ИИ — это сигнал «передать ход следующему игроку».
       onQueueEmpty: () => {
@@ -110,6 +113,7 @@ export class Game {
     this.townView = TownView.get(this.mapView, {
       getPlayers: () => this.playersModel,
       getMapClickEnabled: () => !this.humanBrain?.isActive,
+      getTurn: () => this.judge?.turn ?? 1,
     });
 
     // Окно битвы: создаётся один раз, используется повторно при каждой встрече.
@@ -374,10 +378,12 @@ export class Game {
 
     // ── шапка с именем города (если есть) ────────────────────────
     // Кружочек владельца города — прямо в шапке рядом с названием.
+    // Руины — не город: у них нет владельца и свой значок.
+    const isRuins = city?.type === 'ruins';
     const cityBlock = city
       ? `<div class="city-name"
               style="font-size:16px;font-weight:700;margin:6px 0 2px;">
-          🏙 ${city.name}
+          ${isRuins ? '🏚' : '🏙'} ${city.name}
           ${cityOwner ? this._playerDot(cityOwner, 12) : ''}
         </div>
         <div class="muted" style="margin-bottom:6px;">${cityTypeLabel}</div>`
@@ -511,6 +517,84 @@ export class Game {
       res?.changed);
 
     this.mover.resumeFromEncounter();
+  }
+
+  /* ---------------- руины ---------------- */
+
+  /**
+   * Армия вошла в клетку с руинами (зовёт ArmyMover через onRuinsVisit).
+   * Генерация монстров детерминирована и живёт в core/ruins.js.
+   * Панель руин открывается только игроку-человеку.
+   * @param {Army}  army
+   * @param {object} city — руины
+   */
+  _onRuinsVisit(army, city) {
+    const res = visitRuins(this.worldMap, army, city, this.judge?.turn ?? 1);
+    if (!res) return;
+
+    const p = this.judge.playerByIndex(army.idOwner);
+    const human = p?.isHuman === true;
+
+    if (res.visited) {
+      const monsterName = res.monsters?.[0]?.name ?? res.typeKey ?? 'монстры';
+      this._log(
+        `🏚 Руины «${city.name}»: пробуждены монстры — ` +
+        `${monsterName} ×${res.count}.`, human);
+    } else if (res.reason === 'cooldown') {
+      this._log(
+        `🏚 Руины «${city.name}»: ещё спят ${res.cooldownLeft} кр.`, false);
+    }
+
+    if (!human) return;
+    this.townView?.show?.(city, {
+      visit: res,
+      // Монстры присоединяются к армии только после закрытия окна руин.
+      onClose: (res.visited && res.monsters?.length)
+        ? () => this._claimRuinsMonsters(army, city, res)
+        : null,
+    });
+  }
+
+  /**
+   * Закрыть окно руин: все найденные монстры переходят в армию.
+   * @param {Army}   army — армия, посетившая руины
+   * @param {object} city — руины
+   * @param {object} res  — результат core/ruins.visitRuins()
+   */
+  _claimRuinsMonsters(army, city, res) {
+    if (!res || res.claimed) return;
+    res.claimed = true;
+
+    const monsters = res.monsters ?? [];
+    if (monsters.length === 0) return;
+
+    if (!army || army.alive === false) {
+      this._log(`🏚 Руины «${city.name}»: армия не дождалась монстров.`, false);
+      return;
+    }
+
+    const joined = [];
+    for (const unit of monsters) {
+      if (army.addUnit(unit)) joined.push(unit);
+    }
+
+    if (joined.length === monsters.length && city.ruins) {
+      city.ruins.lastMonsters = [];
+    }
+
+    if (joined.length > 0) {
+      this.mapView?.unitsView?.updateArmy?.(army);
+      SND.clickUnit.play();
+      this._log(
+        `🏚 Армия #${army.id} забрала из руин: ` +
+        `${joined[0].name ?? res.typeKey ?? 'монстры'} ×${joined.length}.`, true);
+    }
+
+    if (joined.length < monsters.length) {
+      this._log(
+        `⚠ В армии #${army.id} не хватило места: ` +
+        `${monsters.length - joined.length} монстров остались в руинах.`, false);
+    }
   }
 
   /* ---------------- битвы армий ---------------- */

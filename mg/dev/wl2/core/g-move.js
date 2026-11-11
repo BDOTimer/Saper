@@ -29,11 +29,13 @@ export class ArmyMover {
    * @param {Function} [opts.onArmyArrive]   — (army, stepsDone)
    * @param {Function} [opts.onBattleRequest]— (army, enemies) — встречен враг;
    *   движение останавливается до конца битвы
-   * @param {Function} [opts.onFriendlyRequest] — (army, friendly) — на следующей
-   *   клетке стоит своя армия (не город); движение останавливается до
-   *   закрытия панели обмена (mover.pauseForEncounter / resumeFromEncounter)
-   * @param {Function} [opts.onQueueEmpty]   — все армии очереди закончили ход
-   */
+    * @param {Function} [opts.onFriendlyRequest] — (army, friendly) — на следующей
+    *   клетке стоит своя армия (не город); движение останавливается до
+    *   закрытия панели обмена (mover.pauseForEncounter / resumeFromEncounter)
+    * @param {Function} [opts.onRuinsVisit]   — (army, city) — армия вошла
+    *   в клетку с руинами (пробуждение монстров — в core/ruins.js)
+    * @param {Function} [opts.onQueueEmpty]   — все армии очереди закончили ход
+    */
   constructor(opts = {}) {
     this.speed = opts.speed ?? 2.6;
 
@@ -42,6 +44,7 @@ export class ArmyMover {
     this.onArmyArrive = opts.onArmyArrive ?? (() => {});
     this.onBattleRequest = opts.onBattleRequest ?? (() => {});
     this.onFriendlyRequest = opts.onFriendlyRequest ?? (() => {});
+    this.onRuinsVisit = opts.onRuinsVisit ?? (() => {});
     this.onQueueEmpty = opts.onQueueEmpty ?? (() => {});
 
     /** @type {Array<Army>} — ожидающие хода (порядок сохранён) */
@@ -257,6 +260,14 @@ export class ArmyMover {
         army.cellGoal  = null;
         this.onBattleRequest(army, enemies);         // бой запускает Game
         return;
+      }
+
+      // ── руины: посещение (не чаще раза в 10 полных кругов) ──
+      // Генерацию монстров выполняет Game через core/ruins.js:
+      // аниматор лишь сообщает, что армия вошла в клетку с руинами.
+      const ruinsCity = ctx.world.getCityAt?.(army.x, army.y) ?? null;
+      if (ruinsCity?.type === 'ruins') {
+        this.onRuinsVisit(army, ruinsCity);
       }
     } else {
       done--;                                        // шаг не состоялся

@@ -33,6 +33,7 @@ import {
 } from '../core/production.js';
 import { skinForPlayer, disposeTree } from './r-units-view.js';
 import { createTownMesh } from './town-mesh.js';
+import { ruinsCooldownLeft } from '../core/ruins.js';
 import { SND } from '../res/snd/--sound-lib.js';
 
 /** Шаг между слотами в мини-сцене юнитов. */
@@ -49,6 +50,13 @@ const CITY_TYPE_LABEL = {
   fortress:   'Крепость',
   backwater:  'Захолустье',
   ruins:      'Руины',
+};
+
+/** Цвета «нейтральных» монстров руин (не привязаны к игрокам). */
+const RUINS_MONSTER_COLOR = {
+  DRAGON: 0x7a3b2e,
+  GHOST:  0x4f7f7a,
+  WIZARD: 0x4a3b7a,
 };
 
 /** Набор производимых юнитов зависит от типа города — см. core/production.js. */
@@ -230,6 +238,39 @@ const CSS = `
   cursor: pointer;
 }
 
+/* Загадочная картинка руин вместо ряда производства. */
+.tv-ruins-mystery {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 18px;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(130, 92, 220, .22), rgba(0,0,0,0) 62%),
+    linear-gradient(rgba(8, 10, 16, .42), rgba(8, 10, 16, .78)),
+    url("./res/img/bg3.jpg") center / cover no-repeat;
+  color: #cdbcff;
+}
+.tv-ruins-q {
+  font-size: 96px; font-weight: 800; line-height: .95;
+  color: #e7dcff;
+  text-shadow:
+    0 0 22px rgba(160, 100, 255, .85),
+    0 0 60px rgba(120, 70, 220, .45),
+    0 4px 18px rgba(0, 0, 0, .65);
+}
+.tv-ruins-title {
+  font-size: 15px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: #b9a4ef;
+}
+.tv-ruins-sub {
+  max-width: 460px;
+  font-size: 12.5px; line-height: 1.45;
+  color: #8f84ad;
+}
+
 .tv-prod-bar {
   min-height: 38px;
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px;
@@ -395,6 +436,8 @@ export class TownView {
     this._opts = opts;
     this.mapView = mapView;
     this.getPlayers = opts.getPlayers ?? (() => mapView?.players ?? null);
+    // Номер текущего полного круга — для отображения кулдауна руин.
+    this._getTurn = opts.getTurn ?? (() => 1);
     // Во время хода человека клики по городам уходят в HumanBrain
     // (построение маршрута), а не в модальную панель города.
     this._getMapClickEnabled = opts.getMapClickEnabled ?? (() => true);
@@ -407,6 +450,14 @@ export class TownView {
     this._raf = null;
     this._unitNodes = [];
     this._cityRoot = null;
+    // Режим панели: 'city' — обычный город, 'ruins' — древнее строение.
+    this._viewMode = 'city';
+    this._ruinsVisit = null;
+    this._onClose = null;
+    this._unitsWrap = null;
+    this._unitsHeadEl = null;
+    this._unitsHintEl = null;
+    this._mysteryEl = null;
     this._boundDom = null;
     this._onDomDown = null;
     this._selType = null;
@@ -502,15 +553,18 @@ export class TownView {
     bottomHead.className = 'tv-section-head';
     const bottomTitle = document.createElement('h4');
     bottomTitle.textContent = 'Производство';
+    this._unitsHeadEl = bottomTitle;
     const hint = document.createElement('span');
     hint.className = 'tv-hint';
     hint.textContent = 'Кликните по модели юнита, чтобы выбрать его в производство';
+    this._unitsHintEl = hint;
     bottomHead.appendChild(bottomTitle);
     bottomHead.appendChild(hint);
     bottom.appendChild(bottomHead);
 
     const unitsWrap = document.createElement('div');
     unitsWrap.className = 'tv-units-wrap';
+    this._unitsWrap = unitsWrap;
     bottom.appendChild(unitsWrap);
 
     const unitsCanvas = document.createElement('canvas');
@@ -518,6 +572,20 @@ export class TownView {
     unitsCanvas.addEventListener('pointerdown', (e) => this._onUnitsClick(e));
     this._unitsCanvas = unitsCanvas;
     unitsWrap.appendChild(unitsCanvas);
+
+    const mystery = document.createElement('div');
+    mystery.className = 'tv-ruins-mystery';
+    mystery.innerHTML = `
+      <div class="tv-ruins-q">?</div>
+      <div class="tv-ruins-title">Неизвестность</div>
+      <div class="tv-ruins-sub">
+        Древние руины хранят тайну. Что скрывается внутри —
+        не знает никто. Отправьте сюда армию, чтобы узнать.
+      </div>
+    `;
+    mystery.style.display = 'none';
+    this._mysteryEl = mystery;
+    unitsWrap.appendChild(mystery);
 
     const prodBar = document.createElement('div');
     prodBar.className = 'tv-prod-bar';
@@ -637,6 +705,7 @@ export class TownView {
     this._opts = opts ?? this._opts;
     this.mapView = mapView;
     this.getPlayers = this._opts?.getPlayers ?? (() => mapView.players ?? null);
+    this._getTurn = this._opts?.getTurn ?? (() => 1);
     this._getMapClickEnabled = this._opts?.getMapClickEnabled ?? (() => true);
     this._bindMapClick();
     return this;
@@ -645,12 +714,30 @@ export class TownView {
   /* =========================================================
      Открытие / закрытие
      ========================================================= */
-  show(city) {
+  /**
+   * Открыть панель.
+   * @param {object} city
+   * @param {Object} [opts]
+   * @param {object} [opts.visit] — результат core/ruins.visitRuins()
+   *   (передаётся, когда армия только что посетила руины)
+   * @param {Function} [opts.onClose] — вызвать после закрытия панели
+   *   (например, забрать пробуждённых монстров в армию)
+   */
+  show(city, opts = {}) {
     if (!city) return;
     this.close();
     this._city = city;
+    this._viewMode = city.type === 'ruins' ? 'ruins' : 'city';
+    this._ruinsVisit = this._viewMode === 'ruins'
+      ? (opts.visit ?? null)
+      : null;
+    this._onClose = (this._viewMode === 'ruins'
+      && typeof opts.onClose === 'function')
+      ? opts.onClose
+      : null;
     this._selType = null;
     this._prodKey = null;
+    this._lastProdRefresh = 0;
     this._open = true;
     this._root.classList.add('open');
 
@@ -662,7 +749,11 @@ export class TownView {
   }
 
   close() {
-    if (this._open) {
+    const wasOpen = this._open;
+    const onClose = this._onClose;
+    this._onClose = null;
+
+    if (wasOpen) {
       SND.winClose.play();
       this._open = false;
     }
@@ -672,6 +763,11 @@ export class TownView {
     }
     this._root.classList.remove('open');
     this._clearModels();
+
+    if (wasOpen && onClose) {
+      try { onClose(); }
+      catch (err) { console.error('TownView onClose:', err); }
+    }
   }
 
   destroy() {
@@ -715,13 +811,23 @@ export class TownView {
     this._ownerSwatch.style.background = color;
     this._ownerSwatch.style.color = color;
 
-    const typeLabel = CITY_TYPE_LABEL[city.type] ?? city.type;
-    this._titleEl.textContent = city.name ?? 'Город';
-    this._subEl.textContent = `${typeLabel} · (${city.x}, ${city.y})`;
-    this._heroTagEl.textContent = typeLabel;
+    const isRuins = this._viewMode === 'ruins';
+    const typeLabel = isRuins
+      ? 'Руины'
+      : (CITY_TYPE_LABEL[city.type] ?? city.type);
+    this._titleEl.textContent = city.name ?? (isRuins ? 'Руины' : 'Город');
+    this._subEl.textContent = isRuins
+      ? `Древнее строение · (${city.x}, ${city.y})`
+      : `${typeLabel} · (${city.x}, ${city.y})`;
+    this._heroTagEl.textContent = isRuins ? 'РУИНЫ' : typeLabel;
   }
 
   _refreshStats() {
+    if (this._viewMode === 'ruins') {
+      this._refreshRuinsStats();
+      return;
+    }
+
     const city = this._city;
     const owner = this._owner();
     const color = this._ownerColorCss();
@@ -821,6 +927,71 @@ export class TownView {
     `;
   }
 
+  /** Статы руин: не город, без владельца и производства. */
+  _refreshRuinsStats() {
+    const city = this._city;
+    const v = this._ruinsVisit;
+    const monsters = v?.monsters ?? [];
+    const typeKey = v?.typeKey ?? null;
+    const typeName = monsters.length > 0 && typeKey
+      ? (UNIT_TYPES[typeKey]?.name ?? typeKey)
+      : null;
+
+    const cd = Math.max(
+      0,
+      ruinsCooldownLeft(city, this._getTurn()),
+      v?.cooldownLeft ?? 0,
+    );
+
+    let statusClass = 'warn';
+    let statusText = 'неизвестность';
+    if (monsters.length > 0) {
+      statusClass = 'good';
+      statusText = `пробуждены (${monsters.length})`;
+    } else if (cd > 0) {
+      statusText = `спят ещё ${cd} кр.`;
+    }
+
+    this._statsEl.innerHTML = `
+      <div class="tv-section">
+        <h4>Строение</h4>
+        <div class="tv-row">
+          <span class="k">Название</span>
+          <span class="v">${escapeHtml(city.name ?? '—')}</span>
+        </div>
+        <div class="tv-row">
+          <span class="k">Тип</span>
+          <span class="v">Руины</span>
+        </div>
+        <div class="tv-row">
+          <span class="k">Координаты</span>
+          <span class="v">(${city.x}, ${city.y})</span>
+        </div>
+      </div>
+
+      <div class="tv-section">
+        <h4>Древнее место</h4>
+        <div class="tv-row">
+          <span class="k">Владелец</span>
+          <span class="v">нет</span>
+        </div>
+        <div class="tv-row">
+          <span class="k">Статус</span>
+          <span class="v ${statusClass}">${escapeHtml(statusText)}</span>
+        </div>
+        ${typeName ? `
+        <div class="tv-row">
+          <span class="k">Обитатели</span>
+          <span class="v">${escapeHtml(typeName)} ×${monsters.length}</span>
+        </div>` : ''}
+        <div class="tv-hint" style="margin-top:8px;">
+          Руины не являются городом: их нельзя захватить,
+          они не принадлежат игрокам и не производят юнитов.
+        </div>
+      </div>
+    `;
+  }
+
   /** Армии и юниты владельца, стоящие в клетке города. */
   _cityArmyStats() {
     const city = this._city;
@@ -840,6 +1011,8 @@ export class TownView {
   }
 
   _refreshProductionBar() {
+    if (this._viewMode === 'ruins') return;
+
     const city = this._city;
     const current = ensureCityProduction(city);
     const type = UNIT_TYPES[current];
@@ -899,6 +1072,18 @@ export class TownView {
       this._unitsRoot.clear();
     }
     this._unitNodes = [];
+
+    if (this._viewMode === 'ruins') {
+      this._buildRuinsUnitsRow();
+      return;
+    }
+
+    // Обычный город: вернуть подписи и видимость канваса.
+    this._unitsHeadEl.textContent = 'Производство';
+    this._unitsHintEl.textContent =
+      'Кликните по модели юнита, чтобы выбрать его в производство';
+    this._unitsCanvas.style.visibility = 'visible';
+    if (this._mysteryEl) this._mysteryEl.style.display = 'none';
 
     const city = this._city;
     const options = productionOptions(city);
@@ -975,6 +1160,74 @@ export class TownView {
     this._refreshProductionBar();
   }
 
+  /**
+   * Нижняя мини-сцена руин:
+   *  - простой клик — загадочная картинка с «?»;
+   *  - после визита армии — модели пробуждённых монстров (все одного типа).
+   */
+  _buildRuinsUnitsRow() {
+    const city = this._city;
+    const v = this._ruinsVisit;
+    const monsters = v?.monsters ?? [];
+    const typeKey = v?.typeKey ?? monsters[0]?.typeKey ?? null;
+    const typeName = typeKey ? (UNIT_TYPES[typeKey]?.name ?? typeKey) : null;
+    const showMonsters = monsters.length > 0;
+
+    this._unitsHeadEl.textContent = 'Руины';
+    this._unitsHintEl.textContent = showMonsters
+      ? 'Пробуждённые обитатели — все одного типа'
+      : 'Содержимое руин неизвестно';
+    this._unitsCanvas.style.visibility = showMonsters ? 'visible' : 'hidden';
+    if (this._mysteryEl) {
+      this._mysteryEl.style.display = showMonsters ? 'none' : 'flex';
+    }
+
+    if (!showMonsters) {
+      const cd = Math.max(
+        0,
+        ruinsCooldownLeft(city, this._getTurn()),
+        v?.cooldownLeft ?? 0,
+      );
+      this._prodBarEl.innerHTML = cd > 0
+        ? `<span>Руины спят ещё <span class="cost">${cd}</span> кр.</span>
+           <span>Ничего не произошло</span>`
+        : `<span>Руины молчат…</span>
+           <span>Внутри чувствуется древняя сила</span>`;
+      return;
+    }
+
+    const skin = skinForPlayer(null);
+    const colorHex = RUINS_MONSTER_COLOR[typeKey] ?? 0x8a8f96;
+    const n = monsters.length;
+    const step = n >= 3 ? 1.05 : 1.20;
+    const scale = n >= 3 ? 0.82 : 0.95;
+
+    for (let i = 0; i < n; i++) {
+      const holder = new THREE.Group();
+      holder.add(skin.build(typeKey, colorHex));
+      holder.position.x = (i - (n - 1) / 2) * step;
+      holder.scale.setScalar(scale);
+      holder.userData = { type: 'ruins-monster', typeKey };
+      this._unitsRoot.add(holder);
+      this._unitNodes.push({ holder, typeKey, isCurrent: false });
+    }
+
+    if (typeName) {
+      const label = makeUnitLabel(typeName, `×${n}`);
+      label.position.set(0, 1.62, 0);
+      this._unitsRoot.add(label);
+    }
+
+    this._prodBarEl.innerHTML = `
+      <span>Пробуждено:
+        <b>${escapeHtml(typeName ?? 'монстры')}</b>
+        ×<span class="cost">${n}</span>
+      </span>
+      <span>монстры одного типа</span>
+      <span>Визит: <span class="cost">${this._getTurn()}</span> кр.</span>
+    `;
+  }
+
   _clearModels() {
     if (this._cityRoot) {
       this._cityScene.remove(this._cityRoot);
@@ -994,6 +1247,8 @@ export class TownView {
      ========================================================= */
   _onUnitsClick(e) {
     if (!this._unitsRoot || !this._unitsCam) return;
+    // В руинах модели монстров не выбираются в производство.
+    if (this._viewMode === 'ruins') return;
 
     const r = this._unitsCanvas.getBoundingClientRect();
     this._mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
@@ -1021,6 +1276,7 @@ export class TownView {
 
   _selectProduction(typeKey) {
     if (!this._city || !UNIT_TYPES[typeKey]) return;
+    if (this._viewMode === 'ruins') return;
 
     this._selType = typeKey;
 
@@ -1096,6 +1352,8 @@ export class TownView {
    */
   _maybeRefreshProduction(now) {
     if (!this._city) return;
+    // У руин нет производства — панель статична.
+    if (this._viewMode === 'ruins') return;
     if (now - this._lastProdRefresh < 400) return;
     this._lastProdRefresh = now;
 
@@ -1125,6 +1383,11 @@ export class TownView {
       this._fitUnitsCamera();
 
       if (this._cityRoot) this._cityRoot.rotation.y += 0.004;
+
+      // Пробуждённые монстры медленно поворачиваются в мини-сцене.
+      if (this._viewMode === 'ruins') {
+        for (const n of this._unitNodes) n.holder.rotation.y += 0.008;
+      }
 
       this._cityRenderer.render(this._cityScene, this._cityCam);
       this._unitsRenderer.render(this._unitsScene, this._unitsCam);

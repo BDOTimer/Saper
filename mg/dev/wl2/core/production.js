@@ -42,7 +42,9 @@ export const CITY_PRODUCTION = {
  * @returns {string[]}
  */
 export function productionOptions(city) {
-  const list = CITY_PRODUCTION[city?.type] ?? CITY_PRODUCTION.provincial;
+  // Руины — не город и ничего не производят.
+  if (!city || city.type === 'ruins') return [];
+  const list = CITY_PRODUCTION[city.type] ?? CITY_PRODUCTION.provincial;
   return list.slice(0, MAX_PRODUCTION_OPTIONS);
 }
 
@@ -70,6 +72,14 @@ export function productionTurns(typeKey) {
  */
 export function ensureCityProduction(city) {
   if (!city) return null;
+  // Руины не производят: не назначаем им слот и не трогаем счётчики.
+  if (city.type === 'ruins') {
+    city.production = null;
+    city.productionOwner = null;
+    city.productionTurnsTotal = 0;
+    city.productionTurnsLeft = 0;
+    return null;
+  }
 
   const options = productionOptions(city);
   const ownerId = city.ownerId ?? null;
@@ -103,6 +113,7 @@ export function ensureCityProduction(city) {
  */
 export function setCityProduction(city, typeKey) {
   if (!city || !UNIT_TYPES[typeKey]) return false;
+  if (city.type === 'ruins') return false;
   if (!productionOptions(city).includes(typeKey)) return false;
 
   city.production = typeKey;
@@ -127,6 +138,7 @@ export function setCityProduction(city, typeKey) {
 export function spawnProducedUnit(world, owner, city, typeKey) {
   const type = UNIT_TYPES[typeKey];
   if (!world || !owner || !city || !type) return null;
+  if (city.type === 'ruins') return null;
   if (owner.index == null) return null;
   if ((city.ownerId ?? null) !== owner.index) return null;
 
@@ -174,6 +186,7 @@ export function spawnProducedUnit(world, owner, city, typeKey) {
  */
 export function tickCityProduction(world, owner, city) {
   if (!world || !owner || !city) return null;
+  if (city.type === 'ruins') return null;
   if (owner.index == null) return null;
   if ((city.ownerId ?? null) !== owner.index) return null;
 

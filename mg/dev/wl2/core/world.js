@@ -71,12 +71,20 @@ export class City {
     this.y = y;
     this.name = data.name ?? `City (${x},${y})`;
     this.type = CITY_TYPE_SET.has(data.type) ? data.type : CITY_TYPE.PROVINCIAL;
-    this.ownerId = data.ownerId ?? null;
+    // Руины — нейтральное строение, владельца у них быть не может.
+    this.ownerId = this.type === CITY_TYPE.RUINS ? null : (data.ownerId ?? null);
     this.site = data.site ?? null;
     this.production = data.production ?? null;
-    this.productionOwner = data.productionOwner ?? this.ownerId;
+    this.productionOwner = this.type === CITY_TYPE.RUINS
+      ? null
+      : (data.productionOwner ?? this.ownerId);
     this.productionTurnsLeft = data.productionTurnsLeft ?? 0;
     this.productionTurnsTotal = data.productionTurnsTotal ?? 0;
+    if (this.type === CITY_TYPE.RUINS) {
+      this.production = null;
+      this.productionTurnsLeft = 0;
+      this.productionTurnsTotal = 0;
+    }
     return this;
   }
 
@@ -94,11 +102,23 @@ export class City {
   setType(type) {
     if (!CITY_TYPE_SET.has(type)) return false;
     this.type = type;
+    if (type === CITY_TYPE.RUINS) {
+      this.ownerId = null;
+      this.production = null;
+      this.productionOwner = null;
+      this.productionTurnsLeft = 0;
+      this.productionTurnsTotal = 0;
+    }
     return true;
   }
 
   /** Назначить/снять владельца. ownerId = null — «ничей». */
   setOwner(ownerId) {
+    // Руины не принадлежат никому.
+    if (this.type === CITY_TYPE.RUINS) {
+      this.ownerId = null;
+      return false;
+    }
     this.ownerId = (ownerId === undefined) ? null : ownerId;
     return true;
   }
@@ -123,6 +143,14 @@ export class City {
     if (this.productionOwner === undefined) this.productionOwner = this.ownerId ?? null;
     if (!Number.isFinite(this.productionTurnsLeft)) this.productionTurnsLeft = 0;
     if (!Number.isFinite(this.productionTurnsTotal)) this.productionTurnsTotal = 0;
+    // Руины всегда нейтральны и не производят юнитов.
+    if (this.type === CITY_TYPE.RUINS) {
+      this.ownerId = null;
+      this.production = null;
+      this.productionOwner = null;
+      this.productionTurnsLeft = 0;
+      this.productionTurnsTotal = 0;
+    }
     return this;
   }
 
@@ -244,6 +272,13 @@ export class CitiesAll {
     const city = this._resolve(cityOrCoord);
     if (!city || !CITY_TYPE_SET.has(type)) return false;
     city.type = type;
+    if (type === CITY_TYPE.RUINS) {
+      city.ownerId = null;
+      city.production = null;
+      city.productionOwner = null;
+      city.productionTurnsLeft = 0;
+      city.productionTurnsTotal = 0;
+    }
     return true;
   }
 
@@ -274,6 +309,12 @@ export class CitiesAll {
     const { makeCapital = false, strict = true } = opts;
     const city = this._resolveRef(cityRef);
     if (!city) return strict ? false : true;
+
+    // Руины не принадлежат игрокам и не могут стать столицей.
+    if (city.type === CITY_TYPE.RUINS) {
+      city.ownerId = null;
+      return false;
+    }
 
     city.ownerId = (ownerId === undefined) ? null : ownerId;
     if (makeCapital) city.type = CITY_TYPE.CAPITAL;
@@ -876,6 +917,16 @@ export class WorldMap {
       world.removeGeneratedSites();
     }
 
+    // Руины — не города: они всегда нейтральны и ничего не производят.
+    for (const c of world.cities) {
+      if (!c || c.type !== CITY_TYPE.RUINS) continue;
+      c.ownerId = null;
+      c.production = null;
+      c.productionOwner = null;
+      c.productionTurnsLeft = 0;
+      c.productionTurnsTotal = 0;
+    }
+
     // ── 0. Активные игроки ─────────────────────────────────────────
     const list = Array.isArray(players)
       ? players
@@ -886,7 +937,11 @@ export class WorldMap {
       throw new Error('distributeTerritoriesAndCapitals: нет активных игроков');
     }
 
-    const cities      = world.cities;
+    // Руины — не города: они не участвуют в раздаче территорий,
+    // не получают владельца и не могут стать столицей.
+    const cities      = world.cities.filter(
+      c => c && c.type !== CITY_TYPE.RUINS
+    );
     const n           = cities.length;
     const playerCount = active.length;
 

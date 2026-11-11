@@ -289,7 +289,7 @@ export class AiBrainHelper {
     let bestD = Infinity;
 
     for (const city of cities) {
-      if (!city || !predicate(city)) continue;
+      if (!city || city.type === 'ruins' || !predicate(city)) continue;
 
       // Город, на клетке которого армия УЖЕ стоит, целью не является —
       // иначе buildRoute() вернёт пустой маршрут и армия «застынет».
