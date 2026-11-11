@@ -55,6 +55,8 @@ export const UNIT_TYPES = {
   MAGE:        { id: 9,  name: 'Маг', strength: 3, damage: 5,  defense: 2, move: 4, cost: 80, build: 5, isHero: false },
   // Особые
   DRAGON:      { id: 10, name: 'Дракон', strength: 9, damage: 10, defense: 6, move: 7, cost: 200, build: 8, isHero: false },
+  GHOST:       { id: 12, name: 'ПРИВЕДЕНИЕ', strength: 9, damage: 9, defense: 7, move: 7, cost: 200, build: 8, isHero: false },
+  WIZARD:      { id: 13, name: 'ВОЛШЕБНИК', strength: 8, damage: 9, defense: 5, move: 5, cost: 180, build: 8, isHero: false },
   // Герои (создаются отдельно, не производятся как обычные юниты)
   HERO:        { id: 11, name: 'Герой', strength: 3, damage: 4,  defense: 3, move: 5, cost: 100, build: 0, isHero: true },
 };

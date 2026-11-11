@@ -19,6 +19,10 @@ const CITY_CORNERS = [
 /** Отступ угла от центра клетки (в долях TILE). */
 const CITY_CORNER_OFFSET = 0.32;
 
+/** Детерминированные счётчики фаз для idle-анимации монстров (только визуал). */
+let ghostSerial = 0;
+let wizardSerial = 0;
+
 /* =========================================================
    РЕЕСТР НАБОРОВ (скинов) для юнитов.
    Каждый скин — функция, возвращающая THREE.Group для типа юнита.
@@ -449,6 +453,307 @@ function buildGenericUnit(typeKey, colorHex) {
       break;
     }
 
+    /* --- ПРИВЕДЕНИЕ (призрак) --- */
+    case 'GHOST': {
+      // Парящий призрак: рваный саван, глубокий капюшон с пустым лицом
+      // и горящими глазами, костлявые руки с когтями, клубы тумана.
+      // Полигонаж ниже дракона: нет крыльев, четырёх лап и шипов хребта.
+      const spectral = color.clone().lerp(new THREE.Color(0x8ff0dc), 0.6);
+      const matShroud = std({
+        color: spectral.clone().lerp(new THREE.Color(0x0a1418), 0.3),
+        roughness: 0.35, metalness: 0.05,
+        emissive: spectral.clone().multiplyScalar(0.22),
+        emissiveIntensity: 0.7,
+        transparent: true, opacity: 0.85, depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const matFace = std({ color: 0x04070a, roughness: 1 });
+      const matBone = std({
+        color: 0xd6e4de, roughness: 0.5,
+        emissive: 0x10241f, emissiveIntensity: 0.4,
+      });
+      const matEye = std({
+        color: 0xff3322, emissive: 0xff1a0e,
+        emissiveIntensity: 2.0, roughness: 0.2,
+      });
+      matEye.userData.glow = true;   // не приглушать подсветкой активного игрока
+      const matMist = new THREE.MeshBasicMaterial({
+        color: 0xa8ffe8, transparent: true, opacity: 0.30,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const matAura = new THREE.MeshBasicMaterial({
+        color: 0x6fffe0, transparent: true, opacity: 0.18,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      const UP = new THREE.Vector3(0, 1, 0);
+      const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+      // Тело — отдельная группа, чтобы парить над землёй, не отрывая
+      // тень и ауру от плитки.
+      const body = new THREE.Group();
+      body.position.y = 0.02;
+      g.add(body);
+
+      const addB = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, y, z);
+        m.rotation.set(rx, ry, rz);
+        body.add(m);
+        return m;
+      };
+
+      const segment = (a, b, r1, r2, mat, seg = 6) => {
+        const dir = new THREE.Vector3().subVectors(b, a);
+        const len = dir.length();
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, len, seg, 1), mat);
+        m.position.copy(a).addScaledVector(dir, 0.5);
+        m.quaternion.setFromUnitVectors(UP, dir.normalize());
+        body.add(m);
+        return m;
+      };
+
+      const blob = (x, y, z, sx, sy, sz, mat, seg = 10) => {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(1, seg, Math.max(6, seg - 2)), mat);
+        m.position.set(x, y, z);
+        m.scale.set(sx, sy, sz);
+        body.add(m);
+        return m;
+      };
+
+      // ── саван: от тлеющего подола к плечам ────────────────
+      const profile = [
+        [0.020, 0.10], [0.070, 0.14], [0.140, 0.22], [0.200, 0.36],
+        [0.220, 0.50], [0.205, 0.64], [0.175, 0.78], [0.150, 0.90],
+        [0.120, 0.97], [0.070, 1.03], [0.000, 1.06],
+      ].map(([r, y]) => new THREE.Vector2(r, y));
+      body.add(new THREE.Mesh(new THREE.LatheGeometry(profile, 12), matShroud));
+
+      // ── капюшон ────────────────────────────────────────────
+      blob(0, 1.00, 0.01, 0.185, 0.205, 0.195, matShroud, 12);
+      addB(new THREE.ConeGeometry(0.10, 0.22, 8), matShroud, 0, 1.16, -0.02, -0.22, 0, 0);
+      addB(new THREE.TorusGeometry(0.118, 0.022, 6, 16), matShroud, 0, 0.99, 0.185, -0.10, 0, 0);
+
+      // ── лицо: пустота, глаза, рот с клыками ────────────────
+      blob(0, 0.98, 0.195, 0.090, 0.110, 0.050, matFace, 10);
+      blob(-0.042, 1.00, 0.238, 0.020, 0.028, 0.014, matEye, 8);
+      blob( 0.042, 1.00, 0.238, 0.020, 0.028, 0.014, matEye, 8);
+      blob(0, 0.925, 0.232, 0.030, 0.045, 0.018, matFace, 8);
+      for (const [tx, ty, h] of [[-0.016, 0.952, 0.030], [0.004, 0.958, 0.036], [0.022, 0.948, 0.026]]) {
+        addB(new THREE.ConeGeometry(0.006, h, 4), matBone, tx, ty, 0.246, Math.PI, 0, 0);
+      }
+
+      // ── костлявые руки с когтями ───────────────────────────
+      const buildArm = (sign, reach) => {
+        const shoulder = V(sign * 0.145, 0.82, 0.04);
+        const elbow    = V(sign * 0.245, 0.69, 0.10 + reach);
+        const wrist    = V(sign * 0.285, 0.57, 0.24 + reach * 0.7);
+        segment(shoulder, elbow, 0.032, 0.024, matBone, 6);
+        segment(elbow, wrist, 0.024, 0.015, matBone, 6);
+        blob(elbow.x, elbow.y, elbow.z, 0.030, 0.030, 0.030, matBone, 8);
+
+        const palm = V(sign * 0.295, 0.545, 0.30 + reach * 0.6);
+        blob(palm.x, palm.y, palm.z, 0.030, 0.020, 0.038, matBone, 8);
+        for (let i = -1; i <= 1; i++) {
+          const base = V(palm.x + sign * i * 0.015, palm.y - 0.005, palm.z + 0.018);
+          const tip  = V(base.x + sign * i * 0.045,
+                         base.y - 0.055 - Math.abs(i) * 0.012,
+                         base.z + 0.095);
+          segment(base, tip, 0.008, 0.0015, matBone, 4);
+        }
+      };
+      buildArm(1, 0.02);
+      buildArm(-1, -0.04);
+
+      // ── рваный подол ───────────────────────────────────────
+      const hem = [
+        [ 0.210,  0.020, 0.22,  0.45],
+        [ 0.120,  0.165, 0.18,  0.90],
+        [-0.185,  0.070, 0.24, -0.70],
+        [-0.100, -0.150, 0.20, -0.30],
+        [ 0.020, -0.190, 0.17,  0.25],
+        [ 0.175, -0.120, 0.15,  0.60],
+      ];
+      for (const [hx, hz, len, tilt] of hem) {
+        addB(new THREE.ConeGeometry(0.045, len, 5), matShroud,
+             hx, 0.30 - len * 0.45, hz, Math.PI, 0, tilt);
+      }
+
+      // ── призрачный туман и струйки ─────────────────────────
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3 + 0.35;
+        const r = 0.15 + (i % 3) * 0.055;
+        const puff = new THREE.Mesh(
+          new THREE.SphereGeometry(0.05 + (i % 2) * 0.02, 8, 6), matMist);
+        puff.position.set(Math.cos(a) * r, 0.065 + (i % 3) * 0.012, Math.sin(a) * r);
+        g.add(puff);
+      }
+      for (const [tx, tz] of [[0.24, 0.02], [-0.21, 0.11], [0.13, -0.20], [-0.15, -0.16]]) {
+        segment(V(tx * 0.5, 0.12, tz * 0.5), V(tx, 0.36 + Math.abs(tx) * 0.4, tz),
+                0.020, 0.002, matMist, 5);
+      }
+
+      // ── аура на земле ──────────────────────────────────────
+      const auraGeo = new THREE.RingGeometry(0.26, 0.40, 28);
+      auraGeo.rotateX(-Math.PI / 2);
+      const aura = new THREE.Mesh(auraGeo, matAura);
+      aura.position.y = 0.05;
+      g.add(aura);
+
+      shadow.scale.setScalar(1.7);
+
+      // Данные для idle-анимации в UnitsView.update().
+      g.userData.ghostFx = {
+        phase: ghostSerial++ * 2.399963,
+        body, aura, shadow, eyeMaterial: matEye,
+      };
+      break;
+    }
+
+    /* --- ВОЛШЕБНИК --- */
+    case 'WIZARD': {
+      // Тёмный чародей: длинная мантия, островерхий капюшон, седая борода,
+      // посох с пылающим кристаллом и парящими рунами, круг силы у ног.
+      const violet = color.clone().lerp(new THREE.Color(0x2a1440), 0.62);
+      const matRobe = std({
+        color: violet, roughness: 0.7,
+        emissive: new THREE.Color(0x2b0f4d), emissiveIntensity: 0.35,
+      });
+      const matTrim = std({
+        color: 0xc9a24a, roughness: 0.35, metalness: 0.6,
+        emissive: 0x2a1c05, emissiveIntensity: 0.3,
+      });
+      const matBeard = std({ color: 0xd9dde0, roughness: 0.85 });
+      const matFaceDark = std({ color: 0x05040a, roughness: 1 });
+      const matEye = std({
+        color: 0xc59bff, emissive: 0x8a2be2,
+        emissiveIntensity: 2.0, roughness: 0.2,
+      });
+      const matWood = std({ color: 0x6b4a2c, roughness: 0.9 });
+      const matOrb = std({
+        color: 0xe0c8ff, emissive: 0x9b4dff,
+        emissiveIntensity: 2.2, roughness: 0.15,
+      });
+      matEye.userData.glow = true;   // не приглушать подсветкой активного игрока
+      matOrb.userData.glow = true;
+      const matRune = new THREE.MeshBasicMaterial({
+        color: 0xc98bff, transparent: true, opacity: 0.85,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const matCircle = new THREE.MeshBasicMaterial({
+        color: 0x9b5cff, transparent: true, opacity: 0.14,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      const UP = new THREE.Vector3(0, 1, 0);
+      const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+      const segment = (a, b, r1, r2, mat, seg = 6) => {
+        const dir = new THREE.Vector3().subVectors(b, a);
+        const len = dir.length();
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, len, seg, 1), mat);
+        m.position.copy(a).addScaledVector(dir, 0.5);
+        m.quaternion.setFromUnitVectors(UP, dir.normalize());
+        g.add(m);
+        return m;
+      };
+
+      const blob = (x, y, z, sx, sy, sz, mat, seg = 10) => {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(1, seg, Math.max(6, seg - 2)), mat);
+        m.position.set(x, y, z);
+        m.scale.set(sx, sy, sz);
+        g.add(m);
+        return m;
+      };
+
+      // ── мантия до земли ────────────────────────────────────
+      const profile = [
+        [0.000, 0.03], [0.180, 0.04], [0.230, 0.10], [0.205, 0.24],
+        [0.165, 0.40], [0.150, 0.56], [0.160, 0.70], [0.150, 0.82],
+        [0.100, 0.90], [0.045, 0.94], [0.000, 0.96],
+      ].map(([r, y]) => new THREE.Vector2(r, y));
+      g.add(new THREE.Mesh(new THREE.LatheGeometry(profile, 12), matRobe));
+
+      // пояс и воротник
+      add(new THREE.TorusGeometry(0.152, 0.018, 6, 14), matTrim,
+          0, 0.56, 0, Math.PI / 2, 0, 0);
+      add(new THREE.TorusGeometry(0.105, 0.022, 6, 14), matTrim,
+          0, 0.88, 0, Math.PI / 2, 0, 0);
+
+      // ── рукава и кисти ─────────────────────────────────────
+      // левая рука на посохе
+      segment(V(-0.14, 0.82, 0.02), V(-0.28, 0.64, 0.10), 0.055, 0.040, matRobe, 7);
+      segment(V(-0.28, 0.64, 0.10), V(-0.33, 0.58, 0.13), 0.040, 0.026, matRobe, 7);
+      blob(-0.335, 0.56, 0.135, 0.034, 0.028, 0.038, matBeard, 8);
+      // правая рука простёрта вперёд — жест заклятия
+      segment(V(0.14, 0.82, 0.02), V(0.27, 0.71, 0.16), 0.055, 0.040, matRobe, 7);
+      segment(V(0.27, 0.71, 0.16), V(0.32, 0.67, 0.30), 0.040, 0.026, matRobe, 7);
+      blob(0.325, 0.665, 0.335, 0.032, 0.024, 0.038, matBeard, 8);
+      for (let i = -1; i <= 1; i++) {
+        segment(V(0.325 + i * 0.014, 0.66, 0.355),
+                V(0.325 + i * 0.035, 0.62, 0.42), 0.007, 0.0015, matBeard, 4);
+      }
+
+      // ── капюшон и лицо ─────────────────────────────────────
+      blob(0, 1.00, 0.00, 0.155, 0.175, 0.160, matRobe, 12);
+      add(new THREE.ConeGeometry(0.095, 0.26, 8), matRobe, 0, 1.17, -0.04, -0.25, 0, 0);
+      add(new THREE.TorusGeometry(0.102, 0.020, 6, 14), matTrim,
+          0, 0.985, 0.145, -0.08, 0, 0);
+      blob(0, 0.975, 0.155, 0.075, 0.095, 0.040, matFaceDark, 10);
+      blob(-0.033, 0.990, 0.190, 0.017, 0.024, 0.012, matEye, 8);
+      blob( 0.033, 0.990, 0.190, 0.017, 0.024, 0.012, matEye, 8);
+
+      // ── седая борода ───────────────────────────────────────
+      add(new THREE.ConeGeometry(0.040, 0.26, 6), matBeard, 0, 0.845, 0.165, Math.PI, 0, 0.04);
+      add(new THREE.ConeGeometry(0.028, 0.20, 6), matBeard, -0.045, 0.86, 0.155, Math.PI, 0, -0.18);
+      add(new THREE.ConeGeometry(0.028, 0.20, 6), matBeard,  0.045, 0.86, 0.155, Math.PI, 0,  0.18);
+      add(new THREE.ConeGeometry(0.022, 0.14, 5), matBeard, -0.020, 0.885, 0.178, Math.PI, 0, -0.10);
+      add(new THREE.ConeGeometry(0.022, 0.14, 5), matBeard,  0.020, 0.885, 0.178, Math.PI, 0,  0.10);
+
+      // ── посох с кристаллом и рунами ────────────────────────
+      const staffX = -0.34, staffZ = 0.12;
+      segment(V(staffX, 0.06, staffZ), V(staffX, 1.06, staffZ), 0.018, 0.014, matWood, 6);
+      for (let i = 0; i < 3; i++) {
+        const a = i * Math.PI * 2 / 3;
+        segment(V(staffX, 1.02, staffZ),
+                V(staffX + Math.cos(a) * 0.085, 1.16, staffZ + Math.sin(a) * 0.085),
+                0.012, 0.002, matTrim, 4);
+      }
+      blob(staffX, 1.11, staffZ, 0.055, 0.055, 0.055, matOrb, 12);
+      add(new THREE.TorusGeometry(0.085, 0.008, 6, 20), matTrim,
+          staffX, 1.11, staffZ, Math.PI / 2, 0, 0);
+
+      const runeGroup = new THREE.Group();
+      runeGroup.position.set(staffX, 1.11, staffZ);
+      g.add(runeGroup);
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        const rune = new THREE.Mesh(new THREE.OctahedronGeometry(0.022, 0), matRune);
+        rune.position.set(Math.cos(a) * 0.17, (i % 2 ? 0.03 : -0.03), Math.sin(a) * 0.17);
+        runeGroup.add(rune);
+      }
+
+      // ── круг силы у ног ────────────────────────────────────
+      const circleGeo = new THREE.RingGeometry(0.24, 0.34, 32);
+      circleGeo.rotateX(-Math.PI / 2);
+      const circle = new THREE.Mesh(circleGeo, matCircle);
+      circle.position.y = 0.045;
+      g.add(circle);
+
+      shadow.scale.setScalar(1.3);
+
+      // Данные для idle-анимации в UnitsView.update().
+      g.userData.wizardFx = {
+        phase: wizardSerial++ * 2.399963,
+        runeGroup, circle, orbMaterial: matOrb, eyeMaterial: matEye,
+      };
+      break;
+    }
+
     /* --- Герой --- */
     case 'HERO': {
       // плащ сзади со сборкой
@@ -663,8 +968,55 @@ export class UnitsView {
     }
   }
 
-  /** Покадровое вращение выбранного юнита. @param {number} dt — мс */
+  /** Покадровая анимация (парящие приведения + вращение выбранного юнита).
+   *  @param {number} dt — мс */
   update(dt) {
+    this._time = (this._time ?? 0) + dt;
+    const t = this._time / 1000;
+
+    // idle-анимация монстров: парение, пульс глаз, руны и ауры
+    for (const n of this._armyNodes) {
+      const ud = n.unitMesh?.userData;
+      if (!ud) continue;
+
+      // ПРИВЕДЕНИЕ
+      const fx = ud.ghostFx;
+      if (fx) {
+        const bob = Math.sin(t * 1.6 + fx.phase);
+        if (fx.body) {
+          fx.body.position.y = 0.02 + bob * 0.05;
+          fx.body.rotation.z = Math.sin(t * 0.8 + fx.phase) * 0.035;
+        }
+        if (fx.eyeMaterial) {
+          fx.eyeMaterial.emissiveIntensity = 1.9 + Math.sin(t * 3.0 + fx.phase) * 0.8;
+        }
+        if (fx.aura) {
+          const pulse = 0.5 + 0.5 * Math.sin(t * 2.1 + fx.phase);
+          fx.aura.material.opacity = 0.10 + pulse * 0.14;
+          fx.aura.scale.setScalar(1 + pulse * 0.10);
+        }
+      }
+
+      // ВОЛШЕБНИК
+      const wfx = ud.wizardFx;
+      if (wfx) {
+        if (wfx.runeGroup) {
+          wfx.runeGroup.rotation.y = t * 1.4 + wfx.phase;
+        }
+        if (wfx.orbMaterial) {
+          wfx.orbMaterial.emissiveIntensity = 2.0 + Math.sin(t * 2.6 + wfx.phase) * 0.8;
+        }
+        if (wfx.eyeMaterial) {
+          wfx.eyeMaterial.emissiveIntensity = 1.8 + Math.sin(t * 2.2 + wfx.phase + 1.7) * 0.6;
+        }
+        if (wfx.circle) {
+          const glow = 0.5 + 0.5 * Math.sin(t * 1.8 + wfx.phase);
+          wfx.circle.material.opacity = 0.08 + glow * 0.10;
+          wfx.circle.scale.setScalar(1 + glow * 0.06);
+        }
+      }
+    }
+
     const node = this._selectedNode;
     if (!node?.unitMesh) return;
 
@@ -678,7 +1030,8 @@ export class UnitsView {
       const isActive = n.army.idOwner === idOwner;
       n.root.visible = true;   // всех рисуем; при желании можно приглушать
       n.root.traverse(o => {
-        if (o.isMesh && o.material && o.material.emissive !== undefined) {
+        if (o.isMesh && o.material && o.material.emissive !== undefined
+            && !o.material.userData?.glow) {
           // лёгкая подсветка активного игрока
           const base = o.userData._baseEmissive ?? 0x000000;
           if (!o.userData._baseEmissive) o.userData._baseEmissive = o.material.emissive.getHex();
@@ -723,7 +1076,7 @@ export class UnitsView {
       o.castShadow = true;
       o.receiveShadow = true;
     });
-    unitMesh.userData = { type: 'army', army };
+    unitMesh.userData = { ...unitMesh.userData, type: 'army', army };
 
     // 4) бейдж с количеством юнитов в стеке
     const badge = this._makeBadge(army.count, army.totalStrength);
