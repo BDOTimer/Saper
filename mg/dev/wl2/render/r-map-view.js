@@ -37,6 +37,8 @@ export class MapView {
     this._topZoom   = null;   // { log, target, vel, ratio }
     this._orbitZoom = null;   // { log, target, vel }
     this._tmpDir    = new THREE.Vector3();
+    /** Центр верхней камеры, закреплённый фокусом на клетке (x,z). */
+    this._topFocusXZ = null;
 
     this._raisedFlags = new Set();
     this._flagAnims = new Map();
@@ -106,6 +108,7 @@ export class MapView {
     if (this.selRing) this.selRing.visible = false;
     if (this.hoverRing) this.hoverRing.visible = false;
     this._pendingFocus = null;
+    this._topFocusXZ = null;
     this.renderer._focusAnim = null;
 
     this._raisedFlags = new Set();
@@ -142,6 +145,8 @@ export class MapView {
 
   setCameraMode(mode) {
     this.renderer.setCameraMode(mode);
+    // новая камера стартует без закреплённого фокуса
+    this._topFocusXZ = null;
     if (mode === 'top') this.renderer._fitTopCamera(this.world.w, this.world.h);
   }
 
@@ -182,10 +187,17 @@ export class MapView {
 
   // плавно фокусируемся на клетке
   _focusOnTile(tile, duration = 1500) {
+    const wx = this._worldX(tile.x);
+    const wz = this._worldZ(tile.y);
+
+    // Верхняя камера: закрепляем центр на клетке, иначе clamp зума
+    // вернёт камеру к центру карты и анимация будет незаметна.
+    this._topFocusXZ = this.renderer.mode === 'top' ? { x: wx, z: wz } : null;
+
     this.renderer.focusOnPoint(
-      this._worldX(tile.x),
+      wx,
       this._worldY(tile) * 0.5, // чуть ниже верхушки — центр экрана «смотрит» в клетку
-      this._worldZ(tile.y),
+      wz,
       duration,
     );
   }
@@ -652,11 +664,17 @@ export class MapView {
     cam.bottom = -h / 2;
     cam.updateProjectionMatrix();
 
-    // после зума нужно пересчитать clamp позиции — фрустум изменился
-    const cl = this._clampTopXZ(cam.position.x, cam.position.z);
-    cam.position.x = cl.x;
-    cam.position.z = cl.z;
-    cam.lookAt(cam.position.x, 0, cam.position.z);
+    // Во время анимации фокуса позицией управляет renderer — не мешаем,
+    // иначе clamp каждый кадр возвращает камеру к центру карты.
+    if (this.renderer._focusAnim?.topFrom) return;
+
+    // после зума нужно пересчитать clamp позиции — фрустум изменился.
+    // Закреплённый фокус держим на клетке, а не в центре карты.
+    const c = this._topFocusXZ
+      ?? this._clampTopXZ(cam.position.x, cam.position.z);
+    cam.position.x = c.x;
+    cam.position.z = c.z;
+    cam.lookAt(c.x, 0, c.z);
   }
 
   _updateOrbitZoom(dt) {
@@ -756,6 +774,8 @@ export class MapView {
           cam.position.x += dx;
           cam.position.z += dz;
           cam.lookAt(cam.position.x, 0, cam.position.z);
+          // ручная панорама снимает закреплённый фокус
+          this._topFocusXZ = { x: cam.position.x, z: cam.position.z };
         }
       }
     } else {

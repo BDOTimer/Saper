@@ -15,12 +15,23 @@
 /* ==========================================
    Глобальные настройки шрифта для всего проекта
    ========================================== */
+:root {
+  --font-base: 'Gothic1', 'Share Tech Mono', 'Courier New', monospace;
+}
+
 html, body {
   /* Сначала ваш шрифт, потом запасные варианты */
-  font-family: 'Gothic1', 'Share Tech Mono', 'Courier New', monospace !important;
+  font-family: var(--font-base) !important;
   font-size: 26px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Шрифт проекта по умолчанию наследуется всеми элементами */
+*,
+*::before,
+*::after {
+  font-family: inherit;
 }
 
 /* Принудительное наследование для элементов форм и кнопок.

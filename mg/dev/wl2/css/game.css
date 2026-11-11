@@ -5,7 +5,7 @@
 .game-screen #hud {
   position: absolute; inset: 0;
   pointer-events: none;
-  font-family: system-ui, sans-serif;
+  font-family: inherit;
   color: #e6edf3;
 }
 .game-screen #hud > * { pointer-events: auto; }
@@ -50,3 +50,12 @@
 }
 .game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
 .game-screen #gameLog div.hl { color: #ffd166; }
+
+/* ---- HUD экрана игры: увеличение шрифта в 1.3 раза ---- */
+.game-screen #hud #gameTopbar { font-size: 16.9px; }
+.game-screen #hud button { font-size: 15.6px; }
+.game-screen #hud #gameSidePanel { font-size: 20.8px; }
+.game-screen #hud #gameSidePanel h3 { font-size: 16.9px; }
+.game-screen #hud #gameLog { font-size: 15.6px; }
+.game-screen #hud #humanTurnPanel { font-size: 20.8px; }
+.game-screen #hud #humanTurnPanel .htp-sub { font-size: 18.2px; }
