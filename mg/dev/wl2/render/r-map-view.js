@@ -14,6 +14,9 @@ import { ForestView } from './forest-mesh.js';
 /** Средне-серый цвет крыши нейтрального города. */
 const NEUTRAL_ROOF = 0x8a8f96;
 
+const TILE_BOARD_HEIGHT = 0.3;
+const CELL_LIFT = TILE_BOARD_HEIGHT / 2;
+
 export class MapView {
   constructor(world, container, players = null) {
     this.world     = world;
@@ -180,7 +183,8 @@ export class MapView {
     let h = 0;
     // Горы стоят на общем уровне земли — без «подставки» под горой.
          if (cell.type === 'hills') h = 0.15 + cell.elevation * 0.15;
-    else if (cell.type === 'mount') h = 0.15 + cell.elevation * 0.15;
+    else if (cell.type === 'mount') h = 0.15 + cell.elevation * 0.15 + CELL_LIFT;
+    else if (cell.type === 'forest') h = CELL_LIFT;
     else if (cell.type === 'water') h = -0.15;
     return h + 0.15;
   }
@@ -318,7 +322,7 @@ export class MapView {
     const count = world.cells.length;
     if (count === 0) return;
 
-    const geo = new THREE.BoxGeometry(TILE * 0.98, 0.3, TILE * 0.98);
+    const geo = new THREE.BoxGeometry(TILE * 0.98, TILE_BOARD_HEIGHT, TILE * 0.98);
     const mat = new THREE.MeshStandardMaterial({ roughness: 1 });
     const inst = new THREE.InstancedMesh(geo, mat, count);
     inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
