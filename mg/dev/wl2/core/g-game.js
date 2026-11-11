@@ -87,6 +87,9 @@ export class Game {
     // Текущая встреча своих армий (панель обмена открыта).
     this._pendingEncounter = null;
 
+    // Армия, на которой сейчас стоит фокус (для Ctrl / кнопки «Армия»).
+    this._focusedArmy = null;
+
     // DOM
     this.el = this._render();
     this.parent.appendChild(this.el);
@@ -164,14 +167,15 @@ export class Game {
       log:       (msg, hl) => this._log(msg, hl),
       requestFinish: () => this._finishPlayerTurn(),
       refreshHud:    () => this._refreshHud(),
+      clearFocus:    () => this._clearSelection(),
       // Программный выбор клетки армии, которая сейчас в фокусе.
       focusArmy:     (army) => this._focusArmy(army),
       ui: {
-        panel:   this.el.querySelector('#humanTurnPanel'),
-        title:   this.el.querySelector('#htpTitle'),
-        sub:     this.el.querySelector('#htpSub'),
-        btnGo:   this.el.querySelector('#btnGoRoute'),
-        btnSkip: this.el.querySelector('#btnSkipArmy'),
+        panel:         this.el.querySelector('#humanTurnPanel'),
+        title:         this.el.querySelector('#htpTitle'),
+        sub:           this.el.querySelector('#htpSub'),
+        btnClearRoute: this.el.querySelector('#btnClearRoute'),
+        btnDeselect:   this.el.querySelector('#btnDeselect'),
       },
     });
 
@@ -208,8 +212,10 @@ export class Game {
             <span class="htp-sub" id="htpSub">—</span>
           </div>
           <div class="htp-actions">
-            <button id="btnGoRoute" class="primary" disabled>Идти по маршруту</button>
-            <button id="btnSkipArmy" disabled>Пропустить армию</button>
+            <button id="btnArmyView" disabled title="Ctrl">Армия</button>
+            <button id="btnCityView" disabled title="Shift">Город</button>
+            <button id="btnClearRoute" disabled>Очистить маршрут</button>
+            <button id="btnDeselect" disabled>Снять выбор</button>
           </div>
         </div>
 
@@ -250,17 +256,47 @@ export class Game {
       this.mapView.setCameraMode('top');
     });
 
+    this.el.querySelector('#btnArmyView').addEventListener('click', () => {
+      SND.clickBtn.play();
+      this._openArmyView();
+    });
+    this.el.querySelector('#btnCityView').addEventListener('click', () => {
+      SND.clickBtn.play();
+      this._openCityView();
+    });
+
     // горячие клавиши
     this._onKey = (e) => {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Модальные окна перехватывают горячие клавиши игры.
+      if (this.armyView?.isOpen || this.townView?.isOpen ||
+          this.battleView?.isOpen || this.armyChangeView?.isOpen) return;
+
+      if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !e.repeat) {
+        if (this.humanBrain?.isPlanning) {
+          e.preventDefault();
+          this._openArmyView();
+        }
+        return;
+      }
+
+      if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
+        if (this.humanBrain?.isPlanning) {
+          e.preventDefault();
+          this._openCityView();
+        }
+        return;
+      }
+
       if (e.code === 'Space') {
         e.preventDefault();
         this._onEndTurnAction();
       }
-      // Enter дублирует клик по «Завершить ход» (когда кнопка активна).
+      // Enter дублирует зелёную кнопку «Следующий круг».
       if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-        if (this.judge.isAwaitingNextCircle || this.humanBrain?.isPlanning) {
+        if (this.judge.isAwaitingNextCircle) {
           e.preventDefault();
           this._onEndTurnAction();
         }
@@ -270,46 +306,48 @@ export class Game {
     window.addEventListener('keydown', this._onKey);
   }
 
-  /** Действие кнопки «Завершить ход» (клик и Enter/Space). */
+  /** Действие кнопки «Следующий круг» (клик, Enter, Space). */
   _onEndTurnAction() {
-    // Между кругами — запустить следующий круг.
-    if (this.judge.isAwaitingNextCircle) { this._onNextCircle(); return; }
-    // В фазе планирования хода человека — завершить ход.
-    if (this.humanBrain?.isPlanning) { this.humanBrain.finishTurn(); return; }
+    if (this.judge.isAwaitingNextCircle) {
+      this._onNextCircle();
+      return;
+    }
+    if (this.humanBrain?.isPlanning) {
+      this._log('Дождитесь зелёной кнопки «Следующий круг».');
+    }
   }
 
   _refreshHud() {
     const j = this.judge;
     const p = j.currentPlayer;
-    if (!p) return;
-
     const label = this.el.querySelector('#turnLabel');
     const btn   = this.el.querySelector('#btnEndTurn');
 
     if (j.isAwaitingNextCircle) {
-      // Круг завершён — ждём зелёную кнопку.
+      // Круг завершён — ждём зелёную кнопку, игрок планирует маршруты.
       label.innerHTML =
-        `⭕ Круг ${j.turn - 1} завершён — нажмите зелёную кнопку,` +
-        ` чтобы начать круг ${j.turn}`;
+        `⭕ Круг ${j.turn - 1} завершён · <b>планирование маршрутов</b> — ` +
+        `нажмите зелёную кнопку, чтобы начать круг ${j.turn}`;
       btn.disabled    = false;
       btn.textContent = '▶ Следующий круг';
       btn.classList.add('ready');
+      this._refreshContextButtons();
       return;
     }
 
-    // Ход человека: после того как все армии сходили, включается фаза
-    // планирования — игрок может перестроить маршруты и завершить ход.
-    const humanPlanning = p.isHuman &&
-      this.humanBrain?.isActive && this.humanBrain?.isPlanning;
-
     btn.classList.remove('ready');
-    btn.textContent = 'Завершить ход';
-    btn.disabled    = !humanPlanning;
+    btn.textContent = '▶ Следующий круг';
+    btn.disabled    = true;
 
+    if (!p) return;
+
+    const humanMoving = p.isHuman && this.humanBrain?.isActive;
     const role = p.isHuman ? 'Человек' : `ИИ (${p.aiMeta?.name ?? '—'})`;
     label.innerHTML =
       `${this._playerDot(p, 10)} Ход: <b>${p.name}</b> · ${role} · круг ${j.turn}` +
-      (humanPlanning ? ' · <b>планирование маршрутов</b>' : '');
+      (humanMoving ? ' · <b>армии идут по маршрутам</b>' : '');
+
+    this._refreshContextButtons();
   }
 
   _log(msg, hl = false) {
@@ -356,6 +394,15 @@ export class Game {
       : null;
 
     const city = this.worldMap.getCityAt(tile.x, tile.y);
+
+    const ownArmy = this.humanBrain?.selected ?? null;
+    const player  = this.humanBrain?.player ?? null;
+    const armies  = (tile.army ?? []).filter(a => a && a.alive !== false);
+    const cellArmy = armies.find(a => a === ownArmy)
+      ?? armies.find(a => a.idOwner === player?.index)
+      ?? armies[0]
+      ?? null;
+    this._focusedArmy = cellArmy ?? ownArmy ?? null;
 
     if (sound) {
       if (city) SND.clickTown.play();   // клик по клетке с городом
@@ -407,6 +454,44 @@ export class Game {
       ${cellOwnerLine}
       ${cityOwnerLine}
     `;
+
+    this._refreshContextButtons();
+  }
+
+  /** Доступность кнопок «Армия» (Ctrl) и «Город» (Shift) в фазе планирования. */
+  _refreshContextButtons() {
+    const planning = this.humanBrain?.isPlanning === true;
+    const btnArmy = this.el?.querySelector('#btnArmyView');
+    const btnCity = this.el?.querySelector('#btnCityView');
+
+    if (btnArmy) {
+      const hasArmy = !!this._focusedArmy && this._focusedArmy.alive !== false;
+      btnArmy.disabled = !(planning && hasArmy);
+    }
+    if (btnCity) {
+      const city = this.selected
+        ? this.worldMap?.getCityAt?.(this.selected.x, this.selected.y)
+        : null;
+      btnCity.disabled = !(planning && city);
+    }
+  }
+
+  /** Ctrl / кнопка «Армия»: панель просмотра состава армии в фокусе. */
+  _openArmyView() {
+    const army = this._focusedArmy ?? this.humanBrain?.selected ?? null;
+    if (!army || army.alive === false || !army.units?.length) return;
+    SND.clickUnit.play();
+    this.armyView?.show?.(army);
+  }
+
+  /** Shift / кнопка «Город»: панель просмотра выбранной клетки с городом. */
+  _openCityView() {
+    const city = this.selected
+      ? this.worldMap?.getCityAt?.(this.selected.x, this.selected.y)
+      : null;
+    if (!city) return;
+    SND.clickTown.play();
+    this.townView?.show?.(city);
   }
 
   /**
@@ -420,6 +505,7 @@ export class Game {
     const cell = this.worldMap?.get?.(army.x, army.y);
     if (!cell) return;
 
+    this._focusedArmy = army;
     this._showTileInfo(cell);
     this.mapView?.selectTile?.(cell, { notify: false, soft: true });
     this.mapView?.unitsView?.setSelected?.(army);
@@ -427,9 +513,12 @@ export class Game {
 
   _clearSelection() {
     this.selected = null;
+    this._focusedArmy = null;
     this.el.querySelector('#selInfo').textContent = 'Кликни по клетке';
     if (this.mapView.selRing) this.mapView.selRing.visible = false;
     this.mapView?.unitsView?.setSelected?.(null);
+    this.humanBrain?.clearSelection?.();
+    this._refreshContextButtons();
   }
 
   /* ---------------- ход: автоматика + зелёная кнопка ---------------- */
@@ -445,7 +534,8 @@ export class Game {
     this.mapView.routeView.rebuild();
 
     if (player.isHuman) {
-      // Человек: маршруты строятся кликами, армии идут по кнопке.
+      // Человек: армии сразу идут по маршрутам, построенным в фазе
+      // планирования; после круга игрок планирует следующие маршруты.
       this.humanBrain.begin(player);
       return;
     }
@@ -463,14 +553,19 @@ export class Game {
     if (!res) return;
 
     this._log(`Ход завершён: ${res.prev.name} → ${res.next.name}`);
-    this._refreshHud();
-    this._clearSelection();
 
+    // Круг замкнулся: зелёная кнопка + планирование маршрутов человеком.
     if (this.judge.isAwaitingNextCircle) {
+      const human = this.judge.players.find(p => p.isHuman) ?? null;
+      if (human) this.humanBrain?.beginPlanning?.(human);
       this._log(
-        `⭕ Круг завершён. Нажмите зелёную кнопку — начать круг ${this.judge.turn}.`,
+        `⭕ Круг завершён. Можно планировать маршруты и нажать ` +
+        `зелёную кнопку — начать круг ${this.judge.turn}.`,
         true);
     }
+
+    this._refreshHud();
+    this._clearSelection();
   }
 
   /* ---------------- встречи своих армий ---------------- */
@@ -660,6 +755,8 @@ export class Game {
   /** Зелёная кнопка HUD (и пробел): запустить следующий круг. */
   _onNextCircle() {
     if (!this.judge.isAwaitingNextCircle) return;  // активно только между кругами
+    this.humanBrain?.endPlanning?.();              // закрыть режим планирования
+    this._clearSelection();                        // снять фокус планирования
     this._clearLog();                              // новый круг — чистая панель лога
     this.judge.startNextCircle();
     this._log(`▶ Круг ${this.judge.turn} начат.`, true);

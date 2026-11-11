@@ -723,6 +723,8 @@ export class TownView {
    * @param {Function} [opts.onClose] — вызвать после закрытия панели
    *   (например, забрать пробуждённых монстров в армию)
    */
+  get isOpen() { return this._open; }
+
   show(city, opts = {}) {
     if (!city) return;
     this.close();

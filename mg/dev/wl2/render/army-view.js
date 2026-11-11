@@ -385,6 +385,8 @@ export class ArmyView {
   /* =========================================================
      Открытие / закрытие панели
      ========================================================= */
+  get isOpen() { return this._open; }
+
   show(army) {
     if (!army || !army.units?.length) return;
     this.close();
