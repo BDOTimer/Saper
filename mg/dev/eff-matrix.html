@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Matrix Rain — русские символы</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: monospace;
+      color: #0f0;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      background: rgba(0, 20, 0, 0.6);
+      padding: 8px 12px;
+      border: 1px solid #0f0;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #ui label {
+      display: block;
+      margin: 4px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    #ui input[type="checkbox"] {
+      margin-right: 6px;
+      accent-color: #0f0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <label>
+    <input type="checkbox" id="flipH"> Инвертировать по горизонтали
+  </label>
+  <label>
+    <input type="checkbox" id="flipV"> Инвертировать по вертикали
+  </label>
+</div>
+
+<!-- Подключаем Three.js -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ---------- Настройки ----------
+const FONT_SIZE = 32;          // размер символа в пикселях
+const COLUMN_WIDTH = 30;       // ширина колонки (px)
+const ROW_HEIGHT = 36;         // высота строки (px)
+const FALL_SPEED_MIN = 2;      // минимальная скорость падения (px/кадр)
+const FALL_SPEED_MAX = 10;     // максимальная скорость падения (px/кадр)
+const TRAIL_LENGTH = 25;       // длина "хвоста" (сколько символов в колонке)
+const RUSSIAN_CHARS = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789';
+
+// ---------- Инициализация Three.js ----------
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: false,
+  alpha: false
+});
+renderer.setPixelRatio(1); // для "пиксельного" эффекта
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
+document.body.appendChild(renderer.domElement);
+
+// ---------- Атлас символов (рисуем на canvas) ----------
+const chars = RUSSIAN_CHARS.split('');
+const atlasCols = 8;
+const atlasRows = Math.ceil(chars.length / atlasCols);
+
+const cellW = COLUMN_WIDTH;
+const cellH = ROW_HEIGHT;
+
+const atlasCanvas = document.createElement('canvas');
+atlasCanvas.width = cellW * atlasCols;
+atlasCanvas.height = cellH * atlasRows;
+const actx = atlasCanvas.getContext('2d');
+
+actx.fillStyle = '#000';
+actx.fillRect(0, 0, atlasCanvas.width, atlasCanvas.height);
+
+actx.font = `bold ${FONT_SIZE}px monospace`;
+actx.textAlign = 'center';
+actx.textBaseline = 'middle';
+
+// Белые символы — цвет будем тонировать в шейдере
+actx.fillStyle = '#ffffff';
+for (let i = 0; i < chars.length; i++) {
+  const col = i % atlasCols;
+  const row = Math.floor(i / atlasCols);
+  const x = col * cellW + cellW / 2;
+  const y = row * cellH + cellH / 2;
+  actx.fillText(chars[i], x, y);
+}
+
+const atlasTexture = new THREE.CanvasTexture(atlasCanvas);
+atlasTexture.minFilter = THREE.NearestFilter;
+atlasTexture.magFilter = THREE.NearestFilter;
+atlasTexture.generateMipmaps = false;
+
+// ---------- InstancedMesh ----------
+// Считаем, сколько всего ячеек (колонок × строк) помещается на экране
+function computeGrid() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const cols = Math.ceil(w / COLUMN_WIDTH);
+  const rows = Math.ceil(h / ROW_HEIGHT);
+  return { cols, rows, w, h };
+}
+
+let grid = computeGrid();
+
+// Максимальное число инстансов: колонки × (строки + хвост)
+let maxInstances = grid.cols * (grid.rows + TRAIL_LENGTH);
+
+// Геометрия — квадрат размером с ячейку
+const geom = new THREE.PlaneGeometry(COLUMN_WIDTH, ROW_HEIGHT);
+
+// Материал с шейдером для тонирования и инверсии
+const material = new THREE.ShaderMaterial({
+  uniforms: {
+    uAtlas: { value: atlasTexture },
+    uAtlasCols: { value: atlasCols },
+    uAtlasRows: { value: atlasRows },
+    uCharsCount: { value: chars.length },
+    uTime: { value: 0 },
+    uFlipH: { value: 0 },
+    uFlipV: { value: 0 }
+  },
+  vertexShader: /* glsl */`
+    attribute float aCharIndex;
+    attribute float aBrightness;
+
+    varying vec2 vUv;
+    varying float vBrightness;
+    varying float vCharIndex;
+
+    void main() {
+      vUv = uv;
+      vBrightness = aBrightness;
+      vCharIndex = aCharIndex;
+
+      vec3 pos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform sampler2D uAtlas;
+    uniform float uAtlasCols;
+    uniform float uAtlasRows;
+    uniform float uCharsCount;
+    uniform float uFlipH;
+    uniform float uFlipV;
+
+    varying vec2 vUv;
+    varying float vBrightness;
+    varying float vCharIndex;
+
+    void main() {
+      // Инверсия UV внутри ячейки атласа
+      vec2 uv = vUv;
+      if (uFlipH > 0.5) uv.x = 1.0 - uv.x;
+      if (uFlipV > 0.5) uv.y = 1.0 - uv.y;
+
+      // Определяем, в какой ячейке атласа находится символ
+      float idx = vCharIndex;
+      float col = mod(idx, uAtlasCols);
+      float row = floor(idx / uAtlasCols);
+
+      // Размер одной ячейки атласа в UV
+      vec2 cellSize = vec2(1.0 / uAtlasCols, 1.0 / uAtlasRows);
+
+      // UV внутри ячейки
+      vec2 cellUv = uv * cellSize;
+
+      // Позиция ячейки в атласе (row идёт сверху вниз — учитываем инверсию Y)
+      // CanvasTexture по умолчанию flipY = true, поэтому row 0 сверху → переворачиваем
+      float atlasY = 1.0 - (row + 1.0) * cellSize.y;
+      cellUv.y += atlasY;
+      cellUv.x += col * cellSize.x;
+
+      vec4 tex = texture2D(uAtlas, cellUv);
+      float alpha = tex.r;
+
+      // Зелёный цвет, яркость зависит от позиции в хвосте
+      vec3 green = vec3(0.0, 1.0, 0.0) * vBrightness;
+      // Немного "пересвета" для головы
+      green += vec3(0.6, 1.0, 0.6) * smoothstep(0.9, 1.0, vBrightness);
+
+      gl_FragColor = vec4(green, alpha);
+      if (alpha < 0.1) discard;
+    }
+  `,
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+
+const mesh = new THREE.InstancedMesh(geom, material, maxInstances);
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+// Атрибуты на инстанс
+const aCharIndex = new Float32Array(maxInstances);
+const aBrightness = new Float32Array(maxInstances);
+
+geom.setAttribute('aCharIndex', new THREE.InstancedBufferAttribute(aCharIndex, 1));
+geom.setAttribute('aBrightness', new THREE.InstancedBufferAttribute(aBrightness, 1));
+
+// Заглушки для матриц (пока не используем instanceMatrix для трансформаций,
+// так как позиционируем через атрибуты проще — но InstancedMesh требует matrix).
+// На самом деле мы будем задавать позиции через instanceMatrix — это проще
+// для ортокамеры. Перепишем vertex shader, чтобы использовать instanceMatrix.
+
+// Переопределим vertex shader, чтобы использовать instanceMatrix
+material.vertexShader = /* glsl */`
+  attribute float aCharIndex;
+  attribute float aBrightness;
+
+  varying vec2 vUv;
+  varying float vBrightness;
+  varying float vCharIndex;
+
+  void main() {
+    vUv = uv;
+    vBrightness = aBrightness;
+    vCharIndex = aCharIndex;
+
+    vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+// ---------- Модель колонок ----------
+// Каждая колонка — "голова" падает вниз, за ней тянется хвост.
+// Позиция головы в пикселях (Y сверху вниз).
+// Голова может уходить ниже экрана, чтобы хвост полностью исчез.
+
+class Column {
+  constructor(index, x) {
+    this.index = index;
+    this.x = x;
+    this.reset();
+  }
+
+  reset() {
+    // Начальная позиция головы — выше экрана
+    this.headY = -Math.random() * window.innerHeight * 1.5;
+    this.speed = FALL_SPEED_MIN + Math.random() * (FALL_SPEED_MAX - FALL_SPEED_MIN);
+    // Случайные символы для каждого слота хвоста
+    this.symbols = new Array(TRAIL_LENGTH);
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+      this.symbols[i] = Math.floor(Math.random() * chars.length);
+    }
+    // Иногда меняем символы
+    this.changeTimer = 0;
+  }
+
+  update(dt) {
+    this.headY += this.speed * dt * 60; // dt в секундах, ~60 fps
+
+    // Меняем символы в хвосте время от времени
+    this.changeTimer += dt;
+    if (this.changeTimer > 0.1) {
+      this.changeTimer = 0;
+      const i = Math.floor(Math.random() * TRAIL_LENGTH);
+      this.symbols[i] = Math.floor(Math.random() * chars.length);
+    }
+
+    // Если голова ушла за нижнюю границу на длину хвоста — сброс
+    const tailBottom = this.headY - TRAIL_LENGTH * ROW_HEIGHT;
+    if (tailBottom > window.innerHeight) {
+      this.reset();
+      this.headY = -Math.random() * 200 - 100;
+    }
+  }
+}
+
+let columns = [];
+
+function initColumns() {
+  const { cols, w } = computeGrid();
+  columns = [];
+  const totalWidth = cols * COLUMN_WIDTH;
+  const startX = -totalWidth / 2 + COLUMN_WIDTH / 2;
+  for (let i = 0; i < cols; i++) {
+    columns.push(new Column(i, startX + i * COLUMN_WIDTH));
+  }
+}
+
+initColumns();
+
+// ---------- Камера под ортографию ----------
+function updateCamera() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  // Ортокамера: левый, правый, верх, низ
+  // Используем координаты в пикселях: X от -w/2 до w/2, Y от -h/2 до h/2
+  // Но проще центрировать в (0,0): X от -w/2..w/2, Y от -h/2..h/2
+  camera.left = -w / 2;
+  camera.right = w / 2;
+  camera.top = h / 2;
+  camera.bottom = -h / 2;
+  camera.updateProjectionMatrix();
+}
+
+updateCamera();
+
+// ---------- Матрица трансформаций ----------
+const dummy = new THREE.Object3D();
+const totalInstances = () => columns.length * (grid.rows + TRAIL_LENGTH);
+
+function updateInstances() {
+  let idx = 0;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // Для каждой колонки
+  for (const col of columns) {
+    // Слоты: от головы вниз (0 — голова, TRAIL_LENGTH-1 — конец хвоста)
+    for (let t = 0; t < TRAIL_LENGTH; t++) {
+      // Y позиция в пикселях (0 — верх экрана, h — низ)
+      const screenY = col.headY - t * ROW_HEIGHT;
+
+      // Проверяем, попадает ли в экран (с запасом)
+      if (screenY < -ROW_HEIGHT * 2 || screenY > h + ROW_HEIGHT * 2) {
+        // Всё равно добавляем, но с alpha=0 (отсечётся в шейдере)
+        // Лучше просто пропустить — но тогда нужно следить за индексом.
+        // Проще: заполняем нулевым масштабом.
+        dummy.position.set(col.x, h / 2 - screenY, 0);
+        dummy.scale.set(0, 0, 0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(idx, dummy.matrix);
+        aCharIndex[idx] = 0;
+        aBrightness[idx] = 0;
+        idx++;
+        continue;
+      }
+
+      // Позиция в мировых координатах (Y вверх)
+      const worldX = col.x;
+      const worldY = h / 2 - screenY;
+
+      dummy.position.set(worldX, worldY, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx, dummy.matrix);
+
+      // Яркость: голова ярче, хвост темнее
+      const brightness = Math.pow(1 - t / TRAIL_LENGTH, 1.5);
+
+      aCharIndex[idx] = col.symbols[t];
+      aBrightness[idx] = brightness;
+      idx++;
+    }
+  }
+
+  mesh.count = idx;
+  mesh.instanceMatrix.needsUpdate = true;
+  geom.attributes.aCharIndex.needsUpdate = true;
+  geom.attributes.aBrightness.needsUpdate = true;
+}
+
+// Обновляем количество инстансов в mesh при ресайзе
+function rebuildMesh() {
+  grid = computeGrid();
+  maxInstances = grid.cols * (grid.rows + TRAIL_LENGTH);
+  // Проще пересоздать меш
+  scene.remove(mesh);
+  const newGeom = new THREE.PlaneGeometry(COLUMN_WIDTH, ROW_HEIGHT);
+  const newACharIndex = new Float32Array(maxInstances);
+  const newABrightness = new Float32Array(maxInstances);
+  newGeom.setAttribute('aCharIndex', new THREE.InstancedBufferAttribute(newACharIndex, 1));
+  newGeom.setAttribute('aBrightness', new THREE.InstancedBufferAttribute(newABrightness, 1));
+
+  const newMesh = new THREE.InstancedMesh(newGeom, material, maxInstances);
+  newMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  newMesh.frustumCulled = false;
+
+  // Обновляем глобальные ссылки
+  meshRef.geom = newGeom;
+  meshRef.mesh = newMesh;
+  scene.add(newMesh);
+
+  initColumns();
+  updateInstances();
+}
+
+// Хак с ссылками, чтобы пересоздавать меш
+const meshRef = { mesh: mesh, geom: geom };
+scene.add(mesh);
+mesh.frustumCulled = false;
+
+// ---------- Обработчики UI ----------
+const flipHCheckbox = document.getElementById('flipH');
+const flipVCheckbox = document.getElementById('flipV');
+
+flipHCheckbox.addEventListener('change', () => {
+  material.uniforms.uFlipH.value = flipHCheckbox.checked ? 1 : 0;
+});
+flipVCheckbox.addEventListener('change', () => {
+  material.uniforms.uFlipV.value = flipVCheckbox.checked ? 1 : 0;
+});
+
+// ---------- Ресайз ----------
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateCamera();
+  rebuildMesh();
+});
+
+// ---------- Анимация ----------
+let lastTime = performance.now();
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((now - lastTime) / 1000, 0.1); // ограничение на большие скачки
+  lastTime = now;
+
+  // Обновляем колонки
+  for (const col of columns) {
+    col.update(dt);
+  }
+
+  updateInstances();
+
+  material.uniforms.uTime.value = now / 1000;
+
+  renderer.render(scene, camera);
+}
+
+// Первый рендер
+updateInstances();
+requestAnimationFrame(animate);
+
+</script>
+</body>
+</html>
