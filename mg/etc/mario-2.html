@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mario 3D — Three.js (v2 — исправленная)</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#87CEEB;font-family:system-ui,sans-serif}
+  #hud{position:fixed;top:12px;left:12px;color:#fff;font-size:20px;font-weight:700;
+       text-shadow:0 2px 4px rgba(0,0,0,.5);pointer-events:none;user-select:none}
+  #hud small{display:block;font-size:13px;font-weight:400;opacity:.85;margin-top:6px}
+  #msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;
+       font-size:40px;font-weight:800;text-shadow:0 4px 12px rgba(0,0,0,.6);
+       pointer-events:none;opacity:0;transition:opacity .4s;text-align:center;line-height:1.45}
+  #msg small{font-size:16px;font-weight:600;opacity:.92}
+</style>
+</head>
+<body>
+<div id="hud">Монеты: <span id="coins">0</span> / <span id="total">0</span> &nbsp;·&nbsp; Жизни: <span id="lives">3</span>
+  <small>WASD / стрелки — движение · Space — прыжок · R — начать заново</small>
+</div>
+<div id="msg"></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   MARIO 3D — версия 2. Что было исправлено относительно v1:
+
+   1. Монеты не исчезали при сборе: они лежат в levelGroup, а код
+      вызывал scene.remove() (несуществующий родитель) → монеты
+      оставались висеть в сцене. Теперь removeFromParent().
+   2. «?»-блоки не срабатывали НИКОГДА: player.vel.y обнулялся до
+      проверки удара, поэтому условие vel.y > 0 было всегда ложным.
+      Проверка перенесена внутрь обработки коллизии ДО обнуления.
+   3. Марио «парил» в ~1.3 юнита над землёй: модель построена вокруг
+      body на высоте 1.35, а физический бокс считает pos центром.
+      Модель подогнана под бокс: scale 0.8, body.y = -0.21 — ступни
+      ровно на -0.95, макушка на +0.9.
+   4. Поворот влево/вправо был перепутан (left → +π/2 = ВПРАВО).
+      Теперь yaw = atan2(vel.x, vel.z) — всегда лицом по движению.
+   5. Отбрасывание при уроне направляло игроко ВНУТРЬ врага
+      (инвертированный знак) → исправлено, толкает ОТ врага.
+   6. Урон срабатывал каждый кадр контакта (спам звука, мгновенная
+      «мясорубка») → добавлены: 3 жизни, окно неуязвимости с
+      миганием, анимация смерти (вращение + падение), Game Over, R.
+   7. Уровень был непроходим: прыжок 2.0 м не доставал до платформ
+      (нужно ~2.5 м), пропасть между берегами 10 м при дальности
+      прыжка ~5 м, флаг никак не использовался, победа — по монетам,
+      часть которых недостижима. Исправлено: JUMP_FORCE 12, добавлен
+      остров-переправа, ПОБЕДА = дойти до флага.
+   8. HUD «Монеты: 15 / 13» — total не учитывал монеты из блоков.
+   Плюс: кирпичи подпрыгивают и дают монету (по ТЗ), coyote-time,
+   регулируемая высота прыжка, squash-анимация врагов, плавное
+   ускорение, скорость анимации зависит от скорости бега, камера
+   слегка смотрит вперёд, logarithmicDepthBuffer, FogExp2,
+   resume() аудиоконтекста (autoplay-политика).
+   ============================================================ */
+
+/* ============================================================
+   ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+   ============================================================ */
+let renderer, scene, camera, sun;
+let mario = null;
+let fxGroup = null;
+let flagPos = null, flagCloth = null;
+let gameState = 'play';          // play | win | over
+let coinsCollected = 0;
+let totalCoins = 0;
+let msgTimer = null;
+let audioCtx = null;
+
+const colliders = [];            // {box: Box3, type, mesh}
+const coins = [];                // {mesh, alive, baseY, phase}
+const enemies = [];              // {mesh, spawn, min, max, dir, speed, alive, squashT, phase}
+const bounces = [];              // анимация подпрыгивания блоков
+const fxList = [];               // монеты, выпрыгивающие из блоков
+const clouds = [];               // облака с дрейфом
+const levelGroup = new THREE.Group();
+
+const SPAWN = new THREE.Vector3(0, 1.6, 5);
+const damp = THREE.MathUtils.damp; // кадронезависимое сглаживание
+
+// --- Константы физики и игрока ---
+const GRAVITY = 25;
+const MOVE_SPEED = 6.5;
+const JUMP_FORCE = 12;           // v1: 10 — не хватало даже на первую платформу
+const COYOTE = 0.09;             // «койот-тайм»: прыжок сразу после схода с края
+const PLAYER_RADIUS = 0.45;
+const PLAYER_HEIGHT = 1.9;
+const PLAYER_HALF = PLAYER_HEIGHT / 2;
+const MARIO_SCALE = 0.8;         // подгонка модели под физический бокс
+const MARIO_BODY_Y = -0.21;      // чтобы ступни были на -0.95 от центра
+
+const player = {
+  pos: null,                     // = mario.position (центр физического бокса)
+  vel: new THREE.Vector3(),
+  onGround: false,
+  state: 'idle',                 // idle | run | jump | dead | win
+  animTime: 0,
+  runPhase: 0,                   // фаза бегового цикла (скорость зависит от бега)
+  dead: false,
+  deathT: 0,
+  lives: 3,
+  invuln: 0,                     // окно неуязвимости после урона
+  coyote: 0,
+  landTimer: 0                   // таймер squash при приземлении
+};
+
+const INPUT = { left:false, right:false, up:false, down:false, jump:false };
+const keys = { KeyW:'up', ArrowUp:'up', KeyS:'down', ArrowDown:'down',
+               KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right',
+               Space:'jump' };
+
+// --- DOM для HUD ---
+const coinsEl = document.getElementById('coins');
+const totalEl = document.getElementById('total');
+const livesEl = document.getElementById('lives');
+const msgEl = document.getElementById('msg');
+
+/* ============================================================
+   ЗВУК (Web Audio API — синтез, без файлов)
+   ============================================================ */
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // ИСПРАВЛЕНО: контекст может стартовать в suspended (autoplay-политика)
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTone(freq, dur=0.12, type='square', vol=0.15, slideTo=null){
+  ensureAudio();
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if(slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t+dur);
+  // Огибающая attack/release — чтобы не щёлкало на границах
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(vol, t+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t); osc.stop(t+dur+0.02);
+}
+const sfx = {
+  jump:  () => playTone(330, 0.16, 'square', 0.14, 660),          // восходящий blip
+  coin:  () => { playTone(988, 0.08, 'square', 0.15);              // два быстрых высоких тона
+                 setTimeout(() => playTone(1318, 0.14, 'square', 0.15), 70); },
+  bump:  () => playTone(220, 0.08, 'triangle', 0.12),              // стук головой о блок
+  stomp: () => playTone(260, 0.12, 'square', 0.16, 90),            // давим врага
+  hit:   () => playTone(180, 0.25, 'sawtooth', 0.18, 60),          // урон — нисходящий
+  die:   () => playTone(420, 0.5,  'sawtooth', 0.18, 55),          // смерть — долгий спад
+  win:   () => [523, 659, 784, 1046].forEach((f, i) =>             // мелодия победы
+                 setTimeout(() => playTone(f, 0.18, 'triangle', 0.18), i * 130))
+};
+
+/* ============================================================
+   МАТЕРИАЛЫ (все MeshStandardMaterial — physically-based)
+   ============================================================ */
+const mat = {
+  red:    new THREE.MeshStandardMaterial({color:0xe02020, roughness:0.6}),
+  blue:   new THREE.MeshStandardMaterial({color:0x1a4fd6, roughness:0.6}),
+  skin:   new THREE.MeshStandardMaterial({color:0xffc38a, roughness:0.7}),
+  brown:  new THREE.MeshStandardMaterial({color:0x5a2a10, roughness:0.8}),
+  yellow: new THREE.MeshStandardMaterial({color:0xffd11a, roughness:0.4, metalness:0.2}),
+  white:  new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.5}),
+  black:  new THREE.MeshStandardMaterial({color:0x101010, roughness:0.4}),
+  green:  new THREE.MeshStandardMaterial({color:0x2e8b32, roughness:0.7}),
+  brick:  new THREE.MeshStandardMaterial({color:0xc0392b, roughness:0.9}),
+  qblock: new THREE.MeshStandardMaterial({color:0xffc107, roughness:0.5, metalness:0.25}),
+  usedBlock: new THREE.MeshStandardMaterial({color:0x9c6b30, roughness:0.85}), // «использованный» ?-блок
+  ground: new THREE.MeshStandardMaterial({color:0x4caf50, roughness:1}),
+  dirt:   new THREE.MeshStandardMaterial({color:0x8b5a2b, roughness:1}),
+  pipe:   new THREE.MeshStandardMaterial({color:0x1e8b3c, roughness:0.5}),
+  enemy:  new THREE.MeshStandardMaterial({color:0x8b4513, roughness:0.8}),
+  cloud:  new THREE.MeshStandardMaterial({color:0xffffff, roughness:1}),
+  hill:   new THREE.MeshStandardMaterial({color:0x4e9e46, roughness:1})
+};
+
+function mkMesh(geo, material){
+  const m = new THREE.Mesh(geo, material);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+/* ============================================================
+   СЦЕНА, РЕНДЕРЕР, КАМЕРА И СВЕТ (ключ к объёму и теням)
+   ============================================================ */
+function initScene(){
+  renderer = new THREE.WebGLRenderer({ antialias:true, logarithmicDepthBuffer:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // «physicallyCorrectLights» удалён из Three.js в r155+ —
+  // физически корректный режим света включён по умолчанию.
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87CEEB);
+  scene.fog = new THREE.FogExp2(0x87CEEB, 0.016); // экспоненциальный туман — глубина сцены
+
+  camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
+  camera.position.set(0, 7, 13);
+
+  // Солнце — основной направленный свет с мягкими тенями.
+  // Тень следует за игроком (см. updateSun), чтобы всегда была в кадре.
+  sun = new THREE.DirectionalLight(0xfff2d0, 2.6);
+  sun.position.set(12, 20, 8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 80;
+  sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+  sun.shadow.camera.top = 30;  sun.shadow.camera.bottom = -30;
+  sun.shadow.bias = -0.0005;      // борьба с shadow acne
+  sun.shadow.normalBias = 0.03;   // убирает «полосы» на наклонных гранях
+  scene.add(sun);
+  scene.add(sun.target);
+
+  // Небесный/земляной свет — заполняет тени, делает их ЦВЕТНЫМИ, а не чёрными
+  scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x5e8c3a, 0.85));
+
+  // Слабый fill-свет с противоположной стороны — подчёркивает объём фигур
+  const fill = new THREE.DirectionalLight(0x9ec7ff, 0.45);
+  fill.position.set(-10, 8, -6);
+  scene.add(fill);
+
+  // Лёгкий ambient для читаемости деталей в глубоких тенях
+  scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+
+  scene.add(levelGroup);
+  fxGroup = new THREE.Group();    // временные эффекты (монеты из блоков)
+  scene.add(fxGroup);
+}
+
+/* ============================================================
+   МАРИО — иерархия узлов для процедурной анимации
+   root → body → (torso, shirt, head, arms[], legs[])
+   Анимация — вращением узлов (pivot-групп), НЕ заменой мешей.
+   ============================================================ */
+function createMario(){
+  const root = new THREE.Group();
+
+  // ИСПРАВЛЕНО: масштаб и высота корпуса подобраны так, чтобы модель
+  // совпала с физическим боксом (ступни на -0.95, макушка на +0.9).
+  root.scale.setScalar(MARIO_SCALE);
+
+  // Узел «body» — для squash & stretch, наклона и покачивания
+  const body = new THREE.Group();
+  body.position.y = MARIO_BODY_Y;
+  root.add(body);
+
+  // Туловище (комбинезон)
+  const torso = mkMesh(new THREE.CapsuleGeometry(0.42, 0.5, 6, 12), mat.blue);
+  body.add(torso);
+  // Красная рубашка сверху
+  const shirt = mkMesh(new THREE.SphereGeometry(0.44, 16, 12, 0, Math.PI*2, 0, Math.PI*0.55), mat.red);
+  shirt.position.y = 0.32;
+  body.add(shirt);
+
+  // Голова — отдельный узел (кивок, повороты)
+  const head = new THREE.Group();
+  head.position.y = 0.78;
+  body.add(head);
+
+  const face = mkMesh(new THREE.SphereGeometry(0.4, 20, 16), mat.skin);
+  head.add(face);
+
+  const nose = mkMesh(new THREE.SphereGeometry(0.13, 12, 10), mat.skin);
+  nose.position.set(0, -0.02, 0.38);
+  head.add(nose);
+
+  // Глаза + зрачки (смотрят вперёд, +Z — «лицо» модели)
+  [-1, 1].forEach(s => {
+    const eye = mkMesh(new THREE.SphereGeometry(0.09, 10, 10), mat.white);
+    eye.position.set(0.13*s, 0.1, 0.33);
+    head.add(eye);
+    const pupil = mkMesh(new THREE.SphereGeometry(0.04, 8, 8), mat.black);
+    pupil.position.set(0.13*s, 0.1, 0.4);
+    head.add(pupil);
+  });
+
+  // Усы
+  [-0.12, 0, 0.12].forEach((x, i) => {
+    const st = mkMesh(new THREE.BoxGeometry(0.11, 0.05, 0.06), mat.brown);
+    st.position.set(x, -0.18, 0.36);
+    st.rotation.z = (i - 1) * 0.25;
+    head.add(st);
+  });
+
+  // Кепка: полусфера + козырёк из сегмента цилиндра
+  const capTop = mkMesh(new THREE.SphereGeometry(0.42, 18, 12, 0, Math.PI*2, 0, Math.PI*0.5), mat.red);
+  capTop.position.y = 0.12;
+  head.add(capTop);
+  const brim = mkMesh(new THREE.CylinderGeometry(0.36, 0.36, 0.05, 20, 1, false, -Math.PI*0.15, Math.PI*0.8), mat.red);
+  brim.position.set(0, 0.06, 0.28);
+  brim.rotation.x = Math.PI*0.05;
+  head.add(brim);
+
+  // Руки: pivot-группы в плечах — вращаем узел, а не меш
+  const arms = [];
+  [-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.5*s, 0.35, 0);
+    body.add(pivot);
+    const arm = mkMesh(new THREE.CapsuleGeometry(0.12, 0.36, 4, 8), mat.red);
+    arm.position.y = -0.22;
+    pivot.add(arm);
+    const hand = mkMesh(new THREE.SphereGeometry(0.14, 10, 10), mat.white);
+    hand.position.y = -0.46;
+    pivot.add(hand);
+    arms.push(pivot);
+  });
+
+  // Ноги: pivot-группы в бёдрах
+  const legs = [];
+  [-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.2*s, -0.45, 0);
+    body.add(pivot);
+    const leg = mkMesh(new THREE.CapsuleGeometry(0.15, 0.3, 4, 8), mat.blue);
+    leg.position.y = -0.2;
+    pivot.add(leg);
+    const shoe = mkMesh(new THREE.BoxGeometry(0.28, 0.18, 0.42), mat.brown);
+    shoe.position.set(0, -0.44, 0.08);
+    pivot.add(shoe);
+    legs.push(pivot);
+  });
+
+  root.userData = { body, head, arms, legs };
+  return root;
+}
+
+/* ============================================================
+   СТРОИТЕЛИ УРОВНЯ
+   ============================================================ */
+function addGround(x, z, w, d, y = 0){
+  const g = new THREE.Group();
+  const top = mkMesh(new THREE.BoxGeometry(w, 0.5, d), mat.ground);
+  top.position.y = y;
+  g.add(top);
+  const dirt = mkMesh(new THREE.BoxGeometry(w, 1.5, d), mat.dirt);
+  dirt.position.y = y - 1;
+  g.add(dirt);
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  const box = new THREE.Box3().setFromObject(g);
+  colliders.push({box, type:'ground', mesh:g});
+  return g;
+}
+
+function addPlatform(x, y, z, w, h, d, material = mat.brick, type = 'brick'){
+  const m = mkMesh(new THREE.BoxGeometry(w, h, d), material);
+  m.position.set(x, y, z);
+  m.userData.basePos = m.position.clone(); // для анимации подпрыгивания и рестарта
+  m.userData.mat0 = material;              // исходный материал (для рестарта)
+  m.userData.hit = false;
+  levelGroup.add(m);
+  const box = new THREE.Box3().setFromCenterAndSize(
+    new THREE.Vector3(x, y, z), new THREE.Vector3(w, h, d)
+  );
+  colliders.push({box, type, mesh:m});
+  return m;
+}
+
+function addCoin(x, y, z){
+  const g = new THREE.Group();
+  const c = mkMesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 16), mat.yellow);
+  c.rotation.x = Math.PI/2;
+  g.add(c);
+  g.position.set(x, y, z);
+  levelGroup.add(g);
+  coins.push({mesh:g, alive:true, baseY:y, phase:Math.random()*Math.PI*2});
+}
+
+function addPipe(x, z, height = 2){
+  const g = new THREE.Group();
+  const body = mkMesh(new THREE.CylinderGeometry(0.55, 0.55, height, 16), mat.pipe);
+  body.position.y = height/2;
+  g.add(body);
+  const lip = mkMesh(new THREE.CylinderGeometry(0.65, 0.65, 0.35, 16), mat.pipe);
+  lip.position.y = height;
+  g.add(lip);
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  const box = new THREE.Box3().setFromObject(g);
+  colliders.push({box, type:'pipe', mesh:g});
+}
+
+// Враг-«гумба»: патрулирует по X в пределах [min, max]
+function createEnemy(x, z, min, max, speed = 1.6){
+  const g = new THREE.Group();
+  const bodyM = mkMesh(new THREE.BoxGeometry(0.7, 0.6, 0.7), mat.enemy);
+  bodyM.position.y = 0.4;
+  g.add(bodyM);
+  const headM = mkMesh(new THREE.SphereGeometry(0.35, 12, 10, 0, Math.PI*2, 0, Math.PI*0.6), mat.enemy);
+  headM.position.y = 0.7;
+  g.add(headM);
+  [-0.12, 0.12].forEach(ex => {
+    const eye = mkMesh(new THREE.SphereGeometry(0.08, 8, 8), mat.white);
+    eye.position.set(ex, 0.75, 0.25);
+    g.add(eye);
+    const p = mkMesh(new THREE.SphereGeometry(0.04, 6, 6), mat.black);
+    p.position.set(ex, 0.75, 0.31);
+    g.add(p);
+  });
+  g.position.set(x, 0, z);
+  g.rotation.y = Math.PI/2; // лицо по +X (направление dir=1)
+  levelGroup.add(g);
+  enemies.push({mesh:g, spawn:new THREE.Vector3(x, 0, z), min, max, dir:1,
+                speed, alive:true, squashT:0, phase:Math.random()*Math.PI*2});
+  return g;
+}
+
+function addCloud(x, y, z, spd = 0.3){
+  const g = new THREE.Group();
+  [[0,0,0,1],[0.8,-0.1,0.3,0.7],[-0.8,-0.1,0.2,0.75],[0.3,0.3,-0.2,0.7]].forEach(([a,b,c,s])=>{
+    const p = new THREE.Mesh(new THREE.SphereGeometry(s, 12, 10), mat.cloud);
+    p.position.set(a, b, c);
+    g.add(p);
+  });
+  g.position.set(x, y, z);
+  scene.add(g);
+  clouds.push({g, spd});
+}
+
+function addBush(x, z, s = 1){
+  const g = new THREE.Group();
+  [[0,0,0,0.42],[0.3,0.12,0.1,0.3],[-0.28,0.1,-0.05,0.32]].forEach(([a,b,c,r])=>{
+    const p = mkMesh(new THREE.SphereGeometry(r*s, 10, 8), mat.green);
+    p.position.set(a*s, b*s, c*s);
+    g.add(p);
+  });
+  g.position.set(x, 0.25, z);
+  levelGroup.add(g);
+}
+
+function addHill(x, z, r){
+  const h = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat.hill);
+  h.scale.y = 0.55;
+  h.position.set(x, 0, z);
+  scene.add(h);
+}
+
+function addFlag(x, z){
+  const g = new THREE.Group();
+  const pole = mkMesh(new THREE.CylinderGeometry(0.08, 0.08, 5, 10), mat.white);
+  pole.position.y = 2.5;
+  g.add(pole);
+  const ball = mkMesh(new THREE.SphereGeometry(0.14, 10, 8), mat.yellow);
+  ball.position.y = 5.05;
+  g.add(ball);
+  const flag = mkMesh(new THREE.PlaneGeometry(1.5, 1),
+    new THREE.MeshStandardMaterial({color:0xe02020, side:THREE.DoubleSide, roughness:0.8}));
+  flag.position.set(0.78, 4.3, 0);
+  g.add(flag);
+  flagCloth = flag;
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  return {x, z};
+}
+
+/* ============================================================
+   УРОВЕНЬ 1 (переработан — теперь проходим до флага)
+   ============================================================ */
+function createLevel(){
+  // Земля: главный остров, остров-переправа посреди пропасти и финишный берег
+  addGround(0, 0, 30, 14);
+  addGround(0, -10.75, 10, 6);  // ИСПРАВЛЕНО: в v1 пропасть 10 м была непроходима
+  addGround(0, -20, 30, 6);
+
+  // Лестница-пирамида: высоты подобраны под прыжок 2.9 м (в v1 были недостижимы)
+  addPlatform(-6, 2.2, -3, 2, 1, 2);
+  addPlatform(-3, 3.5, -3, 2, 1, 2, mat.qblock, 'qblock');
+  addPlatform(0, 4.5, -3, 2, 1, 2);
+  addPlatform(3, 3.5, -3, 2, 1, 2, mat.qblock, 'qblock');
+  addPlatform(6, 2.2, -3, 2, 1, 2);
+  addPlatform(-8, 1.5, 3, 2.5, 1, 2);
+  addPlatform(8, 1.5, 3, 2.5, 1, 2);
+
+  // Монеты: ряд на земле, над пирамидой, над островом и «след» над пропастями
+  for(let i = 0; i < 5; i++) addCoin(-8 + i*4, 1.5, 0);
+  addCoin(-3, 4.7, -3); addCoin(3, 4.7, -3); addCoin(0, 5.7, -3);
+  addCoin(-2, 1.5, -10.75); addCoin(0, 1.5, -10.75); addCoin(2, 1.5, -10.75);
+  addCoin(0, 1.9, -7.4); addCoin(0, 2.4, -15.4);
+
+  // Трубы (на них можно запрыгнуть)
+  addPipe(-10, -2, 2);
+  addPipe(10, -2, 2);
+
+  // Враги-гумбы: два на главной площадке, один на острове, один у финиша
+  createEnemy(-5, -5, -8, -2, 1.6);
+  createEnemy(5, -5, 2, 8, 1.6);
+  createEnemy(0, -10.75, -3.5, 3.5, 1.3);
+  createEnemy(3, -19, -6, 10, 1.9);
+
+  // Декор: три облака с дрейфом, кусты и далёкие холмы в тумане
+  addCloud(-10, 12, -15, 0.35);
+  addCloud(8, 14, -18, 0.5);
+  addCloud(0, 13, -25, 0.3);
+  addBush(-13, 4, 1); addBush(13, 3, 0.9); addBush(-13, -5, 0.8);
+  addHill(-26, -32, 9); addHill(24, -38, 11);
+
+  flagPos = addFlag(12, -18); // ФИНИШ — теперь реально проверяется
+}
+
+/* ============================================================
+   ФИЗИКА: AABB-коллизии игрока с уровнем
+   ============================================================ */
+const _pbox = new THREE.Box3();
+function marioBoxAt(pos){
+  _pbox.min.set(pos.x - PLAYER_RADIUS, pos.y - PLAYER_HALF, pos.z - PLAYER_RADIUS);
+  _pbox.max.set(pos.x + PLAYER_RADIUS, pos.y + PLAYER_HALF, pos.z + PLAYER_RADIUS);
+  return _pbox;
+}
+
+function checkCollisions(){
+  let grounded = false;
+  const box = marioBoxAt(player.pos);
+  for(const c of colliders){
+    if(!box.intersectsBox(c.box)) continue;
+
+    const cx = (box.min.x + box.max.x) * 0.5, cy = (box.min.y + box.max.y) * 0.5,
+          cz = (box.min.z + box.max.z) * 0.5;
+    const bx = (c.box.min.x + c.box.max.x) * 0.5, by = (c.box.min.y + c.box.max.y) * 0.5,
+          bz = (c.box.min.z + c.box.max.z) * 0.5;
+    const oX = Math.min(box.max.x - c.box.min.x, c.box.max.x - box.min.x);
+    const oY = Math.min(box.max.y - c.box.min.y, c.box.max.y - box.min.y);
+    const oZ = Math.min(box.max.z - c.box.min.z, c.box.max.z - box.min.z);
+
+    if(oY <= oX && oY <= oZ){
+      if(cy < by){
+        // Игрок НИЖЕ блока — удар головой.
+        // ИСПРАВЛЕНО: проверка удара о блок выполняется ДО обнуления vel.y
+        // (в v1 скорость обнулялась раньше, и «?»-блоки не срабатывали никогда)
+        if(player.vel.y > 0){
+          if(c.type === 'brick' || c.type === 'qblock') hitBlock(c);
+          player.vel.y = 0;
+        }
+        player.pos.y -= oY;
+      } else {
+        // Игрок ВЫШЕ блока — приземление
+        player.pos.y += oY;
+        if(player.vel.y <= 0){
+          if(player.vel.y < -7) player.landTimer = 0.16; // сильное приземление → squash
+          player.vel.y = 0;
+          grounded = true;
+        }
+      }
+    } else if(oX <= oZ){
+      player.pos.x += (cx < bx) ? -oX : oX;
+    } else {
+      player.pos.z += (cz < bz) ? -oZ : oZ;
+    }
+    marioBoxAt(player.pos); // пересчитать бокс после выталкивания
+  }
+  return grounded;
+}
+
+// Удар головой о кирпич или «?»-блок: подпрыгивает и даёт монету (один раз)
+function hitBlock(c){
+  const m = c.mesh;
+  if(m.userData.hit) return;
+  m.userData.hit = true;
+  bounces.push({mesh: m, t: 0, baseY: m.userData.basePos.y});
+  spawnBlockCoin(m.userData.basePos.x, m.userData.basePos.y + 1.0, m.userData.basePos.z);
+  collectCoin();
+  sfx.bump();
+  setTimeout(() => sfx.coin(), 70);
+  if(c.type === 'qblock') m.material = mat.usedBlock; // ?-блок «гаснет» после использования
+}
+
+// Монета, выпрыгивающая из блока (параболла, потом исчезает)
+function spawnBlockCoin(x, y, z){
+  const g = new THREE.Group();
+  const c = mkMesh(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 16), mat.yellow);
+  c.rotation.x = Math.PI/2;
+  g.add(c);
+  g.position.set(x, y, z);
+  fxGroup.add(g);
+  // ИСПРАВЛЕНО: базовая высота фиксируется один раз (в v1 монета «прыгала»,
+  // т.к. пересчитывалась от анимируемой позиции блока)
+  fxList.push({g, t: 0, baseY: y, vy: 5.5});
+}
+
+/* ============================================================
+   HUD, СООБЩЕНИЯ, СЧЁТ
+   ============================================================ */
+function updateHUD(){
+  coinsEl.textContent = coinsCollected;
+  livesEl.textContent = player.lives;
+}
+
+function showMsg(html, sticky = false, dur = 1400){
+  msgEl.innerHTML = html;
+  msgEl.style.opacity = 1;
+  if(msgTimer){ clearTimeout(msgTimer); msgTimer = null; }
+  if(!sticky) msgTimer = setTimeout(() => { msgEl.style.opacity = 0; }, dur);
+}
+
+function collectCoin(){
+  coinsCollected++;
+  updateHUD();
+  if(coinsCollected === totalCoins && gameState === 'play'){
+    showMsg('Все монеты собраны!', false, 1800);
+  }
+}
+
+/* ============================================================
+   УРОН / СМЕРТЬ / ПОБЕДА / РЕСТАРТ
+   ============================================================ */
+function damagePlayer(dx, dz){
+  player.lives--;
+  updateHUD();
+  if(player.lives <= 0){ startDeath(); return; }
+  player.invuln = 1.6;                     // окно неуязвимости (в v1 урон шёл каждый кадр)
+  const l = Math.hypot(dx, dz) || 1;
+  // ИСПРАВЛЕНО: отбрасывание ОТ врага (в v1 знак был инвертирован)
+  player.vel.set(dx / l * 7, 7, dz / l * 7);
+  sfx.hit();
+  showMsg(`Ой! Жизней: ${player.lives}`);
+}
+
+// Смерть: короткое вращение и падение (по ТЗ)
+function startDeath(){
+  player.dead = true;
+  player.deathT = 0;
+  player.state = 'dead';
+  player.vel.set(0, 9.5, 0);
+  mario.visible = true;
+  sfx.die();
+}
+
+function fellIntoPit(){
+  if(gameState !== 'play' || player.dead) return;
+  player.lives--;
+  updateHUD();
+  sfx.hit();
+  if(player.lives <= 0){ setGameOver(); return; }
+  // Респавн на старте
+  player.pos.copy(SPAWN);
+  player.vel.set(0, 0, 0);
+  player.invuln = 1.2;
+  mario.rotation.y = Math.PI;
+  snapCamera();
+  showMsg(`Ой! Жизней: ${player.lives}`);
+}
+
+function setGameOver(){
+  gameState = 'over';
+  mario.visible = false;
+  sfx.die();
+  showMsg(`ИГРА ОКОНЧЕНА<br><small>Монеты: ${coinsCollected} / ${totalCoins} · Нажмите R, чтобы начать заново</small>`, true);
+}
+
+function winGame(){
+  if(gameState !== 'play' || player.dead) return;
+  gameState = 'win';
+  player.vel.x = 0; player.vel.z = 0;
+  sfx.win();
+  showMsg(`ПОБЕДА!<br><small>Монеты: ${coinsCollected} / ${totalCoins} · Нажмите R, чтобы сыграть ещё раз</small>`, true);
+}
+
+// Полный сброс уровня к исходному состоянию
+function resetGame(){
+  gameState = 'play';
+  player.pos.copy(SPAWN);
+  player.vel.set(0, 0, 0);
+  player.dead = false; player.deathT = 0;
+  player.lives = 3; player.invuln = 0;
+  player.onGround = false; player.coyote = 0; player.landTimer = 0;
+  player.state = 'idle'; player.animTime = 0; player.runPhase = 0;
+  mario.visible = true;
+  mario.rotation.set(0, Math.PI, 0);
+
+  for(const c of coins){
+    c.alive = true;
+    if(!c.mesh.parent) levelGroup.add(c.mesh);
+    c.mesh.position.y = c.baseY;
+  }
+  for(const c of colliders){
+    if(c.type === 'brick' || c.type === 'qblock'){
+      const m = c.mesh;
+      m.userData.hit = false;
+      m.material = m.userData.mat0;
+      m.position.copy(m.userData.basePos);
+    }
+  }
+  bounces.length = 0;
+  for(const f of fxList) fxGroup.remove(f.g);
+  fxList.length = 0;
+  for(const e of enemies){
+    e.mesh.position.copy(e.spawn);
+    e.mesh.rotation.set(0, Math.PI/2, 0);
+    e.mesh.scale.set(1, 1, 1);
+    e.mesh.visible = true;
+    e.dir = 1; e.alive = true; e.squashT = 0;
+  }
+  coinsCollected = 0;
+  updateHUD();
+  if(msgTimer){ clearTimeout(msgTimer); msgTimer = null; }
+  msgEl.style.opacity = 0;
+  snapCamera();
+}
+
+/* ============================================================
+   ОБНОВЛЕНИЕ ИГРОКА (физика, ввод, события)
+   ============================================================ */
+function updatePlayer(dt){
+  // Смерть: полёт по параболе с вращением, коллизии отключены
+  if(player.dead){
+    player.vel.y -= GRAVITY * dt;
+    player.pos.addScaledVector(player.vel, dt);
+    player.deathT += dt;
+    mario.rotation.y += 10 * dt;
+    if(player.deathT > 1.7 && gameState === 'play') setGameOver();
+    return;
+  }
+
+  // --- Ввод → желаемая скорость (плавное ускорение, в воздухе слабее) ---
+  let ix = (INPUT.right ? 1 : 0) - (INPUT.left ? 1 : 0);
+  let iz = (INPUT.down ? 1 : 0) - (INPUT.up ? 1 : 0);
+  const il = Math.hypot(ix, iz);
+  if(il > 0){ ix /= il; iz /= il; } // диагональ не быстрее
+  const accel = player.onGround ? 14 : 6;
+  player.vel.x = damp(player.vel.x, ix * MOVE_SPEED, accel, dt);
+  player.vel.z = damp(player.vel.z, iz * MOVE_SPEED, accel, dt);
+
+  // --- Прыжок с «койот-таймом» ---
+  player.coyote = player.onGround ? COYOTE : Math.max(0, player.coyote - dt);
+  if(INPUT.jump && player.coyote > 0){
+    player.vel.y = JUMP_FORCE;
+    player.coyote = 0;
+    player.onGround = false;
+    sfx.jump();
+  }
+  player.vel.y = Math.max(player.vel.y - GRAVITY * dt, -22); // терминальная скорость
+
+  // --- Интеграция + коллизии ---
+  player.pos.x += player.vel.x * dt;
+  player.pos.z += player.vel.z * dt;
+  player.pos.y += player.vel.y * dt;
+  player.onGround = checkCollisions();
+
+  const hs = Math.hypot(player.vel.x, player.vel.z);
+
+  // --- Поворот лицом по направлению движения ---
+  // ИСПРАВЛЕНО: в v1 left/right были перепутаны местами.
+  // Модель «смотрит» в +Z при rotation.y = 0, поэтому yaw = atan2(vx, vz).
+  if(hs > 0.6){
+    const target = Math.atan2(player.vel.x, player.vel.z);
+    let d = target - mario.rotation.y;
+    while(d > Math.PI) d -= Math.PI * 2;
+    while(d < -Math.PI) d += Math.PI * 2;
+    mario.rotation.y += d * Math.min(1, dt * 12);
+  }
+
+  // --- Мигание в окне неуязвимости ---
+  if(player.invuln > 0){
+    player.invuln -= dt;
+    mario.visible = Math.floor(player.invuln * 12) % 2 === 0;
+    if(player.invuln <= 0) mario.visible = true;
+  }
+
+  // --- Пропасть ---
+  if(player.pos.y < -8){ fellIntoPit(); return; }
+
+  // --- ФИНИШ: дойти до флага (в v1 флаг был декорацией) ---
+  if(Math.hypot(player.pos.x - flagPos.x, player.pos.z - flagPos.z) < 1.6 && player.pos.y < 5){
+    winGame();
+    return;
+  }
+
+  // Состояние для процедурной анимации
+  player.state = !player.onGround ? 'jump' : (hs > 0.8 ? 'run' : 'idle');
+}
+
+// Праздничные прыжки после победы
+function updateWin(dt){
+  player.vel.y -= GRAVITY * dt;
+  player.pos.y += player.vel.y * dt;
+  player.onGround = checkCollisions();
+  if(player.onGround && player.vel.y <= 0) player.vel.y = 6.5;
+  mario.rotation.y += 4.5 * dt;
+  player.state = 'win';
+}
+
+/* ============================================================
+   ВРАГИ: патруль, squash от прыжка сверху, урон
+   ============================================================ */
+function updateEnemies(dt){
+  const now = performance.now() * 0.001;
+  for(const e of enemies){
+    if(!e.alive){
+      // ИСПРАВЛЕНО: враг не исчезает мгновенно, а сплющивается (squash)
+      if(e.squashT < 0.5){
+        e.squashT += dt;
+        const q = Math.min(1, e.squashT / 0.3);
+        e.mesh.scale.set(1 + 0.6*q, Math.max(0.12, 1 - 0.9*q), 1 + 0.6*q);
+        if(e.squashT >= 0.5) e.mesh.visible = false;
+      }
+      continue;
+    }
+    // Патруль между границами
+    e.mesh.position.x += e.dir * e.speed * dt;
+    if(e.mesh.position.x > e.max){ e.mesh.position.x = e.max; e.dir = -1; }
+    if(e.mesh.position.x < e.min){ e.mesh.position.x = e.min; e.dir = 1; }
+    e.mesh.rotation.y = damp(e.mesh.rotation.y, e.dir > 0 ? Math.PI/2 : -Math.PI/2, 8, dt);
+    e.mesh.rotation.z = Math.sin(now * 10 + e.phase) * 0.07;          // переваливание
+    e.mesh.position.y = Math.abs(Math.sin(now * 9 + e.phase)) * 0.06; // подпрыгивание
+
+    if(gameState !== 'play' || player.dead) continue;
+
+    // Столкновение с игроком
+    const dx = player.pos.x - e.mesh.position.x;
+    const dz = player.pos.z - e.mesh.position.z;
+    if(Math.hypot(dx, dz) < 0.95 && Math.abs(player.pos.y - (e.mesh.position.y + 0.45)) < 1.15){
+      const above = player.pos.y - e.mesh.position.y;
+      if(player.vel.y < -1.5 && above > 0.9){
+        // Прыжок сверху — давим врага
+        e.alive = false;
+        e.squashT = 0;
+        player.vel.y = 9; // отскок
+        sfx.stomp();
+      } else if(player.invuln <= 0){
+        damagePlayer(dx, dz); // иначе — урон (не чаще окна неуязвимости)
+      }
+    }
+  }
+}
+
+/* ============================================================
+   МОНЕТЫ: вращение, покачивание, сбор
+   ============================================================ */
+function updateCoins(dt){
+  const now = performance.now() * 0.001;
+  for(const c of coins){
+    if(!c.alive) continue;
+    c.mesh.rotation.y += dt * 3;
+    c.mesh.position.y = c.baseY + Math.sin(now * 2.2 + c.phase) * 0.12;
+    if(gameState !== 'play' || player.dead) continue;
+    const dx = player.pos.x - c.mesh.position.x;
+    const dz = player.pos.z - c.mesh.position.z;
+    const dy = player.pos.y - c.mesh.position.y;
+    if(dx*dx + dz*dz < 0.75 && Math.abs(dy) < 1.05){
+      c.alive = false;
+      // ИСПРАВЛЕНО: в v1 было scene.remove(), а монета лежит в levelGroup —
+      // поэтому собранные монеты оставались висеть в сцене
+      c.mesh.removeFromParent();
+      collectCoin();
+      sfx.coin();
+    }
+  }
+}
+
+/* ============================================================
+   ЭФФЕКТЫ: монеты из блоков и подпрыгивание блоков
+   ============================================================ */
+function updateFx(dt){
+  for(let i = fxList.length - 1; i >= 0; i--){
+    const f = fxList[i];
+    f.t += dt;
+    f.g.position.y = f.baseY + f.vy * f.t - 6 * f.t * f.t;
+    f.g.rotation.y += 9 * dt;
+    if(f.t > 0.7){ fxGroup.remove(f.g); fxList.splice(i, 1); }
+  }
+}
+
+function updateBounces(dt){
+  for(let i = bounces.length - 1; i >= 0; i--){
+    const b = bounces[i];
+    b.t += dt;
+    const q = Math.min(1, b.t / 0.22);
+    b.mesh.position.y = b.baseY + 0.3 * Math.sin(q * Math.PI); // подпрыгнул и вернулся
+    if(b.t >= 0.22){ b.mesh.position.y = b.baseY; bounces.splice(i, 1); }
+  }
+}
+
+/* ============================================================
+   ДЕКОР В ДВИЖЕНИИ: дрейф облаков, волнение флага
+   ============================================================ */
+function updateClouds(dt){
+  for(const c of clouds){
+    c.g.position.x += c.spd * dt;
+    if(c.g.position.x > 40) c.g.position.x = -40;
+  }
+  if(flagCloth) flagCloth.rotation.y = Math.sin(performance.now() * 0.003) * 0.12;
+}
+
+/* ============================================================
+   КАМЕРА: плавное следование (lerp) + взгляд «вперёд» по скорости
+   ============================================================ */
+const _camDesired = new THREE.Vector3();
+const _camLook = new THREE.Vector3();
+const lookTarget = new THREE.Vector3(0, 2, 5);
+
+function updateCamera(dt){
+  _camDesired.set(player.pos.x, player.pos.y + 5.2, player.pos.z + 8.5);
+  camera.position.lerp(_camDesired, 1 - Math.exp(-4 * dt));
+  _camLook.set(player.pos.x + player.vel.x * 0.3,
+               player.pos.y + 1.4,
+               player.pos.z + player.vel.z * 0.3);
+  lookTarget.lerp(_camLook, 1 - Math.exp(-3 * dt));
+  camera.lookAt(lookTarget);
+}
+
+function snapCamera(){
+  camera.position.set(player.pos.x, player.pos.y + 5.2, player.pos.z + 8.5);
+  lookTarget.set(player.pos.x, player.pos.y + 1.4, player.pos.z);
+  camera.lookAt(lookTarget);
+}
+
+// Солнце и его теневая камера следуют за игроком — тени всегда в кадре
+function updateSun(){
+  sun.position.set(player.pos.x + 12, 20, player.pos.z + 8);
+  sun.target.position.set(player.pos.x, 0, player.pos.z);
+}
+
+/* ============================================================
+   ПРОЦЕДУРНАЯ АНИМАЦИЯ МАРИО
+   Все позы задаются целевыми углами узлов и сглаживаются через
+   damp() — переходы между состояниями плавные, скорость бегового
+   цикла зависит от реальной скорости движения.
+   ============================================================ */
+function animateMario(state, dt){
+  const { body, head, arms, legs } = mario.userData;
+  player.animTime += dt;
+  const t = player.animTime;
+  const hs = Math.hypot(player.vel.x, player.vel.z);
+  const speedRatio = Math.min(1, hs / MOVE_SPEED);
+
+  // Целевые позы (по умолчанию — нейтральные)
+  let bodyRotX = 0, bob = 0, sy = 1, sxz = 1, headY = 0;
+  let armL = 0, armR = 0, legL = 0, legR = 0;
+
+  if(state === 'idle'){
+    // Дыхание: лёгкое масштабирование туловища + рассматривание по сторонам
+    const breathe = Math.sin(t * 2) * 0.03;
+    sy = 1 + breathe;
+    sxz = 1 + breathe * 0.5;
+    headY = Math.sin(t * 0.6) * 0.25;
+    armL = Math.sin(t * 2) * 0.08;
+    armR = -armL;
+  }
+  else if(state === 'run'){
+    // Бег: руки и ноги в противофазе, наклон корпуса, подпрыгивание.
+    // Скорость цикла интерполируется от скорости движения (по ТЗ).
+    player.runPhase += dt * (7 + 9 * speedRatio);
+    const s = Math.sin(player.runPhase);
+    armL = s * 0.95;  armR = -s * 0.95;
+    legL = -s * 1.1;  legR = s * 1.1;
+    bodyRotX = 0.18 * speedRatio;                  // наклон вперёд
+    bob = Math.abs(Math.sin(player.runPhase)) * 0.09 * speedRatio;
+  }
+  else if(state === 'jump'){
+    // Прыжок: поджатие ног, взмах руками, squash & stretch (stretch вверху)
+    const up = player.vel.y > 0;
+    armL = armR = up ? -2.3 : -1.0;
+    legL = legR = up ? 0.7 : -0.45;
+    bodyRotX = up ? -0.12 : 0.12;
+    sy = up ? 1.10 : 0.97;
+    sxz = 1 / Math.sqrt(sy);
+  }
+  else if(state === 'dead'){
+    // Смерть: «звёздочка» с дрожью конечностей (вращение корня — в updatePlayer)
+    armL = armR = -2.6 + Math.sin(t * 18) * 0.3;
+    legL = 0.55; legR = -0.55;
+    bodyRotX = 0.1;
+  }
+  else if(state === 'win'){
+    // Победа: руки вверх, пружинит (сама физика — в updateWin)
+    armL = armR = -2.9;
+  }
+
+  // Squash при приземлении (таймер ставится в checkCollisions)
+  if(player.landTimer > 0){
+    player.landTimer = Math.max(0, player.landTimer - dt);
+    const q = player.landTimer / 0.16;
+    sy *= (1 - 0.20 * q);
+    sxz *= (1 + 0.16 * q);
+  }
+
+  // Плавное применение поз: damp не зависит от FPS
+  const k = 14;
+  arms[0].rotation.x = damp(arms[0].rotation.x, armL, k, dt);
+  arms[1].rotation.x = damp(arms[1].rotation.x, armR, k, dt);
+  legs[0].rotation.x = damp(legs[0].rotation.x, legL, k, dt);
+  legs[1].rotation.x = damp(legs[1].rotation.x, legR, k, dt);
+  head.rotation.y = damp(head.rotation.y, headY, 6, dt);
+  body.rotation.x = damp(body.rotation.x, bodyRotX, k, dt);
+  body.scale.set(damp(body.scale.x, sxz, 18, dt),
+                 damp(body.scale.y, sy, 18, dt),
+                 damp(body.scale.z, sxz, 18, dt));
+  body.position.y = MARIO_BODY_Y + bob;
+}
+
+/* ============================================================
+   УПРАВЛЕНИЕ (клавиатура)
+   ============================================================ */
+addEventListener('keydown', e => {
+  if(e.code === 'KeyR'){ resetGame(); return; }
+  const k = keys[e.code];
+  if(k){ INPUT[k] = true; e.preventDefault(); ensureAudio(); }
+});
+addEventListener('keyup', e => {
+  const k = keys[e.code];
+  if(k){
+    INPUT[k] = false;
+    e.preventDefault();
+    // Короткое нажатие — низкий прыжок (регулируемая высота)
+    if(k === 'jump' && player.vel.y > 3.5) player.vel.y *= 0.55;
+  }
+});
+
+/* ============================================================
+   ГЛАВНЫЙ ЦИКЛ: requestAnimationFrame + delta-time (с clamp)
+   ============================================================ */
+const clock = new THREE.Clock();
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if(gameState === 'play') updatePlayer(dt);
+  else if(gameState === 'win') updateWin(dt);
+
+  animateMario(player.state, dt);
+  updateEnemies(dt);
+  updateCoins(dt);
+  updateFx(dt);
+  updateBounces(dt);
+  updateClouds(dt);
+  updateCamera(dt);
+  updateSun();
+
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   ЗАПУСК
+   ============================================================ */
+initScene();
+mario = createMario();
+mario.position.copy(SPAWN);
+mario.rotation.y = Math.PI; // лицом в уровень, спиной к камере
+scene.add(mario);
+player.pos = mario.position; // физика и меш работают с одной точкой
+
+createLevel();
+// Весь счёт: монеты на уровне + монеты из кирпичей и «?»-блоков
+// (ИСПРАВЛЕНО: в v1 total не включал блоки → получалось «15 / 13»)
+totalCoins = coins.length + colliders.filter(c => c.type === 'brick' || c.type === 'qblock').length;
+totalEl.textContent = totalCoins;
+updateHUD();
+snapCamera();
+showMsg('Доберись до флага!<br><small>Прыгай врагам на голову сверху и собирай монеты</small>', false, 3200);
+
+tick();
+</script>
+</body>
+</html>
