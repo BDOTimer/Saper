@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Mario 3D — Three.js</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#87CEEB;font-family:system-ui,sans-serif}
+  #hud{position:fixed;top:12px;left:12px;color:#fff;font-size:20px;font-weight:700;
+       text-shadow:0 2px 4px rgba(0,0,0,.5);pointer-events:none;user-select:none}
+  #hud small{display:block;font-size:13px;font-weight:400;opacity:.85;margin-top:6px}
+  #msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;
+       font-size:42px;font-weight:800;text-shadow:0 4px 12px rgba(0,0,0,.6);
+       pointer-events:none;opacity:0;transition:opacity .4s;text-align:center}
+</style>
+</head>
+<body>
+<div id="hud">Монеты: <span id="coins">0</span> / <span id="total">0</span>
+  <small>WASD / стрелки — движение · Space — прыжок</small>
+</div>
+<div id="msg"></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   ИНИЦИАЛИЗАЦИЯ СЦЕНЫ
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 40, 90);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 6, 10);
+
+/* ============================================================
+   ОСВЕЩЕНИЕ — ключ к объёму и теням
+   ============================================================ */
+// Солнце — основной направленный свет с мягкими тенями
+const sun = new THREE.DirectionalLight(0xfff2d0, 2.4);
+sun.position.set(12, 20, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 80;
+sun.shadow.camera.left = -30;
+sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 30;
+sun.shadow.camera.bottom = -30;
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+scene.add(sun.target);
+
+// Небесный/земляной свет — заполняет тени, чтобы они были цветными
+const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x6b8e23, 0.9);
+scene.add(hemi);
+
+// Слабый fill-свет с противоположной стороны — подчёркивает объём
+const fill = new THREE.DirectionalLight(0x9ec7ff, 0.5);
+fill.position.set(-10, 8, -6);
+scene.add(fill);
+
+// Ambient для читаемости деталей в тенях
+scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+
+/* ============================================================
+   ЗВУК (Web Audio API — синтез, без файлов)
+   ============================================================ */
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playTone(freq, dur=0.12, type='square', vol=0.15, slideTo=null){
+  ensureAudio();
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if(slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t+dur);
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(vol, t+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t); osc.stop(t+dur+0.02);
+}
+const sfx = {
+  jump:  () => playTone(330, 0.16, 'square', 0.14, 660),
+  coin:  () => { playTone(988, 0.08, 'square', 0.15); setTimeout(()=>playTone(1318,0.14,'square',0.15),70); },
+  hit:   () => playTone(180, 0.25, 'sawtooth', 0.18, 60),
+  win:   () => [523,659,784,1046].forEach((f,i)=>setTimeout(()=>playTone(f,0.18,'triangle',0.18),i*130)),
+  bump:  () => playTone(220, 0.08, 'triangle', 0.12)
+};
+
+/* ============================================================
+   МАРИО — иерархия для анимации
+   ============================================================ */
+const mat = {
+  red:    new THREE.MeshStandardMaterial({color:0xe02020, roughness:0.6}),
+  blue:   new THREE.MeshStandardMaterial({color:0x1a4fd6, roughness:0.6}),
+  skin:   new THREE.MeshStandardMaterial({color:0xffc38a, roughness:0.7}),
+  brown:  new THREE.MeshStandardMaterial({color:0x5a2a10, roughness:0.8}),
+  yellow: new THREE.MeshStandardMaterial({color:0xffd11a, roughness:0.4, metalness:0.2}),
+  white:  new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.5}),
+  black:  new THREE.MeshStandardMaterial({color:0x101010, roughness:0.4}),
+  green:  new THREE.MeshStandardMaterial({color:0x2e8b32, roughness:0.7}),
+  brick:  new THREE.MeshStandardMaterial({color:0xc0392b, roughness:0.9}),
+  qblock: new THREE.MeshStandardMaterial({color:0xffc107, roughness:0.5, metalness:0.25}),
+  ground: new THREE.MeshStandardMaterial({color:0x4caf50, roughness:1}),
+  dirt:   new THREE.MeshStandardMaterial({color:0x8b5a2b, roughness:1}),
+  pipe:   new THREE.MeshStandardMaterial({color:0x1e8b3c, roughness:0.5}),
+  enemy:  new THREE.MeshStandardMaterial({color:0x8b4513, roughness:0.8}),
+  cloud:  new THREE.MeshStandardMaterial({color:0xffffff, roughness:1}),
+};
+
+function mkMesh(geo, material){
+  const m = new THREE.Mesh(geo, material);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+function createMario(){
+  const root = new THREE.Group();
+
+  // Тело-корпус (для squash & stretch и наклона)
+  const body = new THREE.Group();
+  body.position.y = 1.35;
+  root.add(body);
+
+  // Туловище (комбинезон)
+  const torso = mkMesh(new THREE.CapsuleGeometry(0.42, 0.5, 6, 12), mat.blue);
+  body.add(torso);
+  // Красная рубашка сверху
+  const shirt = mkMesh(new THREE.SphereGeometry(0.44, 16, 12, 0, Math.PI*2, 0, Math.PI*0.55), mat.red);
+  shirt.position.y = 0.32;
+  body.add(shirt);
+
+  // Голова
+  const head = new THREE.Group();
+  head.position.y = 0.78;
+  body.add(head);
+
+  const face = mkMesh(new THREE.SphereGeometry(0.4, 20, 16), mat.skin);
+  head.add(face);
+
+  // Нос
+  const nose = mkMesh(new THREE.SphereGeometry(0.13, 12, 10), mat.skin);
+  nose.position.set(0, -0.02, 0.38);
+  head.add(nose);
+
+  // Глаза
+  [-1, 1].forEach(s => {
+    const eye = mkMesh(new THREE.SphereGeometry(0.09, 10, 10), mat.white);
+    eye.position.set(0.13*s, 0.1, 0.33);
+    head.add(eye);
+    const pupil = mkMesh(new THREE.SphereGeometry(0.04, 8, 8), mat.black);
+    pupil.position.set(0.13*s, 0.1, 0.4);
+    head.add(pupil);
+  });
+
+  // Усы
+  [-0.12, 0, 0.12].forEach((x,i) => {
+    const st = mkMesh(new THREE.BoxGeometry(0.11, 0.05, 0.06), mat.brown);
+    st.position.set(x, -0.18, 0.36);
+    st.rotation.z = (i-1) * 0.25;
+    head.add(st);
+  });
+
+  // Кепка
+  const capTop = mkMesh(new THREE.SphereGeometry(0.42, 18, 12, 0, Math.PI*2, 0, Math.PI*0.5), mat.red);
+  capTop.position.y = 0.12;
+  head.add(capTop);
+  const brim = mkMesh(new THREE.CylinderGeometry(0.36, 0.36, 0.05, 20, 1, false, -Math.PI*0.15, Math.PI*0.8), mat.red);
+  brim.position.set(0, 0.06, 0.28);
+  brim.rotation.x = Math.PI*0.05;
+  head.add(brim);
+
+  // Руки (пивоты в плечах)
+  const arms = [];
+  [-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.5*s, 0.35, 0);
+    body.add(pivot);
+    const arm = mkMesh(new THREE.CapsuleGeometry(0.12, 0.36, 4, 8), mat.red);
+    arm.position.y = -0.22;
+    pivot.add(arm);
+    const hand = mkMesh(new THREE.SphereGeometry(0.14, 10, 10), mat.white);
+    hand.position.y = -0.46;
+    pivot.add(hand);
+    arms.push(pivot);
+  });
+
+  // Ноги (пивоты в бёдрах)
+  const legs = [];
+  [-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.2*s, -0.45, 0);
+    body.add(pivot);
+    const leg = mkMesh(new THREE.CapsuleGeometry(0.15, 0.3, 4, 8), mat.blue);
+    leg.position.y = -0.2;
+    pivot.add(leg);
+    const shoe = mkMesh(new THREE.BoxGeometry(0.28, 0.18, 0.42), mat.brown);
+    shoe.position.set(0, -0.44, 0.08);
+    pivot.add(shoe);
+    legs.push(pivot);
+  });
+
+  root.userData = { body, head, arms, legs };
+  return root;
+}
+
+/* ============================================================
+   УРОВЕНЬ 1
+   ============================================================ */
+const colliders = [];  // {mesh, box3, type}
+const coins = [];
+const qblocks = [];
+const enemies = [];
+const levelGroup = new THREE.Group();
+scene.add(levelGroup);
+
+function addGround(x, z, w, d, y=0){
+  const g = new THREE.Group();
+  const top = mkMesh(new THREE.BoxGeometry(w, 0.5, d), mat.ground);
+  top.position.y = y;
+  g.add(top);
+  const dirt = mkMesh(new THREE.BoxGeometry(w, 1.5, d), mat.dirt);
+  dirt.position.y = y - 1;
+  g.add(dirt);
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  const box = new THREE.Box3().setFromObject(g);
+  colliders.push({box, type:'ground', mesh:g});
+  return g;
+}
+
+function addPlatform(x, y, z, w, h, d, material=mat.brick, type='brick'){
+  const m = mkMesh(new THREE.BoxGeometry(w, h, d), material);
+  m.position.set(x, y, z);
+  levelGroup.add(m);
+  // подгоняем box3 точно под меш
+  const box = new THREE.Box3().setFromCenterAndSize(
+    new THREE.Vector3(x, y, z), new THREE.Vector3(w, h, d)
+  );
+  colliders.push({box, type, mesh:m});
+  if(type === 'qblock'){ qblocks.push(m); }
+  return m;
+}
+
+function addCoin(x, y, z){
+  const g = new THREE.Group();
+  const c = mkMesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 16), mat.yellow);
+  c.rotation.x = Math.PI/2;
+  g.add(c);
+  g.position.set(x, y, z);
+  levelGroup.add(g);
+  coins.push({mesh:g, alive:true, baseY:y});
+}
+
+function addPipe(x, z, height=2){
+  const g = new THREE.Group();
+  const body = mkMesh(new THREE.CylinderGeometry(0.55, 0.55, height, 16), mat.pipe);
+  body.position.y = height/2;
+  g.add(body);
+  const lip = mkMesh(new THREE.CylinderGeometry(0.65, 0.65, 0.35, 16), mat.pipe);
+  lip.position.y = height;
+  g.add(lip);
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  const box = new THREE.Box3().setFromObject(g);
+  colliders.push({box, type:'pipe', mesh:g});
+}
+
+function addEnemy(x, z, patrolMin, patrolMax){
+  const g = new THREE.Group();
+  const body = mkMesh(new THREE.BoxGeometry(0.7, 0.6, 0.7), mat.enemy);
+  body.position.y = 0.4;
+  g.add(body);
+  const head = mkMesh(new THREE.SphereGeometry(0.35, 12, 10, 0, Math.PI*2, 0, Math.PI*0.6), mat.enemy);
+  head.position.y = 0.7;
+  g.add(head);
+  [-0.12, 0.12].forEach(x => {
+    const eye = mkMesh(new THREE.SphereGeometry(0.08, 8, 8), mat.white);
+    eye.position.set(x, 0.75, 0.25);
+    g.add(eye);
+    const p = mkMesh(new THREE.SphereGeometry(0.04, 6, 6), mat.black);
+    p.position.set(x, 0.75, 0.31);
+    g.add(p);
+  });
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  enemies.push({mesh:g, min:patrolMin, max:patrolMax, dir:1, speed:1.6, alive:true, baseY:0});
+}
+
+function addCloud(x,y,z){
+  const g = new THREE.Group();
+  [[0,0,0,1],[0.8,-0.1,0.3,0.7],[-0.8,-0.1,0.2,0.75],[0.3,0.3,-0.2,0.7]].forEach(([a,b,c,s])=>{
+    const p = new THREE.Mesh(new THREE.SphereGeometry(s,12,10), mat.cloud);
+    p.position.set(a,b,c);
+    g.add(p);
+  });
+  g.position.set(x,y,z);
+  scene.add(g);
+}
+
+function addFlag(x, z){
+  const g = new THREE.Group();
+  const pole = mkMesh(new THREE.CylinderGeometry(0.08, 0.08, 5, 10), mat.white);
+  pole.position.y = 2.5;
+  g.add(pole);
+  const flag = mkMesh(new THREE.PlaneGeometry(1.5, 1), new THREE.MeshStandardMaterial({color:0xe02020, side:THREE.DoubleSide, roughness:0.8}));
+  flag.position.set(0.75, 4.2, 0);
+  g.add(flag);
+  g.position.set(x, 0, z);
+  levelGroup.add(g);
+  return {x, z};
+}
+
+// ----- Строим уровень -----
+addGround(0, 0, 30, 14);
+addGround(0, -20, 30, 6);   // мост-платформа впереди
+
+// Платформы
+addPlatform(-6, 2.2, -3, 2, 1, 2);
+addPlatform(-3, 3.5, -3, 2, 1, 2, mat.qblock, 'qblock');
+addPlatform(0, 4.5, -3, 2, 1, 2);
+addPlatform(3, 3.5, -3, 2, 1, 2, mat.qblock, 'qblock');
+addPlatform(6, 2.2, -3, 2, 1, 2);
+addPlatform(-8, 1.5, 3, 2.5, 1, 2);
+addPlatform(8, 1.5, 3, 2.5, 1, 2);
+
+// Монеты
+for(let i=0;i<5;i++) addCoin(-8 + i*4, 1.5, 0);
+addCoin(-3, 4.5, -3);
+addCoin(3, 4.5, -3);
+addCoin(0, 5.5, -3);
+
+// Трубы
+addPipe(-10, -2, 2);
+addPipe(10, -2, 2);
+
+// Враги
+addEnemy(-5, -5, -8, -2);
+addEnemy(5, -5, 2, 8);
+addEnemy(0, -18, -6, 6);
+
+// Облака
+addCloud(-10, 12, -15);
+addCloud(8, 14, -18);
+addCloud(0, 13, -25);
+
+// Флаг
+const flagPos = addFlag(12, -18);
+
+/* ============================================================
+   ИГРОК
+   ============================================================ */
+const mario = createMario();
+mario.position.set(0, 1.5, 5);
+scene.add(mario);
+
+const player = {
+  pos: mario.position,
+  vel: new THREE.Vector3(),
+  onGround: false,
+  state: 'idle',       // idle | run | jump
+  animTime: 0,
+  facing: 0,           // угол поворота
+  alive: true
+};
+
+const INPUT = { left:false, right:false, up:false, down:false, jump:false };
+const keys = { KeyW:'up', ArrowUp:'up', KeyS:'down', ArrowDown:'down',
+               KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right',
+               Space:'jump' };
+
+addEventListener('keydown', e => {
+  const k = keys[e.code];
+  if(k){ INPUT[k] = true; e.preventDefault(); ensureAudio(); }
+});
+addEventListener('keyup', e => {
+  const k = keys[e.code];
+  if(k){ INPUT[k] = false; e.preventDefault(); }
+});
+
+/* ============================================================
+   ФИЗИКА
+   ============================================================ */
+const GRAVITY = 25;
+const MOVE_SPEED = 6.5;
+const JUMP_FORCE = 10;
+const PLAYER_RADIUS = 0.45;
+const PLAYER_HEIGHT = 1.9;   // от ступней до макушки
+const PLAYER_HALF = PLAYER_HEIGHT/2;
+
+function marioBoxAt(pos){
+  return new THREE.Box3(
+    new THREE.Vector3(pos.x-PLAYER_RADIUS, pos.y-PLAYER_HALF, pos.z-PLAYER_RADIUS),
+    new THREE.Vector3(pos.x+PLAYER_RADIUS, pos.y+PLAYER_HALF, pos.z+PLAYER_RADIUS)
+  );
+}
+
+function resolveCollisions(){
+  // Простейший метод: по осям.
+  const box = marioBoxAt(player.pos);
+  let grounded = false;
+  for(const c of colliders){
+    if(!box.intersectsBox(c.box)) continue;
+
+    // Вычислим минимальное проникновение по оси Y (приоритет — приземление/удар снизу)
+    const pX = (box.min.x + box.max.x)/2;
+    const pY = (box.min.y + box.max.y)/2;
+    const pZ = (box.min.z + box.max.z)/2;
+
+    // Перекрытия по каждой оси
+    const overlapX = Math.min(box.max.x - c.box.min.x, c.box.max.x - box.min.x);
+    const overlapY = Math.min(box.max.y - c.box.min.y, c.box.max.y - box.min.y);
+    const overlapZ = Math.min(box.max.z - c.box.min.z, c.box.max.z - box.min.z);
+
+    // Меньшее перекрытие — та ось, по которой выталкиваем
+    if(overlapY <= overlapX && overlapY <= overlapZ){
+      // По вертикали
+      if(pY < (c.box.min.y + c.box.max.y)/2){
+        // игрок ниже блока — толкаем вниз
+        player.pos.y -= overlapY;
+        if(player.vel.y > 0) player.vel.y = 0;
+      } else {
+        // игрок выше блока — приземление
+        player.pos.y += overlapY;
+        if(player.vel.y < 0) player.vel.y = 0;
+        grounded = true;
+      }
+    } else if(overlapX <= overlapZ){
+      // По X
+      if(pX < (c.box.min.x + c.box.max.x)/2) player.pos.x -= overlapX;
+      else player.pos.x += overlapX;
+    } else {
+      // По Z
+      if(pZ < (c.box.min.z + c.box.max.z)/2) player.pos.z -= overlapZ;
+      else player.pos.z += overlapZ;
+    }
+
+    // Хит по "?"-блоку снизу → срабатывает
+    if(c.type === 'qblock' && player.vel.y > 0){
+      const b = c.mesh;
+      if(!b.userData.hit){
+        b.userData.hit = true;
+        b.position.y += 0.25;
+        setTimeout(()=>{ b.position.y -= 0.25; }, 120);
+        sfx.bump();
+        // даём монету
+        const cc = new THREE.Group();
+        const coinMesh = mkMesh(new THREE.CylinderGeometry(0.25,0.25,0.07,16), mat.yellow);
+        coinMesh.rotation.x = Math.PI/2;
+        cc.add(coinMesh);
+        cc.position.copy(b.position);
+        cc.position.y += 1;
+        scene.add(cc);
+        let vy = 6;
+        const start = performance.now();
+        const step = () => {
+          const t = (performance.now()-start)/1000;
+          cc.position.y = b.position.y + 1 + vy*t - 0.5*15*t*t;
+          cc.rotation.y += 0.3;
+          if(t < 0.6) requestAnimationFrame(step);
+          else { scene.remove(cc); }
+        };
+        step();
+        collectCoin();
+        sfx.coin();
+      }
+    }
+  }
+  return grounded;
+}
+
+/* ============================================================
+   СБОР МОНЕТ
+   ============================================================ */
+let coinsCollected = 0;
+const totalEl = document.getElementById('total');
+const coinsEl = document.getElementById('coins');
+totalEl.textContent = coins.length;
+
+function collectCoin(){
+  coinsCollected++;
+  coinsEl.textContent = coinsCollected;
+  if(coinsCollected >= coins.length) showMsg('ПОБЕДА! 🏁', true);
+}
+function showMsg(text, win){
+  const m = document.getElementById('msg');
+  m.textContent = text;
+  m.style.opacity = 1;
+  if(!win){
+    setTimeout(()=>{ m.style.opacity = 0; }, 1200);
+  } else {
+    sfx.win();
+  }
+}
+
+/* ============================================================
+   ОБНОВЛЕНИЕ МАРИО / АНИМАЦИЯ
+   ============================================================ */
+function animateMario(dt){
+  const { body, head, arms, legs } = mario.userData;
+
+  // Определяем состояние
+  const moving = (INPUT.left||INPUT.right||INPUT.up||INPUT.down);
+  if(!player.onGround) player.state = 'jump';
+  else if(moving) player.state = 'run';
+  else player.state = 'idle';
+
+  // Поворот по направлению
+  let targetAngle = player.facing;
+  if(INPUT.left) targetAngle = Math.PI/2;
+  if(INPUT.right) targetAngle = -Math.PI/2;
+  if(INPUT.up) targetAngle = Math.PI;
+  if(INPUT.down) targetAngle = 0;
+  if(moving){
+    let d = targetAngle - mario.rotation.y;
+    while(d > Math.PI) d -= Math.PI*2;
+    while(d < -Math.PI) d += Math.PI*2;
+    mario.rotation.y += d * Math.min(1, dt*12);
+    player.facing = mario.rotation.y;
+  }
+
+  player.animTime += dt;
+
+  // Применяем позы
+  const t = player.animTime;
+  let bodyTiltX = 0;
+  let armSwing = 0, legSwing = 0;
+  let bob = 0;
+
+  if(player.state === 'idle'){
+    // Дыхание
+    const breathe = Math.sin(t*2) * 0.03;
+    body.scale.set(1+breathe*0.5, 1+breathe, 1+breathe*0.5);
+    body.rotation.x = 0;
+    head.rotation.y = Math.sin(t*0.6) * 0.2;
+    arms[0].rotation.x = Math.sin(t*2)*0.1;
+    arms[1].rotation.x = -Math.sin(t*2)*0.1;
+    legs[0].rotation.x = 0;
+    legs[1].rotation.x = 0;
+  }
+  else if(player.state === 'run'){
+    const spd = 14;
+    const s = Math.sin(t*spd);
+    armSwing = s * 0.9;
+    legSwing = s * 1.1;
+    body.rotation.x = 0.15;
+    bodyTiltX = 0.15;
+    bob = Math.abs(Math.sin(t*spd)) * 0.08;
+    body.scale.set(1, 1, 1);
+    arms[0].rotation.x = armSwing;
+    arms[1].rotation.x = -armSwing;
+    legs[0].rotation.x = -legSwing;
+    legs[1].rotation.x = legSwing;
+    head.rotation.y = 0;
+  }
+  else if(player.state === 'jump'){
+    // Поджатие ног + взмах руками
+    const up = player.vel.y > 0;
+    body.rotation.x = up ? -0.15 : 0.1;
+    arms[0].rotation.x = up ? -2.2 : -0.8;
+    arms[1].rotation.x = up ? -2.2 : -0.8;
+    legs[0].rotation.x = up ? 0.6 : -0.4;
+    legs[1].rotation.x = up ? 0.6 : -0.4;
+    // Squash & stretch
+    const stretch = up ? 1.08 : 0.94;
+    body.scale.set(1/Math.sqrt(stretch), stretch, 1/Math.sqrt(stretch));
+  }
+
+  // Смещение корпуса по высоте при беге (bob)
+  body.position.y = 1.35 + bob;
+}
+
+/* ============================================================
+   ОБНОВЛЕНИЕ ВРАГОВ
+   ============================================================ */
+function updateEnemies(dt){
+  for(const e of enemies){
+    if(!e.alive) continue;
+    e.mesh.position.x += e.dir * e.speed * dt;
+    if(e.mesh.position.x > e.max){ e.mesh.position.x = e.max; e.dir = -1; }
+    if(e.mesh.position.x < e.min){ e.mesh.position.x = e.min; e.dir = 1; }
+    e.mesh.rotation.y = e.dir > 0 ? Math.PI/2 : -Math.PI/2;
+    // Проверка столкновения с игроком
+    const dx = player.pos.x - e.mesh.position.x;
+    const dz = player.pos.z - e.mesh.position.z;
+    const dist = Math.hypot(dx, dz);
+    if(dist < 1.0 && Math.abs(player.pos.y - (e.mesh.position.y + 0.5)) < 1.2){
+      // сверху — убиваем
+      if(player.vel.y < -2 && player.pos.y > e.mesh.position.y + 0.8){
+        e.alive = false;
+        e.mesh.visible = false;
+        player.vel.y = 8;
+        sfx.hit();
+      } else {
+        // урон
+        player.vel.y = 8;
+        player.vel.x = (dx > 0 ? -1 : 1) * 5;
+        player.vel.z = (dz > 0 ? -1 : 1) * 5;
+        sfx.hit();
+      }
+    }
+  }
+}
+
+/* ============================================================
+   МОНЕТЫ — вращение и сбор
+   ============================================================ */
+function updateCoins(dt){
+  for(const c of coins){
+    if(!c.alive) continue;
+    c.mesh.rotation.y += dt * 3;
+    c.mesh.position.y = c.baseY + Math.sin(performance.now()*0.003) * 0.12;
+    const dx = player.pos.x - c.mesh.position.x;
+    const dz = player.pos.z - c.mesh.position.z;
+    const dy = player.pos.y - c.mesh.position.y;
+    if(dx*dx + dz*dz < 0.7 && Math.abs(dy) < 1.0){
+      c.alive = false;
+      scene.remove(c.mesh);
+      collectCoin();
+      sfx.coin();
+    }
+  }
+}
+
+/* ============================================================
+   КАМЕРА — следует за игроком
+   ============================================================ */
+const camTarget = new THREE.Vector3();
+const camOffset = new THREE.Vector3(0, 5.5, 8);
+function updateCamera(dt){
+  camTarget.set(player.pos.x, player.pos.y + 1.2, player.pos.z);
+  const desired = new THREE.Vector3(
+    player.pos.x + camOffset.x,
+    player.pos.y + camOffset.y,
+    player.pos.z + camOffset.z
+  );
+  camera.position.lerp(desired, Math.min(1, dt*4));
+  camera.lookAt(camTarget);
+}
+
+/* ============================================================
+   ГЛАВНЫЙ ЦИКЛ
+   ============================================================ */
+const clock = new THREE.Clock();
+let wasOnGround = false;
+
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // Ввод → скорость
+  const inputX = (INPUT.right ? 1:0) - (INPUT.left ? 1:0);
+  const inputZ = (INPUT.down ? 1:0) - (INPUT.up ? 1:0);
+
+  player.vel.x = inputX * MOVE_SPEED;
+  player.vel.z = inputZ * MOVE_SPEED;
+
+  // Гравитация
+  player.vel.y -= GRAVITY * dt;
+
+  // Прыжок
+  if(INPUT.jump && player.onGround){
+    player.vel.y = JUMP_FORCE;
+    player.onGround = false;
+    sfx.jump();
+  }
+
+  // Двигаем по осям с раздельной проверкой коллизий
+  player.pos.x += player.vel.x * dt;
+  player.pos.z += player.vel.z * dt;
+  player.pos.y += player.vel.y * dt;
+
+  // Коллизии
+  player.onGround = resolveCollisions();
+
+  // Ограничение по краям уровня (защита от падения)
+  if(player.pos.y < -10){
+    player.pos.set(0, 3, 5);
+    player.vel.set(0,0,0);
+  }
+
+  // Анимация
+  animateMario(dt);
+  mario.position.copy(player.pos);
+
+  // Обновления
+  updateEnemies(dt);
+  updateCoins(dt);
+  updateCamera(dt);
+
+  // Солнце следует за игроком (чтобы тени всегда были в кадре)
+  sun.target.position.set(player.pos.x, 0, player.pos.z);
+  sun.position.set(player.pos.x + 12, 20, player.pos.z + 8);
+
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+tick();
+</script>
+</body>
+</html>
