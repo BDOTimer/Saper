@@ -635,12 +635,13 @@ let kit = null;
 try {
     if (typeof SoundKit !== 'undefined') {
         kit = SoundKit.createSoundKit({
-            move    : { src: '../res/tetris/1/move-1.mp3',      volume: 0.35, pool: 3 },
-            rot     : { src: '../res/tetris/1/rot-1.mp3',       volume: 0.35, pool: 3 },
-            kickFig : { src: '../res/tetris/1/kick-fig-1.mp3',  volume: 0.45, pool: 2 },
-            kickSide: { src: '../res/tetris/1/kick-side-1.mp3', volume: 0.45, pool: 2 },
-            linedel : { src: '../res/tetris/1/linedel-1.mp3',   volume: 0.55, pool: 2 },
-            death   : { src: '../res/tetris/1/death.mp3',       volume: 0.55, pool: 1 },
+            move    : { src: '../res/tetris/1/move-1.mp3',      volume: 0.3, pool: 3 },
+            rot     : { src: '../res/tetris/1/rot-1.mp3',       volume: 0.3, pool: 3 },
+            kickFig : { src: '../res/tetris/1/kick-fig-1.mp3',  volume: 0.4, pool: 2 },
+            kickSide: { src: '../res/tetris/1/kick-side-1.mp3', volume: 0.4, pool: 2 },
+            linedel : { src: '../res/tetris/1/linedel-1.mp3',   volume: 0.5, pool: 2 },
+            death   : { src: '../res/tetris/1/death.mp3',       volume: 0.5, pool: 1 },
+            click   : { src: '../res/dzin-1.mp3'        ,       volume: 0.5, pool: 3 },
         });
         kit.autoUnlock();
     }
@@ -898,6 +899,7 @@ function onCellClick(r, c) {
 
         // Включаем режим ввода в клетке
         state.typing = { r, c };
+        sfx('click'); 
         render();
         focusTypingInput();
         return;
@@ -926,7 +928,7 @@ function commitTypedLetter(letter) {
     state.phase = 'select';
     state.selection = [];
     showStatus('Кликайте клетки по порядку слова — свою букву тоже', 'timer-on', 0);
-    sfx('move');
+    sfx('click');
     render();
 }
 
@@ -987,6 +989,7 @@ window.addEventListener('blur', () => {
 function toggleCell(r, c) {
     const idx = state.selection.findIndex(p => p.r === r && p.c === c);
 
+    // Повторный клик по уже выбранной клетке — убрать её
     if (idx >= 0) {
         state.selection.splice(idx, 1);
         sfx('kickSide');
@@ -994,43 +997,27 @@ function toggleCell(r, c) {
         return;
     }
 
+    // Первая клетка — можно любую
     if (state.selection.length === 0) {
         state.selection.push({ r, c });
-        sfx('move');
+        sfx('click');
         render();
         return;
     }
 
-    const isNeighbor = (a, b) =>
-        (Math.abs(a.r - b.r) + Math.abs(a.c - b.c)) === 1;
+    // Каждая следующая должна быть 4-соседом предыдущей — и ТОЛЬКО В КОНЕЦ
+    const last = state.selection[state.selection.length - 1];
+    const isNeighbor =
+        (Math.abs(last.r - r) + Math.abs(last.c - c)) === 1;
 
-    if (state.selection.length === 1) {
-        if (!isNeighbor(state.selection[0], { r, c })) {
-            showStatus('Кликните соседнюю клетку (не по диагонали)', 'bad', 1600);
-            sfx('kickFig');
-            return;
-        }
-        state.selection.push({ r, c });
-        sfx('move');
-        render();
-        return;
-    }
-
-    const first = state.selection[0];
-    const last  = state.selection[state.selection.length - 1];
-    const cell  = { r, c };
-
-    if (isNeighbor(first, cell)) {
-        state.selection.unshift(cell);
-        sfx('move');
-    } else if (isNeighbor(last, cell)) {
-        state.selection.push(cell);
-        sfx('move');
-    } else {
-        showStatus('Кликните клетку рядом с первой или последней буквой', 'bad', 1600);
+    if (!isNeighbor) {
+        showStatus('Кликните клетку рядом с последней выбранной (не по диагонали)', 'bad', 1600);
         sfx('kickFig');
         return;
     }
+
+    state.selection.push({ r, c });   // ← всегда в конец, порядок = порядок кликов
+    sfx('move');
     render();
 }
 
@@ -1049,13 +1036,26 @@ function getSelectedWord() {
 // ============================================================
 function onAccept() {
     const word = getSelectedWord();
+
     if (word.length < 2) {
         showStatus('Выделите минимум 2 буквы', 'bad', 1600);
         sfx('kickFig');
         return;
     }
 
-    // 1) Слова нет в словаре
+    // В отправленном слове обязана быть введённая буква игрока
+    if (state.pending) {
+        const inWord = state.selection.some(
+            p => p.r === state.pending.r && p.c === state.pending.c
+        );
+        if (!inWord) {
+            showStatus('В отправленном слове должна быть ваша новая буква', 'bad', 2000);
+            sfx('kickFig');
+            return;
+        }
+    }
+
+    // Слова нет в словаре — буква убирается, тикает таймер
     if (!hasWord(word)) {
         showStatus(`Слова «${word}» нет в словаре. Буква убрана. ${TURN_SECONDS} с на новый вариант`, 'bad', 0);
         sfx('kickFig');
@@ -1068,24 +1068,19 @@ function onAccept() {
         return;
     }
 
-    // 2) Слово уже было
+    // Слово уже было — не принимаем
     if (state.usedWords.has(word)) {
         showStatus(`Слово «${word}» уже было в игре. Придумайте другое`, 'bad', 0);
         sfx('kickFig');
         return;
     }
 
-    // 3) Успех
+    // Успех
     if (state.pending) {
         const { r, c, letter } = state.pending;
         state.board[r][c] = { letter, owner: state.currentPlayer };
     }
     state.scores[state.currentPlayer] += word.length;
-    
-    const scoreEl = state.currentPlayer === 0 ? score0El : score1El;
-    scoreEl.style.transform = 'scale(1.25)';
-    setTimeout(() => { scoreEl.style.transform = ''; }, 220);
-    
     state.usedWords.add(word);
     state.moves++;
     sfx('linedel');
@@ -1097,7 +1092,10 @@ function onAccept() {
     state.phase = 'input';
     switchPlayer();
     render();
-    setTimeout(() => { if (state.phase !== 'finished') showStatus(DEFAULT_STATUS, ''); }, 2500);
+    startTimer();
+    setTimeout(() => {
+        if (state.phase !== 'finished') showStatus(DEFAULT_STATUS, '');
+    }, 2500);
 }
 
 function onClear() {
@@ -1164,6 +1162,7 @@ function onTimeout() {
     switchPlayer();
     sfx('rot');
     render();
+    startTimer(); 
 }
 
 // ============================================================
@@ -1224,8 +1223,15 @@ function restartGame() {
 // ============================================================
 document.getElementById('btnStart').addEventListener('click', startGame);
 startWordIn.addEventListener('keydown', e => {
-    if (e.key === 'Enter') startGame();
+    if (e.key === 'Enter') {
+        startGame();
+        return;
+    }
+    // Озвучка набора буквы в поле стартового слова
+    const k = norm(e.key).trim();
+    if (/^[а-я]$/.test(k)) sfx('click');
 });
+
 acceptBtn.addEventListener('click', onAccept);
 clearBtn.addEventListener('click', onClear);
 cancelBtn.addEventListener('click', cancelPendingLetter);
