@@ -753,13 +753,14 @@ function initBoard() {
 }
 
 function placeStartWord(word) {
-    // Горизонтально в середине квадрата
-    const midRow = Math.floor(state.size / 2);
-    const midCol = Math.floor((state.size - word.length) / 2);
+    const size   = state.size;
+    const midRow = (size >> 1) - (size % 2 === 0 ? 1 : 0);
+    const midCol = (size - word.length) >> 1;
+
     for (let i = 0; i < word.length; i++) {
         state.board[midRow][midCol + i] = { letter: word[i], owner: 0 };
     }
-    // Первым ходит Игрок 1
+
     state.currentPlayer = 0;
 }
 
