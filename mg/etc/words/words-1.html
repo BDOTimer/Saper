@@ -2439,8 +2439,9 @@ if (!window.WORDS) {
 <script>
 /* ============================================================
    ФОН-ЗАСТАВКА
-   Процедурный пиксель-арт: киберпанк, минимализм, тонализм,
-   сфумато, объёмные планы города и неоновый туман.
+   Процедурный пиксель-арт: ночной город на левом берегу,
+   пустое море в центре, закат и спокойная солнечная дорожка
+   справа. Тонализм, сфумато, неоновый туман.
    Рисуется в низком разрешении и масштабируется без сглаживания.
    ============================================================ */
 (function () {
@@ -2454,14 +2455,17 @@ if (!window.WORDS) {
     const reduceMotion = window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* Ограниченная палитра: приглушённые тона + неоновые акценты */
+    /* Ограниченная палитра: ночь, тёплый закат, неоновые акценты */
     const PALETTE = [
         [3, 5, 11], [6, 9, 18], [9, 14, 26], [13, 19, 35],
         [17, 25, 46], [23, 31, 57], [31, 35, 68], [42, 38, 74],
         [54, 39, 78], [70, 42, 82], [88, 47, 86], [108, 55, 90],
         [132, 66, 96], [164, 84, 105], [16, 44, 54], [21, 68, 76],
         [31, 102, 106], [58, 142, 142], [96, 200, 196], [140, 238, 230],
-        [246, 88, 162], [255, 178, 110], [4, 7, 14]
+        [246, 88, 162], [255, 178, 110], [4, 7, 14],
+        [92, 52, 50], [128, 62, 50], [168, 80, 52], [204, 104, 58],
+        [232, 134, 70], [248, 168, 96], [255, 204, 140], [255, 232, 180],
+        [150, 92, 110]
     ];
 
     const BAYER = [
@@ -2479,6 +2483,12 @@ if (!window.WORDS) {
             t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
             return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
+    }
+
+    function hash01(n) {
+        n = Math.imul(n ^ (n >>> 16), 2246822507);
+        n = Math.imul(n ^ (n >>> 13), 3266489909);
+        return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
     }
 
     function makeCanvas(w, h) {
@@ -2529,10 +2539,11 @@ if (!window.WORDS) {
     let sunX = 0;
     let sunR = 0;
     let base = null;
-    let fogTeal = null;
-    let fogRose = null;
-    let fogTealY = 0;
-    let fogRoseY = 0;
+    let fogLeft = null;
+    let fogRight = null;
+    let fogLeftY = 0;
+    let fogRightY = 0;
+    let blinkLights = [];
 
     function buildScene() {
         const vw = Math.max(240, window.innerWidth);
@@ -2554,70 +2565,99 @@ if (!window.WORDS) {
         canvas.height = H;
         ctx.imageSmoothingEnabled = false;
 
-        horizon = Math.round(H * 0.63);
-        sunX = Math.round(W * 0.66);
-        sunR = Math.max(8, Math.round(Math.min(W * 0.09, H * 0.16)));
+        horizon = Math.round(H * 0.6);
+        sunX = Math.round(W * 0.84);
+        sunR = Math.max(8, Math.round(Math.min(W * 0.05, H * 0.09)));
+        const sunY = horizon - Math.round(sunR * 0.12);
+        const cityEnd = Math.round(W * 0.38);
 
         base = makeCanvas(W, H);
         const g = base.getContext('2d');
         const rand = rng(0xC0FFEE ^ (W * 131 + H * 17));
-        const sunY = horizon - Math.round(H * 0.075);
+        blinkLights = [];
 
-        /* Небо */
+        /* Небо: ночь слева, тёплый закат справа */
         const sky = g.createLinearGradient(0, 0, 0, horizon);
-        sky.addColorStop(0, '#04060d');
-        sky.addColorStop(0.45, '#0a1022');
-        sky.addColorStop(0.78, '#1b1538');
-        sky.addColorStop(1, '#33203f');
+        sky.addColorStop(0, '#05070f');
+        sky.addColorStop(0.5, '#0b1124');
+        sky.addColorStop(0.85, '#1a1735');
+        sky.addColorStop(1, '#2a1d3f');
         g.fillStyle = sky;
         g.fillRect(0, 0, W, horizon + 1);
 
-        /* Редкие звёзды */
-        g.fillStyle = 'rgba(150, 220, 225, 0.35)';
-        const stars = Math.max(8, Math.round(W * H / 7000));
+        const warmSky = g.createLinearGradient(W * 0.5, 0, W, 0);
+        warmSky.addColorStop(0, 'rgba(150, 70, 80, 0)');
+        warmSky.addColorStop(0.55, 'rgba(195, 95, 75, 0.12)');
+        warmSky.addColorStop(1, 'rgba(245, 155, 85, 0.24)');
+        g.fillStyle = warmSky;
+        g.fillRect(0, 0, W, horizon + 1);
+
+        /* Редкие звёзды — только в левой половине неба */
+        g.fillStyle = 'rgba(150, 220, 225, 0.32)';
+        const stars = Math.max(6, Math.round(W * H / 9000));
         for (let i = 0; i < stars; i++) {
-            g.fillRect(
-                Math.floor(rand() * W),
-                Math.floor(rand() * horizon * 0.55),
-                1, 1
-            );
+            const sx = Math.floor(rand() * W * 0.62);
+            const sy = Math.floor(rand() * horizon * 0.55);
+            g.fillRect(sx, sy, 1, 1);
         }
 
-        /* Сфумато-ореол и диск солнца */
-        const halo = g.createRadialGradient(sunX, sunY, sunR * 0.4, sunX, sunY, sunR * 4.2);
-        halo.addColorStop(0, 'rgba(255, 105, 175, 0.5)');
-        halo.addColorStop(0.35, 'rgba(170, 60, 140, 0.22)');
-        halo.addColorStop(1, 'rgba(60, 20, 80, 0)');
+        /* Дымка на линии горизонта (под солнцем) */
+        const haze = g.createLinearGradient(0, horizon - H * 0.14, 0, horizon + H * 0.06);
+        haze.addColorStop(0, 'rgba(60, 35, 70, 0)');
+        haze.addColorStop(0.55, 'rgba(120, 70, 90, 0.24)');
+        haze.addColorStop(1, 'rgba(50, 30, 55, 0)');
+        g.fillStyle = haze;
+        g.fillRect(0, horizon - H * 0.14, W, H * 0.2);
+
+        /* Сфумато-ореол заката */
+        const halo = g.createRadialGradient(sunX, sunY, sunR * 0.25, sunX, sunY, sunR * 5.2);
+        halo.addColorStop(0, 'rgba(255, 215, 150, 0.75)');
+        halo.addColorStop(0.4, 'rgba(250, 140, 80, 0.3)');
+        halo.addColorStop(1, 'rgba(90, 45, 60, 0)');
         g.fillStyle = halo;
         g.fillRect(0, 0, W, horizon + 1);
 
+        /* Солнце у горизонта */
         const disc = g.createLinearGradient(0, sunY - sunR, 0, sunY + sunR);
-        disc.addColorStop(0, '#e9a7c0');
-        disc.addColorStop(0.55, '#b96a92');
-        disc.addColorStop(1, '#5f2b58');
+        disc.addColorStop(0, '#ffdf9a');
+        disc.addColorStop(0.5, '#ffb066');
+        disc.addColorStop(1, '#d95f42');
         g.fillStyle = disc;
         g.beginPath();
         g.arc(sunX, sunY, sunR, 0, Math.PI * 2);
         g.fill();
 
-        /* Дымка на линии горизонта */
-        const haze = g.createLinearGradient(0, horizon - H * 0.16, 0, horizon + H * 0.08);
-        haze.addColorStop(0, 'rgba(70, 40, 100, 0)');
-        haze.addColorStop(0.55, 'rgba(95, 52, 118, 0.28)');
-        haze.addColorStop(1, 'rgba(40, 25, 60, 0)');
-        g.fillStyle = haze;
-        g.fillRect(0, horizon - H * 0.16, W, H * 0.24);
+        /* ---------- ГОРОД СЛЕВА ---------- */
+        const reflections = [];
+        function addBlink(x, y, color, glow) {
+            if (blinkLights.length >= 12) return;
+            const idx = blinkLights.length;
+            blinkLights.push({
+                x: x,
+                y: y,
+                color: color,
+                w: 1,
+                alpha: 0.55 + rand() * 0.35,
+                period: 2.6 + (idx % 5) * 0.9,
+                phase: rand() * 4,
+                seed: (idx * 2654435761 + 12345) | 0,
+                threshold: idx < 8 ? 0.12 : 0.78,
+                glow: glow
+            });
+        }
 
-        /* Слои города: дальше — светлее и дымнее */
         function skyline(opts) {
             const built = [];
             let x = -Math.floor(rand() * opts.maxW);
-            while (x < W) {
-                const bw = opts.minW + Math.floor(rand() * (opts.maxW - opts.minW + 1));
+            while (x < cityEnd) {
+                let bw = opts.minW + Math.floor(rand() * (opts.maxW - opts.minW + 1));
+                if (x + bw > cityEnd) bw = cityEnd - x;
+                if (bw < 5) break;
                 let bh = opts.minH + Math.floor(rand() * (opts.maxH - opts.minH + 1));
                 const cx = x + bw / 2;
-                const dist = Math.min(1, Math.abs(cx - sunX) / (W * 0.5));
-                bh = Math.round(bh * (0.45 + 0.55 * dist));
+                const falloff = 1 - 0.38 * (cx / cityEnd);
+                bh = Math.round(bh * falloff);
+                bh = Math.max(6, Math.min(bh, horizon - 2));
                 const top = horizon - bh;
 
                 g.globalAlpha = opts.alpha;
@@ -2630,9 +2670,13 @@ if (!window.WORDS) {
                     const ah = 4 + Math.floor(rand() * Math.max(3, bh * 0.3));
                     g.fillStyle = opts.color;
                     g.fillRect(ax, top - ah, 1, ah);
-                    if (rand() < 0.5) {
-                        g.fillStyle = 'rgba(255, 90, 140, 0.8)';
-                        g.fillRect(ax, top - ah, 1, 1);
+                    if (rand() < 0.55) {
+                        if (blinkLights.length < 10 && rand() < 0.5) {
+                            addBlink(ax, top - ah, '#ff6a7a', true);
+                        } else {
+                            g.fillStyle = 'rgba(255, 100, 130, 0.8)';
+                            g.fillRect(ax, top - ah, 1, 1);
+                        }
                     }
                 }
 
@@ -2640,9 +2684,22 @@ if (!window.WORDS) {
                     for (let wy = top + 4; wy < horizon - 3; wy += 3) {
                         for (let wx = x + 2; wx < x + bw - 1; wx += 3) {
                             if (rand() > opts.wChance) continue;
-                            g.fillStyle = opts.wColors[(rand() * opts.wColors.length) | 0];
+                            const col = opts.wColors[(rand() * opts.wColors.length) | 0];
+                            if (blinkLights.length < 12 && rand() < 0.035) {
+                                addBlink(wx, wy, col.solid, false);
+                                continue;
+                            }
+                            g.fillStyle = col.fill;
                             g.globalAlpha = 0.25 + rand() * 0.5;
                             g.fillRect(wx, wy, 1, 1);
+                            if (col.reflect && rand() < 0.28 && reflections.length < 26) {
+                                reflections.push({
+                                    x: wx,
+                                    rgb: col.rgb,
+                                    len: Math.round(H * 0.06 + rand() * H * 0.1),
+                                    alpha: 0.12 + rand() * 0.1
+                                });
+                            }
                         }
                     }
                     g.globalAlpha = 1;
@@ -2655,127 +2712,179 @@ if (!window.WORDS) {
         }
 
         skyline({
-            minH: 14, maxH: Math.round(H * 0.16),
-            minW: 7, maxW: 18,
-            color: '#2c2748', alpha: 0.9, windows: false
+            minH: 12, maxH: Math.round(H * 0.18),
+            minW: 7, maxW: 16,
+            color: '#2b2344', alpha: 0.85, windows: false
         });
 
         skyline({
-            minH: Math.round(H * 0.05), maxH: Math.round(H * 0.28),
-            minW: 9, maxW: 24,
-            color: '#181c33', alpha: 1, windows: true, wChance: 0.05,
-            wColors: ['rgba(120, 200, 215, 0.5)', 'rgba(255, 170, 120, 0.35)']
-        });
-
-        const front = skyline({
-            minH: Math.round(H * 0.08), maxH: Math.round(H * 0.42),
-            minW: 12, maxW: 34,
-            color: '#080b16', alpha: 1, windows: true, wChance: 0.08,
+            minH: Math.round(H * 0.06), maxH: Math.round(H * 0.3),
+            minW: 8, maxW: 22,
+            color: '#171a31', alpha: 1, windows: true, wChance: 0.06,
             wColors: [
-                'rgba(110, 225, 225, 0.75)',
-                'rgba(255, 90, 165, 0.65)',
-                'rgba(255, 185, 120, 0.55)'
+                { fill: 'rgba(120, 200, 215, 0.5)', solid: '#8fdfe6', rgb: '120, 210, 220', reflect: true },
+                { fill: 'rgba(255, 180, 120, 0.4)', solid: '#ffcf8a', rgb: '255, 190, 120', reflect: true }
             ]
         });
 
-        /* Неоновые вывески и их отражения */
-        const reflections = [];
-        const candidates = front.filter(function (b) {
-            return b.h > H * 0.1 && b.w > 14 &&
-                Math.abs((b.x + b.w / 2) - sunX) > W * 0.16;
+        const front = skyline({
+            minH: Math.round(H * 0.1), maxH: Math.round(H * 0.44),
+            minW: 10, maxW: 30,
+            color: '#070a15', alpha: 1, windows: true, wChance: 0.085,
+            wColors: [
+                { fill: 'rgba(120, 235, 230, 0.8)', solid: '#9ff5ee', rgb: '120, 240, 232', reflect: true },
+                { fill: 'rgba(255, 200, 130, 0.7)', solid: '#ffd08a', rgb: '255, 200, 130', reflect: true },
+                { fill: 'rgba(255, 120, 150, 0.6)', solid: '#ff8ab0', rgb: '255, 120, 160', reflect: true }
+            ]
         });
 
-        const signCount = Math.min(3, candidates.length);
+        /* Неоновые вывески в городе */
+        const candidates = front.filter(function (b) {
+            return b.h > H * 0.12 && b.w > 12;
+        });
+        const signCount = Math.min(2, candidates.length);
         for (let i = 0; i < signCount; i++) {
             const b = candidates.splice(Math.floor(rand() * candidates.length), 1)[0];
             const neon = i % 2 === 0
                 ? { rgb: '120, 240, 232', solid: '#8ff5ee' }
-                : { rgb: '255, 90, 168', solid: '#ff6bb2' };
+                : { rgb: '255, 110, 168', solid: '#ff7ab8' };
             const sx = b.x + 2 + Math.floor(rand() * Math.max(1, b.w - 6));
-            const sy = b.top + 6 + Math.floor(rand() * Math.max(1, Math.round(b.h * 0.3)));
+            const sy = b.top + 5 + Math.floor(rand() * Math.max(1, Math.round(b.h * 0.25)));
+            const sw = 2;
+            const sh = Math.max(7, Math.round(H * 0.04 + rand() * H * 0.05));
+            const cx = sx + sw / 2;
+            const cy = sy + sh / 2;
+            const glow = g.createRadialGradient(cx, cy, 1, cx, cy, Math.max(sw, sh) * 1.6);
+            glow.addColorStop(0, 'rgba(' + neon.rgb + ', 0.38)');
+            glow.addColorStop(1, 'rgba(' + neon.rgb + ', 0)');
+            g.fillStyle = glow;
+            g.fillRect(sx - sh, sy - sh, sw + sh * 2, sh + sh * 2);
+            g.fillStyle = neon.solid;
+            g.fillRect(sx, sy, sw, sh);
+            g.fillStyle = 'rgba(5, 8, 16, 0.55)';
+            for (let yy = sy + 3; yy < sy + sh - 1; yy += 4) {
+                g.fillRect(sx, yy, sw, 1);
+            }
+            reflections.push({ x: sx, rgb: neon.rgb, len: H * 0.14, alpha: 0.2 });
+        }
 
-            if (rand() < 0.7) {
-                const sw = 2 + ((rand() * 2) | 0);
-                const sh = Math.max(8, Math.round(H * 0.05 + rand() * H * 0.05));
-                const cx = sx + sw / 2;
-                const cy = sy + sh / 2;
-                const glow = g.createRadialGradient(cx, cy, 1, cx, cy, Math.max(sw, sh) * 1.5);
-                glow.addColorStop(0, 'rgba(' + neon.rgb + ', 0.4)');
-                glow.addColorStop(1, 'rgba(' + neon.rgb + ', 0)');
-                g.fillStyle = glow;
-                g.fillRect(sx - sh, sy - sh, sw + sh * 2, sh + sh * 2);
-                g.fillStyle = neon.solid;
-                g.fillRect(sx, sy, sw, sh);
-                g.fillStyle = 'rgba(5, 8, 16, 0.55)';
-                for (let yy = sy + 3; yy < sy + sh - 1; yy += 4) {
-                    g.fillRect(sx, yy, sw, 1);
+        /* ---------- МОРЕ ---------- */
+        const sea = g.createLinearGradient(0, horizon, 0, H);
+        sea.addColorStop(0, '#141126');
+        sea.addColorStop(0.3, '#090d1a');
+        sea.addColorStop(1, '#03050c');
+        g.fillStyle = sea;
+        g.fillRect(0, horizon, W, H - horizon);
+
+        /* Тёплый след заката на воде (мягкая эллиптическая основа) */
+        const refH = H - horizon;
+        g.save();
+        g.translate(sunX, horizon);
+        g.scale(1, Math.max(0.01, refH / (sunR * 2.2)));
+        const sunRef = g.createRadialGradient(0, 0, 0, 0, 0, sunR * 1.7);
+        sunRef.addColorStop(0, 'rgba(255, 185, 115, 0.3)');
+        sunRef.addColorStop(0.45, 'rgba(225, 130, 85, 0.14)');
+        sunRef.addColorStop(1, 'rgba(160, 80, 80, 0)');
+        g.fillStyle = sunRef;
+        g.fillRect(-sunR * 1.7, 0, sunR * 3.4, sunR * 2.2);
+        g.restore();
+
+        /* Отражения городских огней */
+        for (let i = 0; i < reflections.length; i++) {
+            const r = reflections[i];
+            const ref = g.createLinearGradient(0, horizon, 0, horizon + r.len);
+            ref.addColorStop(0, 'rgba(' + r.rgb + ',' + r.alpha.toFixed(2) + ')');
+            ref.addColorStop(1, 'rgba(' + r.rgb + ',0)');
+            g.fillStyle = ref;
+            g.fillRect(r.x, horizon, 1, r.len);
+        }
+
+        /* Лёгкая рябь, центр моря остаётся спокойным */
+        for (let y = horizon + 2; y < H; y += 3) {
+            const depth = (y - horizon) / (H - horizon);
+            const count = 2 + ((rand() * 3) | 0);
+            for (let i = 0; i < count; i++) {
+                let x;
+                if (rand() < 0.7) {
+                    x = rand() < 0.5
+                        ? Math.floor(rand() * W * 0.36)
+                        : Math.floor(W * 0.64 + rand() * W * 0.36);
+                } else {
+                    x = Math.floor(rand() * W);
                 }
-                reflections.push({ x: sx, w: sw, rgb: neon.rgb });
-            } else {
-                const sw = Math.max(10, Math.round(b.w * 0.55));
-                const sh = 3;
-                const glow = g.createRadialGradient(sx, sy, 1, sx, sy, sw);
-                glow.addColorStop(0, 'rgba(' + neon.rgb + ', 0.35)');
-                glow.addColorStop(1, 'rgba(' + neon.rgb + ', 0)');
-                g.fillStyle = glow;
-                g.fillRect(sx - sw, sy - sw, sw * 3, sw * 2);
-                g.fillStyle = neon.solid;
-                g.fillRect(sx, sy, sw, sh);
-                g.fillStyle = 'rgba(5, 8, 16, 0.55)';
-                for (let xx = sx + 3; xx < sx + sw - 1; xx += 5) {
-                    g.fillRect(xx, sy, 1, sh);
-                }
-                reflections.push({ x: sx, w: sw, rgb: neon.rgb });
+                const len = 2 + ((rand() * 6) | 0);
+                g.fillStyle = 'rgba(95, 155, 165, ' + (0.05 + (1 - depth) * 0.05).toFixed(3) + ')';
+                g.fillRect(x, y, len, 1);
             }
         }
 
-        /* Земля */
-        const ground = g.createLinearGradient(0, horizon, 0, H);
-        ground.addColorStop(0, '#100c1e');
-        ground.addColorStop(0.35, '#070a14');
-        ground.addColorStop(1, '#02040a');
-        g.fillStyle = ground;
-        g.fillRect(0, horizon, W, H - horizon);
+        /* Линия горизонта */
+        g.fillStyle = 'rgba(3, 5, 10, 0.7)';
+        g.fillRect(0, horizon, W, 1);
 
-        /* Отражение солнца на мокрой полосе */
-        const sunRef = g.createLinearGradient(0, horizon, 0, H);
-        sunRef.addColorStop(0, 'rgba(230, 100, 160, 0.22)');
-        sunRef.addColorStop(0.45, 'rgba(160, 60, 130, 0.09)');
-        sunRef.addColorStop(1, 'rgba(80, 30, 90, 0)');
-        g.fillStyle = sunRef;
-        g.fillRect(Math.round(sunX - sunR * 0.8), horizon, Math.round(sunR * 1.6), H - horizon);
+        /* ---------- НАБЕРЕЖНАЯ НА ПЕРЕДНЕМ ПЛАНЕ ---------- */
+        const quayColor = '#010206';
+        const quayTop1 = Math.round(H * 0.84);
+        const quayTop2 = Math.round(H * 0.88);
+        const quayTop3 = Math.round(H * 0.91);
+        const quayTop4 = Math.round(H * 0.94);
+        const quayW1 = Math.round(W * 0.12);
+        const quayW2 = Math.round(W * 0.2);
+        const quayW3 = Math.round(W * 0.28);
+        const quayW4 = Math.round(W * 0.34);
+        g.fillStyle = quayColor;
+        g.fillRect(0, quayTop1, quayW1, H);
+        g.fillRect(0, quayTop2, quayW2, H);
+        g.fillRect(0, quayTop3, quayW3, H);
+        g.fillRect(0, quayTop4, quayW4, H);
+        g.fillStyle = 'rgba(95, 185, 195, 0.34)';
+        g.fillRect(0, quayTop1, quayW1, 1);
+        g.fillRect(0, quayTop2, quayW2, 1);
+        g.fillRect(0, quayTop3, quayW3, 1);
+        g.fillRect(0, quayTop4, quayW4, 1);
 
-        /* Отражения вывесок */
-        for (let i = 0; i < reflections.length; i++) {
-            const r = reflections[i];
-            const ref = g.createLinearGradient(0, horizon, 0, horizon + H * 0.24);
-            ref.addColorStop(0, 'rgba(' + r.rgb + ', 0.22)');
-            ref.addColorStop(1, 'rgba(' + r.rgb + ', 0)');
-            g.fillStyle = ref;
-            g.fillRect(r.x, horizon, r.w, H * 0.24);
+        /* Фонари на набережной */
+        const lampR = Math.max(6, Math.round(W * 0.024));
+        const lamps = [
+            { x: Math.round(W * 0.075), top: Math.round(H * 0.8) },
+            { x: Math.round(W * 0.185), top: Math.round(H * 0.845) }
+        ];
+        for (let i = 0; i < lamps.length; i++) {
+            const lamp = lamps[i];
+            g.fillStyle = '#0b111c';
+            g.fillRect(lamp.x, lamp.top, 1, quayTop2 - lamp.top);
+            g.fillStyle = 'rgba(255, 210, 140, 0.28)';
+            g.fillRect(lamp.x, lamp.top + 1, 1, Math.max(1, quayTop2 - lamp.top - 1));
+            const glow = g.createRadialGradient(lamp.x, lamp.top, 0.5, lamp.x, lamp.top, lampR);
+            glow.addColorStop(0, 'rgba(255, 205, 130, 0.65)');
+            glow.addColorStop(0.5, 'rgba(255, 170, 100, 0.22)');
+            glow.addColorStop(1, 'rgba(255, 150, 90, 0)');
+            g.fillStyle = glow;
+            g.fillRect(lamp.x - lampR, lamp.top - lampR, lampR * 2, lampR * 2);
+            g.fillStyle = '#ffe2a8';
+            g.fillRect(lamp.x, lamp.top, 1, 1);
+            if (i === 1) addBlink(lamp.x, lamp.top, '#ffd08a', false);
         }
 
-        /* Линия улицы */
-        g.fillStyle = 'rgba(3, 5, 10, 0.85)';
-        g.fillRect(0, horizon, W, Math.max(1, Math.round(H * 0.008)));
+        quantize(g, W, H, 22);
 
-        /* Приземный туман */
-        const mist = g.createLinearGradient(0, horizon, 0, horizon + H * 0.2);
-        mist.addColorStop(0, 'rgba(45, 120, 120, 0.22)');
-        mist.addColorStop(1, 'rgba(45, 120, 120, 0)');
-        g.fillStyle = mist;
-        g.fillRect(0, horizon, W, H * 0.2);
-
-        quantize(g, W, H, 24);
-
-        fogTeal = makeFog(W, Math.max(14, Math.round(H * 0.2)), '120, 225, 220', 0.22, 0.8);
-        fogRose = makeFog(W, Math.max(14, Math.round(H * 0.28)), '235, 110, 170', 0.17, 2.3);
-        fogTealY = Math.round(horizon - H * 0.15);
-        fogRoseY = Math.round(horizon - H * 0.02);
+        /* Туман: слева холодный, справа тёплый, к центру затухает */
+        fogLeft = makeFog(
+            Math.max(40, Math.round(W * 0.5)),
+            Math.max(12, Math.round(H * 0.18)),
+            '110, 200, 210', 0.16, 0.8, 0.04, 0.5
+        );
+        fogRight = makeFog(
+            Math.max(40, Math.round(W * 0.45)),
+            Math.max(12, Math.round(H * 0.2)),
+            '240, 145, 100', 0.14, 2.3, 0.5, 0.04
+        );
+        fogLeftY = Math.round(horizon - H * 0.13);
+        fogRightY = Math.round(horizon - H * 0.11);
     }
 
-    /* Дрейфующие полосы тумана (бесшовные по горизонтали) */
-    function makeFog(w, h, rgb, alphaMax, phase) {
+    /* Дрейфующие полосы тумана с затуханием к центру */
+    function makeFog(w, h, rgb, alphaMax, phase, fadeIn, fadeOut) {
         const c = makeCanvas(w, h);
         const g = c.getContext('2d');
         for (let y = 0; y < h; y++) {
@@ -2783,8 +2892,13 @@ if (!window.WORDS) {
             const prof2 = prof * prof;
             const row = 0.55 + 0.45 * Math.sin(y * 0.75 + phase * 2.1);
             for (let x = 0; x < w; x += 2) {
+                const nx = x / (w - 1);
+                let mask = 1;
+                if (fadeIn > 0) mask *= Math.min(1, nx / fadeIn);
+                if (fadeOut > 0) mask *= Math.min(1, (1 - nx) / fadeOut);
+                mask = mask * mask * (3 - 2 * mask);
                 const xv = 0.65 + 0.35 * Math.sin((x / w) * Math.PI * 6 + y * 0.08 + phase);
-                const q = Math.floor(prof2 * row * xv * 4) / 4;
+                const q = Math.floor(prof2 * row * xv * mask * 4) / 4;
                 if (q <= 0) continue;
                 g.fillStyle = 'rgba(' + rgb + ',' + (q * alphaMax).toFixed(3) + ')';
                 g.fillRect(x, y, 2, 1);
@@ -2793,16 +2907,62 @@ if (!window.WORDS) {
         return c;
     }
 
+    /* Спокойная, но заметная солнечная дорожка на воде */
+    function drawSunGlitter(t) {
+        const waterH = H - horizon;
+        if (waterH <= 0) return;
+        const warm = ['#ffd08a', '#f7b06a', '#ff9d72', '#ffe2a8'];
+        for (let y = horizon + 2; y < H; y += 2) {
+            const depth = (y - horizon) / waterH;
+            const fade = Math.pow(1 - depth, 1.25);
+            const rowA = 0.1 + 0.4 * fade;
+            const spread = sunR * (0.35 + depth * 1.9);
+            const phase = t * 0.9 + y * 0.42;
+            const qa = Math.round(rowA * 8) / 8;
+            if (qa <= 0) continue;
+            ctx.globalAlpha = qa;
+            for (let k = -2; k <= 2; k++) {
+                const off = Math.sin(phase + k * 1.9) * (1.5 + depth * 5);
+                const x = Math.round(sunX + k * spread * 0.42 + off);
+                const len = 2 + ((k + 2) % 3) * 2 + Math.round((1 - depth) * 2);
+                ctx.fillStyle = warm[(Math.abs(k) + (y >> 1)) & 3];
+                ctx.fillRect(x, y, len, 1);
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    /* Редко мигающие огни города */
+    function drawBlinkLights(t) {
+        for (let i = 0; i < blinkLights.length; i++) {
+            const L = blinkLights[i];
+            const slot = Math.floor(t / L.period + L.phase);
+            const h = hash01(Math.imul(slot, 374761393) + L.seed);
+            let on = h > L.threshold;
+            if (L.glow && h > 0.9) {
+                on = hash01(Math.floor(t * 5) + L.seed) > 0.5;
+            }
+            if (!on) continue;
+            ctx.globalAlpha = L.alpha;
+            ctx.fillStyle = L.color;
+            ctx.fillRect(L.x, L.y, L.w, 1);
+        }
+        ctx.globalAlpha = 1;
+    }
+
     function paint(now) {
         if (!base) return;
         ctx.drawImage(base, 0, 0);
         const t = reduceMotion ? 0 : now / 1000;
-        const offTeal = Math.floor((t * 6) % W);
-        const offRose = Math.floor((W - (t * 3.5) % W) % W);
-        ctx.drawImage(fogTeal, -offTeal, fogTealY);
-        ctx.drawImage(fogTeal, W - offTeal, fogTealY);
-        ctx.drawImage(fogRose, -offRose, fogRoseY);
-        ctx.drawImage(fogRose, W - offRose, fogRoseY);
+
+        drawSunGlitter(t);
+
+        const leftOff = Math.round(Math.sin(t * 0.25 + 0.7) * 7);
+        const rightOff = Math.round(Math.sin(t * 0.19 + 2.4) * 7);
+        ctx.drawImage(fogLeft, leftOff, fogLeftY);
+        ctx.drawImage(fogRight, W - fogRight.width + rightOff, fogRightY);
+
+        drawBlinkLights(t);
     }
 
     let rafId = 0;
