@@ -102,46 +102,18 @@
     overflow: hidden;
 }
 
-/* Игрок 2 — розовый неон */
-.player-panel.player-1 {
-    border-color: rgba(255, 0, 255, 0.25);
-    background: rgba(255, 0, 255, 0.04);
-    box-shadow:
-        inset 0 0 18px rgba(255, 0, 255, 0.08),
-        0 0 14px rgba(255, 0, 255, 0.15);
-}
-
-/* Активный игрок — сияние и пульс */
-.player-panel.active.player-0 {
-    border-color: #0ff;
-    background: rgba(0, 255, 255, 0.12);
-    box-shadow:
-        inset 0 0 26px rgba(0, 255, 255, 0.35),
-        0 0 28px rgba(0, 255, 255, 0.7),
-        0 0 60px rgba(0, 255, 255, 0.4);
-    animation: glowPulse0 2s ease-in-out infinite alternate;
-}
-.player-panel.active.player-1 {
+/* Активный игрок — всегда розовое сияние, независимо от номера */
+.player-panel.active {
     border-color: #f0f;
     background: rgba(255, 0, 255, 0.12);
     box-shadow:
         inset 0 0 26px rgba(255, 0, 255, 0.35),
         0 0 28px rgba(255, 0, 255, 0.7),
         0 0 60px rgba(255, 0, 255, 0.4);
-    animation: glowPulse1 2s ease-in-out infinite alternate;
+    animation: glowPulseActive 2s ease-in-out infinite alternate;
 }
 
-@keyframes glowPulse0 {
-    from { box-shadow:
-        inset 0 0 22px rgba(0, 255, 255, 0.3),
-        0 0 22px rgba(0, 255, 255, 0.55),
-        0 0 50px rgba(0, 255, 255, 0.3); }
-    to   { box-shadow:
-        inset 0 0 30px rgba(0, 255, 255, 0.45),
-        0 0 34px rgba(0, 255, 255, 0.85),
-        0 0 80px rgba(0, 255, 255, 0.55); }
-}
-@keyframes glowPulse1 {
+@keyframes glowPulseActive {
     from { box-shadow:
         inset 0 0 22px rgba(255, 0, 255, 0.3),
         0 0 22px rgba(255, 0, 255, 0.55),
@@ -161,10 +133,7 @@
     margin-bottom: 4px;
     white-space: nowrap;
 }
-.player-1 .player-label {
-    color: #f0f;
-    text-shadow: 0 0 8px #f0f;
-}
+
 
 /* БОЛЬШИЕ ОБЪЁМНЫЕ ЦИФРЫ */
 .player-score {
@@ -185,7 +154,11 @@
         0 0 42px #0ff;
     transition: transform 0.2s ease;
 }
-.player-1 .player-score {
+
+
+/* Подсветка цифр активного игрока */
+/* Цифры активного игрока — розовые и пульсируют */
+.player-panel.active .player-score {
     color: #f0f;
     text-shadow:
         0 1px 0 #606,
@@ -197,10 +170,6 @@
         0 0 12px #f0f,
         0 0 24px #f0f,
         0 0 42px #f0f;
-}
-
-/* Подсветка цифр активного игрока */
-.player-panel.active .player-score {
     animation: scorePulse 1.6s ease-in-out infinite alternate;
 }
 @keyframes scorePulse {
@@ -563,6 +532,15 @@
         cursor: pointer;
         box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
     }
+    
+    body.paused .board {
+        filter: grayscale(0.6) brightness(0.7);
+        pointer-events: none;
+    }
+    body.paused .controls {
+        opacity: 0.4;
+        pointer-events: none;
+    }
 </style>
 </head>
 <body>
@@ -640,7 +618,7 @@ try {
             kickFig : { src: '../res/tetris/1/kick-fig-1.mp3',  volume: 0.4, pool: 2 },
             kickSide: { src: '../res/tetris/1/kick-side-1.mp3', volume: 0.4, pool: 2 },
             linedel : { src: '../res/tetris/1/linedel-1.mp3',   volume: 0.5, pool: 2 },
-            death   : { src: '../res/tetris/1/death.mp3',       volume: 0.5, pool: 1 },
+            death   : { src: '../res/tetris/1/death.mp3',       volume: 0.1, pool: 1 },
             click   : { src: '../res/dzin-1.mp3'        ,       volume: 0.5, pool: 3 },
         });
         kit.autoUnlock();
@@ -711,6 +689,10 @@ const state = {
     timeLeft: 0,
     startTime: 0,
     moves: 0,
+    
+    paused: false,          // ← новое: вкладка неактивна
+    pausedAt: 0,            // ← новое: когда ушли с вкладки
+    wasTimerRunning: false, // ← новое: таймер шёл в момент паузы
 };
 
 let cells = [];
@@ -881,6 +863,7 @@ function onCellClick(r, c) {
     if (state.typing && !(state.typing.r === r && state.typing.c === c)) {
         state.typing = null;
     }
+    if (state.paused) return;
 
     if (state.phase === 'input') {
         const cell = state.board[r][c];
@@ -942,6 +925,7 @@ hiddenInput.style.cssText =
 document.body.appendChild(hiddenInput);
 
 hiddenInput.addEventListener('input', () => {
+    if (state.paused) { hiddenInput.value = ''; return; }
     if (!state.typing) { hiddenInput.value = ''; return; }
     const letter = norm(hiddenInput.value.trim()).slice(-1);
     hiddenInput.value = '';
@@ -956,6 +940,7 @@ function focusTypingInput() {
 }
 
 document.addEventListener('keydown', e => {
+    if (state.paused) return; 
     if (!state.typing) return;
 
     if (e.key === 'Escape') {
@@ -982,6 +967,26 @@ window.addEventListener('blur', () => {
         state.typing = null;
         render();
     }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        pauseGame();
+    } else {
+        resumeGame();
+    }
+});
+
+window.addEventListener('blur', () => {
+    if (state.typing) {
+        state.typing = null;
+        render();
+    }
+    pauseGame();
+});
+
+window.addEventListener('focus', () => {
+    resumeGame();
 });
 
 // ============================================================
@@ -1149,7 +1154,60 @@ function stopTimer() {
         clearInterval(state.timerId);
         state.timerId = null;
     }
-    state.timeLeft = 0;
+    //state.timeLeft = 0;
+}
+
+function pauseGame() {
+    if (state.paused) return;
+    state.paused = true;
+    state.pausedAt = Date.now();
+    state.wasTimerRunning = state.timerId !== null;
+
+    // Останавливаем таймер, но запоминаем оставшееся время
+    if (state.timerId) {
+        stopTimer();
+        // stopTimer() обнуляет timeLeft — восстановим
+        state.timeLeft = state.pausedTimeLeft ?? state.timeLeft;
+    }
+    showStatus('Пауза (вкладка неактивна)', 'timer-on', 0);
+    
+    document.body.classList.add('paused');
+}
+
+function resumeGame() {
+    if (!state.paused) return;
+    state.paused = false;
+
+    // Если таймер шёл до паузы — возобновляем
+    if (state.wasTimerRunning && state.timeLeft > 0) {
+        resumeTimer(state.timeLeft);
+    }
+    state.wasTimerRunning = false;
+
+    if (state.phase !== 'finished') {
+        showStatus(DEFAULT_STATUS, '');
+    }
+    document.body.classList.remove('paused');
+}
+
+function resumeTimer(leftSeconds) {
+    if (state.timerId) return;
+    state.timeLeft = leftSeconds;
+    state.startTime = Date.now() - (TURN_SECONDS - leftSeconds) * 1000;
+
+    renderHud();
+
+    state.timerId = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+        state.timeLeft = Math.max(0, TURN_SECONDS - elapsed);
+        renderHud();
+
+        if (state.timeLeft <= 0) {
+            stopTimer();
+            state.timeLeft = 0;
+            onTimeout();
+        }
+    }, 250);
 }
 
 function onTimeout() {
@@ -1193,6 +1251,8 @@ function startGame() {
 
     state.size = raw.length;
     initBoard();
+    state.paused = false;
+    state.wasTimerRunning = false;
     placeStartWord(raw);
     buildBoardDom();
     state.phase = 'input';
@@ -1214,9 +1274,12 @@ function restartGame() {
     state.pending = null;
     state.typing = null;
     state.selection = [];
+    state.paused = false;
+    state.wasTimerRunning = false;
     boardEl.innerHTML = '';
     previewEl.textContent = '\u00A0';
     showStatus('Введите стартовое слово', '');
+    
 }
 
 // ============================================================
