@@ -2360,6 +2360,8 @@ cancelBtn.addEventListener('click', cancelPendingLetter);
 const fsBtn  = document.getElementById('btnFullscreen');
 const fsIcon = document.getElementById('fsIcon');
 const fsTarget = document.documentElement;
+const FS_PARAM = 'fs';
+const IS_FS_TAB = new URLSearchParams(location.search).get(FS_PARAM) === '1';
 
 function isFullscreen() {
     return document.fullscreenElement ||
@@ -2367,34 +2369,94 @@ function isFullscreen() {
            document.msFullscreenElement;
 }
 function updateFsIcon() {
-    fsIcon.textContent = isFullscreen() ? '⤡' : '⛶';
+    const fs = !!isFullscreen();
+    fsIcon.textContent = fs ? '⤡' : '⛶';
+    fsBtn.title = fs ? 'Выйти из полноэкранного режима' : 'Открыть на весь экран';
 }
-function toggleFullscreen() {
-    if (!isFullscreen()) {
-        const req = fsTarget.requestFullscreen ||
-                    fsTarget.webkitRequestFullscreen ||
-                    fsTarget.msRequestFullscreen;
-        if (req) {
-            const p = req.call(fsTarget);
-            if (p && p.catch) p.catch(() => {});
-        }
-    } else {
-        const exit = document.exitFullscreen ||
-                     document.webkitExitFullscreen ||
-                     document.msExitFullscreen;
-        if (exit) {
-            const p = exit.call(document);
-            if (p && p.catch) p.catch(() => {});
-        }
+function requestFs(el) {
+    const req = el.requestFullscreen ||
+                el.webkitRequestFullscreen ||
+                el.msRequestFullscreen;
+    if (!req) return Promise.reject(new Error('fullscreen unsupported'));
+    try {
+        return Promise.resolve(req.call(el));
+    } catch (e) {
+        return Promise.reject(e);
     }
 }
-fsBtn.addEventListener('click', toggleFullscreen);
+function exitFs() {
+    const exit = document.exitFullscreen ||
+                 document.webkitExitFullscreen ||
+                 document.msExitFullscreen;
+    if (!exit) return;
+    try {
+        const p = exit.call(document);
+        if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+}
+function openFullscreenTab() {
+    const base = location.href.split('#')[0];
+    const sep = base.indexOf('?') === -1 ? '?' : '&';
+    const win = window.open(base + sep + FS_PARAM + '=1', '_blank');
+    if (!win) {
+        requestFs(fsTarget).catch(() => {});
+        return;
+    }
+    try { win.focus(); } catch (e) {}
+}
+function onFullscreenClick() {
+    if (IS_FS_TAB) {
+        if (isFullscreen()) exitFs();
+        else requestFs(fsTarget).catch(() => {});
+    } else {
+        openFullscreenTab();
+    }
+}
+fsBtn.addEventListener('click', onFullscreenClick);
 fsBtn.addEventListener('pointerdown', e => e.stopPropagation());
 
 ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
     .forEach(evt => document.addEventListener(evt, updateFsIcon));
 
 updateFsIcon();
+
+/* Вкладка, открытая кнопкой: пробуем развернуть сразу, иначе — по первому клику */
+if (IS_FS_TAB) {
+    requestFs(fsTarget).catch(() => {});
+    const unlock = e => {
+        document.removeEventListener('pointerdown', unlock, true);
+        document.removeEventListener('keydown', unlock, true);
+        if (e.target && e.target.closest && e.target.closest('#btnFullscreen')) return;
+        if (!isFullscreen()) requestFs(fsTarget).catch(() => {});
+    };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('keydown', unlock, true);
+
+    let hint = null;
+    const hideHint = () => {
+        if (!hint) return;
+        const el = hint;
+        hint = null;
+        el.remove();
+    };
+    setTimeout(() => {
+        if (isFullscreen() || hint) return;
+        hint = document.createElement('div');
+        hint.textContent = 'Нажмите в любом месте, чтобы развернуть игру на весь экран';
+        hint.style.cssText = 'position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:40;max-width:90vw;padding:10px 16px;border:1px solid rgba(0,255,255,.55);border-radius:10px;background:rgba(3,10,18,.92);color:#0ff;font:13px/1.3 "Courier New",monospace;text-align:center;pointer-events:none;box-shadow:0 0 16px rgba(0,255,255,.28);opacity:0;transition:opacity .25s ease;';
+        document.body.appendChild(hint);
+        requestAnimationFrame(() => { if (hint) hint.style.opacity = '1'; });
+        setTimeout(() => {
+            if (!hint) return;
+            hint.style.opacity = '0';
+            const el = hint;
+            hint = null;
+            setTimeout(() => el.remove(), 300);
+        }, 6000);
+    }, 700);
+    ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']
+        .forEach(evt => document.addEventListener(evt, () => { if (isFullscreen()) hideHint(); }));
+}
 
 // ============================================================
 //                   КНОПКА MUTE
