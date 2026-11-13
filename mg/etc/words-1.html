@@ -172,9 +172,20 @@
         0 0 42px #f0f;
     animation: scorePulse 1.6s ease-in-out infinite alternate;
 }
+
 @keyframes scorePulse {
     from { transform: scale(1); }
     to   { transform: scale(1.06); }
+}
+
+.player-panel.active .player-label {
+    color: #f0f;
+    text-shadow:
+        0 0 8px #f0f,
+        0 0 16px #f0f,
+        0 0 28px #f0f;
+    opacity: 1;
+    animation: labelGlow 1.6s ease-in-out infinite alternate;
 }
 
 /* Центральный блок — ход + таймер */
