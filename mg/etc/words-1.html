@@ -755,6 +755,7 @@ function placeStartWord(word) {
     }
 
     state.currentPlayer = 0;
+    state.usedWords.add(word);
 }
 
 function inBounds(r, c) {
