@@ -107,6 +107,31 @@
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.3;
     document.body.appendChild(renderer.domElement);
+    
+// Сразу после создания renderer:
+renderer.domElement.tabIndex = 0;
+renderer.domElement.style.outline = 'none';
+
+// Фокус при клике по канвасу:
+renderer.domElement.addEventListener('click', () => renderer.domElement.focus());
+
+// Если внутри iframe — попытаться забрать фокус при загрузке:
+if (window.self !== window.top) {
+  // мы в iframe
+  renderer.domElement.focus();
+}
+
+// Слушатели вешаем на document (надёжнее, чем window в iframe):
+document.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+// Пробел — отдельно:
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    tryDig();
+  }
+});
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
