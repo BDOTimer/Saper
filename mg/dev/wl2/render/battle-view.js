@@ -164,6 +164,7 @@ export class BattleView {
     this._finished = false;   // окно можно закрыть только после конца боя
     this._battle   = null;    // core/g-battle.js Battle
     this._onEnd    = null;    // сигнал «конец битвы» наружу
+    this._onClose  = null;    // сигнал «окно закрыто» наружу
     this._raf      = null;
     this._roundAt  = 0;       // аккумулятор мс до следующего раунда
     this._fx       = null;    // текущая анимация раунда
@@ -272,10 +273,12 @@ export class BattleView {
    * @param {Army}        armyB — армия соперника
    * @param {Object}  [opts]
    * @param {Function} [opts.onEnd] — сигнал конца битвы: (winner, loser) => void
+   * @param {Function} [opts.onClose] — сигнал фактического закрытия окна
    */
   runBattle(armyA, armyB, opts = {}) {
     if (!armyA || !armyB || !armyA.alive || !armyB.alive) return;
 
+    this._onClose = null;
     this.close(true);   // на случай повторного запуска (переиспользование)
 
     // ТЗ: армия игрока текущего хода — слева, соперник — справа.
@@ -288,6 +291,7 @@ export class BattleView {
     this._right    = right;
     this._battle   = new Battle(left, right);
     this._onEnd    = opts.onEnd ?? null;
+    this._onClose  = opts.onClose ?? null;
     this._finished = false;
 
     this._buildScene();
@@ -312,6 +316,9 @@ export class BattleView {
   /** @param {boolean} [force] — аварийное закрытие (destroy), без ограничений */
   close(force = false) {
     if (this._open && !this._finished && !force) return;
+
+    const onClose = (!force && this._finished) ? this._onClose : null;
+    this._onClose = null;
 
     if (this._open && !force) {
       SND.winClose.play();   // звук закрыть окно
@@ -340,6 +347,7 @@ export class BattleView {
     this._right  = null;
 
     this._root.classList.remove('open');
+    onClose?.();
   }
 
   destroy() {

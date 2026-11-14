@@ -530,7 +530,7 @@ export class Game {
     this._refreshHud();
 
     // Красные маркеры маршрутов на карте.
-    // У ИИ маршруты уже построены в Player.doStep через AiBrainHelper.
+    // У ИИ маршруты уже построены в ComputerBrain перед стартом хода.
     this.mapView.routeView.rebuild();
 
     if (player.isHuman) {
@@ -640,7 +640,13 @@ export class Game {
         `🏚 Руины «${city.name}»: ещё спят ${res.cooldownLeft} кр.`, false);
     }
 
-    if (!human) return;
+    if (!human) {
+      if (res.visited && res.monsters?.length) {
+        this._claimRuinsMonsters(army, city, res);
+      }
+      return;
+    }
+
     this.townView?.show?.(city, {
       visit: res,
       // Монстры присоединяются к армии только после закрытия окна руин.
@@ -704,6 +710,8 @@ export class Game {
     const defender = enemies[0];
     if (!defender) return;
 
+    this.mover.pauseForBattle();
+
     const dp = this.judge.playerByIndex(defender.idOwner);
     this._log(
       `⚔ Армия #${attacker.id} встретила армию #${defender.id}` +
@@ -714,7 +722,10 @@ export class Game {
 
     this.battleView.runBattle(attacker, defender, {
       onEnd: (winner, loser) => this._onBattleEnd(winner, loser),
+      onClose: () => this.mover.resumeAfterBattle(),
     });
+
+    if (this.battleView.isOpen === false) this.mover.resumeAfterBattle();
   }
 
   /**

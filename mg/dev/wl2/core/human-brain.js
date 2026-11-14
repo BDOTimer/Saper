@@ -217,7 +217,6 @@ export class HumanBrain {
   onBattleStart(army) {
     if (!this.active || this._planning) return;
     this._inBattle = true;
-    this.deps?.mover?.pauseForEncounter?.(army);
     this._refreshUI();
   }
 
@@ -232,21 +231,8 @@ export class HumanBrain {
   onBattleEnd() {
     if (!this.active) return;
 
-    const wasBattle = this._inBattle;
     this._inBattle = false;
     this._inEncounter = false;
-
-    if (!wasBattle) {
-      this._refreshUI();
-      return;
-    }
-
-    const mover = this.deps?.mover;
-    if (mover?.paused) mover.resumeFromEncounter();
-
-    // Очередь могла опустеть во время боя — даём mover'у штатно
-    // сообщить onQueueEmpty на следующем кадре (без двойного финиша).
-    if (mover && !mover.busy) mover.enqueue?.([]);
 
     this._refreshUI();
   }

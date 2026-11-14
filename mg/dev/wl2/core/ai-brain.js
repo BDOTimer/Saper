@@ -132,6 +132,45 @@ export class AiBrainHelper {
   }
 
   /**
+   * Публичное поле стоимостей от позиции армии.
+   * @param {WorldMap} world
+   * @param {object}   army
+   * @param {object}   [opts]
+   * @returns {{costs: Map<Cell,{cost:number,prev:Cell|null}>, start: Cell|null}}
+   */
+  static search(world, army, opts = {}) {
+    const start = world?.get?.(army?.x, army?.y) ?? null;
+    if (!start) return { costs: new Map(), start: null };
+    const { costs } = this._search(world, army, null, opts);
+    return { costs, start };
+  }
+
+  /**
+   * Восстановить маршрут по полю стоимостей.
+   * @param {Map<Cell,{cost:number,prev:Cell|null}>} costs
+   * @param {Cell} start
+   * @param {Cell} goal
+   * @returns {Cell[]} клетки без стартовой
+   */
+  static pathFrom(costs, start, goal) {
+    if (!costs || !start || !goal || start === goal) return [];
+    if (!costs.has(goal)) return [];
+
+    const path = [];
+    let cur = goal;
+    let guard = costs.size + 1;
+
+    while (cur && cur !== start && guard-- > 0) {
+      path.push(cur);
+      cur = costs.get(cur)?.prev ?? null;
+    }
+
+    if (cur !== start) return [];
+    path.reverse();
+    return path;
+  }
+
+  /**
    * Общий поиск по стоимости стамины.
    *
    * Если goal задан — A* до цели, иначе Dijkstra по всем достижимым клеткам
@@ -150,6 +189,7 @@ export class AiBrainHelper {
     const maxCost = opts.maxCost ?? Infinity;
     const allowGoalOnWater = opts.allowGoalOnWater === true;
     const minMove = this._armyMinMove(army);
+    const blockCells = opts.blockCells instanceof Set ? opts.blockCells : null;
 
     // Ключ — cell; value — { cost, prev }
     const costs = new Map();
@@ -171,6 +211,8 @@ export class AiBrainHelper {
 
       for (const nb of world.neighbors4(cell.x, cell.y)) {
         if (!nb) continue;
+
+        if (blockCells && nb !== goal && blockCells.has(nb)) continue;
 
         // Проходимость
         if (this._isImpassable(nb) && !(allowGoalOnWater && nb === goal)) continue;

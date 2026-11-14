@@ -7,6 +7,7 @@ import { STATE, TICK     } from './g-state.js';
 import { NAME            } from './gen-name.js';
 import { UNIT_TYPES, Unit, Army } from './units.js';
 import { tickCityProduction } from './production.js';
+import { ComputerBrain } from '../ai/computer-brain.js';
 
 ///----------------------------------------------------------------------------|
 /// Судья знающий правила игры...
@@ -39,6 +40,8 @@ export class Judge {
     // true — круг завершился, следующий запускает игрок кнопкой.
     this.awaitNextCircle = false;
 
+    ComputerBrain.reset();
+
     // Колбэк Game: (player) => void — игрок вступил в ход
     // (маршруты построены, можно показывать их и запускать армии).
     this.onTurnStart = null;
@@ -69,14 +72,15 @@ export class Judge {
   playerByIndex(i) { return this._byIndex.get(i) ?? null; }
 
   ///----------------------------------------------------------
-  /// Игрок вступает в ход: маршруты строятся для КАЖДОЙ его армии
-  /// (Player.doStep → AiBrainHelper.find/buildRoute → army.route).
+  /// Игрок вступает в ход: для ИИ маршруты строит ComputerBrain,
+  /// для человека армии готовит Player.doStep.
   ///----------------------------------------------------------:
   playerGo()
   {   const player = this.currentPlayer;
       player.isTurn = true; /// Игрок в процессе хода
 
-      player.doStep();
+      if (player.isHuman) player.doStep();
+      else ComputerBrain.get().begin(player, { world: this.world, turn: this.turn });
 
       // Сообщаем экрану игры: можно рисовать красные маркеры маршрутов
       // и запускать плавное передвижение армий.

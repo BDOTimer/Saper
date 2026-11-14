@@ -7,7 +7,6 @@
 
 import { SND           } from '../res/snd/--sound-lib.js';
 import { STATE         } from './g-state.js';
-import { AiBrainHelper } from './ai-brain.js';
 
 // Текущая задача:
 //  - сделать Панель(оверлей) PanelPlayers в которой определить
@@ -59,65 +58,27 @@ export class Player {
   }
 
   /**
-   * Игрок делает ход.
-   *  - Компьютер: если у армии уже есть сохранённый маршрут — он остаётся
-   *    (армия продолжит его автоматически), иначе строится новый.
-   *  - Человек: армии готовятся к ручному ходу — сбрасываются очки движения,
-   *    а построенные ранее маршруты СОХРАНЯЮТСЯ, чтобы армия автоматически
-   *    прошла по ним в начале своего хода.
+   * Подготовка армий к ходу.
+   * ИИ-армии планирует ComputerBrain, здесь сбрасываются очки только
+   * для человека. Маршрут человека не трогаем — его строит HumanBrain.
    */
   doStep()
   {
     const world = STATE.world;
     if (!world)
-    {   console.warn('🔍 doStep(): STATE.world не задан — маршрут не построить');
+    {   console.warn('🔍 doStep(): STATE.world не задан — ход не подготовить');
         return;
     }
 
-    // ── Человек: ход делает HumanBrain ────────────────────────────
-    if (this.isHuman)
-    {
-      for (const army of this.army)
-      {
-        if (!army?.alive) continue;
-        army.resetTurn();
-        // army.route НЕ очищаем — армия помнит маршрут прошлого круга
-        // и пройдёт по нему автоматически (см. HumanBrain).
-      }
-      return;
-    }
+    if (!this.isHuman) return;
 
     for (const army of this.army)
     {
       if (!army?.alive) continue;
-
-      army.resetTurn();   // новые очки движения всем юнитам стека
-
-      // Маршрут уже построен в прошлом круге и ещё проходим —
-      // не пересчитываем, армия продолжит движение по нему.
-      if (army.route?.length) {
-        const next = army.route[0];
-        const cost = Number.isFinite(next?.staminaCost) ? next.staminaCost : Infinity;
-        if (army.canMoveTo(cost)) continue;
-        // Первую клетку пройти не может — маршрут бесполезен, строим заново.
-        army.route = [];
-        army.cellGoal = null;
-      }
-
-      const cellGoal = AiBrainHelper.find(world, army);
-      if  (!cellGoal) continue;
-
-      const route = AiBrainHelper.buildRoute(world, army, cellGoal);
-
-      if  (!route || route.length === 0) continue;
-
-      army.route = route;
-      army.cellGoal = cellGoal;
-
-    //console.log('🔍 RouteView build:', army.id, 'cells=', army.route?.length);
+      army.resetTurn();
+      // army.route НЕ очищаем — армия помнит маршрут прошлого круга
+      // и пройдёт по нему автоматически (см. HumanBrain).
     }
-
-    // TODO: ...
   }
 
   /**

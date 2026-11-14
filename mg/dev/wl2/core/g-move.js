@@ -54,6 +54,7 @@ export class ArmyMover {
 
     /** Пауза на время модальной панели обмена юнитами. */
     this.paused = false;
+    this._pausedForBattle = false;
     this._encounterArmy = null;
     this._encounterSteps = 0;
 
@@ -78,6 +79,7 @@ export class ArmyMover {
     this.queue.length = 0;
     this.active = null;
     this.paused = false;
+    this._pausedForBattle = false;
     this._encounterArmy = null;
     this._encounterSteps = 0;
     this._done = true;
@@ -89,6 +91,7 @@ export class ArmyMover {
    * @param {Army} army — армия, остановленная перед своей армией
    */
   pauseForEncounter(army) {
+    if (this._pausedForBattle) return false;
     this.paused = true;
     this._encounterArmy = army ?? null;
     return true;
@@ -100,13 +103,26 @@ export class ArmyMover {
    * @returns {boolean}
    */
   resumeFromEncounter() {
-    if (!this.paused) return false;
+    if (!this.paused || this._pausedForBattle) return false;
     const army = this._encounterArmy;
     const steps = this._encounterSteps;
     this.paused = false;
     this._encounterArmy = null;
     this._encounterSteps = 0;
     if (army) this.onArmyArrive(army, steps);
+    return true;
+  }
+
+  pauseForBattle() {
+    this.paused = true;
+    this._pausedForBattle = true;
+    return true;
+  }
+
+  resumeAfterBattle() {
+    if (!this._pausedForBattle) return false;
+    this._pausedForBattle = false;
+    this.paused = false;
     return true;
   }
 
