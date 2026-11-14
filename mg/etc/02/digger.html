@@ -1,511 +1,2457 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Изумрудный Диггер | Three.js</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    #info {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      color: #e0ffe0;
-      text-shadow: 0 0 10px #00ff88, 0 0 20px #004400;
-      pointer-events: none;
-      z-index: 10;
-    }
-    #score {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      font-size: 28px;
-      font-weight: bold;
-      color: #b5ffb5;
-      text-shadow: 0 0 20px #00aa55, 0 0 40px #006633;
-      background: rgba(0, 30, 0, 0.6);
-      padding: 10px 25px;
-      border-radius: 50px;
-      backdrop-filter: blur(5px);
-      border: 2px solid #00ff88;
-      box-shadow: 0 0 30px #00ff88;
-      z-index: 10;
-    }
-    #controls {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #aaffaa;
-      background: rgba(0, 20, 0, 0.7);
-      padding: 12px 30px;
-      border-radius: 40px;
-      font-size: 18px;
-      letter-spacing: 2px;
-      backdrop-filter: blur(4px);
-      border: 1px solid #00cc66;
-      box-shadow: 0 0 25px #00aa55;
-      z-index: 10;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    .key {
-      display: inline-block;
-      background: #003300;
-      border: 1px solid #00ff88;
-      border-radius: 8px;
-      padding: 4px 12px;
-      margin: 0 4px;
-      color: #ccffcc;
-      font-weight: bold;
-      box-shadow: 0 0 12px #00ff88;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#050b10">
+<title>Изумрудный Диггер — 3D</title>
+<style>
+  :root{
+    --em:#3dffa8; --em2:#0bd47e; --amber:#ffbb55; --ink:#eafff6;
+    --stroke:rgba(90,255,190,.22);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; overflow:hidden; background:#04080c; color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,"Trebuchet MS",sans-serif;
+    -webkit-font-smoothing:antialiased; user-select:none; -webkit-user-select:none;
+    touch-action:none;
+  }
+  canvas.scene{position:fixed; inset:0; display:block}
+
+  /* ---------- затемнение по краям ---------- */
+  #vignette{
+    position:fixed; inset:0; z-index:5; pointer-events:none;
+    background:
+      radial-gradient(130% 105% at 50% 42%, rgba(0,0,0,0) 42%, rgba(0,0,0,.42) 78%, rgba(0,0,0,.72) 100%),
+      linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,0) 18%, rgba(0,0,0,0) 82%, rgba(0,0,0,.42));
+  }
+  /* красная кромка, когда воздух на исходе */
+  #lowair{
+    position:fixed; inset:0; z-index:6; pointer-events:none; opacity:0; transition:opacity .5s;
+    background:radial-gradient(120% 100% at 50% 50%, rgba(0,0,0,0) 42%, rgba(190,25,25,.5) 100%);
+  }
+  #lowair.on{opacity:.85; animation:lowPulse 1.15s infinite}
+  @keyframes lowPulse{50%{opacity:.3}}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed; inset:0; z-index:10; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between}
+  .top{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 18px}
+  .panel{
+    background:linear-gradient(180deg, rgba(9,26,26,.80), rgba(4,12,14,.58));
+    border:1px solid var(--stroke); border-radius:16px;
+    box-shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.07);
+    backdrop-filter:blur(12px) saturate(1.2); -webkit-backdrop-filter:blur(12px) saturate(1.2);
+    padding:10px 16px;
+  }
+  .brand{display:flex; align-items:center; gap:12px}
+  .gemIcon{
+    width:26px; height:26px; flex:0 0 auto; border-radius:5px; transform:rotate(45deg);
+    background:linear-gradient(135deg,#b8ffe2,#2bffa5 45%,#049a63);
+    box-shadow:0 0 16px rgba(45,255,170,.75), inset 0 0 8px rgba(255,255,255,.6);
+  }
+  .t1{font-size:13px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#d6fff0; opacity:.92; line-height:1.1}
+  .t2{font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#7fd9b7; opacity:.75; margin-top:4px; line-height:1}
+  .t2 b{color:#bfffe6; font-weight:700}
+  .air{min-width:216px; padding:9px 14px 11px}
+  .air .row{display:flex; justify-content:space-between; align-items:baseline; font-size:10.5px; letter-spacing:.18em; color:#7fd9b7; margin-bottom:7px; font-weight:700; text-transform:uppercase}
+  .air .row b{color:#d8fff0; font-size:12px; letter-spacing:.06em}
+  .bar{position:relative; height:9px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; box-shadow:inset 0 1px 3px rgba(0,0,0,.6)}
+  .bar i{
+    position:absolute; inset:0 auto 0 0; width:100%; border-radius:99px;
+    background:linear-gradient(90deg,#0b9c6a,#2bffa5 60%,#c9ffe9);
+    box-shadow:0 0 14px rgba(45,255,170,.7); transition:width .12s linear, background .3s;
+  }
+  .bar i.low{background:linear-gradient(90deg,#a8500d,#ffab3d 60%,#ffe6b0); box-shadow:0 0 14px rgba(255,160,60,.75); animation:pulseBar .8s infinite}
+  .bar i.crit{background:linear-gradient(90deg,#8c1b1b,#ff5a4d 60%,#ffc9c4); box-shadow:0 0 16px rgba(255,80,70,.8); animation:pulseBar .42s infinite}
+  @keyframes pulseBar{50%{opacity:.55}}
+  .stats{display:flex; gap:20px; padding:9px 18px}
+  .stat{display:flex; flex-direction:column; align-items:flex-end; gap:3px}
+  .stat span{font-size:10.5px; letter-spacing:.16em; color:#7fd9b7; text-transform:uppercase; font-weight:700}
+  .stat b{font-size:19px; font-weight:800; letter-spacing:.02em; color:#e9fff6; text-shadow:0 0 14px rgba(45,255,170,.4); font-variant-numeric:tabular-nums}
+  .stat b.pop{animation:scorePop .34s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes scorePop{0%{transform:scale(1)}40%{transform:scale(1.22); color:#b6ffe2}100%{transform:scale(1)}}
+  .stat b s{text-decoration:none; opacity:.35; margin:0 2px; font-weight:600}
+  .stat b i{font-style:normal}
+  .stat.big b{color:#8dffcf}
+
+  .bottom{display:flex; justify-content:center; padding:0 18px 18px}
+  .hint{
+    font-size:12.5px; letter-spacing:.03em; color:#a9e7d1; display:flex; align-items:center; gap:7px; flex-wrap:wrap; justify-content:center;
+    background:linear-gradient(180deg, rgba(9,26,26,.66), rgba(4,12,14,.42)); border:1px solid rgba(90,255,190,.14);
+    border-radius:12px; padding:8px 16px; backdrop-filter:blur(8px);
+  }
+  kbd{
+    display:inline-block; min-width:24px; text-align:center; padding:3px 7px; border-radius:7px;
+    background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.17); border-bottom-width:2px;
+    font:700 12px/1 "Segoe UI",sans-serif; color:#e2fff3;
+  }
+
+  /* ---------- всплывающие числа ---------- */
+  #floatLayer{position:fixed; inset:0; z-index:20; pointer-events:none; overflow:hidden}
+  .float{
+    position:absolute; transform:translate(-50%,-50%); white-space:nowrap;
+    font-size:19px; font-weight:900; letter-spacing:.02em; color:#8dffcf;
+    text-shadow:0 0 12px rgba(30,255,160,.9), 0 0 26px rgba(0,200,120,.5), 0 2px 6px rgba(0,0,0,.9);
+    animation:floatUp 1.15s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  .float.bad{color:#ffb36b; text-shadow:0 0 12px rgba(255,120,40,.9), 0 2px 6px rgba(0,0,0,.9)}
+  .float.combo{color:#ffe98a; text-shadow:0 0 14px rgba(255,220,90,.9), 0 2px 6px rgba(0,0,0,.9)}
+  @keyframes floatUp{
+    0%{opacity:0; transform:translate(-50%,-50%) scale(.55)}
+    18%{opacity:1; transform:translate(-50%,-72%) scale(1.12)}
+    100%{opacity:0; transform:translate(-50%,-210%) scale(1)}
+  }
+
+  /* ---------- баннер по центру ---------- */
+  #banner{
+    position:fixed; left:50%; top:34%; z-index:22; transform:translate(-50%,-50%);
+    text-align:center; pointer-events:none; opacity:0;
+    padding:26px 52px; border-radius:28px;
+    background:radial-gradient(72% 72% at 50% 50%, rgba(2,10,9,.80) 0%, rgba(2,10,9,.52) 58%, rgba(2,10,9,0) 100%);
+  }
+  #banner.show{animation:bannerIn 1.6s ease forwards}
+  #banner .b1{
+    font-size:clamp(26px,4.6vw,54px); font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+    background:linear-gradient(180deg,#ffffff,#7dffc9 55%,#0fbf7f); -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 6px 24px rgba(20,255,160,.45));
+  }
+  #banner .b2{font-size:15px; font-weight:600; color:#b9f5dd; margin-top:6px; letter-spacing:.1em; text-transform:uppercase; opacity:.85}
+  @keyframes bannerIn{
+    0%{opacity:0; transform:translate(-50%,-50%) scale(.7)}
+    15%{opacity:1; transform:translate(-50%,-50%) scale(1.04)}
+    25%{transform:translate(-50%,-50%) scale(1)}
+    80%{opacity:1}
+    100%{opacity:0; transform:translate(-50%,-58%) scale(1)}
+  }
+
+  /* ---------- оверлей ---------- */
+  #overlay{
+    position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:flex-start;
+    padding:0 6vw; opacity:0; visibility:hidden; transition:opacity .4s ease, visibility .4s;
+    background:linear-gradient(90deg, rgba(3,8,10,.94) 0%, rgba(3,9,11,.80) 34%, rgba(3,9,11,.25) 62%, rgba(3,9,11,0) 82%);
+  }
+  #overlay.center{align-items:center; justify-content:center; padding:0 5vw;
+    background:radial-gradient(90% 80% at 50% 50%, rgba(3,8,10,.86), rgba(3,8,10,.55) 60%, rgba(3,8,10,.2))}
+  #overlay.show{opacity:1; visibility:visible}
+  .card{max-width:560px; transform:translateY(16px) scale(.99); transition:transform .5s cubic-bezier(.2,.9,.2,1)}
+  #overlay.center .card{
+    background:linear-gradient(180deg, rgba(6,20,20,.72), rgba(3,10,12,.62));
+    border:1px solid rgba(90,255,190,.18); border-radius:24px; padding:34px 42px 38px;
+    box-shadow:0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+    backdrop-filter:blur(14px) saturate(1.15); -webkit-backdrop-filter:blur(14px) saturate(1.15);
+  }
+  #overlay.show .card{transform:none}
+  .kicker{font-size:11px; letter-spacing:.34em; text-transform:uppercase; color:#54e6ac; font-weight:800; opacity:.85}
+  .card h1{
+    font-size:clamp(38px,5.6vw,74px); line-height:.92; margin:14px 0 0; letter-spacing:-.025em; font-weight:900;
+    background:linear-gradient(180deg,#f2fffa 10%,#6affc2 58%,#0a9d68);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 8px 30px rgba(20,255,160,.28));
+  }
+  .card h2{
+    font-size:clamp(26px,3.6vw,44px); margin:10px 0 0; font-weight:900; letter-spacing:-.01em; line-height:1;
+    background:linear-gradient(180deg,#fff3e6,#ffc07a 60%,#c96a12);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 8px 26px rgba(255,160,60,.25));
+  }
+  .card h2.win{background:linear-gradient(180deg,#f2fffa,#7dffc9 55%,#0fbf7f); -webkit-background-clip:text; background-clip:text; filter:drop-shadow(0 8px 26px rgba(20,255,160,.35))}
+  .card .lead{font-size:15.5px; line-height:1.6; color:#b6e7d8; margin:16px 0 0; max-width:460px}
+  .card .lead b{color:#e9fff6}
+  .card .lead.small{font-size:13px; color:#7fc8af; margin-top:8px}
+  .card .keys{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:20px 0 0; font-size:13px; color:#9fe3c9}
+  .card .keys span.sep{opacity:.35}
+  .card button{
+    margin-top:26px; font:inherit; font-weight:900; letter-spacing:.14em; text-transform:uppercase; font-size:14px;
+    padding:15px 34px; border-radius:14px; cursor:pointer; color:#03231a;
+    background:linear-gradient(180deg,#8dffd0,#1ee39a 55%,#08b877);
+    border:1px solid rgba(200,255,235,.7);
+    box-shadow:0 14px 34px rgba(20,255,160,.3), inset 0 1px 0 rgba(255,255,255,.75), inset 0 -3px 0 rgba(0,90,60,.25);
+    transition:transform .16s ease, box-shadow .16s ease, filter .16s;
+  }
+  .card button:hover{transform:translateY(-2px); box-shadow:0 18px 40px rgba(20,255,160,.42), inset 0 1px 0 rgba(255,255,255,.8), inset 0 -3px 0 rgba(0,90,60,.25); filter:saturate(1.1)}
+  .card button:active{transform:translateY(1px) scale(.99)}
+  .card button b{font-weight:900; opacity:.55; margin-left:8px}
+
+  /* ---------- тач-кнопки ---------- */
+  #touch{position:fixed; inset:auto 0 0 0; z-index:15; display:none; justify-content:center; gap:14px; padding:0 18px 22px}
+  body.touch #touch{display:flex}
+  #touch button{
+    width:78px; height:64px; border-radius:16px; font-size:22px; color:#d9fff0; cursor:pointer;
+    background:linear-gradient(180deg, rgba(12,40,36,.9), rgba(4,14,16,.8));
+    border:1px solid rgba(90,255,190,.3); box-shadow:0 10px 24px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter:blur(8px);
+  }
+  #touch button:active{background:rgba(40,255,170,.24)}
+
+  @media (max-width:780px){
+    .brand{display:none}
+    .air{min-width:150px}
+    .stats{gap:12px; padding:9px 12px}
+    .stat b{font-size:16px}
+    #overlay{padding:0 7vw}
+  }
+
+  /* ---------- загрузка ---------- */
+  #loading{
+    position:fixed; inset:0; z-index:60; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:22px; background:#04080c;
+    transition:opacity .6s ease; color:#9fe3c9; font-size:14px; letter-spacing:.18em;
+    text-transform:uppercase; font-weight:700;
+  }
+  #loading.hide{opacity:0; pointer-events:none}
+  #loading .ring{
+    width:56px; height:56px; border-radius:50%;
+    border:3px solid rgba(60,255,170,.16); border-top-color:#3dffa8;
+    animation:spin 1s linear infinite; box-shadow:0 0 26px rgba(45,255,170,.28);
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
 </head>
 <body>
-  <div id="info">💎 Изумрудный Диггер</div>
-  <div id="score">💚 <span id="scoreValue">0</span></div>
-  <div id="controls">
-    <span class="key">←</span> <span class="key">→</span> <span class="key">↑</span> <span class="key">↓</span> копать
+
+<div id="vignette"></div>
+<div id="lowair"></div>
+
+<div id="loading">
+  <div class="ring"></div>
+  <div class="load-text">Загрузка шахты…</div>
+</div>
+
+<div id="hud">
+  <div class="top">
+    <div class="panel brand">
+      <span class="gemIcon"></span>
+      <div>
+        <div class="t1">Изумрудный диггер</div>
+        <div class="t2">Уровень <b id="hLvl">1</b> · Глубина <b id="hDepth">1</b>/<b id="hDepthMax">8</b></div>
+      </div>
+    </div>
+
+    <div class="panel air">
+      <div class="row"><span>Воздух</span><b id="hAir">100%</b></div>
+      <div class="bar"><i id="hAirFill"></i></div>
+    </div>
+
+    <div class="panel stats">
+      <div class="stat big"><span>Изумруды</span><b><i id="hGems">0</i><s>/</s><i id="hGemsTotal">0</i></b></div>
+      <div class="stat"><span>Очки</span><b id="hScore">0</b></div>
+    </div>
   </div>
 
-  <!-- Подключаем Three.js и OrbitControls -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
-      }
+  <div class="bottom">
+    <div class="hint" id="hint">
+      <kbd>←</kbd><kbd>→</kbd> идти и бурить вбок
+      <span style="opacity:.35">·</span>
+      <kbd>↓</kbd> бурить вниз
+      <span style="opacity:.35">·</span>
+      <kbd>R</kbd> заново
+    </div>
+  </div>
+</div>
+
+<div id="floatLayer"></div>
+<div id="banner"></div>
+
+<div id="overlay">
+  <div class="card" id="card"></div>
+</div>
+
+<div id="touch">
+  <button data-k="left">◀</button>
+  <button data-k="down">▼</button>
+  <button data-k="right">▶</button>
+</div>
+
+<script>
+  // Страховка: если модуль с three.js не загрузился (нет сети / CDN недоступен),
+  // через 15 секунд честно говорим об этом вместо бесконечного спиннера.
+  setTimeout(function(){
+    var el = document.getElementById('loading');
+    if(el && !el.classList.contains('hide')){
+      var t = el.querySelector('.load-text');
+      if(t) t.textContent = 'Не удалось загрузить three.js — проверьте интернет и обновите страницу';
     }
-  </script>
+  }, 15000);
+</script>
 
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
 
-    // --- Инициализация сцены ---
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050a10);
-    scene.fog = new THREE.FogExp2(0x050a10, 0.015);
+<script type="module">
+import * as THREE from 'three';
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(15, 18, 25);
-    camera.lookAt(0, 0, 0);
+/* ============================================================
+   ИЗУМРУДНЫЙ ДИГГЕР — 3D
+   ------------------------------------------------------------
+   Аркада «копай вниз» в стиле Mr. Driller, но на Three.js:
+   шахтёр (модель Марио из mario-3.html в другой одежде)
+   бурит землю, собирает изумруды и должен добраться до дна
+   шахты, пока не кончился воздух.
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.shadowMap.bias = 0.0001;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
-    document.body.appendChild(renderer.domElement);
+   Что внутри:
+   • сетка земли W×H из кубов; игрок ходит по горизонтали,
+     бурит вбок и вниз, падает по гравитации, камера следит;
+   • вся графика процедурная: canvas-текстуры (земля, камень,
+     трава, дерево, ткань, эмблема на кепке), небо — шейдер,
+     IBL через PMREM, ACES-тонмаппинг, мягкие тени;
+   • персонаж — иерархия узлов из mario-3.html + бур и фонарик
+     на каске; анимация процедурная (бег, бурение, падение,
+     ликование, выдох), плавная через damp() — не зависит от FPS;
+   • звук синтезируется Web Audio (без файлов): бур, изумруд,
+     газ, посадка, победа, проигрыш;
+   • HUD на CSS: воздух, изумруды, очки, уровни, всплывающие
+     числа, баннеры, стартовый и финальные экраны.
+   ============================================================ */
 
-    // --- Управление камерой (орбитальное, чтобы можно было осматривать) ---
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.autoRotate = false;
-    controls.enableZoom = true;
-    controls.zoomSpeed = 0.8;
-    controls.rotateSpeed = 0.5;
-    controls.target.set(0, 0, 0);
-    controls.maxPolarAngle = Math.PI / 2.2;
+/* ============================================================
+   КОНСТАНТЫ
+   ============================================================ */
+const CS          = 1.6;      // ребро куба земли (мир)
+const MAX_LEVEL   = 5;
+const GRAV        = 34;
+const DIG_SIDE    = 0.34;     // сек на бурение вбок
+const DIG_DOWN    = 0.30;     // сек на бурение вниз
+const STEP        = 0.145;    // сек на шаг в пустую клетку
 
-    // --- Освещение ---
-    // Основной направленный свет (луна)
-    const dirLight = new THREE.DirectionalLight(0xaaccff, 1.5);
-    dirLight.position.set(10, 30, 20);
-    dirLight.castShadow = true;
-    dirLight.receiveShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    const d = 30;
-    dirLight.shadow.camera.left = -d;
-    dirLight.shadow.camera.right = d;
-    dirLight.shadow.camera.top = d;
-    dirLight.shadow.camera.bottom = -d;
-    dirLight.shadow.camera.near = 1;
-    dirLight.shadow.camera.far = 50;
-    dirLight.shadow.bias = -0.0005;
-    scene.add(dirLight);
+const CHAR_SCALE  = 0.612;            // 2.37 локальных юнита → 1.45 мира
+const FOOT_OFF    = 1.19 * CHAR_SCALE; // смещение модели: ступни на нуле
 
-    // Заполняющий свет (голубоватый)
-    const fillLight = new THREE.PointLight(0x4466ff, 0.8);
-    fillLight.position.set(-10, 5, 15);
-    scene.add(fillLight);
+const AIR_MAX     = 100;
+const AIR_DRAIN   = 3.2;      // расход стоя/шагая
+const AIR_DIG     = 2.4;      // добавка во время бурения
+const AIR_GEM     = 7;        // + за изумруд
+const AIR_GAS     = 11;       // − за карман газа
 
-    // Теплый акцентный свет (снизу)
-    const accentLight = new THREE.PointLight(0xffaa33, 0.6);
-    accentLight.position.set(0, -2, 5);
-    scene.add(accentLight);
+const SCORE_GEM   = 100;
+const SCORE_BIG   = 500;
 
-    // Мерцающий свет для изумрудов
-    const gemLight = new THREE.PointLight(0x00ff88, 1.2);
-    gemLight.position.set(0, 0, 0);
-    scene.add(gemLight);
+const DEMO = /(^|[?&#])demo/.test(location.href);
+const NOMENU = /(^|[?&#])(nomenu|demo)/.test(location.href);
 
-    // --- Атмосферные частицы (звездная пыль) ---
-    const starsGeometry = new THREE.BufferGeometry();
-    const starsCount = 2000;
-    const starPositions = new Float32Array(starsCount * 3);
-    for (let i = 0; i < starsCount * 3; i += 3) {
-      starPositions[i] = (Math.random() - 0.5) * 200;
-      starPositions[i+1] = (Math.random() - 0.5) * 100 + 20; // выше
-      starPositions[i+2] = (Math.random() - 0.5) * 200;
+/* ============================================================
+   ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+   ============================================================ */
+let renderer, scene, camera, sun, rim, sky, starGroup, dust;
+let digger = null;
+let levelGroup = null;
+let grid = [];                 // grid[j][i] — клетка (j: снизу вверх)
+let W = 11, H = 8;
+
+let gameState = 'menu';        // menu | playing | clear | over | victory
+let level = 1;
+let air = AIR_MAX;
+let score = 0;
+let best = 0;
+let gemsTotal = 0, gemsGot = 0;
+let combo = 1, comboTimer = 0;
+
+let camMix = 0;                // 0 — крупный план героя, 1 — вся шахта
+let camFitDist = 24;
+const camLookAt = new THREE.Vector3(0, 6, 0);
+let shakeAmp = 0;
+let introT = 0;
+let levelTimer = 0;
+let warnTimer = 0;
+
+const blockFx = [];            // {mesh,t,baseY,dir}
+const gemFx = [];              // {obj,t,vy,vx,vz,spin}
+const debris = [];             // {mesh,vel,life,spin}
+const debrisPool = [];
+const puffs = [];              // {spr,t,life,scale}
+const puffsPool = [];
+const crystals = [];           // мерцающие кристаллы на дальней стене
+
+const pl = {
+  gx: 5, gy: 8,
+  x: 0, y: 12,
+  facing: 1,
+  state: 'idle',               // idle | walk | dig | fall | cheer | out
+  act: null,
+  vy: 0,
+  landRow: 1,
+  runPhase: 0,
+  animTime: 0,
+  landTimer: 0
+};
+
+const INPUT = { left:false, right:false, down:false };
+
+const $ = id => document.getElementById(id);
+const damp = THREE.MathUtils.damp;
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const rnd = (a,b) => a + Math.random() * (b - a);
+const smoothstep = x => { x = clamp(x,0,1); return x*x*(3-2*x); };
+
+/* ============================================================
+   ПРОЦЕДУРНЫЕ ТЕКСТУРЫ (canvas → CanvasTexture)
+   ============================================================ */
+const ALL_TEX = [];
+
+function canvasTex(w, h, draw, opts = {}){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = opts.srgb === false ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if(opts.repeat) t.repeat.set(opts.repeat[0], opts.repeat[1]);
+  ALL_TEX.push(t);
+  return t;
+}
+
+function speckle(ctx, w, h, n, colors, rMin = 1, rMax = 2.5, alpha = 0.15){
+  for(let i = 0; i < n; i++){
+    ctx.fillStyle = colors[(Math.random() * colors.length) | 0];
+    ctx.globalAlpha = alpha * (0.4 + Math.random() * 0.6);
+    ctx.beginPath();
+    ctx.arc(Math.random() * w, Math.random() * h, rMin + Math.random() * (rMax - rMin), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function blotches(ctx, w, h, n, rgb, alpha = 0.06, rMin = 40, rMax = 120){
+  for(let i = 0; i < n; i++){
+    const r = rMin + Math.random() * (rMax - rMin);
+    const x = Math.random() * w, y = Math.random() * h;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${alpha})`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+}
+
+// Ткань: базовый цвет + зерно + диагональное плетение
+function fabricTex(base, light, dark){
+  return canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 1500, [light, dark], 0.6, 1.8, 0.22);
+    ctx.strokeStyle = 'rgba(0,0,0,0.055)'; ctx.lineWidth = 1;
+    for(let i = -h; i < w; i += 5){
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + h, h); ctx.stroke();
     }
-    starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starsMaterial = new THREE.PointsMaterial({
-      color: 0xaaccff,
-      size: 0.25,
-      transparent: true,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending
-    });
-    const stars = new THREE.Points(starsGeometry, starsMaterial);
-    scene.add(stars);
+  });
+}
 
-    // --- Земля (поле с сеткой для копания) ---
-    const gridSize = 10; // 10x10 клеток
-    const cellSize = 2;
-    const halfGrid = gridSize * cellSize / 2;
-    
-    // Основание (некопаемая мрачная земля)
-    const baseGeo = new THREE.BoxGeometry(gridSize * cellSize, 0.5, gridSize * cellSize);
-    const baseMat = new THREE.MeshStandardMaterial({ 
-      color: 0x1a2a1a, 
-      roughness: 0.9, 
-      metalness: 0.1,
-      emissive: new THREE.Color(0x002200)
-    });
-    const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.y = -0.75;
-    base.receiveShadow = true;
-    base.castShadow = true;
-    scene.add(base);
+// Мягкое радиальное свечение (спрайты изумрудов, пыль)
+function glowTex(rgb){
+  return canvasTex(128, 128, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w/2);
+    g.addColorStop(0,    `rgba(${rgb},0.95)`);
+    g.addColorStop(0.22, `rgba(${rgb},0.55)`);
+    g.addColorStop(0.55, `rgba(${rgb},0.14)`);
+    g.addColorStop(1,    `rgba(${rgb},0)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  });
+}
 
-    // Сетка (клетки для копания)
-    const cells = []; // { mesh, type: 'dirt' | 'emerald' | 'empty', gridX, gridZ, hp }
-    const cellMeshes = [];
+const T = (() => {
+  const t = {};
 
-    // Материалы для клеток
-    const dirtMat = new THREE.MeshStandardMaterial({ 
-      color: 0x3a2e1e, 
-      roughness: 1.0,
-      emissive: new THREE.Color(0x1a0f00)
-    });
-    const dirtMat2 = new THREE.MeshStandardMaterial({ 
-      color: 0x4a3e2e, 
-      roughness: 1.0,
-      emissive: new THREE.Color(0x1a0f00)
-    });
-    const emeraldMat = new THREE.MeshStandardMaterial({ 
-      color: 0x00cc66, 
-      emissive: new THREE.Color(0x00ff88), 
-      emissiveIntensity: 1.8,
-      roughness: 0.2,
-      metalness: 0.3,
-      transparent: true,
-      opacity: 0.95
-    });
-    const emptyMat = new THREE.MeshStandardMaterial({ 
-      color: 0x111111, 
-      roughness: 0.8,
-      emissive: new THREE.Color(0x001100)
-    });
-
-    // Функция для создания клетки
-    function createCell(gridX, gridZ, type = 'dirt') {
-      let geometry, material;
-      if (type === 'emerald') {
-        // Кристаллическая форма - октаэдр
-        geometry = new THREE.OctahedronGeometry(0.8, 0);
-        material = emeraldMat.clone();
-      } else if (type === 'empty') {
-        geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
-        material = emptyMat;
-      } else {
-        // Земля - куб
-        geometry = new THREE.BoxGeometry(cellSize * 0.95, 0.5, cellSize * 0.95);
-        material = Math.random() > 0.5 ? dirtMat.clone() : dirtMat2.clone();
-        // Небольшой случайный сдвиг цвета
-        material.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
-      }
-
-      const mesh = new THREE.Mesh(geometry, material);
-      const x = (gridX - gridSize/2 + 0.5) * cellSize;
-      const z = (gridZ - gridSize/2 + 0.5) * cellSize;
-      
-      if (type === 'emerald') {
-        mesh.position.set(x, 0.6, z);
-        mesh.rotation.y = Math.random() * Math.PI;
-        // Добавляем свечение вокруг изумруда
-        const glowLight = new THREE.PointLight(0x00ff88, 0.8, 4);
-        glowLight.position.set(x, 1.0, z);
-        scene.add(glowLight);
-        mesh.userData.glowLight = glowLight;
-      } else if (type === 'empty') {
-        mesh.position.set(x, -0.35, z);
-      } else {
-        mesh.position.set(x, 0.0, z);
-      }
-      
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.userData = { 
-        ...mesh.userData,
-        gridX, 
-        gridZ, 
-        type: type,
-        hp: type === 'emerald' ? 2 : (type === 'dirt' ? 1 : 0) // изумруд нужно копать дважды
-      };
-      
-      scene.add(mesh);
-      cellMeshes.push(mesh);
-      return mesh;
+  /* --- Земля: пласты, камешки, трещинки, шов между блоками --- */
+  const dirt = (base) => canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, 18, '36,20,7', 0.24);
+    blotches(ctx, w, h, 14, '196,152,100', 0.10);
+    speckle(ctx, w, h, 700, ['#3e2710', '#8a5f34', '#57381c', '#9c7442'], 1, 3.2, 0.30);
+    // камешки с тенью и бликом
+    for(let i = 0; i < 64; i++){
+      const x = Math.random() * w, y = Math.random() * h, r = 2.4 + Math.random() * 5.5;
+      const a = Math.random() * 3;
+      ctx.fillStyle = 'rgba(26,15,5,0.42)';
+      ctx.beginPath(); ctx.ellipse(x + 1.5, y + 2, r, r * 0.68, a, 0, 6.29); ctx.fill();
+      ctx.fillStyle = `rgba(${124 + Math.random() * 34 | 0},${108 + Math.random() * 26 | 0},${88 + Math.random() * 22 | 0},0.40)`;
+      ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.68, a, 0, 6.29); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,215,0.12)';
+      ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.34, r * 0.5, r * 0.3, a, 0, 6.29); ctx.fill();
     }
-
-    // Заполняем сетку: изумруды случайно, остальное земля
-    const totalCells = gridSize * gridSize;
-    const emeraldCount = 25; // количество изумрудов
-    const emeraldIndices = new Set();
-    while (emeraldIndices.size < emeraldCount) {
-      emeraldIndices.add(Math.floor(Math.random() * totalCells));
-    }
-
-    let index = 0;
-    for (let z = 0; z < gridSize; z++) {
-      for (let x = 0; x < gridSize; x++) {
-        const type = emeraldIndices.has(index) ? 'emerald' : 'dirt';
-        createCell(x, z, type);
-        index++;
+    // трещинки
+    for(let i = 0; i < 4; i++){
+      ctx.strokeStyle = `rgba(20,11,3,${0.22 + Math.random() * 0.22})`;
+      ctx.lineWidth = 0.9 + Math.random() * 1.1;
+      ctx.beginPath();
+      let x = Math.random() * w, y = Math.random() * h;
+      ctx.moveTo(x, y);
+      for(let k = 0; k < 4; k++){
+        x += rnd(-26, 26); y += rnd(-20, 20);
+        ctx.lineTo(x, y);
       }
+      ctx.stroke();
     }
+    // шов блока
+    ctx.strokeStyle = 'rgba(12,6,1,0.72)'; ctx.lineWidth = 12; ctx.strokeRect(5, 5, w - 10, h - 10);
+    ctx.strokeStyle = 'rgba(255,220,170,0.12)'; ctx.lineWidth = 2; ctx.strokeRect(13, 13, w - 26, h - 26);
+    // свет сверху / тень снизу
+    let g = ctx.createLinearGradient(0, 0, 0, 76);
+    g.addColorStop(0, 'rgba(255,232,190,0.22)'); g.addColorStop(1, 'rgba(255,232,190,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, 76);
+    g = ctx.createLinearGradient(0, h - 90, 0, h);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.46)');
+    ctx.fillStyle = g; ctx.fillRect(0, h - 90, w, 90);
+  });
+  t.dirt1 = dirt('#7f5a35'); t.dirt2 = dirt('#6b4826'); t.dirt3 = dirt('#8b6941');
 
-    // --- Подсветка границ сетки (красиво) ---
-    const gridHelper = new THREE.GridHelper(gridSize * cellSize, gridSize, 0x00ff88, 0x005533);
-    gridHelper.position.y = 0.01;
-    scene.add(gridHelper);
-
-    // --- Декоративные частицы вокруг (светлячки) ---
-    const fireflyGeo = new THREE.BufferGeometry();
-    const fireflyCount = 300;
-    const fireflyPos = new Float32Array(fireflyCount * 3);
-    for (let i = 0; i < fireflyCount * 3; i += 3) {
-      fireflyPos[i] = (Math.random() - 0.5) * 30;
-      fireflyPos[i+1] = Math.random() * 8 + 1;
-      fireflyPos[i+2] = (Math.random() - 0.5) * 30;
+  /* --- Трава на верхней грани верхнего ряда --- */
+  t.grassTop = canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#3f7a3a'; ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, 12, '30,70,30', 0.16);
+    blotches(ctx, w, h, 10, '150,220,130', 0.10);
+    speckle(ctx, w, h, 1100, ['#4f9448', '#2f6330', '#62ae56', '#3a7f3c'], 1, 2.2, 0.5);
+    ctx.strokeStyle = 'rgba(190,255,170,0.20)'; ctx.lineWidth = 1.2;
+    for(let i = 0; i < 130; i++){
+      const x = Math.random() * w, y = Math.random() * h, a = Math.random() * Math.PI;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * 9, y + Math.sin(a) * 4); ctx.stroke();
     }
-    fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
-    const fireflyMat = new THREE.PointsMaterial({
-      color: 0x88ffaa,
-      size: 0.15,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      opacity: 0.9
-    });
-    const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
-    scene.add(fireflies);
+    ctx.strokeStyle = 'rgba(10,30,10,0.45)'; ctx.lineWidth = 9; ctx.strokeRect(4, 4, w - 8, h - 8);
+  });
 
-    // --- Счёт ---
-    let score = 0;
-    const scoreElement = document.getElementById('scoreValue');
-
-    // --- Анимация мерцания изумрудов и света ---
-    const clock = new THREE.Clock();
-
-    // --- Управление копанием ---
-    // Курсор-указатель (невидимый, но для позиции)
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    let hoveredCell = null;
-    let clickCooldown = false;
-
-    // Визуальный маркер под курсором
-    const markerGeo = new THREE.RingGeometry(0.6, 0.8, 32);
-    const markerMat = new THREE.MeshStandardMaterial({
-      color: 0x00ffaa,
-      emissive: new THREE.Color(0x00ff88),
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8
-    });
-    const marker = new THREE.Mesh(markerGeo, markerMat);
-    marker.rotation.x = -Math.PI / 2;
-    marker.position.y = 0.3;
-    marker.visible = false;
-    scene.add(marker);
-
-    // Обработчик движения мыши
-    window.addEventListener('mousemove', (event) => {
-      // Преобразуем в нормализованные координаты
-      mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
-      mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      
-      // Находим пересечения с клетками (только с землёй и изумрудами)
-      const intersects = raycaster.intersectObjects(cellMeshes);
-      
-      if (intersects.length > 0) {
-        const hit = intersects[0].object;
-        if (hit.userData.type !== 'empty') {
-          hoveredCell = hit;
-          marker.position.x = hit.position.x;
-          marker.position.z = hit.position.z;
-          marker.visible = true;
-          marker.material.emissiveIntensity = 1.5;
-        } else {
-          hoveredCell = null;
-          marker.visible = false;
-        }
-      } else {
-        hoveredCell = null;
-        marker.visible = false;
+  /* --- Камень дна шахты с изумрудными прожилками --- */
+  t.stone = canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#2e343c'; ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, 16, '14,17,22', 0.30);
+    blotches(ctx, w, h, 10, '110,124,146', 0.06);
+    speckle(ctx, w, h, 900, ['#22272e', '#3c434d', '#4d5765'], 1, 3, 0.4);
+    // прожилки изумрудов
+    for(let i = 0; i < 11; i++){
+      ctx.strokeStyle = `rgba(60,255,170,${0.14 + Math.random() * 0.30})`;
+      ctx.lineWidth = 1 + Math.random() * 2.4;
+      ctx.beginPath();
+      let x = Math.random() * w, y = Math.random() * h;
+      ctx.moveTo(x, y);
+      for(let k = 0; k < 5; k++){
+        x += (Math.random() - 0.5) * 70; y += (Math.random() - 0.5) * 60;
+        ctx.lineTo(x, y);
       }
-    });
-
-    // Обработчик клика (копание)
-    window.addEventListener('mousedown', (event) => {
-      if (event.button !== 0) return; // только левая кнопка
-      if (clickCooldown) return;
-      
-      if (hoveredCell && hoveredCell.userData.type !== 'empty') {
-        digCell(hoveredCell);
-        clickCooldown = true;
-        setTimeout(() => { clickCooldown = false; }, 200);
-      }
-    });
-
-    // Функция копания
-    function digCell(cell) {
-      const data = cell.userData;
-      
-      if (data.type === 'dirt') {
-        // Превращаем в пустую клетку
-        data.type = 'empty';
-        cell.material = emptyMat;
-        cell.geometry.dispose();
-        cell.geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
-        cell.position.y = -0.35;
-        cell.scale.set(0.95, 0.6, 0.95);
-        // Анимация "провала"
-        cell.scale.set(1, 1, 1);
-        // Убираем свечение если было
-        if (cell.userData.glowLight) {
-          scene.remove(cell.userData.glowLight);
-          cell.userData.glowLight = null;
-        }
-        // Обновляем маркер
-        if (hoveredCell === cell) {
-          marker.visible = false;
-          hoveredCell = null;
-        }
-      } 
-      else if (data.type === 'emerald') {
-        if (data.hp > 1) {
-          // Первое попадание - трещина (визуально уменьшаем и меняем цвет)
-          data.hp = 1;
-          cell.scale.set(0.7, 0.7, 0.7);
-          cell.material.emissiveIntensity = 0.8;
-          cell.material.color.setHex(0x00aa44);
-          // Небольшой эффект
-          cell.rotation.y += 0.5;
-        } else {
-          // Добываем изумруд
-          data.type = 'empty';
-          // Удаляем свет
-          if (cell.userData.glowLight) {
-            scene.remove(cell.userData.glowLight);
-          }
-          // Меняем на пустую клетку
-          cell.material = emptyMat;
-          cell.geometry.dispose();
-          cell.geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
-          cell.position.y = -0.35;
-          cell.scale.set(1, 0.6, 1);
-          cell.rotation.y = 0;
-          
-          // Увеличиваем счёт
-          score++;
-          scoreElement.textContent = score;
-          
-          // Эффект вспышки
-          const flash = new THREE.PointLight(0x00ff88, 3, 6);
-          flash.position.set(cell.position.x, 1, cell.position.z);
-          scene.add(flash);
-          setTimeout(() => scene.remove(flash), 300);
-          
-          // Обновляем маркер
-          if (hoveredCell === cell) {
-            marker.visible = false;
-            hoveredCell = null;
-          }
-        }
-      }
+      ctx.stroke();
     }
+    ctx.strokeStyle = 'rgba(6,8,12,0.6)'; ctx.lineWidth = 11; ctx.strokeRect(5, 5, w - 10, h - 10);
+    const g = ctx.createLinearGradient(0, 0, 0, 70);
+    g.addColorStop(0, 'rgba(190,210,230,0.12)'); g.addColorStop(1, 'rgba(190,210,230,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, 70);
+  });
 
-    // --- Управление с клавиатуры (стрелки для перемещения маркера? Не обязательно, но добавим для удобства) ---
-    // Можно было бы реализовать, но оставим только мышь для простоты, так как в задании сказано "копать изумруды".
-    // Но чтобы соответствовать "копать" - добавим возможность копать по клику. Уже есть.
+  /* --- Дерево (стойки, рама, фонарный столб) --- */
+  t.wood = canvasTex(128, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#6b4526'; ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, 8, '40,24,10', 0.20);
+    for(let i = 0; i < 26; i++){
+      ctx.strokeStyle = `rgba(${30 + Math.random() * 60},${18 + Math.random() * 30},8,${0.15 + Math.random() * 0.3})`;
+      ctx.lineWidth = 0.8 + Math.random() * 2;
+      const x = Math.random() * w;
+      ctx.beginPath(); ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + rnd(-8,8), h * 0.33, x + rnd(-8,8), h * 0.66, x + rnd(-5,5), h);
+      ctx.stroke();
+    }
+    speckle(ctx, w, h, 400, ['#8a5c33', '#3f2611'], 0.6, 1.8, 0.3);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(0, 0, 5, h); ctx.fillRect(w - 5, 0, 5, h);
+  }, { repeat: [1, 1] });
 
-    // --- Анимация ---
-    function animate() {
-      const delta = clock.getDelta();
-      const elapsedTime = performance.now() * 0.001;
+  /* --- Дальняя стена шахты --- */
+  t.rockWall = canvasTex(512, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#463420'; ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, 30, '22,14,7', 0.42, 60, 220);
+    blotches(ctx, w, h, 14, '150,116,80', 0.07, 60, 180);
+    // слои породы
+    for(let y = 20; y < h; y += 30 + Math.random() * 40){
+      ctx.fillStyle = `rgba(8,5,2,${0.16 + Math.random() * 0.2})`;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      for(let x = 0; x <= w; x += 32) ctx.lineTo(x, y + Math.sin(x * 0.03) * 6 + rnd(-3,3));
+      ctx.lineTo(w, y + 14); ctx.lineTo(0, y + 14);
+      ctx.fill();
+    }
+    speckle(ctx, w, h, 1400, ['#0c0805', '#4a3624', '#2c2016'], 1, 3, 0.4);
+    // редкие искры-кристаллы в породе
+    for(let i = 0; i < 26; i++){
+      const x = Math.random() * w, y = Math.random() * h, r = 1.5 + Math.random() * 3.5;
+      ctx.fillStyle = `rgba(60,255,170,${0.10 + Math.random() * 0.25})`;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.29); ctx.fill();
+    }
+  }, { repeat: [2, 2] });
 
-      // Вращение звёзд и светлячков
-      stars.rotation.y += 0.0001;
-      fireflies.rotation.y += 0.0002;
+  /* --- Корка травы для поверхности за шахтой --- */
+  t.grassStrip = canvasTex(512, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#356b33'; ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, 22, '24,60,26', 0.16);
+    blotches(ctx, w, h, 16, '140,210,120', 0.09);
+    speckle(ctx, w, h, 2200, ['#4d8f45', '#2b5c2c', '#5fa751', '#3b7a3b'], 1, 2.4, 0.45);
+    ctx.strokeStyle = 'rgba(200,255,180,0.18)'; ctx.lineWidth = 1.4;
+    for(let i = 0; i < 260; i++){
+      const x = Math.random() * w, y = Math.random() * h, a = Math.random() * Math.PI;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * 10, y + Math.sin(a) * 4); ctx.stroke();
+    }
+  }, { repeat: [6, 2] });
 
-      // Пульсация света изумрудов
-      cellMeshes.forEach(mesh => {
-        if (mesh.userData.type === 'emerald' && mesh.userData.glowLight) {
-          const intensity = 0.6 + Math.sin(elapsedTime * 5 + mesh.position.x) * 0.3;
-          mesh.userData.glowLight.intensity = intensity;
-          if (mesh.material.emissiveIntensity !== undefined) {
-            mesh.material.emissiveIntensity = 1.2 + Math.sin(elapsedTime * 4 + mesh.position.z) * 0.6;
-          }
-        }
+  /* --- Силуэты дальних холмов (с альфой) --- */
+  const hills = (seed, fill, tops) => canvasTex(1024, 256, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    let y = h * 0.62;
+    ctx.lineTo(0, y);
+    for(let x = 0; x <= w; x += w / 22){
+      y = h * (0.74 - Math.abs(Math.sin(x * 0.004 + seed)) * tops) + rnd(-10, 10);
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+    // огоньки
+    ctx.fillStyle = 'rgba(255,190,110,0.55)';
+    for(let i = 0; i < 10; i++){
+      ctx.beginPath();
+      ctx.arc(rnd(w * 0.1, w * 0.9), rnd(h * 0.72, h * 0.9), 1.6, 0, 6.29);
+      ctx.fill();
+    }
+  });
+  t.hillsFar  = hills(1.3, 'rgba(14,22,36,0.98)', 0.30);
+  t.hillsNear = hills(2.7, 'rgba(8,13,22,1.0)',  0.42);
+
+  /* --- Эмблема на кепке: огранённый изумруд --- */
+  t.cap = canvasTex(1024, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#e08a1c'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 2600, ['#ffb95e', '#a85c07'], 1, 2.4, 0.18);
+    // круглый шеврон
+    const cx = w * 0.125, cy = h * 0.50;
+    ctx.fillStyle = '#f8f4ea';
+    ctx.beginPath(); ctx.arc(cx, cy, 58, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+    ctx.beginPath(); ctx.arc(cx, cy, 54, 0, Math.PI * 2); ctx.stroke();
+    // огранка
+    const R = 34;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - R); ctx.lineTo(cx + R * 0.78, cy - R * 0.1);
+    ctx.lineTo(cx, cy + R); ctx.lineTo(cx - R * 0.78, cy - R * 0.1);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+    g.addColorStop(0, '#9dffd4'); g.addColorStop(0.5, '#18d38a'); g.addColorStop(1, '#046a45');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#04452e'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - R * 0.78, cy - R * 0.1); ctx.lineTo(cx + R * 0.78, cy - R * 0.1); ctx.stroke();
+  });
+
+  /* --- Вспышки --- */
+  t.glowGreen = glowTex('60,255,170');
+  t.glowWarm  = glowTex('255,190,110');
+  t.glowWhite = glowTex('255,250,235');
+
+  return t;
+})();
+
+/* ============================================================
+   МАТЕРИАЛЫ
+   ============================================================ */
+const dirtMats = [];
+(() => {
+  const tex = [T.dirt1, T.dirt2, T.dirt3];
+  // три оттенка: ближе к поверхности — светлее, в глубине — темнее
+  const tints = [0xffffff, 0xe6d5c2, 0xc4b2a2];
+  for(const tint of tints){
+    for(const map of tex){
+      dirtMats.push(new THREE.MeshStandardMaterial({
+        map, bumpMap: map, bumpScale: 0.055, roughness: 0.94, metalness: 0.0,
+        color: tint, envMapIntensity: 0.45
+      }));
+    }
+  }
+})();
+
+const MAT = {
+  stone:  new THREE.MeshStandardMaterial({ map:T.stone, bumpMap:T.stone, bumpScale:0.07, roughness:0.82, metalness:0.08, envMapIntensity:0.55 }),
+  grassT: new THREE.MeshStandardMaterial({ map:T.grassTop, bumpMap:T.grassTop, bumpScale:0.05, roughness:0.95, envMapIntensity:0.4 }),
+  wood:   new THREE.MeshStandardMaterial({ map:T.wood, bumpMap:T.wood, bumpScale:0.05, roughness:0.85, envMapIntensity:0.4 }),
+  rockW:  new THREE.MeshStandardMaterial({ map:T.rockWall, bumpMap:T.rockWall, bumpScale:0.12, roughness:1.0, metalness:0.0, envMapIntensity:0.3 }),
+  grassS: new THREE.MeshStandardMaterial({ map:T.grassStrip, bumpMap:T.grassStrip, bumpScale:0.06, roughness:1.0, envMapIntensity:0.35 }),
+  // боковая грань верхнего ряда (сверху — трава, спереди — земля)
+  topSide: new THREE.MeshStandardMaterial({ map:T.dirt1, bumpMap:T.dirt1, bumpScale:0.055, roughness:0.94, envMapIntensity:0.45 }),
+  // берег за шахтой: тёмный срез земли (без растянутой текстуры)
+  bank: new THREE.MeshStandardMaterial({ color:0x4a3421, roughness:1.0, envMapIntensity:0.35 }),
+  hillsFar:  new THREE.MeshBasicMaterial({ map:T.hillsFar,  transparent:true, depthWrite:false, fog:false, toneMapped:false }),
+  hillsNear: new THREE.MeshBasicMaterial({ map:T.hillsNear, transparent:true, depthWrite:false, fog:false, toneMapped:false }),
+
+  // персонаж — палитра Диггера (Марио в другой одежде)
+  shirt:  new THREE.MeshStandardMaterial({ map:fabricTex('#e08a1c','#ffb95e','#a85c07'), roughness:0.62, envMapIntensity:0.5 }),
+  cap:    new THREE.MeshStandardMaterial({ map:T.cap, roughness:0.55, envMapIntensity:0.55 }),
+  jeans:  new THREE.MeshStandardMaterial({ map:fabricTex('#17564f','#2f8f80','#0a322e'), roughness:0.72, envMapIntensity:0.45 }),
+  skin:   new THREE.MeshStandardMaterial({ color:0xf6b98a, roughness:0.66, envMapIntensity:0.5 }),
+  leather:new THREE.MeshStandardMaterial({ map:fabricTex('#4a2a12','#71411f','#2b1708'), roughness:0.8, envMapIntensity:0.4 }),
+  white:  new THREE.MeshStandardMaterial({ color:0xf7f3ea, roughness:0.72, envMapIntensity:0.3 }),
+  black:  new THREE.MeshStandardMaterial({ color:0x141414, roughness:0.45, envMapIntensity:0.25 }),
+  metal:  new THREE.MeshStandardMaterial({ color:0x9aa5b1, roughness:0.34, metalness:0.8, envMapIntensity:1.0 }),
+  metalD: new THREE.MeshStandardMaterial({ color:0x6a747d, roughness:0.42, metalness:0.75, envMapIntensity:1.0 }),
+  lampOn: new THREE.MeshStandardMaterial({ color:0xffd79a, emissive:0xffb14a, emissiveIntensity:1.5, roughness:0.35, envMapIntensity:0.7 }),
+
+  gem:    new THREE.MeshStandardMaterial({ color:0x14c980, emissive:0x0b9c62, emissiveIntensity:0.42, metalness:0.05, roughness:0.34, flatShading:true, envMapIntensity:1.1 }),
+  gemBig: new THREE.MeshStandardMaterial({ color:0x22e8c6, emissive:0x11bfa4, emissiveIntensity:0.55, metalness:0.1, roughness:0.26, flatShading:true, envMapIntensity:1.4 }),
+  gas:    new THREE.MeshStandardMaterial({ color:0x9bff4d, emissive:0xa8ff2e, emissiveIntensity:0.9, roughness:0.4 }),
+  crystal:new THREE.MeshStandardMaterial({ color:0x1fd9a0, emissive:0x0d9c72, emissiveIntensity:0.5, roughness:0.14, metalness:0.25, flatShading:true, envMapIntensity:1.2 }),
+  chunk:  new THREE.MeshStandardMaterial({ color:0x6b4a2b, roughness:1.0, flatShading:true })
+};
+
+// Анимированные спрайты (общие материалы — без прозрачности на кадр)
+const SPRITE_MAT = {
+  green:  new THREE.SpriteMaterial({ map:T.glowGreen, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, opacity:0.55, color:0x63ffc0 }),
+  white:  new THREE.SpriteMaterial({ map:T.glowWhite, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, opacity:0.9 }),
+  warm:   new THREE.SpriteMaterial({ map:T.glowWarm,  blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, opacity:0.9 }),
+  dust:   new THREE.SpriteMaterial({ map:T.glowWhite, blending:THREE.NormalBlending, transparent:true, depthWrite:false, opacity:0.35, color:0xc9a87a })
+};
+
+const mkMesh = (geo, material) => {
+  const m = new THREE.Mesh(geo, material);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+};
+
+/* ============================================================
+   ЗВУК — Web Audio, синтез без файлов
+   ============================================================ */
+let actx = null, noiseBuf = null;
+function audioOn(){
+  if(!actx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    actx = new AC();
+  }
+  if(actx.state === 'suspended') actx.resume();
+}
+function tone(freq, dur = 0.12, type = 'square', vol = 0.14, slideTo = null, delay = 0){
+  if(!actx) return;
+  const t0 = actx.currentTime + delay;
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if(slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + dur);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(actx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.03);
+}
+function noisetone(dur = 0.2, vol = 0.15, freq = 900, q = 1, delay = 0, type = 'bandpass'){
+  if(!actx) return;
+  if(!noiseBuf){
+    const len = Math.floor(actx.sampleRate * 0.6);
+    noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t0 = actx.currentTime + delay;
+  const src = actx.createBufferSource();
+  src.buffer = noiseBuf;
+  const f = actx.createBiquadFilter();
+  f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(vol, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(actx.destination);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  dig(){  noisetone(0.17, 0.15, 1500, 1.1); tone(110, 0.09, 'sawtooth', 0.07, 70); },
+  step(){ tone(150, 0.05, 'sine', 0.045, 100); },
+  land(){ noisetone(0.11, 0.1, 300, 0.9); tone(130, 0.09, 'sine', 0.07, 60); },
+  gem(){  tone(1046, 0.09, 'triangle', 0.12); tone(1568, 0.16, 'triangle', 0.11, null, 0.07); },
+  big(){  [784, 1046, 1318, 1568].forEach((f, i) => tone(f, 0.2, 'triangle', 0.11, null, i * 0.08)); },
+  gas(){  noisetone(0.55, 0.18, 700, 0.6); tone(240, 0.5, 'sawtooth', 0.09, 70); },
+  warn(){ tone(920, 0.06, 'square', 0.06); },
+  win(){  [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, null, i * 0.11)); },
+  lose(){ [392, 330, 262, 196].forEach((f, i) => tone(f, 0.34, 'sawtooth', 0.12, null, i * 0.16)); },
+  ui(){   tone(680, 0.07, 'square', 0.07, 980); }
+};
+
+/* ============================================================
+   СЦЕНА, СВЕТ, НЕБО, IBL
+   ============================================================ */
+function makeSkyMaterial(){
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      topColor:  { value: new THREE.Color(0x081528) },
+      midColor:  { value: new THREE.Color(0x1d3a5e) },
+      botColor:  { value: new THREE.Color(0x22303f) },
+      glowColor: { value: new THREE.Color(0x379a86) }
+    },
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    vertexShader: `
+      varying vec3 vDir;
+      void main(){
+        vDir = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying vec3 vDir;
+      uniform vec3 topColor, midColor, botColor, glowColor;
+      void main(){
+        vec3 d = normalize(vDir);
+        float h = d.y;
+        vec3 col = mix(midColor, topColor, pow(clamp(h, 0.0, 1.0), 0.55));
+        col = mix(botColor, col, smoothstep(-0.30, 0.08, h));
+        // тёплое свечение у линии горизонта
+        col += glowColor * pow(clamp(1.0 - abs(h) * 1.6, 0.0, 1.0), 7.0) * 0.55;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+}
+
+function initScene(){
+  renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+  renderer.domElement.className = 'scene';
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.28;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x131f30, 0.010);
+
+  camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 900);
+  camera.position.set(6, 12, 26);
+
+  // Луна: холодный ключевой свет почти спереди — лицевые грани шахты освещены
+  sun = new THREE.DirectionalLight(0xcadcff, 3.1);
+  sun.position.set(14, 18, 28);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 90;
+  sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
+  sun.shadow.camera.top = 18;   sun.shadow.camera.bottom = -18;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.05;
+  scene.add(sun);
+  scene.add(sun.target);
+
+  // Тёплый контровой свет сзади-слева — отделяет шахту от фона
+  rim = new THREE.DirectionalLight(0xffa870, 0.8);
+  rim.position.set(-18, 10, -22);
+  scene.add(rim);
+
+  // Мягкая заливка
+  scene.add(new THREE.HemisphereLight(0x8fb4e4, 0x3a2415, 0.9));
+
+  // Небо-купол
+  sky = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 20), makeSkyMaterial());
+  sky.frustumCulled = false;
+  sky.renderOrder = -10;
+  scene.add(sky);
+
+  // Звёзды (группа следует за камерой)
+  starGroup = new THREE.Group();  const starGeo = new THREE.BufferGeometry();
+  const N = 1500;
+  const pos = new Float32Array(N * 3);
+  for(let i = 0; i < N; i++){
+    // полусфера над горизонтом
+    const th = Math.random() * Math.PI * 0.5 + 0.02;
+    const ph = Math.random() * Math.PI * 2;
+    const r = 380;
+    pos[i*3]   = Math.cos(ph) * Math.cos(th) * r;
+    pos[i*3+1] = Math.sin(th) * r * 0.95 + 8;
+    pos[i*3+2] = Math.sin(ph) * Math.cos(th) * r;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const starMat = new THREE.PointsMaterial({
+    color:0xdfe9ff, size:1.7, sizeAttenuation:false, transparent:true, opacity:0.9,
+    depthWrite:false, fog:false, toneMapped:false, blending:THREE.AdditiveBlending
+  });
+  const stars = new THREE.Points(starGeo, starMat);
+  stars.frustumCulled = false;
+  starGroup.add(stars);
+  scene.add(starGroup);
+
+  // Дальние холмы (силуэты)
+  const hillsFar = new THREE.Mesh(new THREE.PlaneGeometry(300, 74), MAT.hillsFar);
+  hillsFar.position.set(0, 24, -150);
+  scene.add(hillsFar);
+  const hillsNear = new THREE.Mesh(new THREE.PlaneGeometry(230, 58), MAT.hillsNear);
+  hillsNear.position.set(-6, 16, -96);
+  scene.add(hillsNear);
+
+  // Пыль в воздухе шахты — медленно плывёт, даёт объём и жизнь
+  {
+    const N2 = 130;
+    const g = new THREE.BufferGeometry();
+    const p = new Float32Array(N2 * 3);
+    for(let i = 0; i < N2; i++){
+      p[i*3]   = rnd(-13, 13);
+      p[i*3+1] = rnd(0, 26);
+      p[i*3+2] = rnd(-2.2, 1.4);
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    dust = new THREE.Points(g, new THREE.PointsMaterial({
+      color: 0xffdca8, size: 0.12, map: T.glowWhite, alphaMap: T.glowWhite,
+      sizeAttenuation: true, transparent: true, opacity: 0.45, depthWrite: false,
+      blending: THREE.AdditiveBlending, fog: false
+    }));
+    dust.frustumCulled = false;
+    scene.add(dust);
+  }
+
+  // IBL: карта окружения из того же неба
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(60, 32, 20), makeSkyMaterial()));
+  scene.environment = pmrem.fromScene(envScene, 0.05).texture;
+  pmrem.dispose();
+
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  ALL_TEX.forEach(t => { t.anisotropy = aniso; });
+
+  // Общие геометрии
+  GEO.block = new THREE.BoxGeometry(CS * 0.995, CS * 0.995, CS * 0.995);
+  GEO.gem   = new THREE.OctahedronGeometry(0.34, 0);
+  GEO.gemBig= new THREE.OctahedronGeometry(0.5, 0);
+  GEO.gas   = new THREE.IcosahedronGeometry(0.2, 0);
+  GEO.chunk = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+  GEO.crystal = new THREE.OctahedronGeometry(0.3, 0);
+
+
+  // Пул частиц
+  for(let i = 0; i < 70; i++){
+    const m = new THREE.Mesh(GEO.chunk, MAT.chunk);
+    m.visible = false; m.castShadow = false;
+    scene.add(m);
+    debrisPool.push(m);
+  }
+  for(let i = 0; i < 26; i++){
+    const s = new THREE.Sprite(SPRITE_MAT.dust.clone());
+    s.visible = false; s.material.opacity = 0;
+    scene.add(s);
+    puffsPool.push(s);
+  }
+}
+
+const GEO = {};
+
+/* ============================================================
+   ПЕРСОНАЖ — Диггер (Марио из mario-3.html в другой одежде)
+   Иерархия: root → body → (torso, shirt, head, arms[], legs[])
+   Анимация — вращением узлов, а не заменой мешей.
+   ============================================================ */
+function createBrimGeometry(){
+  const R = 0.40, tube = 0.16, arc = Math.PI * 0.72;
+  const dropA = 0.15, z0 = 0.28, z1 = R + tube;
+  const g = new THREE.TorusGeometry(R, tube, 14, 42, arc);
+  g.rotateZ(Math.PI / 2 - arc / 2);
+  g.rotateX(Math.PI / 2);
+  g.scale(1, 0.30, 1);
+  const pos = g.attributes.position, nor = g.attributes.normal;
+  for(let i = 0; i < pos.count; i++){
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const phi = Math.atan2(x, z);
+    const f = 0.42 + 0.58 * Math.pow(Math.max(Math.cos(phi), 0), 1.4);
+    const cx = R * Math.sin(phi), cz = R * Math.cos(phi);
+    let nx2 = cx + (x - cx) * f, ny2 = y * f, nz2 = cz + (z - cz) * f;
+    const s = clamp((nz2 - z0) / (z1 - z0), 0, 1);
+    ny2 -= dropA * s * s;
+    pos.setXYZ(i, nx2, ny2, nz2);
+    let nx = nor.getX(i), ny = nor.getY(i), nz = nor.getZ(i);
+    const fp = s > 0 ? 2 * dropA * s / (z1 - z0) : 0;
+    nz -= fp * ny;
+    const inv = 1 / Math.hypot(nx, ny, nz);
+    nor.setXYZ(i, nx * inv, ny * inv, nz * inv);
+  }
+  return g;
+}
+
+function createDigger(){
+  const root = new THREE.Group();
+  root.scale.setScalar(CHAR_SCALE);
+
+  const body = new THREE.Group();
+  body.position.y = -0.21;
+  root.add(body);
+
+  // тёплый «карман» света вокруг шахтёра — тоннели читаются как тёмные
+  const bodyLight = new THREE.PointLight(0xffd6a0, 3.2, 6.5, 2);
+  bodyLight.position.set(0, 0.5, 0.3);
+  body.add(bodyLight);
+
+  // комбинезон
+  const torso = mkMesh(new THREE.CapsuleGeometry(0.42, 0.5, 6, 12), MAT.jeans);
+  body.add(torso);
+  // рубашка
+  const shirt = mkMesh(new THREE.SphereGeometry(0.44, 16, 12, 0, Math.PI*2, 0, Math.PI*0.55), MAT.shirt);
+  shirt.position.y = 0.32;
+  body.add(shirt);
+
+  // голова
+  const head = new THREE.Group();
+  head.position.y = 0.78;
+  body.add(head);
+
+  head.add(mkMesh(new THREE.SphereGeometry(0.4, 20, 16), MAT.skin));
+
+  const nose = mkMesh(new THREE.SphereGeometry(0.13, 12, 10), MAT.skin);
+  nose.position.set(0, -0.02, 0.38);
+  head.add(nose);
+
+  [-1, 1].forEach(s => {
+    const eye = mkMesh(new THREE.SphereGeometry(0.09, 10, 10), MAT.white);
+    eye.position.set(0.13*s, 0.05, 0.33);
+    head.add(eye);
+    const pupil = mkMesh(new THREE.SphereGeometry(0.042, 8, 8), MAT.black);
+    pupil.position.set(0.13*s, 0.05, 0.402);
+    head.add(pupil);
+  });
+
+  [-0.12, 0, 0.12].forEach((x, i) => {
+    const st = mkMesh(new THREE.BoxGeometry(0.11, 0.05, 0.06), MAT.leather);
+    st.position.set(x, -0.18, 0.36);
+    st.rotation.z = (i - 1) * 0.25;
+    head.add(st);
+  });
+
+  // кепка
+  const capTop = mkMesh(new THREE.SphereGeometry(0.43, 24, 16, 0, Math.PI*2, 0, Math.PI*0.52), MAT.cap);
+  capTop.position.y = 0.18;
+  head.add(capTop);
+  const capButton = mkMesh(new THREE.SphereGeometry(0.055, 10, 8), MAT.shirt);
+  capButton.position.y = 0.615;
+  head.add(capButton);
+
+  const brim = new THREE.Group();
+  brim.position.y = 0.21;
+  brim.add(mkMesh(createBrimGeometry(), MAT.shirt));
+  const BR = 0.40, BArc = Math.PI * 0.72;
+  [-1, 1].forEach(s => {
+    const end = mkMesh(new THREE.SphereGeometry(0.10, 10, 8), MAT.shirt);
+    end.position.set(s * BR * Math.sin(BArc / 2), 0, BR * Math.cos(BArc / 2));
+    end.scale.y = 0.30;
+    brim.add(end);
+  });
+  head.add(brim);
+
+  // налобный фонарик
+  const lampBody = mkMesh(new THREE.CylinderGeometry(0.075, 0.085, 0.1, 12), MAT.metalD);
+  lampBody.rotation.x = Math.PI / 2;
+  lampBody.position.set(0, 0.3, 0.42);
+  head.add(lampBody);
+  const lampLens = mkMesh(new THREE.CylinderGeometry(0.062, 0.062, 0.03, 12), MAT.lampOn);
+  lampLens.rotation.x = Math.PI / 2;
+  lampLens.position.set(0, 0.3, 0.475);
+  head.add(lampLens);
+
+  // видимый ореол фонарика
+  const lampHalo = new THREE.Sprite(SPRITE_MAT.warm.clone());
+  lampHalo.scale.setScalar(0.62);
+  lampHalo.material.opacity = 0.55;
+  lampHalo.position.set(0, 0.31, 0.53);
+  head.add(lampHalo);
+
+  const lamp = new THREE.SpotLight(0xffe7b8, 17, 11, 0.62, 0.65, 1.5);
+  lamp.position.set(0, 0.3, 0.46);
+  const lampTarget = new THREE.Object3D();
+  lampTarget.position.set(0, 0.1, 5);
+  head.add(lampTarget);
+  lamp.target = lampTarget;
+  head.add(lamp);
+
+  // руки
+  const arms = [];
+  [-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.5*s, 0.35, 0);
+    body.add(pivot);
+    const arm = mkMesh(new THREE.CapsuleGeometry(0.12, 0.36, 4, 8), MAT.shirt);
+    arm.position.y = -0.22;
+    pivot.add(arm);
+    const hand = mkMesh(new THREE.SphereGeometry(0.14, 10, 10), MAT.white);
+    hand.position.y = -0.46;
+    pivot.add(hand);
+    arms.push(pivot);
+  });
+
+  // бур — в обеих руках перед грудью, всегда на виду
+  const drill = new THREE.Group();
+  drill.position.set(0.2, 0.02, 0.42);
+  drill.rotation.x = 1.15;
+  body.add(drill);
+  const drillBody = mkMesh(new THREE.CylinderGeometry(0.12, 0.14, 0.42, 12), MAT.metalD);
+  drillBody.rotation.x = Math.PI / 2;
+  drillBody.position.z = 0.06;
+  drill.add(drillBody);
+  const drillCone = mkMesh(new THREE.ConeGeometry(0.15, 0.5, 12), MAT.metal);
+  drillCone.rotation.x = Math.PI / 2;
+  drillCone.position.z = 0.52;
+  drill.add(drillCone);
+  // спираль бура
+  for(let i = 0; i < 3; i++){
+    const r = 0.135 - i * 0.03;
+    const ring = mkMesh(new THREE.TorusGeometry(r, 0.022, 6, 14), MAT.metal);
+    ring.position.z = 0.34 + i * 0.11;
+    drill.add(ring);
+  }
+  // рукоять
+  const grip = mkMesh(new THREE.BoxGeometry(0.36, 0.11, 0.12), MAT.leather);
+  grip.position.set(0, -0.17, -0.14);
+  drill.add(grip);
+  const drillGlow = new THREE.Sprite(SPRITE_MAT.white.clone());
+  drillGlow.scale.setScalar(0.75);
+  drillGlow.material.opacity = 0;
+  drillGlow.position.z = 0.82;
+  drill.add(drillGlow);
+
+  // ноги
+  const legs = [];
+  [-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.2*s, -0.45, 0);
+    body.add(pivot);
+    const leg = mkMesh(new THREE.CapsuleGeometry(0.15, 0.3, 4, 8), MAT.jeans);
+    leg.position.y = -0.2;
+    pivot.add(leg);
+    const shoe = mkMesh(new THREE.BoxGeometry(0.28, 0.18, 0.42), MAT.leather);
+    shoe.position.set(0, -0.44, 0.08);
+    pivot.add(shoe);
+    legs.push(pivot);
+  });
+
+  root.userData = { body, head, arms, legs, drill, drillGlow, lamp, lampLens };
+  return root;
+}
+
+/* ============================================================
+   УРОВЕНЬ: земля, изумруды, газ, декор
+   ============================================================ */
+const cellX = i => (i - (W - 1) / 2) * CS;
+const rowY  = j => j * CS;
+
+function solidAt(i, j){
+  if(j < 0) return true;                 // ниже мира — «пол»
+  if(j >= H) return false;               // над шапкой земли — воздух
+  if(i < 0 || i >= W) return false;
+  return grid[j][i].solid;
+}
+
+function clearLevel(){
+  blockFx.length = 0;
+  gemFx.length = 0;
+  crystals.length = 0;
+  if(levelGroup){
+    scene.remove(levelGroup);
+    levelGroup.traverse(o => {
+      if(o.isSprite && o.material && o.material !== SPRITE_MAT.green) o.material.dispose?.();
+    });
+  }
+  levelGroup = new THREE.Group();
+  scene.add(levelGroup);
+}
+
+function makeGem(big){
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(big ? GEO.gemBig : GEO.gem, big ? MAT.gemBig : MAT.gem);
+  core.scale.y = 1.55;
+  g.add(core);
+  const glow = new THREE.Sprite(big ? SPRITE_MAT.green : SPRITE_MAT.green);
+  glow.scale.setScalar(big ? 2.5 : 1.7);
+  glow.position.z = 0.02;
+  g.add(glow);
+  g.userData.core = core;
+  g.userData.glow = glow;
+  g.userData.baseY = 0;
+  g.userData.phase = Math.random() * Math.PI * 2;
+  return g;
+}
+
+function shuffle(a){
+  for(let i = a.length - 1; i > 0; i--){
+    const j = (Math.random() * (i + 1)) | 0;
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildLevel(lv){
+  level = lv;
+  W = 11;                       // ширина забоя (нечётная — есть центральный столбец)
+  H = 11 + lv * 2;              // глубина шахты растёт с уровнем: 13…21 ряд
+
+  clearLevel();
+
+  const groundY = H * CS;
+  grid = [];
+
+  /* --- сетка --- */
+  for(let j = 0; j < H; j++){
+    const row = [];
+    for(let i = 0; i < W; i++){
+      row.push({
+        i, j, solid:true, type: j === 0 ? 'rock' : 'dirt',
+        gem:null, gas:false, mesh:null, gasSprite:null
       });
+    }
+    grid.push(row);
+  }
 
-      // Пульсация маркера
-      if (marker.visible) {
-        marker.scale.setScalar(1 + Math.sin(elapsedTime * 10) * 0.1);
-        marker.material.emissiveIntensity = 1.0 + Math.sin(elapsedTime * 12) * 0.5;
+  /* --- расстановка изумрудов и газа --- */
+  const free = [];
+  for(let j = 1; j < H; j++) for(let i = 0; i < W; i++) free.push([i, j]);
+  shuffle(free);
+
+  const startCol = (W - 1) >> 1;
+  let gemCount = 8 + lv * 2;
+  const cellsUsed = new Set();
+
+  // первый изумруд — прямо под стартом: первое бурение сразу даёт награду
+  if(lv === 1){
+    const c = grid[H - 1][startCol];
+    c.gem = { big:false };
+    cellsUsed.add(startCol + ',' + (H - 1));
+    gemCount--;
+  }
+
+  const take = () => {
+    for(let k = 0; k < free.length; k++){
+      const [i, j] = free[k];
+      const key = i + ',' + j;
+      if(cellsUsed.has(key)) continue;
+      if(i === startCol && j >= H - 2) continue;   // не под самым стартом
+      free.splice(k, 1);
+      cellsUsed.add(key);
+      return [i, j];
+    }
+    return null;
+  };
+
+  // большой изумруд — в нижней половине
+  {
+    const pick = [];
+    for(const [i, j] of free) if(j <= Math.max(2, Math.floor(H / 2))) pick.push([i, j]);
+    if(pick.length){
+      const [i, j] = pick[(Math.random() * pick.length) | 0];
+      grid[j][i].gem = { big:true };
+      cellsUsed.add(i + ',' + j);
+    }
+  }
+
+  for(let n = 0; n < gemCount; n++){
+    const c = take();
+    if(!c) break;
+    grid[c[1]][c[0]].gem = { big:false };
+  }
+
+  // карманы газа
+  const gasCount = 1 + lv;
+  for(let n = 0; n < gasCount; n++){
+    const c = take();
+    if(!c) break;
+    grid[c[1]][c[0]].gas = true;
+  }
+
+  gemsTotal = 0;
+  for(let j = 1; j < H; j++) for(let i = 0; i < W; i++) if(grid[j][i].gem) gemsTotal++;
+
+  /* --- блоки --- */
+  for(let j = 0; j < H; j++){
+    const band = Math.min(2, Math.floor((H - j) / Math.max(1, H / 3)));  // 0 — верх, 2 — глубина
+    for(let i = 0; i < W; i++){
+      const c = grid[j][i];
+      let mats;
+      if(j === 0) mats = MAT.stone;
+      else if(j === H - 1){
+        // верхний ряд: сверху трава, остальные грани — земля
+        mats = [MAT.topSide, MAT.topSide, MAT.grassT, MAT.topSide, MAT.topSide, MAT.topSide];
+      } else {
+        mats = dirtMats[band * 3 + ((Math.random() * 3) | 0)];
       }
-
-      // Плавное вращение камеры вокруг центра (очень медленное, для эффекта)
-      // controls.autoRotate = true; // можно включить, но лучше не мешать игроку
-
-      controls.update();
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+      const m = new THREE.Mesh(GEO.block, mats);
+      m.position.set(cellX(i), rowY(j) + CS / 2, 0);
+      m.receiveShadow = true;
+      // блоки не отбрасывают тень: иначе верхний ряд затемняет весь забой
+      m.castShadow = false;
+      m.userData.cell = c;
+      levelGroup.add(m);
+      c.mesh = m;
+      if(j === H - 1 && Array.isArray(mats)) c.topRow = true;
     }
+  }
 
-    animate();
-
-    // --- Обработка ресайза ---
-    window.addEventListener('resize', onWindowResize, false);
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+  /* --- изумруды и газ --- */
+  for(let j = 1; j < H; j++){
+    for(let i = 0; i < W; i++){
+      const c = grid[j][i];
+      const px = cellX(i), py = rowY(j) + CS * 0.5;
+      if(c.gem){
+        const g = makeGem(c.gem.big);
+        g.position.set(px, py + 0.12, CS * 0.5 - 0.02);
+        g.userData.baseY = py + 0.12;
+        levelGroup.add(g);
+        c.gemObj = g;
+      }
+      if(c.gas){
+        const s = new THREE.Sprite(SPRITE_MAT.green.clone());
+        s.material.color.setHex(0x9bff4d);
+        s.material.opacity = 0.55;
+        s.scale.setScalar(1.05);
+        s.position.set(px, py, CS * 0.5 + 0.02);
+        levelGroup.add(s);
+        c.gasSprite = s;
+        const core = new THREE.Mesh(GEO.gas, MAT.gas);
+        core.position.set(px, py, CS * 0.5 - 0.06);
+        levelGroup.add(core);
+        c.gasCore = core;
+      }
     }
+  }
 
-    // --- Дополнительный визуальный эффект: свечение под землёй (некопаемое) ---
-    const undergroundGlow = new THREE.PointLight(0x224422, 0.5);
-    undergroundGlow.position.set(0, -2, 0);
-    scene.add(undergroundGlow);
+  /* --- дальняя стена шахты --- */
+  const wallW = W * CS + 26;
+  const wallH = groundY + 10;
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(wallW, wallH), MAT.rockW);
+  wall.position.set(0, (groundY - 10) / 2, -2.3);   // ровно от -10 до groundY
+  wall.receiveShadow = false;   // иначе тень героя превращается в чёрное пятно на стене
+  levelGroup.add(wall);
 
-    // Немного тумана для глубины
-    scene.fog = new THREE.FogExp2(0x050a10, 0.02);
+  // деревянные стойки у дальней стены (видны в прорубленных тоннелях)
+  for(let i = 0; i <= W; i += 3){
+    const x = cellX(i) - CS / 2;
+    if(x < -wallW / 2 || x > wallW / 2) continue;
+    const post = mkMesh(new THREE.CylinderGeometry(0.12, 0.15, groundY, 8), MAT.wood);
+    post.position.set(x, groundY / 2, -2.1);
+    post.castShadow = false;
+    levelGroup.add(post);
+  }
+  {
+    const beam = mkMesh(new THREE.BoxGeometry(W * CS + 1.4, 0.22, 0.22), MAT.wood);
+    beam.position.set(0, groundY - 0.5, -2.1);
+    beam.castShadow = false;
+    levelGroup.add(beam);
+  }
 
-    console.log('💎 Изумрудный Диггер запущен! Кликай по клеткам, чтобы копать. Изумруды нужно копать дважды.');
-  </script>
+  // кристаллы на дальней стене
+  for(let i = 0; i < 16; i++){
+    const c = new THREE.Mesh(GEO.crystal, MAT.crystal);
+    c.scale.setScalar(rnd(0.35, 0.9));
+    c.position.set(rnd(-W * CS / 2 + 0.4, W * CS / 2 - 0.4), rnd(0.4, groundY - 0.4), -2.15);
+    c.rotation.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1));
+    levelGroup.add(c);
+    crystals.push({ m:c, phase:Math.random() * 6.28, base:c.position.y, s0:c.scale.x });
+  }
+
+  /* --- трава за шахтой + декор --- */
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(wallW, 0.5, 7),
+    [MAT.bank, MAT.bank, MAT.grassS, MAT.bank, MAT.bank, MAT.bank]
+  );
+  strip.position.set(0, groundY - 0.2, -5.6);
+  strip.receiveShadow = true;
+  levelGroup.add(strip);
+
+  addProps(groundY);
+
+  // свечение дна — визуальная цель «добраться до низа»
+  const bottomGlow = new THREE.Sprite(SPRITE_MAT.green.clone());
+  bottomGlow.material.color.setHex(0x2fffa8);
+  bottomGlow.material.opacity = 0.26;
+  bottomGlow.scale.set(W * CS + 6, 3.2, 1);
+  bottomGlow.position.set(0, CS * 0.55, CS * 0.85);
+  levelGroup.add(bottomGlow);
+  levelGroup.userData.bottomGlow = bottomGlow;
+
+  // тёплый фонарь у старта (сзади, за краем шахты)
+  const lantern = addLantern(cellX(startCol) + 0.4, groundY, -2.9);
+  const lanternLight = new THREE.PointLight(0xffb45e, 16, 14, 2);
+  lanternLight.position.set(cellX(startCol) + 0.4, groundY + 1.9, -2.6);
+  levelGroup.add(lanternLight);
+  lantern.userData.light = lanternLight;
+
+  /* --- ИГРОК --- */
+  pl.gx = startCol;
+  pl.gy = H;
+  pl.x = cellX(pl.gx);
+  pl.y = groundY;
+  pl.vy = 0;
+  pl.state = 'idle';
+  pl.act = null;
+  pl.facing = 1;
+  pl.landTimer = 0;
+  gemsGot = 0;
+  combo = 1;
+  comboTimer = 0;
+  $('hDepthMax').textContent = H;
+
+  fitCamera();
+  updateHUD();
+}
+
+function addProps(groundY){
+  // забор
+  for(let x = -14; x <= 14; x += 2.6){
+    const p = mkMesh(new THREE.BoxGeometry(0.16, 1.15, 0.16), MAT.wood);
+    p.position.set(x, groundY + 0.55, -8.5);
+    levelGroup.add(p);
+  }
+  for(const y of [0.45, 0.9]){
+    const r = mkMesh(new THREE.BoxGeometry(30, 0.13, 0.13), MAT.wood);
+    r.position.set(0, groundY + y, -8.5);
+    levelGroup.add(r);
+  }
+  // кусты
+  for(const [x, z, s] of [[-11, -4.2, 1.15], [11.5, -4.6, 1.0], [-4.5, -10, 1.3], [7, -11, 1.1]]){
+    const b = new THREE.Group();
+    [[0,0,0,0.55],[0.42,0.14,0.12,0.4],[-0.4,0.12,-0.08,0.42],[0.05,0.42,-0.1,0.36]].forEach(([a,c,d,r]) => {
+      const p = mkMesh(new THREE.SphereGeometry(r * s, 10, 8), MAT.grassT);
+      p.position.set(a * s, c * s, d * s);
+      b.add(p);
+    });
+    b.position.set(x, groundY + 0.15, z);
+    levelGroup.add(b);
+  }
+  // камни
+  for(const [x, z, s] of [[-8.5, -3.4, 0.5], [9, -3.2, 0.4], [3.5, -6.2, 0.6]]){
+    const r = mkMesh(new THREE.DodecahedronGeometry(s, 0), MAT.stone);
+    r.position.set(x, groundY + s * 0.55, z);
+    r.rotation.set(rnd(0, 3), rnd(0, 3), rnd(0, 3));
+    levelGroup.add(r);
+  }
+}
+
+function addLantern(x, y, z){
+  const g = new THREE.Group();
+  const post = mkMesh(new THREE.CylinderGeometry(0.07, 0.09, 1.9, 8), MAT.wood);
+  post.position.y = 0.95;
+  g.add(post);
+  const arm = mkMesh(new THREE.BoxGeometry(0.5, 0.07, 0.07), MAT.wood);
+  arm.position.set(0.22, 1.86, 0);
+  g.add(arm);
+  const cage = mkMesh(new THREE.BoxGeometry(0.26, 0.3, 0.26), MAT.metalD);
+  cage.position.set(0.44, 1.62, 0);
+  g.add(cage);
+  const bulb = mkMesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), MAT.lampOn);
+  bulb.position.set(0.44, 1.62, 0);
+  g.add(bulb);
+  const halo = new THREE.Sprite(SPRITE_MAT.warm.clone());
+  halo.scale.setScalar(1.9);
+  halo.material.opacity = 0.7;
+  halo.position.set(0.44, 1.62, 0.16);
+  g.add(halo);
+  g.userData.halo = halo;
+  g.position.set(x, y, z);
+  levelGroup.add(g);
+  return g;
+}
+
+/* ============================================================
+   ЧАСТИЦЫ
+   ============================================================ */
+function spawnDebris(x, y, z, n = 8, spread = 2.4){
+  for(let k = 0; k < n; k++){
+    const m = debrisPool.pop();
+    if(!m) return;
+    m.visible = true;
+    m.position.set(x + rnd(-0.4, 0.4), y + rnd(-0.4, 0.4), z + rnd(-0.3, CS * 0.4));
+    m.rotation.set(rnd(0, 6), rnd(0, 6), rnd(0, 6));
+    m.scale.setScalar(rnd(0.5, 1.5));
+    debris.push({
+      mesh:m, life:rnd(0.5, 0.95), t:0,
+      vel:new THREE.Vector3(rnd(-spread, spread), rnd(0.6, spread * 1.5), rnd(-spread * 0.5, spread)),
+      spin:new THREE.Vector3(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9))
+    });
+  }
+}
+function spawnPuff(x, y, z, scale = 1.3, color = 0xc9a87a){
+  const s = puffsPool.pop();
+  if(!s) return;
+  s.visible = true;
+  s.position.set(x, y, z);
+  s.material.color.setHex(color);
+  s.scale.setScalar(scale * 0.5);
+  puffs.push({ spr:s, t:0, life:0.55, scale });
+}
+
+function updateDebris(dt){
+  for(let i = debris.length - 1; i >= 0; i--){
+    const d = debris[i];
+    d.t += dt;
+    d.vel.y -= 22 * dt;
+    d.mesh.position.addScaledVector(d.vel, dt);
+    d.mesh.rotation.x += d.spin.x * dt;
+    d.mesh.rotation.y += d.spin.y * dt;
+    d.mesh.rotation.z += d.spin.z * dt;
+    const q = d.t / d.life;
+    if(q >= 1){
+      d.mesh.visible = false;
+      debrisPool.push(d.mesh);
+      debris.splice(i, 1);
+    } else {
+      d.mesh.scale.setScalar(Math.max(0.01, (1 - q) * 1.4));
+    }
+  }
+}
+function updatePuffs(dt){
+  for(let i = puffs.length - 1; i >= 0; i--){
+    const p = puffs[i];
+    p.t += dt;
+    const q = p.t / p.life;
+    if(q >= 1){
+      p.spr.visible = false;
+      p.spr.material.opacity = 0;
+      puffsPool.push(p.spr);
+      puffs.splice(i, 1);
+    } else {
+      p.spr.scale.setScalar(p.scale * (0.5 + q * 1.6));
+      p.spr.material.opacity = 0.55 * (1 - q);
+    }
+  }
+}
+
+function updateBlockFx(dt){
+  for(let i = blockFx.length - 1; i >= 0; i--){
+    const f = blockFx[i];
+    f.t += dt;
+    const q = Math.min(1, f.t / 0.3);
+    f.mesh.scale.setScalar(1 - q * 0.8);
+    f.mesh.position.y = f.baseY - q * 0.42;
+    f.mesh.rotation.z = q * 0.3 * f.dir;
+    if(q >= 1){
+      f.mesh.visible = false;
+      f.mesh.scale.setScalar(1);
+      f.mesh.rotation.z = 0;
+      f.mesh.position.y = f.baseY;
+      blockFx.splice(i, 1);
+    }
+  }
+}
+
+function updateGemFx(dt){
+  for(let i = gemFx.length - 1; i >= 0; i--){
+    const g = gemFx[i];
+    g.t += dt;
+    const q = g.t / 0.75;
+    g.obj.position.y += g.vy * dt;
+    g.obj.position.x += g.vx * dt;
+    g.obj.position.z += g.vz * dt;
+    g.vx *= 1 - 2.5 * dt;
+    g.vz *= 1 - 2.5 * dt;
+    g.obj.rotation.y += g.spin * dt;
+    g.obj.rotation.z += g.spin * 0.6 * dt;
+    g.obj.scale.setScalar(Math.max(0.01, 1 - q * q));
+    g.glow.scale.setScalar(g.glowScale * (1 + q * 1.5));
+    if(q >= 1){ g.obj.visible = false; levelGroup.remove(g.obj); gemFx.splice(i, 1); }
+  }
+}
+
+/* ============================================================
+   ВСПЫШКИ ИНТЕРФЕЙСА
+   ============================================================ */
+const floatLayer = $('floatLayer');
+const _v3 = new THREE.Vector3();
+
+function floatText(worldPos, text, cls){
+  _v3.copy(worldPos).project(camera);
+  if(_v3.z > 1) return;
+  const x = (_v3.x * 0.5 + 0.5) * innerWidth;
+  const y = (-_v3.y * 0.5 + 0.5) * innerHeight;
+  const el = document.createElement('div');
+  el.className = 'float' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  floatLayer.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+let bannerTimer = 0;
+function banner(main, sub, dur = 1600){
+  const b = $('banner');
+  b.innerHTML = `<div class="b1">${main}</div>` + (sub ? `<div class="b2">${sub}</div>` : '');
+  b.classList.remove('show');
+  void b.offsetWidth;
+  b.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.remove('show'), dur);
+}
+
+function shake(v){ shakeAmp = Math.max(shakeAmp, v); }
+
+/* ============================================================
+   HUD
+   ============================================================ */
+let hudCache = {};
+function updateHUD(force){
+  const airPct = clamp(air, 0, AIR_MAX) / AIR_MAX;
+  const w = (airPct * 100).toFixed(1) + '%';
+  if(force || hudCache.w !== w){
+    $('hAirFill').style.width = w;
+    $('hAir').textContent = Math.round(airPct * 100) + '%';
+    hudCache.w = w;
+  }
+  const fill = $('hAirFill');
+  const cls = airPct < 0.16 ? 'crit' : airPct < 0.32 ? 'low' : '';
+  if(fill.className !== cls) fill.className = cls;
+  const low = airPct < 0.26 && gameState === 'playing';
+  if(low !== hudCache.low){
+    $('lowair').classList.toggle('on', low);
+    hudCache.low = low;
+  }
+
+  if(force || hudCache.gems !== gemsGot){
+    $('hGems').textContent = gemsGot;
+    $('hGemsTotal').textContent = gemsTotal;
+    hudCache.gems = gemsGot;
+  }
+  if(force || hudCache.score !== score){
+    const el = $('hScore');
+    el.textContent = score;
+    if(hudCache.score !== undefined && score !== hudCache.score){
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop');
+    }
+    hudCache.score = score;
+  }
+  if(force || hudCache.lvl !== level){
+    $('hLvl').textContent = level;
+    hudCache.lvl = level;
+  }
+  const depth = clamp(H - pl.gy + 1, 1, H);
+  if(force || hudCache.depth !== depth){
+    $('hDepth').textContent = depth;
+    hudCache.depth = depth;
+  }
+}
+
+/* ============================================================
+   ОВЕРЛЕЙ
+   ============================================================ */
+const overlay = $('overlay');
+const card = $('card');
+
+function showOverlay(html, center = false){
+  card.innerHTML = html;
+  overlay.classList.toggle('center', center);
+  overlay.classList.add('show');
+}
+function hideOverlay(){ overlay.classList.remove('show'); }
+
+function menuScreen(){
+  showOverlay(`
+    <div class="kicker">3D · аркада · three.js</div>
+    <h1>Изумрудный<br>Диггер</h1>
+    <p class="lead">Ты — шахтёр с буром. Вгрызайся в землю, вытаскивай изумруды
+      и успевай добраться до дна шахты, пока не кончился воздух.
+      Каждый изумруд — глоток воздуха и очки.</p>
+    <p class="keys">
+      <kbd>←</kbd><kbd>→</kbd> идти и бурить вбок
+      <span class="sep">·</span>
+      <kbd>↓</kbd> бурить вниз
+      <span class="sep">·</span>
+      <kbd>R</kbd> заново
+    </p>
+    <button id="btnPlay">Играть <b>⏎</b></button>
+  `, false);
+  $('btnPlay').onclick = () => { audioOn(); sfx.ui(); startGame(); };
+}
+
+function overScreen(){
+  showOverlay(`
+    <div class="kicker">воздух кончился</div>
+    <h2>Игра окончена</h2>
+    <p class="lead">Очки: <b>${score}</b> · Рекорд: <b>${best}</b></p>
+    <p class="lead small">Уровень ${level} · изумрудов ${gemsGot} из ${gemsTotal}</p>
+    <button id="btnRetry">Ещё раз <b>R</b></button>
+  `, true);
+  $('btnRetry').onclick = () => { audioOn(); sfx.ui(); startGame(); };
+}
+
+function victoryScreen(){
+  showOverlay(`
+    <div class="kicker">шахта пройдена до конца</div>
+    <h2 class="win">Победа!</h2>
+    <p class="lead">Ты выбрался со дна живым и с полными карманами изумрудов.<br>
+      Итог: <b>${score}</b> очков · рекорд <b>${best}</b></p>
+    <p class="lead small">Пройдено уровней: ${MAX_LEVEL} из ${MAX_LEVEL}</p>
+    <button id="btnRetry">Играть снова <b>R</b></button>
+  `, true);
+  $('btnRetry').onclick = () => { audioOn(); sfx.ui(); startGame(); };
+}
+
+/* ============================================================
+   ИГРОВОЙ ЦИКЛ УРОВНЯ
+   ============================================================ */
+function startGame(){
+  hideOverlay();
+  clearTimeout(levelTimer);       // иначе отложенный переход на след. уровень «догонит» рестарт
+  level = 1;
+  score = 0;
+  air = AIR_MAX;
+  buildLevel(1);
+  gameState = 'playing';
+  camMix = 0.22;
+  introT = 0;
+  hudCache = {};
+  updateHUD(true);
+  banner('Уровень 1', 'Бури вниз · собирай изумруды', 1800);
+}
+
+function nextLevel(){
+  level++;
+  if(level > MAX_LEVEL){ victory(); return; }
+  air = Math.min(AIR_MAX, AIR_MAX - (level - 1) * 6);
+  buildLevel(level);
+  gameState = 'playing';
+  camMix = 0.3;
+  hudCache = {};
+  updateHUD(true);
+  banner('Уровень ' + level, 'Глубже · воздуха меньше', 1700);
+}
+
+function victory(){
+  gameState = 'victory';
+  saveBest();
+  sfx.win();
+  banner('Шахта пройдена', 'Все ' + MAX_LEVEL + ' уровней', 2200);
+  setTimeout(() => { if(gameState === 'victory') victoryScreen(); }, 900);
+}
+
+function gameOver(){
+  if(gameState !== 'playing') return;
+  gameState = 'over';
+  pl.state = 'out';
+  pl.act = null;
+  saveBest();
+  sfx.lose();
+  shake(0.5);
+  banner('Воздух кончился', '', 1400);
+  setTimeout(() => { if(gameState === 'over') overScreen(); }, 1100);
+}
+
+function saveBest(){
+  if(score > best){
+    best = score;
+    try { localStorage.setItem('digger.best', String(best)); } catch(e){ /* file:// */ }
+  }
+  updateHUD(true);
+}
+
+function levelClear(){
+  if(gameState !== 'playing') return;
+  gameState = 'clear';
+  pl.state = 'cheer';
+  pl.act = null;
+  const bonus = 250 + Math.round(air) * 4 + gemsGot * 25;
+  score += bonus;
+  updateHUD(true);
+  sfx.win();
+  shake(0.2);
+  banner('Уровень ' + level + ' пройден', '+' + bonus + ' очков · изумрудов ' + gemsGot + '/' + gemsTotal, 2100);
+  clearTimeout(levelTimer);
+  levelTimer = setTimeout(() => {
+    if(gameState === 'clear'){
+      if(level >= MAX_LEVEL){ gameState = 'playing'; victory(); }
+      else nextLevel();
+    }
+  }, 2200);
+}
+
+/* ============================================================
+   ИГРОК: шаг, бурение, падение
+   ============================================================ */
+function startWalk(i, j, dur = STEP){
+  pl.act = {
+    type:'walk', t:0, dur,
+    fromX: pl.x, fromY: pl.y,
+    toX: cellX(i), toY: rowY(j), i, j
+  };
+  pl.state = 'walk';
+  if(i !== pl.gx) pl.facing = i > pl.gx ? 1 : -1;
+  sfx.step();
+}
+
+function startDig(i, j, dx, dy){
+  const c = grid[j][i];
+  pl.act = {
+    type:'dig', t:0, dur: dy !== 0 ? DIG_DOWN : DIG_SIDE,
+    i, j, dx, dy, cell: c,
+    baseY: c.mesh ? c.mesh.position.y : 0
+  };
+  pl.state = 'dig';
+  if(dx !== 0) pl.facing = dx;
+  sfx.dig();
+  spawnPuff(cellX(i), rowY(j) + CS * 0.5, CS * 0.6, 0.8);
+}
+
+function startFall(){
+  let land = pl.gy - 1;
+  while(land >= 0 && !solidAt(pl.gx, land)) land--;
+  pl.landRow = Math.max(1, land + 1);
+  pl.vy = 0;
+  pl.state = 'fall';
+  pl.act = null;
+}
+
+function breakCell(i, j){
+  const c = grid[j][i];
+  if(!c || !c.solid) return;
+  c.solid = false;
+
+  // визуал: блок «схлопывается»
+  if(c.mesh){
+    blockFx.push({ mesh:c.mesh, t:0, baseY:c.mesh.position.y, dir: Math.random() < 0.5 ? -1 : 1 });
+  }
+  spawnDebris(cellX(i), rowY(j) + CS * 0.5, CS * 0.45, 9);
+  spawnPuff(cellX(i), rowY(j) + CS * 0.5, CS * 0.6, 1.9);
+  shake(0.07);
+
+  // газ
+  if(c.gas){
+    air = Math.max(0, air - AIR_GAS);
+    spawnDebris(cellX(i), rowY(j) + CS * 0.5, CS * 0.4, 10, 3.4);
+    spawnPuff(cellX(i), rowY(j) + CS * 0.5, CS * 0.7, 3.2, 0x9bff4d);
+    floatText(new THREE.Vector3(cellX(i), rowY(j) + CS, 0.5), 'ГАЗ! −' + AIR_GAS, 'bad');
+    sfx.gas();
+    shake(0.28);
+    combo = 1;
+  }
+
+  // изумруд
+  if(c.gemObj){
+    collectGem(c, i, j);
+  }
+}
+
+function collectGem(c, i, j){
+  const g = c.gemObj;
+  c.gemObj = null;
+  const big = c.gem.big;
+  combo = Math.min(4, combo + 1);
+  comboTimer = 2.0;
+  const pts = (big ? SCORE_BIG : SCORE_GEM) * combo;
+  score += pts;
+  gemsGot++;
+  air = Math.min(AIR_MAX, air + (big ? AIR_GEM * 2 : AIR_GEM));
+
+  floatText(new THREE.Vector3(cellX(i), rowY(j) + CS * 1.1, CS * 0.6), '+' + pts, combo > 1 ? 'combo' : '');
+  if(combo > 1) floatText(new THREE.Vector3(cellX(i), rowY(j) + CS * 1.55, CS * 0.6), 'x' + combo, 'combo');
+
+  spawnPuff(cellX(i), rowY(j) + CS * 0.6, CS * 0.7, big ? 3.4 : 2.2, 0x7dffc9);
+  sfx[big ? 'big' : 'gem']();
+  shake(big ? 0.16 : 0.05);
+
+  // «выпрыгивание» изумруда
+  g.userData.glow.scale.setScalar(big ? 3.4 : 2.2);
+  g.userData.glow.material = SPRITE_MAT.green;
+  gemFx.push({
+    obj: g, glow: g.userData.glow, glowScale: big ? 2.5 : 1.7, t: 0,
+    vy: rnd(3.2, 4.6), vx: rnd(-1.6, 1.6), vz: rnd(0.4, 1.8), spin: rnd(6, 12)
+  });
+  updateHUD();
+}
+
+function updateAir(dt){
+  const extra = pl.state === 'dig' ? AIR_DIG : 0;
+  air -= (AIR_DRAIN + extra) * dt;
+  if(air <= 0){
+    air = 0;
+    updateHUD();
+    gameOver();
+    return;
+  }
+  // предупреждение
+  if(air < 24){
+    warnTimer -= dt;
+    if(warnTimer <= 0){ warnTimer = air < 12 ? 0.42 : 0.9; sfx.warn(); }
+  }
+  // комбо-таймер
+  if(comboTimer > 0){
+    comboTimer -= dt;
+    if(comboTimer <= 0) combo = 1;
+  }
+}
+
+function arriveCell(i, j){
+  pl.gx = i; pl.gy = j;
+  pl.x = cellX(i);
+  pl.y = rowY(j);
+  pl.state = 'idle';
+  pl.act = null;
+  updateHUD();
+  if(pl.gy <= 1){ levelClear(); return; }
+  if(!solidAt(pl.gx, pl.gy - 1)) startFall();
+}
+
+function updatePlayer(dt){
+  if(gameState === 'clear'){
+    pl.landTimer = Math.max(0, pl.landTimer - dt);
+    return;
+  }
+  if(gameState !== 'playing') return;
+  if(pl.state === 'cheer' || pl.state === 'out') return;
+
+  /* --- падение --- */
+  if(pl.state === 'fall'){
+    pl.vy += GRAV * dt;
+    pl.y -= pl.vy * dt;
+    const target = rowY(pl.landRow);
+    if(pl.y <= target){
+      pl.y = target;
+      pl.gy = pl.landRow;
+      pl.vy = 0;
+      pl.state = 'idle';
+      pl.landTimer = 0.18;
+      spawnPuff(pl.x, pl.y + 0.08, CS * 0.3, 1.1);
+      sfx.land();
+      if(pl.gy <= 1) levelClear();
+    }
+    return;
+  }
+
+  /* --- шаг --- */
+  if(pl.state === 'walk'){
+    const a = pl.act;
+    if(!a){ pl.state = 'idle'; return; }
+    a.t += dt;
+    const q = clamp(a.t / a.dur, 0, 1);
+    const e = q * q * (3 - 2 * q);
+    pl.x = a.fromX + (a.toX - a.fromX) * e;
+    pl.y = a.fromY + (a.toY - a.fromY) * e;
+    if(q >= 1){ arriveCell(a.i, a.j); }
+    return;
+  }
+
+  /* --- бурение --- */
+  if(pl.state === 'dig'){
+    const a = pl.act;
+    if(!a){ pl.state = 'idle'; return; }
+    a.t += dt;
+    // трясём блок, который бурим
+    if(a.cell && a.cell.mesh){
+      const k = Math.sin(a.t * 62);
+      a.cell.mesh.position.x = cellX(a.i) + k * 0.035;
+      a.cell.mesh.position.y = a.baseY + Math.cos(a.t * 71) * 0.03;
+    }
+    if(a.t >= a.dur){
+      if(a.cell && a.cell.mesh){
+        a.cell.mesh.position.x = cellX(a.i);
+        a.cell.mesh.position.y = a.baseY;
+      }
+      breakCell(a.i, a.j);
+      if(a.dy !== 0){
+        startFall();
+      } else {
+        startWalk(a.i, a.j);
+      }
+    }
+    return;
+  }
+
+  /* --- покой: управление --- */
+  pl.landTimer = Math.max(0, pl.landTimer - dt);
+
+  const dirX = (INPUT.right ? 1 : 0) - (INPUT.left ? 1 : 0);
+
+  if(dirX !== 0){
+    const nx = pl.gx + dirX;
+    pl.facing = dirX;
+    if(nx >= 0 && nx < W){
+      if(solidAt(nx, pl.gy)){
+        const c = grid[pl.gy][nx];
+        if(c.type !== 'rock'){ startDig(nx, pl.gy, dirX, 0); return; }
+      } else {
+        startWalk(nx, pl.gy);
+        return;
+      }
+    }
+  }
+
+  if(INPUT.down){
+    if(solidAt(pl.gx, pl.gy - 1) && pl.gy - 1 >= 1){
+      startDig(pl.gx, pl.gy - 1, 0, -1);
+      return;
+    }
+    if(!solidAt(pl.gx, pl.gy - 1)){ startFall(); return; }
+    // у самого дна — там уже победа
+    if(pl.gy - 1 === 0 && pl.gy <= 1){ levelClear(); return; }
+  }
+
+  // некуда идти — проваливаемся
+  if(!solidAt(pl.gx, pl.gy - 1)) startFall();
+}
+
+/* ============================================================
+   КАМЕРА
+   ============================================================ */
+const CAM_DIR = new THREE.Vector3(0.10, 0.095, 1).normalize();
+const TOP_PAD = 4.2, BOT_PAD = 1.4;   // запас неба сверху и «дна» снизу
+const camCenter = new THREE.Vector3();
+const _fitPts = [];
+const _fitV = new THREE.Vector3();
+let camSnap = true;
+
+/* Подгонка камеры.
+   Экран 16:9 при узкой высокой шахте всё равно оставил бы поля, поэтому
+   масштаб фиксируется по ШИРИНЕ доски, а по вертикали камера плавно
+   едет за игроком. Ширину подбираем итеративно по восьми углам рамки:
+   перспектива «приближает» ближний к камере край, и наивная формула
+   через тангенс половины угла обрезала бы доску справа. */
+function fitCamera(){
+  const groundY = H * CS;
+  const boardW = W * CS;
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const lookY = groundY / 2;
+
+  _fitPts.length = 0;
+  for(const x of [-boardW/2 - 0.9, boardW/2 + 0.9])
+    for(const y of [0, groundY])
+      for(const z of [-0.9, 0.9]) _fitPts.push(new THREE.Vector3(x, y, z));
+
+  let d = ((boardW + 1.8) / 2) / (tanHalf * Math.max(0.4, camera.aspect));
+  for(let it = 0; it < 9; it++){
+    camera.position.set(CAM_DIR.x * d, lookY + CAM_DIR.y * d, CAM_DIR.z * d);
+    camera.lookAt(0, lookY, 0);
+    camera.updateMatrixWorld(true);
+    let mx = 0;
+    for(const p of _fitPts){
+      _fitV.copy(p).project(camera);
+      mx = Math.max(mx, Math.abs(_fitV.x));
+    }
+    const k = mx / 0.94;
+    if(Math.abs(k - 1) < 0.004) break;
+    d = clamp(d * k, 5, 220);
+  }
+  // на узких экранах не отъезжаем слишком далеко: герой должен оставаться крупным,
+  // а доска просто будет прокручиваться по горизонтали
+  let dd = Math.min(d, (13.5 / 2) / tanHalf);
+  const dWmin = 8 / (2 * tanHalf * Math.max(0.25, camera.aspect));   // не уже 8 юнитов
+  if(dd < dWmin) dd = Math.min(d, dWmin);
+  camFitDist = dd;
+  camSnap = true;
+
+  // тени: свет и его ортокамера накрывают всю шахту целиком
+  const cy = groundY * 0.5;
+  sun.target.position.set(0, cy, 0);
+  sun.position.set(14, cy + 15, 28);
+  const sc = sun.shadow.camera;
+  const half = Math.max(groundY, boardW) * 0.62 + 4;
+  sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half;
+  sc.near = 1; sc.far = 100;
+  sc.updateProjectionMatrix();
+}
+
+/* Куда смотрит камера: центр окна, прижатый к границам шахты. */
+function boardCenterTarget(out){
+  const groundY = H * CS;
+  const totalH = groundY + TOP_PAD + BOT_PAD;
+  const boardW = W * CS;
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const viewH = 2 * camFitDist * tanHalf;
+  const viewW = viewH * camera.aspect;
+
+  const cy = viewH >= totalH
+    ? (groundY + TOP_PAD - BOT_PAD) / 2
+    : clamp(pl.y + 1.1, -BOT_PAD + viewH / 2, groundY + TOP_PAD - viewH / 2);
+  const cx = viewW >= boardW + 1.4
+    ? 0
+    : clamp(pl.x, -boardW / 2 + viewW / 2, boardW / 2 - viewW / 2);
+  out.set(cx, cy, 0);
+}
+
+const _bp = new THREE.Vector3();
+const _bt = new THREE.Vector3();
+const _mp = new THREE.Vector3();
+const _mt = new THREE.Vector3();
+
+function updateCamera(dt){
+  // куда смотрит камера в режиме «шахта»
+  boardCenterTarget(_bt);
+  if(camSnap){ camCenter.copy(_bt); camSnap = false; }
+  else camCenter.lerp(_bt, 1 - Math.exp(-6 * dt));
+  _bp.copy(camCenter).addScaledVector(CAM_DIR, camFitDist);
+
+  // крупный план героя (меню и первые кадры уровня)
+  introT += dt;
+  const a = introT * 0.11 + 0.55;
+  const r = 4.2;
+  _mp.set(pl.x + Math.sin(a) * r * 0.85 + 0.6,
+          pl.y + 1.35 + Math.sin(introT * 0.5) * 0.18,
+          Math.cos(a) * r + 1.2);
+  _mt.set(pl.x - 1.05, pl.y + 0.85, 0);
+
+  const m = smoothstep(camMix);
+  camera.position.lerpVectors(_mp, _bp, m);
+  camLookAt.lerpVectors(_mt, camCenter, m);
+
+  // тряска
+  if(shakeAmp > 0.0005){
+    camera.position.x += rnd(-1, 1) * shakeAmp;
+    camera.position.y += rnd(-1, 1) * shakeAmp;
+    shakeAmp *= Math.pow(0.02, dt);
+  } else shakeAmp = 0;
+
+  camera.lookAt(camLookAt);
+
+  if(gameState !== 'menu' && !window.__freezeCam && camMix < 1) camMix = Math.min(1, camMix + dt / 1.35);
+}
+
+function updateSky(){
+  if(sky) sky.position.copy(camera.position);
+  if(starGroup) starGroup.position.copy(camera.position);
+  if(dust){
+    const a = dust.geometry.attributes.position;
+    const arr = a.array;
+    for(let i = 1; i < arr.length; i += 3){
+      arr[i] += 0.35 * (1/60);
+      if(arr[i] > 26) arr[i] = 0;
+    }
+    a.needsUpdate = true;
+  }
+}
+
+/* ============================================================
+   АНИМАЦИЯ ПЕРСОНАЖА
+   ============================================================ */
+function animateDigger(dt){
+  const U = digger.userData;
+  pl.animTime += dt;
+  const t = pl.animTime;
+
+  let bodyX = 0, bodyZ = 0, headY = 0, bob = 0, sy = 1, sxz = 1;
+  let armL = 0, armR = 0, armLz = 0.1, armRz = -0.1;
+  let legL = 0, legR = 0, spin = 1.2, glowA = 0, drillRot = 1.15;
+
+  const st = pl.state;
+
+  if(st === 'idle'){
+    const br = Math.sin(t * 2.1) * 0.022;
+    sy = 1 + br; sxz = 1 - br * 0.5;
+    headY = Math.sin(t * 0.55) * 0.3;
+    armL = 0.34 + Math.sin(t * 2.1) * 0.05;
+    armR = 0.34 - Math.sin(t * 2.1) * 0.05;
+    bob = Math.sin(t * 2.1) * 0.006;
+  }
+  else if(st === 'walk'){
+    pl.runPhase += dt * 15.5;
+    const s = Math.sin(pl.runPhase);
+    legL = -s * 1.12;
+    legR = s * 1.12;
+    armL = 0.3 + s * 0.55;
+    armR = 0.3 - s * 0.55;
+    bodyX = 0.15;
+    bob = Math.abs(Math.sin(pl.runPhase)) * 0.065;
+    headY = Math.sin(pl.runPhase * 0.5) * 0.08;
+  }
+  else if(st === 'dig'){
+    const side = pl.act && pl.act.dy === 0;
+    const k = Math.sin(t * 48) * 0.045;
+    spin = 30;
+    glowA = 0.9;
+    if(side){
+      armL = 1.42 + k; armR = 1.42 + k;
+      armLz = 0.3; armRz = -0.3;
+      bodyX = 0.3;
+      legL = 0.42; legR = -0.3;
+      bob = k * 0.3;
+      drillRot = 0.12;
+    } else {
+      armL = 1.05 + k; armR = 1.05 + k;
+      armLz = 0.34; armRz = -0.34;
+      bodyX = 0.42;
+      legL = 0.55; legR = -0.42;
+      bob = -0.05 + k * 0.25;
+      drillRot = 0.85;
+    }
+  }
+  else if(st === 'fall'){
+    armL = -2.15; armR = -2.35;
+    armLz = 0.5; armRz = -0.5;
+    legL = 0.55; legR = -0.5;
+    bodyX = -0.12;
+    spin = 6;
+    drillRot = 0.7;
+    headY = Math.sin(t * 12) * 0.12;
+  }
+  else if(st === 'cheer'){
+    armL = -2.75 + Math.sin(t * 7) * 0.22;
+    armR = -2.75 - Math.sin(t * 7) * 0.22;
+    armLz = 0.55; armRz = -0.55;
+    bob = Math.abs(Math.sin(t * 7)) * 0.14;
+    legL = Math.sin(t * 7) * 0.18;
+    legR = -legL;
+    spin = 4;
+    drillRot = 0.4;
+  }
+  else if(st === 'out'){
+    armL = 0.05; armR = 0.05;
+    armLz = 0.22; armRz = -0.22;
+    legL = 0.1; legR = -0.1;
+    bodyX = 0.85;
+    bodyZ = 0.28;
+    sy = 0.92; sxz = 1.06;
+    headY = 0.4;
+    spin = 0;
+    drillRot = 1.0;
+  }
+
+  // squash при посадке
+  if(pl.landTimer > 0){
+    pl.landTimer = Math.max(0, pl.landTimer - dt);
+    const q = pl.landTimer / 0.18;
+    sy *= 1 - 0.22 * q;
+    sxz *= 1 + 0.18 * q;
+  }
+
+  const k = 13;
+  U.arms[0].rotation.x = damp(U.arms[0].rotation.x, armL, k, dt);
+  U.arms[0].rotation.z = damp(U.arms[0].rotation.z, armLz, k, dt);
+  U.arms[1].rotation.x = damp(U.arms[1].rotation.x, armR, k, dt);
+  U.arms[1].rotation.z = damp(U.arms[1].rotation.z, armRz, k, dt);
+  U.legs[0].rotation.x = damp(U.legs[0].rotation.x, legL, k, dt);
+  U.legs[1].rotation.x = damp(U.legs[1].rotation.x, legR, k, dt);
+  U.head.rotation.y = damp(U.head.rotation.y, headY, 6, dt);
+  U.body.rotation.x = damp(U.body.rotation.x, bodyX, 11, dt);
+  U.body.rotation.z = damp(U.body.rotation.z, bodyZ, 11, dt);
+  U.body.scale.set(
+    damp(U.body.scale.x, sxz, 18, dt),
+    damp(U.body.scale.y, sy, 18, dt),
+    damp(U.body.scale.z, sxz, 18, dt)
+  );
+  U.body.position.y = -0.21 + bob;
+
+  // бур
+  U.drill.rotation.x = damp(U.drill.rotation.x, drillRot, 11, dt);
+  U.drill.rotation.z += spin * dt;
+  U.drillGlow.material.opacity = damp(U.drillGlow.material.opacity, glowA, 12, dt);
+
+  // фонарик мигает при бурении
+  U.lamp.intensity = (st === 'dig' ? 30 : 24) + Math.sin(t * 30) * (st === 'dig' ? 4 : 0.6);
+
+  // позиция и поворот
+  digger.position.set(pl.x, pl.y + FOOT_OFF, 0);
+  const targetYaw = pl.facing * (st === 'walk' || st === 'dig' ? 0.98 : st === 'idle' ? 0.5 : 0.72);
+  digger.rotation.y = damp(digger.rotation.y, targetYaw, 9, dt);
+  // при падении — лёгкий крен
+  digger.rotation.z = damp(digger.rotation.z, st === 'fall' ? Math.sin(t * 9) * 0.08 : 0, 8, dt);
+}
+
+/* ============================================================
+   ПРОЧИЕ АНИМАЦИИ МИРА
+   ============================================================ */
+function updateWorld(dt){
+  const t = performance.now() * 0.001;
+
+  // изумруды парят и светятся
+  for(let j = 1; j < H; j++){
+    for(let i = 0; i < W; i++){
+      const c = grid[j] && grid[j][i];
+      if(!c || !c.gemObj) continue;
+      const g = c.gemObj;
+      g.position.y = g.userData.baseY + Math.sin(t * 1.7 + g.userData.phase) * 0.07;
+      g.userData.core.rotation.y += dt * 0.8;
+      const s = 1 + Math.sin(t * 2.4 + g.userData.phase) * 0.06;
+      g.userData.glow.scale.setScalar((c.gem.big ? 2.5 : 1.7) * s);
+    }
+  }
+
+  // газовые карманы пульсируют
+  for(let j = 1; j < H; j++){
+    for(let i = 0; i < W; i++){
+      const c = grid[j] && grid[j][i];
+      if(!c || !c.gasSprite) continue;
+      c.gasSprite.scale.setScalar(1.0 + Math.sin(t * 2.6 + i + j) * 0.14);
+      if(c.gasCore) c.gasCore.rotation.y += dt * 0.7;
+    }
+  }
+
+  // кристаллы на дальней стене
+  for(const c of crystals){
+    c.m.rotation.y += dt * 0.25;
+    c.m.scale.setScalar(c.s0 * (1 + Math.sin(t * 1.4 + c.phase) * 0.1));
+  }
+
+  // свечение дна
+  if(levelGroup.userData.bottomGlow){
+    levelGroup.userData.bottomGlow.material.opacity = 0.20 + Math.sin(t * 1.8) * 0.07;
+  }
+
+  // мерцание фонаря
+  for(const o of levelGroup.children){
+    if(o.userData && o.userData.light){
+      o.userData.light.intensity = 15 + Math.sin(t * 7.3) * 1.6 + Math.sin(t * 2.1) * 1.2;
+      if(o.userData.halo) o.userData.halo.scale.setScalar(2.5 + Math.sin(t * 3.4) * 0.12);
+    }
+  }
+}
+
+/* ============================================================
+   ОБНОВЛЕНИЕ КАДРА
+   ============================================================ */
+const clock = new THREE.Clock();
+// ?ff=N — ускорение симуляции для отладки/скриншотов (на игру не влияет)
+const FF = (() => {
+  const m = location.search.match(/ff=(\d+)/);
+  return m ? clamp(parseInt(m[1], 10) || 1, 1, 12) : 1;
+})();
+
+let simTime = 0;
+
+// ?demo — сценарий автоигры для отладки: бурим вниз, вбок, снова вниз
+function demoInput(t){
+  const p = t % 11;
+  INPUT.down  = (p > 0.6 && p < 2.4) || (p > 4.2 && p < 5.4) || (p > 7.0 && p < 8.2);
+  INPUT.right = (p > 2.5 && p < 4.1);
+  INPUT.left  = (p > 5.5 && p < 6.9);
+}
+
+function simulate(dt){
+  simTime += dt;
+  if(DEMO) demoInput(simTime);
+  updatePlayer(dt);
+  if(gameState === 'playing') updateAir(dt);
+  updateBlockFx(dt);
+  updateGemFx(dt);
+  updateDebris(dt);
+  updatePuffs(dt);
+  updateWorld(dt);
+  animateDigger(dt);
+}
+
+function tick(){
+  requestAnimationFrame(tick);
+  const real = Math.min(clock.getDelta(), 0.05);
+
+  if(FF > 1){ for(let i = 0; i < FF; i++) simulate(1 / 60); }
+  else simulate(real);
+
+  if(pl.state === 'dig' && Math.random() < 0.25){
+    // искры от бура
+    const tip = new THREE.Vector3(0, 0, 0.7);
+    digger.userData.drill.localToWorld(tip);
+    spawnDebris(tip.x, tip.y, tip.z, 1, 1.2);
+  }
+
+  updateCamera(FF > 1 ? Math.min(0.05, FF / 60) : real);
+  updateSky();
+  updateHUD(false);
+
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   ВВОД
+   ============================================================ */
+const KEYMAP = {
+  ArrowLeft:'left', KeyA:'left',
+  ArrowRight:'right', KeyD:'right',
+  ArrowDown:'down', KeyS:'down'
+};
+
+addEventListener('keydown', e => {
+  if(e.repeat){ e.preventDefault(); return; }
+  const k = KEYMAP[e.code];
+  if(k){ INPUT[k] = true; e.preventDefault(); audioOn(); return; }
+  if(e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter'){
+    e.preventDefault();
+    audioOn();
+    if(gameState === 'menu' || gameState === 'over' || gameState === 'victory'){
+      sfx.ui();
+      startGame();
+    } else {
+      INPUT.down = true;          // пробел в игре = бурить вниз
+    }
+    return;
+  }
+  if(e.code === 'KeyR'){
+    e.preventDefault();
+    audioOn();
+    sfx.ui();
+    startGame();
+  }
+});
+
+addEventListener('keyup', e => {
+  if(e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter'){ INPUT.down = false; return; }
+  const k = KEYMAP[e.code];
+  if(k){ INPUT[k] = false; e.preventDefault(); }
+});
+
+addEventListener('blur', () => { INPUT.left = INPUT.right = INPUT.down = false; });
+
+// тач
+if(matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window){
+  document.body.classList.add('touch');
+}
+document.querySelectorAll('#touch button').forEach(b => {
+  const k = b.dataset.k;
+  const on = e => { e.preventDefault(); INPUT[k] = true; audioOn(); if(gameState === 'menu') startGame(); };
+  const off = e => { e.preventDefault(); INPUT[k] = false; };
+  b.addEventListener('pointerdown', on);
+  b.addEventListener('pointerup', off);
+  b.addEventListener('pointercancel', off);
+  b.addEventListener('pointerleave', off);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  fitCamera();
+});
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+function boot(){
+  initScene();
+
+  digger = createDigger();
+  digger.position.set(0, 0, 0);
+  scene.add(digger);
+
+  try { best = parseInt(localStorage.getItem('digger.best') || '0', 10) || 0; } catch(e){ best = 0; }
+
+  buildLevel(1);
+  updateHUD(true);
+  menuScreen();
+
+  if(NOMENU){
+    hideOverlay();
+    gameState = 'playing';
+    camMix = 1;
+    air = AIR_MAX;
+    banner('Уровень 1', 'Бури вниз · собирай изумруды', 1500);
+  }
+
+  if(DEMO){
+    // сценарий автоигры — см. demoInput()
+  }
+
+  tick();
+
+  // прячем экран загрузки, когда первая сцена уже собрана
+  const loadingEl = $('loading');
+  if(loadingEl){
+    requestAnimationFrame(() => {
+      loadingEl.classList.add('hide');
+      setTimeout(() => loadingEl.remove(), 900);
+    });
+  }
+
+  window.DBG = {
+    THREE, scene, camera, digger, player: pl, input: INPUT,
+    start: startGame, next: () => nextLevel(),
+    setIntro: v => { introT = v; },
+    setMix: v => { camMix = v; },
+    setAir: v => { air = Math.max(0, v); },
+    get grid(){ return grid; },
+    get state(){ return gameState; },
+    get info(){ return { level, air: Math.round(air), score, gemsGot, gemsTotal, W, H, camMix: +camMix.toFixed(2), py: +pl.y.toFixed(2), state: pl.state }; }
+  };
+}
+
+boot();
+</script>
 </body>
 </html>

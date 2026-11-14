@@ -12,6 +12,7 @@ three.js-r182.tar.gz
 push.bat
 \!acl-repair/
 \.codeviz/
+\02-acl-recovery/
 
 # Next.js билд и кэш
 .next/
