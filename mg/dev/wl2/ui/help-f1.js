@@ -100,7 +100,7 @@ const CSS = `
     linear-gradient(180deg, #f0d796, #8a652c) border-box;
   color: #ffe8b5;
   font: inherit;
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: .08em;
   cursor: pointer;
@@ -352,9 +352,9 @@ const CSS = `
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
   align-content: start;
-  gap: 14px;
+  gap: 16px;
   padding: 20px 24px 24px;
   overflow-y: auto;
   scrollbar-color: #2a3441 #0b0f14;
@@ -399,10 +399,10 @@ const CSS = `
 
 .help-f1-row {
   display: grid;
-  grid-template-columns: minmax(112px, .38fr) 1fr;
-  gap: 10px;
+  grid-template-columns: minmax(160px, 230px) minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
-  padding: 7px 0;
+  padding: 8px 0;
 }
 
 .help-f1-row + .help-f1-row {
@@ -428,8 +428,8 @@ const CSS = `
 
 .help-f1-desc {
   color: #c3d0dc;
-  font-size: 18px;
-  line-height: 1.45;
+  font-size: 20px;
+  line-height: 1.5;
 }
 
 .help-f1-foot {
