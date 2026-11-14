@@ -19,6 +19,7 @@ import { ArmyView    } from '../render/army-view.js';
 import { TownView    } from '../render/town-view.js';
 import { BattleView  } from '../render/battle-view.js';
 import { ArmyChangeView } from '../render/army-change-view.js';
+import { HelpF1       } from '../ui/help-f1.js';
 
 ///----------------------------------------------------------------------------|
 /// Созаётся когда нажимается кнопка НАЧАТЬ ИГРУ
@@ -186,6 +187,10 @@ export class Game {
 
     this.selected = null;
     this._bindUI();
+    this.helpF1 = new HelpF1({
+      buttonParent: this.el.querySelector('#gameTopbar'),
+      buttonBefore: this.el.querySelector('#turnLabel'),
+    });
     this._refreshHud();
     this._log(
 `Партия начата. Игроков: ${this.judge.players.length}. Ход ${this.judge.turn}.`);
@@ -830,6 +835,7 @@ export class Game {
     if (this._destroyed) return;
     this._destroyed = true;
     window.removeEventListener('keydown', this._onKey);
+    this.helpF1?.destroy?.();
     this.mover?.clear();
     this.judge.onTurnStart = null;
     this.humanBrain?.detach?.();
