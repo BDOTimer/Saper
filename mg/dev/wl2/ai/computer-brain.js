@@ -262,6 +262,7 @@ export class ComputerBrain {
           cell: null,
           garrisonPower: 0,
           threatPower: 0,
+          threatCell: null,
           threatened: false,
           value: this._cityValue(city),
         });
@@ -276,11 +277,15 @@ export class ComputerBrain {
       }
 
       let threatPower = 0;
+      let threatCell = null;
       for (const rec of ctx.enemyByCell.values()) {
         const distance = Math.abs(rec.cell.x - city.x)
           + Math.abs(rec.cell.y - city.y);
         if (distance > radius) continue;
-        if (rec.power > threatPower) threatPower = rec.power;
+        if (rec.power > threatPower) {
+          threatPower = rec.power;
+          threatCell = rec.cell;
+        }
       }
 
       const threatened = threatPower > 0
@@ -291,6 +296,7 @@ export class ComputerBrain {
         cell,
         garrisonPower,
         threatPower,
+        threatCell,
         threatened,
         value: this._cityValue(city),
       });
@@ -418,6 +424,7 @@ export class ComputerBrain {
       if (!goal) continue;
 
       const threshold = info.threatPower * this.profile.defenseRatio;
+      const threatCell = info.threatCell ?? null;
       const candidates = [];
 
       for (const army of this._armies) {
@@ -429,11 +436,19 @@ export class ComputerBrain {
         const cost = costRec?.costs.get(goal)?.cost;
         if (!Number.isFinite(cost)) continue;
 
+        const interceptCost = threatCell && threatCell !== goal
+          ? costRec?.costs.get(threatCell)?.cost
+          : undefined;
+
         const power = Number(army.totalStrength) || 0;
         candidates.push({
           army,
           power,
           turns: this._turns(cost, army),
+          interceptCost,
+          interceptTurns: Number.isFinite(interceptCost)
+            ? this._turns(interceptCost, army)
+            : Infinity,
           sufficient: power >= threshold,
         });
       }
@@ -457,27 +472,57 @@ export class ComputerBrain {
       });
 
       let chosen = null;
+      let chosenGoal = goal;
 
-      for (const candidate of candidates) {
-        const path = this._routeToGoal(
-          ctx,
-          candidate.army,
-          goal,
-          reserved,
-          costsByArmy.get(candidate.army),
-        );
+      if (threatCell && threatCell !== goal && info.threatPower > 0) {
+        const interceptors = candidates
+          .filter((candidate) => Number.isFinite(candidate.interceptCost)
+            && candidate.power > 0
+            && candidate.power / (candidate.power + info.threatPower)
+              >= this.profile.attackOdds)
+          .sort((a, b) => (a.interceptTurns - b.interceptTurns)
+            || (b.power - a.power)
+            || ((a.army.id ?? 0) - (b.army.id ?? 0)));
 
-        if (path.length === 0) continue;
-        chosen = { ...candidate, path };
-        break;
+        for (const candidate of interceptors) {
+          const path = this._routeToGoal(
+            ctx,
+            candidate.army,
+            threatCell,
+            reserved,
+            costsByArmy.get(candidate.army),
+          );
+
+          if (path.length === 0) continue;
+          chosen = { ...candidate, path };
+          chosenGoal = threatCell;
+          break;
+        }
+      }
+
+      if (!chosen) {
+        for (const candidate of candidates) {
+          const path = this._routeToGoal(
+            ctx,
+            candidate.army,
+            goal,
+            reserved,
+            costsByArmy.get(candidate.army),
+          );
+
+          if (path.length === 0) continue;
+          chosen = { ...candidate, path };
+          break;
+        }
       }
 
       if (!chosen) continue;
 
       chosen.army.route = chosen.path;
-      chosen.army.cellGoal = goal;
+      chosen.army.cellGoal = chosenGoal;
+      chosen.army.aiGuardCity = city;
       assigned.add(chosen.army);
-      reserved.add(this._key(goal));
+      reserved.add(this._key(chosenGoal));
       defended++;
     }
 
@@ -499,7 +544,11 @@ export class ComputerBrain {
         continue;
       }
 
-      if (this._validSavedRoute(army, threats, reserved)) {
+      const hold = this._guardThreat(army, threats);
+      const holdGoal = hold?.info.threatCell ?? null;
+
+      if (this._validSavedRoute(army, threats, reserved)
+        && (!hold || army.cellGoal === holdGoal)) {
         reserved.add(this._key(army.cellGoal));
         continue;
       }
@@ -516,6 +565,8 @@ export class ComputerBrain {
       const ordered = this._orderCandidates(scored, army);
 
       for (const candidate of ordered) {
+        if (hold && candidate.cell !== holdGoal) continue;
+
         const path = this._routeToGoal(
           ctx,
           army,
@@ -607,8 +658,8 @@ export class ComputerBrain {
           * oddsFactor
           / (1 + turns);
       } else if (target.type === 'enemy-army') {
-        score = (15 + enemyPower * 1.5)
-          * this.profile.huntWeight
+        score = ((15 + enemyPower * 1.5) * this.profile.huntWeight
+          + this._threatBonusForCell(target.cell, threats))
           / (1 + turns);
       } else if (target.type === 'ruins') {
         score = 25 * this.profile.ruinsWeight / (1 + turns);
@@ -630,6 +681,24 @@ export class ComputerBrain {
     }
 
     return scored;
+  }
+
+  _threatBonusForCell(cell, threats) {
+    let bonus = 0;
+
+    for (const info of threats.values()) {
+      if (!info?.city || !(info.threatPower > 0)) continue;
+
+      const distance = Math.abs(cell.x - info.city.x)
+        + Math.abs(cell.y - info.city.y);
+      if (distance > this.profile.threatRadius) continue;
+
+      const value = (Number(info.value) || 0)
+        * (this.profile.defenseWeight ?? 1);
+      if (value > bonus) bonus = value;
+    }
+
+    return bonus;
   }
 
   _orderCandidates(scored, army) {
@@ -834,6 +903,27 @@ export class ComputerBrain {
     }
 
     return blocked;
+  }
+
+  _guardThreat(army, threats) {
+    const city = army.aiGuardCity ?? null;
+    if (!city) return null;
+
+    if ((city.ownerId ?? null) !== this.player.index) {
+      army.aiGuardCity = null;
+      return null;
+    }
+
+    const info = threats.get(city);
+    if (!info || !(info.threatPower > 0)) {
+      army.aiGuardCity = null;
+      return null;
+    }
+
+    const cell = this.world.get(army.x, army.y);
+    if (!cell || this._cityAtCell(cell) !== city) return null;
+
+    return { cell, city, info };
   }
 
   _canReleaseFromCity(army, threats, targetCity) {

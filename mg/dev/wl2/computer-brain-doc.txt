@@ -119,7 +119,7 @@ async/await, Promise, setTimeout, Math.random.
   neutralWeight   1.20
   enemyCityWeight 0.70
   huntWeight      0.40
-  defenseWeight   1.30   (поле есть, в текущих формулах не используется)
+  defenseWeight   1.30   (бонус к охоте на врага у своего города)
   risk            0.00
   ruinsWeight     0.20
   topN            1
@@ -133,7 +133,7 @@ async/await, Promise, setTimeout, Math.random.
   neutralWeight   1.00
   enemyCityWeight 1.00
   huntWeight      0.80
-  defenseWeight   0.90   (не используется)
+  defenseWeight   0.90   (бонус к охоте на врага у своего города)
   risk            0.25
   ruinsWeight     0.35
   topN            2
@@ -147,7 +147,7 @@ async/await, Promise, setTimeout, Math.random.
   neutralWeight   1.10
   enemyCityWeight 0.90
   huntWeight      0.60
-  defenseWeight   1.00   (не используется)
+  defenseWeight   1.00   (бонус к охоте на врага у своего города)
   risk            0.10
   ruinsWeight     0.25
   topN            1
@@ -161,7 +161,7 @@ async/await, Promise, setTimeout, Math.random.
   neutralWeight   0.90
   enemyCityWeight 1.20
   huntWeight      1.00
-  defenseWeight   0.70   (не используется)
+  defenseWeight   0.70   (бонус к охоте на врага у своего города)
   risk            0.15
   ruinsWeight     0.30
   topN            1
@@ -390,6 +390,7 @@ ComputerBrain не создаёт армии и юнитов сам: он тол
   garrisonPower — сумма totalStrength своих живых армий в клетке города.
   threatPower — максимум power среди вражеских клеток, для которых
                 манхэттенское расстояние до города <= profile.threatRadius.
+  threatCell — клетка самой сильной угрозы; используется для перехвата.
   threatened = threatPower > 0
                && garrisonPower < threatPower * profile.defenseRatio.
 
@@ -410,7 +411,8 @@ ComputerBrain не создаёт армии и юнитов сам: он тол
     - ещё не назначены в оборону;
     - не стоят в самом защищаемом городе;
     - могут покинуть текущий город (_canReleaseFromCity);
-    - имеют конечную стоимость пути до города.
+    - имеют конечную стоимость пути до города;
+    - для перехвата — конечную стоимость пути до threatCell.
 
 Проверка _canReleaseFromCity:
   - армия не в городе -> можно;
@@ -428,10 +430,26 @@ ComputerBrain не создаёт армии и юнитов сам: он тол
   - среди sufficient: turns ASC, power DESC, army.id ASC;
   - среди insufficient: power DESC, turns ASC, army.id ASC.
 
-Выбирается первый кандидат, для которого удалось построить маршрут.
+Перехват угрозы:
+  - если threatCell известен и не совпадает с городом;
+  - кандидат имеет конечный interceptCost;
+  - odds = power / (power + threatPower) >= profile.attackOdds.
+  Перехватчики сортируются: interceptTurns ASC, power DESC, army.id ASC.
+  Выбирается первый, для которого построен маршрут до threatCell.
+  Это позволяет сильной армии уничтожить угрозу, а не метаться между
+  крепостью и своим городом.
+
+Если перехват невозможен — выбирается первый кандидат с маршрутом до города.
 Армия получает route/cellGoal, помечается assigned, цель резервируется,
 defended++.
 Один защитник на город; один город на армию.
+
+После назначения армии выставляется aiGuardCity = город. Пока в городе
+сохраняется threatPower > 0, армия-гарнизон не уходит на обычные цели:
+  - _guardThreat() возвращает запись города, если армия стоит в нём;
+  - в _planAttack разрешена только цель threatCell (сортировка на угрозу);
+  - когда threatPower становится 0, aiGuardCity сбрасывается, и армия
+    снова может наступать.
 
 
 9. НАСТУПЛЕНИЕ
@@ -440,12 +458,15 @@ defended++.
 Сортировка: totalStrength DESC, army.id ASC.
 
 Для каждой армии:
-  1) Hold-guard: если армия — последний гарнизон своего города, который
-     под угрозой или содержит врага, маршрут очищается и армия пропускается.
+  1) Hold-guard: если армия — последний гарнизон своего города и город
+     под угрозой/содержит врага, маршрут очищается и армия пропускается.
      Проверка: _canReleaseFromCity(army, threats, null).
-  2) Если сохранённый маршрут валиден (_validSavedRoute) — он сохраняется,
+  2) Если у армии есть aiGuardCity и она стоит в этом городе при
+     threatPower > 0, разрешена только цель threatCell; иначе маршрут
+     очищается и армия остаётся в гарнизоне (_guardThreat).
+  3) Если сохранённый маршрут валиден (_validSavedRoute) — он сохраняется,
      цель резервируется, новая цель не ищется.
-  3) Иначе route/cellGoal очищаются и ищется новая цель.
+  4) Иначе route/cellGoal очищаются и ищется новая цель.
 
 Кандидаты целей:
   - нейтральные города;
@@ -479,7 +500,10 @@ defended++.
     cityValue * enemyCityWeight * oddsFactor / (1 + turns)
     oddsFactor = enemyPower > 0 ? (0.5 + odds) : 1.5
   enemy-army:
-    (15 + enemyPower * 1.5) * huntWeight / (1 + turns)
+    ((15 + enemyPower * 1.5) * huntWeight + threatBonus) / (1 + turns)
+    threatBonus = максимум по своим городам, где threatPower > 0 и
+      клетка врага в пределах threatRadius:
+      cityValue * defenseWeight
   ruins:
     25 * ruinsWeight / (1 + turns)
 
@@ -749,8 +773,8 @@ LIMIT_POLICY = константы формул лимитов из core/g-limits
 
 17. ОГРАНИЧЕНИЯ И ОСОБЕННОСТИ
 --------------------------------------------------------------------------------
-1) defenseWeight присутствует в профилях, но в текущих формулах не
-   используется.
+1) Перехват и guard — эвристика: при нескольких угрозах выбирается
+   сильнейшая, остальные обрабатываются на следующих ходах.
 2) Fallback может выбрать целевой город без свободного слота производства
    и без проверки числа армий в нём.
 3) _planDefense при недоступном пути у sufficient-кандидата может выбрать
