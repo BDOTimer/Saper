@@ -100,7 +100,7 @@ const CSS = `
     linear-gradient(180deg, #f0d796, #8a652c) border-box;
   color: #ffe8b5;
   font: inherit;
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: .08em;
   cursor: pointer;
@@ -273,7 +273,7 @@ const CSS = `
 .help-f1-kicker {
   margin-bottom: 5px;
   color: #c9ab72;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: .28em;
   text-transform: uppercase;
@@ -298,7 +298,7 @@ const CSS = `
 .help-f1-sub {
   margin: 8px 0 0;
   color: #9fb2c4;
-  font-size: 13px;
+  font-size: 18px;
   line-height: 1.4;
 }
 
@@ -313,7 +313,7 @@ const CSS = `
     linear-gradient(180deg, #fff0c6, #8a652c) border-box;
   color: #f6e7c4;
   font: inherit;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: .11em;
   text-transform: uppercase;
@@ -379,7 +379,7 @@ const CSS = `
   padding-bottom: 9px;
   border-bottom: 1px solid rgba(232, 195, 122, .20);
   color: #e8c37a;
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: .035em;
   text-shadow: 0 1px 4px rgba(0, 0, 0, .5);
@@ -417,7 +417,7 @@ const CSS = `
   background:
     linear-gradient(180deg, rgba(61, 84, 108, .92), rgba(17, 29, 41, .92));
   color: #ffe9b8;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.35;
   box-shadow:
@@ -428,7 +428,7 @@ const CSS = `
 
 .help-f1-desc {
   color: #c3d0dc;
-  font-size: 13px;
+  font-size: 18px;
   line-height: 1.45;
 }
 
@@ -443,7 +443,7 @@ const CSS = `
   background: linear-gradient(180deg, rgba(9, 18, 27, .38), rgba(6, 12, 19, .58));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
   color: #8ea3b8;
-  font-size: 12px;
+  font-size: 16px;
   letter-spacing: .02em;
 }
 
