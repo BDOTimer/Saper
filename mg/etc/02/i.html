@@ -67,6 +67,23 @@
       font-weight: bold;
       box-shadow: 0 0 12px #00ff88;
     }
+    #focusHint {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #aaffaa;
+      font-size: 20px;
+      background: rgba(0,20,0,0.85);
+      padding: 20px 40px;
+      border-radius: 20px;
+      border: 2px solid #00ff88;
+      box-shadow: 0 0 40px #00ff88;
+      z-index: 20;
+      cursor: pointer;
+      transition: opacity 0.3s;
+    }
+    #focusHint.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -77,6 +94,7 @@
     <span class="key">ПРОБЕЛ</span> копать &nbsp;|&nbsp;
     <span class="key">МЫШЬ</span> вращать камеру
   </div>
+  <div id="focusHint">🖱️ Кликните сюда, чтобы играть</div>
 
   <script type="importmap">
     {
@@ -107,25 +125,49 @@
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.3;
     document.body.appendChild(renderer.domElement);
-    
-// === ФИКС ДЛЯ IFRAME ===
-renderer.domElement.tabIndex = 0;
-renderer.domElement.style.outline = 'none';
-renderer.domElement.style.display = 'block';
 
-// Автофокус при любом клике (мышь, тап)
-renderer.domElement.addEventListener('pointerdown', () => {
-  renderer.domElement.focus();
-});
+    // ========== ФИКС ФОКУСА ДЛЯ IFRAME ==========
+    renderer.domElement.tabIndex = 0;
+    renderer.domElement.style.outline = 'none';
+    renderer.domElement.style.display = 'block';
+    renderer.domElement.style.cursor = 'pointer';
 
-// Если внутри iframe — попробуем забрать фокус и при загрузке
-if (window.self !== window.top) {
-  window.focus();
-  renderer.domElement.focus();
-  // и ещё раз после короткой задержки (iframe иногда поздно получает фокус)
-  setTimeout(() => renderer.domElement.focus(), 100);
-}
+    const focusHint = document.getElementById('focusHint');
 
+    function grabFocus() {
+      renderer.domElement.focus();
+      focusHint.classList.add('hidden');
+    }
+
+    // Фокус при клике/тапе на канвасе или подсказке
+    renderer.domElement.addEventListener('pointerdown', grabFocus);
+    focusHint.addEventListener('pointerdown', grabFocus);
+
+    // Пытаемся забрать фокус при загрузке (работает в большинстве случаев)
+    if (window.self !== window.top) {
+      window.focus();
+      renderer.domElement.focus();
+      setTimeout(() => {
+        renderer.domElement.focus();
+        // Если фокус не получен — показываем подсказку
+        if (document.activeElement !== renderer.domElement) {
+          focusHint.classList.remove('hidden');
+        }
+      }, 200);
+    } else {
+      renderer.domElement.focus();
+    }
+
+    // Следим: если фокус ушёл с канваса — снова показываем подсказку
+    document.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (document.activeElement !== renderer.domElement) {
+          focusHint.classList.remove('hidden');
+        }
+      }, 100);
+    });
+
+    // ============ КАМЕРА ============
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -133,6 +175,8 @@ if (window.self !== window.top) {
     controls.minDistance = 8;
     controls.maxDistance = 40;
     controls.maxPolarAngle = Math.PI / 2.1;
+    // Разрешаем клавиатуру (OrbitControls не будет блокировать)
+    controls.enableKeys = false;
 
     // ============ ОСВЕЩЕНИЕ ============
     const dirLight = new THREE.DirectionalLight(0xaaccff, 1.6);
@@ -488,8 +532,39 @@ if (window.self !== window.top) {
 
     // ============ УПРАВЛЕНИЕ ============
     const keys = {};
-    window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-    window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+    // Слушатели на DOCUMENT (в iframe работает надёжнее, чем на window)
+    const KEY_CODES = new Set([
+      'KeyW', 'KeyA', 'KeyS', 'KeyD',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'Space'
+    ]);
+
+    document.addEventListener('keydown', (e) => {
+      if (KEY_CODES.has(e.code)) {
+        e.preventDefault(); // не даём браузеру скроллить
+      }
+      keys[e.code] = true;
+      // Дублируем по e.key для совместимости с раскладками
+      keys[e.key.toLowerCase()] = true;
+      if (e.code === 'Space') {
+        tryDig();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // При потере фокуса сбрасываем все клавиши (чтобы не "залипали")
+    window.addEventListener('blur', () => {
+      for (const k in keys) keys[k] = false;
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        for (const k in keys) keys[k] = false;
+      }
+    });
 
     const moveBounds = {
       minX: -halfGrid + 0.8,
@@ -503,21 +578,15 @@ if (window.self !== window.top) {
     const score = { value: 0 };
     const scoreElement = document.getElementById('scoreValue');
 
-    // Целевой угол поворота (накапливаемый, чтобы плавно крутиться без прыжков через 2π)
     let targetRotationY = 0;
 
-    // Плавная интерполяция угла (кратчайший путь)
     function lerpAngle(current, target, t) {
       let diff = target - current;
-      // Приводим diff к диапазону [-PI, PI]
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       return current + diff * t;
     }
 
-    // Определяем угол поворота по вектору направления (dx, dz)
-    // В Three.js: 0 rad = смотрит в +Z (модель повернута так, что "лицо" на +Z)
-    // atan2(dx, dz) даёт нужный угол
     function dirToAngle(dx, dz) {
       return Math.atan2(dx, dz);
     }
@@ -550,7 +619,6 @@ if (window.self !== window.top) {
         }
       }
       
-      // Поворачиваемся лицом к клетке, которую копаем
       if (closest) {
         const dx = closest.position.x - digger.position.x;
         const dz = closest.position.z - digger.position.z;
@@ -616,20 +684,19 @@ if (window.self !== window.top) {
     // ============ ОБНОВЛЕНИЕ ============
     const clock = new THREE.Clock();
     const moveSpeed = 0.08;
-    const ROT_LERP = 0.2; // скорость плавного поворота
+    const ROT_LERP = 0.2;
 
     function updateDigger(delta) {
       let moved = false;
       let moveX = 0, moveZ = 0;
 
-      if (keys['w'] || keys['arrowup'])    { moveZ -= 1; moved = true; }
-      if (keys['s'] || keys['arrowdown'])  { moveZ += 1; moved = true; }
-      if (keys['a'] || keys['arrowleft'])  { moveX -= 1; moved = true; }
-      if (keys['d'] || keys['arrowright']) { moveX += 1; moved = true; }
+      // Проверяем и по e.code, и по e.key (на случай разных раскладок)
+      if (keys['KeyW'] || keys['w'] || keys['ArrowUp'] || keys['arrowup'])    { moveZ -= 1; moved = true; }
+      if (keys['KeyS'] || keys['s'] || keys['ArrowDown'] || keys['arrowdown'])  { moveZ += 1; moved = true; }
+      if (keys['KeyA'] || keys['a'] || keys['ArrowLeft'] || keys['arrowleft'])  { moveX -= 1; moved = true; }
+      if (keys['KeyD'] || keys['d'] || keys['ArrowRight'] || keys['arrowright']) { moveX += 1; moved = true; }
 
-      // Двигаем персонажа
       if (moved) {
-        // Нормализуем диагональ (чтобы не было быстрее)
         const len = Math.hypot(moveX, moveZ);
         if (len > 0) {
           moveX /= len;
@@ -638,20 +705,16 @@ if (window.self !== window.top) {
         digger.position.x += moveX * moveSpeed;
         digger.position.z += moveZ * moveSpeed;
 
-        // Ограничение движения
         digger.position.x = Math.max(moveBounds.minX, Math.min(moveBounds.maxX, digger.position.x));
         digger.position.z = Math.max(moveBounds.minZ, Math.min(moveBounds.maxZ, digger.position.z));
 
-        // Поворачиваемся в сторону движения (только если не копаем)
         if (digAnim <= 0) {
           targetRotationY = dirToAngle(moveX, moveZ);
         }
       }
 
-      // Плавный поворот к целевому углу
       digger.rotation.y = lerpAngle(digger.rotation.y, targetRotationY, ROT_LERP);
 
-      // Анимация ходьбы
       if (moved) {
         walkPhase += delta * 10;
         const bob = Math.sin(walkPhase) * 0.08;
@@ -674,7 +737,6 @@ if (window.self !== window.top) {
         armL.rotation.x *= 0.9;
       }
 
-      // Анимация копания
       if (digAnim > 0) {
         digAnim -= delta;
         const progress = 1 - digAnim / 0.6;
@@ -692,13 +754,6 @@ if (window.self !== window.top) {
         }
       }
     }
-
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        tryDig();
-      }
-    });
 
     function animate() {
       requestAnimationFrame(animate);
