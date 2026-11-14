@@ -6,7 +6,12 @@ import {
   productionTurns,
   setCityProduction,
 } from '../core/production.js';
-import { MAX_ARMIES_PER_CITY } from '../core/units.js';
+import { MAX_ARMIES_PER_CITY, MAX_ARMY_SIZE } from '../core/units.js';
+import {
+  canCreateArmy,
+  canGrowArmy,
+  computeGameLimits,
+} from '../core/g-limits.js';
 import { ruinsCooldownLeft } from '../core/ruins.js';
 
 const CITY_VALUE = Object.freeze({
@@ -121,6 +126,7 @@ export class ComputerBrain {
     this.player = null;
     this.turn = 1;
     this.profile = null;
+    this.limits = null;
     this._armies = [];
     this._ctx = null;
   }
@@ -142,6 +148,9 @@ export class ComputerBrain {
     this.player = player;
     this.turn = opts.turn ?? STATE.turn ?? 1;
     this.profile = AI_PROFILES[player.aiLevel] ?? AI_PROFILES[2];
+    this.limits = opts.limits
+      ?? computeGameLimits(world, opts.players ?? [player]);
+    player.limits = this.limits;
 
     this._armies = (player.army ?? []).filter((army) => this._isLiveArmy(army));
 
@@ -173,6 +182,11 @@ export class ComputerBrain {
       routes,
       defended: defense.defended,
       production,
+      limits: {
+        maxArmies: this.limits.maxArmies,
+        maxUnits: this.limits.maxUnits,
+        maxSmallArmies: { ...this.limits.maxSmallArmies },
+      },
     };
   }
 
@@ -292,6 +306,7 @@ export class ComputerBrain {
       const options = productionOptions(city);
       if (options.length === 0) continue;
       if (!this._canChangeProduction(city, options)) continue;
+      if (!this._canProduceInCity(city)) continue;
 
       const desired = this._desiredProduction(city, options, threats.get(city));
       if (!desired || desired === city.production) continue;
@@ -306,6 +321,24 @@ export class ComputerBrain {
     }
 
     return production;
+  }
+
+  _canProduceInCity(city) {
+    if (!this.limits) return true;
+
+    const cell = this.world.get(city.x, city.y);
+    if (!cell) return false;
+
+    const armies = this._ownArmiesAt(cell);
+    const canGrow = armies.some(army =>
+      (army.units?.length ?? 0) < MAX_ARMY_SIZE
+      && canGrowArmy(this.player, this.limits, army)
+    );
+
+    if (canGrow) return true;
+    if (armies.length >= MAX_ARMIES_PER_CITY) return false;
+
+    return canCreateArmy(this.player, this.limits);
   }
 
   _canChangeProduction(city, options) {

@@ -55,6 +55,7 @@ export class Player {
 
     this.army = [];
     this._armyMap = new Map();
+    this.limits = null;
   }
 
   /**

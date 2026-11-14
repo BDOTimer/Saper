@@ -14,6 +14,7 @@ import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
 import { visitRuins  } from './ruins.js';
 import { HumanBrain  } from './human-brain.js';
+import { canGrowArmy } from './g-limits.js';
 import { ArmyView    } from '../render/army-view.js';
 import { TownView    } from '../render/town-view.js';
 import { BattleView  } from '../render/battle-view.js';
@@ -674,8 +675,14 @@ export class Game {
       return;
     }
 
+    const owner = this.judge?.playerByIndex?.(army.idOwner) ?? null;
+    const limits = owner
+      ? (this.judge?.limits?.forPlayer(owner) ?? owner.limits ?? null)
+      : null;
+
     const joined = [];
     for (const unit of monsters) {
+      if (limits && !canGrowArmy(owner, limits, army)) break;
       if (army.addUnit(unit)) joined.push(unit);
     }
 

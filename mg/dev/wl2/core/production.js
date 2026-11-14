@@ -24,6 +24,13 @@ import {
   MAX_ARMY_SIZE,
   MAX_ARMIES_PER_CITY,
 } from './units.js';
+import {
+  canCreateArmy,
+  canGrowArmy,
+  computePlayerLimits,
+  getLiveUnitCount,
+  isLiveArmy,
+} from './g-limits.js';
 
 /** Максимум вариантов, которые город показывает в слоте производства. */
 export const MAX_PRODUCTION_OPTIONS = 4;
@@ -127,15 +134,17 @@ export function setCityProduction(city, typeKey) {
  * Найти (или создать) армию в городе и добавить в неё юнита.
  *
  * Если армии ещё нет — сначала создаётся армия, затем в неё кладётся юнит.
- * Если все 4 армии полны — возвращает null (юнит пока не появляется).
+ * Если все 4 армии полны или исчерпан лимит игрока — возвращает null
+ * (юнит пока не появляется).
  *
  * @param {import('./world.js').WorldMap} world
  * @param {import('./players.js').Player} owner
  * @param {object} city
  * @param {string} typeKey
+ * @param {object|null} limits
  * @returns {{army: object, unit: object, city: object, typeKey: string, created: boolean}|null}
  */
-export function spawnProducedUnit(world, owner, city, typeKey) {
+export function spawnProducedUnit(world, owner, city, typeKey, limits = null) {
   const type = UNIT_TYPES[typeKey];
   if (!world || !owner || !city || !type) return null;
   if (city.type === 'ruins') return null;
@@ -145,31 +154,31 @@ export function spawnProducedUnit(world, owner, city, typeKey) {
   const cell = world.get?.(city.x, city.y);
   if (!cell) return null;
 
-  const unit = Unit.spawn(owner.index, typeKey);
-  // У только что созданного юнита имя — ключ типа; для панелей показываем
-  // читаемое название («Лёгкая пехота»), а не «LIGHT_INF».
-  unit.name = type.name ?? typeKey;
-
+  const activeLimits = limits ?? owner.limits ?? computePlayerLimits(owner, world);
   const armies = (cell.army ?? []).filter(a =>
-    a && a.idOwner === owner.index && a.alive !== false
+    a && a.idOwner === owner.index && isLiveArmy(a)
   );
 
-  // 1) Есть армия со свободным местом — юнит идёт в неё.
-  let army = armies.find(a => (a.units?.length ?? 0) < MAX_ARMY_SIZE);
+  let army = armies
+    .filter(a => (a.units?.length ?? 0) < MAX_ARMY_SIZE
+      && canGrowArmy(owner, activeLimits, a))
+    .sort((a, b) => (getLiveUnitCount(b) - getLiveUnitCount(a))
+      || ((a.id ?? 0) - (b.id ?? 0)))[0] ?? null;
   let created = false;
 
-  // 2) Свободных армий нет — создаём новую (но не больше 4 в городе).
   if (!army) {
     if (armies.length >= MAX_ARMIES_PER_CITY) return null;
+    if (!canCreateArmy(owner, activeLimits)) return null;
 
-    // Сначала армия, затем юнит в неё — как требует правило.
     army = Army.spawn(owner.index, city.x, city.y);
     owner.addArmy?.(army);
     world.addArmy?.(army);
     created = true;
   }
 
-  // 3) Добавляем юнита в состав армии.
+  const unit = Unit.spawn(owner.index, typeKey);
+  unit.name = type.name ?? typeKey;
+
   if (!army.addUnit(unit)) return null;
 
   return { army, unit, city, typeKey, created };
@@ -181,10 +190,11 @@ export function spawnProducedUnit(world, owner, city, typeKey) {
  * @param {import('./world.js').WorldMap} world
  * @param {import('./players.js').Player} owner
  * @param {object} city
+ * @param {object|null} limits
  * @returns {{army: object, unit: object, city: object, typeKey: string, created: boolean}|null}
  *          результат, если юнит появился; иначе null
  */
-export function tickCityProduction(world, owner, city) {
+export function tickCityProduction(world, owner, city, limits = null) {
   if (!world || !owner || !city) return null;
   if (city.type === 'ruins') return null;
   if (owner.index == null) return null;
@@ -199,9 +209,9 @@ export function tickCityProduction(world, owner, city) {
   if (city.productionTurnsLeft > 0) return null;
 
   // Счётчик дошёл до нуля: пробуем выпустить юнита.
-  // Если места в армиях нет (4 полные армии) — счётчик остаётся нулевым
-  // и попытка повторится в следующем круге.
-  const result = spawnProducedUnit(world, owner, city, typeKey);
+  // Если места в армиях нет или исчерпан лимит игрока — счётчик остаётся
+  // нулевым и попытка повторится в следующем круге.
+  const result = spawnProducedUnit(world, owner, city, typeKey, limits);
   if (!result) return null;
 
   // Следующий юнит того же типа — счётчик заново.

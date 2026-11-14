@@ -7,6 +7,7 @@ import { STATE, TICK     } from './g-state.js';
 import { NAME            } from './gen-name.js';
 import { UNIT_TYPES, Unit, Army } from './units.js';
 import { tickCityProduction } from './production.js';
+import { GameLimits } from './g-limits.js';
 import { ComputerBrain } from '../ai/computer-brain.js';
 
 ///----------------------------------------------------------------------------|
@@ -32,6 +33,9 @@ export class Judge {
 
     // быстрый доступ: владелец клетки → Player
     this._byIndex = new Map(this.players.map(p => [p.index, p]));
+
+    this.limits = new GameLimits(worldMap, this.players);
+    this._refreshPlayerLimits();
 
     // Номер круга храним в глобальном состоянии — единый источник истины.
     STATE.turn = 1;
@@ -71,6 +75,16 @@ export class Judge {
   /** Найти Player по индексу */
   playerByIndex(i) { return this._byIndex.get(i) ?? null; }
 
+  _refreshPlayerLimits() {
+    this.limits.refresh();
+
+    for (const player of this.players) {
+      player.limits = this.limits.forPlayer(player);
+    }
+
+    return this.limits;
+  }
+
   ///----------------------------------------------------------
   /// Игрок вступает в ход: для ИИ маршруты строит ComputerBrain,
   /// для человека армии готовит Player.doStep.
@@ -79,8 +93,14 @@ export class Judge {
   {   const player = this.currentPlayer;
       player.isTurn = true; /// Игрок в процессе хода
 
+      this._refreshPlayerLimits();
+
       if (player.isHuman) player.doStep();
-      else ComputerBrain.get().begin(player, { world: this.world, turn: this.turn });
+      else ComputerBrain.get().begin(player, {
+        world: this.world,
+        turn: this.turn,
+        limits: this.limits.forPlayer(player),
+      });
 
       // Сообщаем экрану игры: можно рисовать красные маркеры маршрутов
       // и запускать плавное передвижение армий.
@@ -140,6 +160,7 @@ export class Judge {
   _doCities()
   {
     const cities = this.world?.cities ?? [];
+    this._refreshPlayerLimits();
 
     for (const city of cities)
     {
@@ -153,7 +174,12 @@ export class Judge {
 
       // В конце полного круга: счётчик -1; на нуле — выпуск юнита в армию
       // (армия создаётся автоматически, если её ещё нет).
-      const produced = tickCityProduction(this.world, owner, city);
+      const produced = tickCityProduction(
+        this.world,
+        owner,
+        city,
+        this.limits.forPlayer(owner),
+      );
       if (produced) this.onCityProduced?.(produced);
     }
   }
