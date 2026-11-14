@@ -108,30 +108,23 @@
     renderer.toneMappingExposure = 1.3;
     document.body.appendChild(renderer.domElement);
     
-// Сразу после создания renderer:
+// === ФИКС ДЛЯ IFRAME ===
 renderer.domElement.tabIndex = 0;
 renderer.domElement.style.outline = 'none';
+renderer.domElement.style.display = 'block';
 
-// Фокус при клике по канвасу:
-renderer.domElement.addEventListener('click', () => renderer.domElement.focus());
-
-// Если внутри iframe — попытаться забрать фокус при загрузке:
-if (window.self !== window.top) {
-  // мы в iframe
+// Автофокус при любом клике (мышь, тап)
+renderer.domElement.addEventListener('pointerdown', () => {
   renderer.domElement.focus();
-}
-
-// Слушатели вешаем на document (надёжнее, чем window в iframe):
-document.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-
-// Пробел — отдельно:
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    tryDig();
-  }
 });
+
+// Если внутри iframe — попробуем забрать фокус и при загрузке
+if (window.self !== window.top) {
+  window.focus();
+  renderer.domElement.focus();
+  // и ещё раз после короткой задержки (iframe иногда поздно получает фокус)
+  setTimeout(() => renderer.domElement.focus(), 100);
+}
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
