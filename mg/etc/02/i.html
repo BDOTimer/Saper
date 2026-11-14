@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Изумрудный Диггер | Three.js</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      user-select: none;
+    }
+    #info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #e0ffe0;
+      font-size: 22px;
+      font-weight: bold;
+      text-shadow: 0 0 10px #00ff88, 0 0 20px #004400;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #score {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #b5ffb5;
+      text-shadow: 0 0 20px #00aa55, 0 0 40px #006633;
+      background: rgba(0, 30, 0, 0.6);
+      padding: 10px 25px;
+      border-radius: 50px;
+      backdrop-filter: blur(5px);
+      border: 2px solid #00ff88;
+      box-shadow: 0 0 30px #00ff88;
+      z-index: 10;
+    }
+    #controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #aaffaa;
+      background: rgba(0, 20, 0, 0.7);
+      padding: 12px 30px;
+      border-radius: 40px;
+      font-size: 16px;
+      letter-spacing: 1px;
+      backdrop-filter: blur(4px);
+      border: 1px solid #00cc66;
+      box-shadow: 0 0 25px #00aa55;
+      z-index: 10;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .key {
+      display: inline-block;
+      background: #003300;
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 3px 10px;
+      margin: 0 4px;
+      color: #ccffcc;
+      font-weight: bold;
+      box-shadow: 0 0 12px #00ff88;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">💎 Изумрудный Диггер</div>
+  <div id="score">💚 <span id="scoreValue">0</span></div>
+  <div id="controls">
+    <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> двигаться &nbsp;|&nbsp;
+    <span class="key">ПРОБЕЛ</span> копать &nbsp;|&nbsp;
+    <span class="key">МЫШЬ</span> вращать камеру
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============ СЦЕНА ============
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050a10);
+    scene.fog = new THREE.FogExp2(0x050a10, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(12, 14, 18);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.3;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 1, 0);
+    controls.minDistance = 8;
+    controls.maxDistance = 40;
+    controls.maxPolarAngle = Math.PI / 2.1;
+
+    // ============ ОСВЕЩЕНИЕ ============
+    const dirLight = new THREE.DirectionalLight(0xaaccff, 1.6);
+    dirLight.position.set(15, 25, 12);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.left = -25;
+    dirLight.shadow.camera.right = 25;
+    dirLight.shadow.camera.top = 25;
+    dirLight.shadow.camera.bottom = -25;
+    dirLight.shadow.camera.near = 1;
+    dirLight.shadow.camera.far = 60;
+    dirLight.shadow.bias = -0.0003;
+    scene.add(dirLight);
+
+    const fillLight = new THREE.PointLight(0x4466ff, 0.7);
+    fillLight.position.set(-10, 8, 12);
+    scene.add(fillLight);
+
+    const gemGlow = new THREE.PointLight(0x00ff88, 0.6);
+    gemGlow.position.set(0, 3, 0);
+    scene.add(gemGlow);
+
+    // ============ КОНСТАНТЫ ============
+    const gridSize = 10;
+    const cellSize = 2;
+    const halfGrid = gridSize * cellSize / 2;
+
+    // ============ ЗЕМЛЯ ============
+    const baseGeo = new THREE.BoxGeometry(gridSize * cellSize + 1, 1, gridSize * cellSize + 1);
+    const baseMat = new THREE.MeshStandardMaterial({ 
+      color: 0x1a2a1a, roughness: 0.95, metalness: 0.05,
+      emissive: new THREE.Color(0x002200), emissiveIntensity: 0.5
+    });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = -1.0;
+    base.receiveShadow = true;
+    scene.add(base);
+
+    const gridHelper = new THREE.GridHelper(gridSize * cellSize, gridSize, 0x00ff88, 0x004422);
+    gridHelper.position.y = 0.01;
+    scene.add(gridHelper);
+
+    // ============ МАТЕРИАЛЫ ============
+    const dirtMat = new THREE.MeshStandardMaterial({ color: 0x3a2e1e, roughness: 1.0 });
+    const dirtMat2 = new THREE.MeshStandardMaterial({ color: 0x4a3e2e, roughness: 1.0 });
+    const emeraldMat = new THREE.MeshStandardMaterial({ 
+      color: 0x00cc66, emissive: new THREE.Color(0x00ff88), emissiveIntensity: 1.8,
+      roughness: 0.15, metalness: 0.4, transparent: true, opacity: 0.95
+    });
+    const emptyMat = new THREE.MeshStandardMaterial({ 
+      color: 0x0a0a0a, roughness: 0.9, emissive: new THREE.Color(0x001100), emissiveIntensity: 0.4
+    });
+
+    // ============ КЛЕТКИ ============
+    const cellMeshes = [];
+
+    function createCell(gridX, gridZ, type = 'dirt') {
+      let geometry, material;
+      if (type === 'emerald') {
+        geometry = new THREE.OctahedronGeometry(0.85, 0);
+        material = emeraldMat.clone();
+      } else if (type === 'empty') {
+        geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
+        material = emptyMat;
+      } else {
+        geometry = new THREE.BoxGeometry(cellSize * 0.95, 0.5, cellSize * 0.95);
+        material = (Math.random() > 0.5 ? dirtMat : dirtMat2).clone();
+        material.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.08);
+      }
+
+      const mesh = new THREE.Mesh(geometry, material);
+      const x = (gridX - gridSize/2 + 0.5) * cellSize;
+      const z = (gridZ - gridSize/2 + 0.5) * cellSize;
+      
+      if (type === 'emerald') {
+        mesh.position.set(x, 0.6, z);
+        mesh.rotation.y = Math.random() * Math.PI;
+        const glow = new THREE.PointLight(0x00ff88, 0.9, 4);
+        glow.position.set(x, 1.0, z);
+        scene.add(glow);
+        mesh.userData.glowLight = glow;
+      } else if (type === 'empty') {
+        mesh.position.set(x, -0.35, z);
+      } else {
+        mesh.position.set(x, 0.0, z);
+      }
+      
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData = {
+        ...mesh.userData, gridX, gridZ, type,
+        hp: type === 'emerald' ? 2 : (type === 'dirt' ? 1 : 0)
+      };
+      
+      scene.add(mesh);
+      cellMeshes.push(mesh);
+      return mesh;
+    }
+
+    const totalCells = gridSize * gridSize;
+    const emeraldCount = 28;
+    const emeraldIndices = new Set();
+    while (emeraldIndices.size < emeraldCount) {
+      emeraldIndices.add(Math.floor(Math.random() * totalCells));
+    }
+
+    let idx = 0;
+    for (let z = 0; z < gridSize; z++) {
+      for (let x = 0; x < gridSize; x++) {
+        const type = emeraldIndices.has(idx) ? 'emerald' : 'dirt';
+        createCell(x, z, type);
+        idx++;
+      }
+    }
+
+    // ============ ПЕРСОНАЖ ============
+    const digger = new THREE.Group();
+    digger.position.set(0, 0, 0);
+    scene.add(digger);
+
+    function makeCapsule(radius, length, mat) {
+      const group = new THREE.Group();
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, length, 12),
+        mat
+      );
+      cyl.castShadow = true;
+      cyl.receiveShadow = true;
+      group.add(cyl);
+      const top = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 10), mat);
+      top.position.y = length / 2;
+      top.castShadow = true;
+      group.add(top);
+      const bot = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 10), mat);
+      bot.position.y = -length / 2;
+      bot.castShadow = true;
+      group.add(bot);
+      return group;
+    }
+
+    const bodyMat = new THREE.MeshStandardMaterial({ 
+      color: 0xff8c42, roughness: 0.7, metalness: 0.1,
+      emissive: new THREE.Color(0x331100), emissiveIntensity: 0.4
+    });
+    const bodyMesh = makeCapsule(0.45, 0.6, bodyMat);
+    const body = new THREE.Group();
+    body.add(bodyMesh);
+    body.position.y = 0.9;
+    digger.add(body);
+
+    const headMat = new THREE.MeshStandardMaterial({ 
+      color: 0xffcc99, roughness: 0.6,
+      emissive: new THREE.Color(0x221100), emissiveIntensity: 0.3
+    });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), headMat);
+    head.position.y = 1.65;
+    head.castShadow = true;
+    digger.add(head);
+
+    const helmetMat = new THREE.MeshStandardMaterial({ 
+      color: 0xffcc00, roughness: 0.3, metalness: 0.6,
+      emissive: new THREE.Color(0xffaa00), emissiveIntensity: 0.8
+    });
+    const helmet = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      helmetMat
+    );
+    helmet.position.y = 1.75;
+    helmet.castShadow = true;
+    digger.add(helmet);
+
+    const helmetLight = new THREE.PointLight(0xffffaa, 1.5, 8);
+    helmetLight.position.set(0, 1.85, 0.3);
+    digger.add(helmetLight);
+
+    const lampMat = new THREE.MeshStandardMaterial({ 
+      color: 0xffffaa, emissive: new THREE.Color(0xffffaa), emissiveIntensity: 3
+    });
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), lampMat);
+    lamp.position.set(0, 1.78, 0.38);
+    digger.add(lamp);
+
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat);
+    eyeL.position.set(-0.13, 1.68, 0.32);
+    digger.add(eyeL);
+    const eyeR = eyeL.clone();
+    eyeR.position.x = 0.13;
+    digger.add(eyeR);
+
+    const armMat = new THREE.MeshStandardMaterial({ 
+      color: 0xff8c42, roughness: 0.7,
+      emissive: new THREE.Color(0x331100), emissiveIntensity: 0.3
+    });
+    
+    const armL = new THREE.Group();
+    const armLBody = makeCapsule(0.12, 0.5, armMat);
+    armLBody.position.y = -0.3;
+    armL.add(armLBody);
+    armL.position.set(-0.5, 1.15, 0);
+    digger.add(armL);
+
+    const armR = new THREE.Group();
+    const armRBody = makeCapsule(0.12, 0.5, armMat);
+    armRBody.position.y = -0.3;
+    armR.add(armRBody);
+    armR.position.set(0.5, 1.15, 0);
+    digger.add(armR);
+
+    const pickaxe = new THREE.Group();
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 8), handleMat);
+    handle.position.y = -0.5;
+    handle.castShadow = true;
+    pickaxe.add(handle);
+
+    const headMatPick = new THREE.MeshStandardMaterial({ 
+      color: 0xaaccff, roughness: 0.3, metalness: 0.9,
+      emissive: new THREE.Color(0x2244aa), emissiveIntensity: 0.3
+    });
+    const pickHead = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.7, 4), headMatPick);
+    pickHead.position.y = 0.05;
+    pickHead.rotation.z = Math.PI / 2;
+    pickHead.castShadow = true;
+    pickaxe.add(pickHead);
+
+    const pickHead2 = pickHead.clone();
+    pickHead2.rotation.z = -Math.PI / 2;
+    pickHead2.position.y = 0.05;
+    pickHead2.scale.set(1, 0.6, 1);
+    pickaxe.add(pickHead2);
+
+    pickaxe.position.set(0.5, 0.75, 0.3);
+    pickaxe.rotation.x = 0.3;
+    digger.add(pickaxe);
+
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 });
+    const legL = makeCapsule(0.15, 0.4, legMat);
+    legL.position.set(-0.2, 0.3, 0);
+    digger.add(legL);
+    const legR = makeCapsule(0.15, 0.4, legMat);
+    legR.position.set(0.2, 0.3, 0);
+    digger.add(legR);
+
+    const backpack = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.6, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.9 })
+    );
+    backpack.position.set(0, 1.0, -0.5);
+    backpack.castShadow = true;
+    digger.add(backpack);
+
+    const backpackGems = [];
+    for (let i = 0; i < 5; i++) {
+      const g = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.12, 0),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x00ff88, emissive: new THREE.Color(0x00ff88), emissiveIntensity: 1.5,
+          transparent: true, opacity: 0.9
+        })
+      );
+      g.position.set((Math.random() - 0.5) * 0.3, 1.2 + i * 0.08, -0.6);
+      g.visible = false;
+      backpackGems.push(g);
+      digger.add(g);
+    }
+
+    // ============ ЧАСТИЦЫ ============
+    const particles = [];
+    function spawnDust(position, color = 0x8b6b4a, count = 15) {
+      for (let i = 0; i < count; i++) {
+        const p = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08 + Math.random() * 0.1, 4, 4),
+          new THREE.MeshBasicMaterial({ 
+            color: color, transparent: true, opacity: 0.9,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        p.position.copy(position);
+        p.position.y += 0.3;
+        p.userData.velocity = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.3,
+          Math.random() * 0.25 + 0.1,
+          (Math.random() - 0.5) * 0.3
+        );
+        p.userData.life = 1.0;
+        p.userData.decay = 0.02 + Math.random() * 0.02;
+        scene.add(p);
+        particles.push(p);
+      }
+    }
+
+    function spawnGemBurst(position) {
+      for (let i = 0; i < 25; i++) {
+        const p = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.06 + Math.random() * 0.08, 0),
+          new THREE.MeshStandardMaterial({ 
+            color: 0x00ff88, emissive: new THREE.Color(0x00ff88), emissiveIntensity: 2,
+            transparent: true, opacity: 1
+          })
+        );
+        p.position.copy(position);
+        p.position.y += 0.6;
+        p.userData.velocity = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.6,
+          Math.random() * 0.5 + 0.2,
+          (Math.random() - 0.5) * 0.6
+        );
+        p.userData.life = 1.0;
+        p.userData.decay = 0.015;
+        p.userData.rotSpeed = (Math.random() - 0.5) * 0.3;
+        scene.add(p);
+        particles.push(p);
+      }
+      const flash = new THREE.PointLight(0x00ff88, 4, 8);
+      flash.position.copy(position);
+      flash.position.y += 1;
+      scene.add(flash);
+      setTimeout(() => scene.remove(flash), 300);
+    }
+
+    // ============ ФОН ============
+    const fireflyGeo = new THREE.BufferGeometry();
+    const fireflyCount = 400;
+    const fireflyPos = new Float32Array(fireflyCount * 3);
+    for (let i = 0; i < fireflyCount * 3; i += 3) {
+      fireflyPos[i] = (Math.random() - 0.5) * 40;
+      fireflyPos[i+1] = Math.random() * 10 + 1;
+      fireflyPos[i+2] = (Math.random() - 0.5) * 40;
+    }
+    fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+    const fireflyMat = new THREE.PointsMaterial({
+      color: 0x88ffaa, size: 0.18, transparent: true,
+      blending: THREE.AdditiveBlending, opacity: 0.85
+    });
+    const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
+    scene.add(fireflies);
+
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 1500;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i += 3) {
+      starPos[i] = (Math.random() - 0.5) * 200;
+      starPos[i+1] = Math.random() * 60 + 15;
+      starPos[i+2] = (Math.random() - 0.5) * 200;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+      color: 0xaaccff, size: 0.3, transparent: true, opacity: 0.7
+    }));
+    scene.add(stars);
+
+    // ============ УПРАВЛЕНИЕ ============
+    const keys = {};
+    window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+    const moveBounds = {
+      minX: -halfGrid + 0.8,
+      maxX: halfGrid - 0.8,
+      minZ: -halfGrid + 0.8,
+      maxZ: halfGrid - 0.8
+    };
+
+    let walkPhase = 0;
+    let digAnim = 0;
+    const score = { value: 0 };
+    const scoreElement = document.getElementById('scoreValue');
+
+    // Целевой угол поворота (накапливаемый, чтобы плавно крутиться без прыжков через 2π)
+    let targetRotationY = 0;
+
+    // Плавная интерполяция угла (кратчайший путь)
+    function lerpAngle(current, target, t) {
+      let diff = target - current;
+      // Приводим diff к диапазону [-PI, PI]
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      return current + diff * t;
+    }
+
+    // Определяем угол поворота по вектору направления (dx, dz)
+    // В Three.js: 0 rad = смотрит в +Z (модель повернута так, что "лицо" на +Z)
+    // atan2(dx, dz) даёт нужный угол
+    function dirToAngle(dx, dz) {
+      return Math.atan2(dx, dz);
+    }
+
+    function tryDig() {
+      if (digAnim > 0) return;
+      
+      const forward = new THREE.Vector3(0, 0, 1);
+      const digPos = digger.position.clone().add(forward.multiplyScalar(1.2));
+      
+      let closest = null;
+      let minDist = 1.5;
+      for (const cell of cellMeshes) {
+        if (cell.userData.type === 'empty') continue;
+        const d = cell.position.distanceTo(digPos);
+        if (d < minDist) {
+          minDist = d;
+          closest = cell;
+        }
+      }
+      
+      if (!closest) {
+        for (const cell of cellMeshes) {
+          if (cell.userData.type === 'empty') continue;
+          const d = cell.position.distanceTo(digger.position);
+          if (d < 1.3) {
+            closest = cell;
+            break;
+          }
+        }
+      }
+      
+      // Поворачиваемся лицом к клетке, которую копаем
+      if (closest) {
+        const dx = closest.position.x - digger.position.x;
+        const dz = closest.position.z - digger.position.z;
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          targetRotationY = dirToAngle(dx, dz);
+        }
+      }
+      
+      digAnim = 0.6;
+      
+      if (closest) {
+        setTimeout(() => {
+          if (closest.userData.type !== 'empty') {
+            digCell(closest);
+          }
+        }, 250);
+      }
+    }
+
+    function digCell(cell) {
+      const data = cell.userData;
+      
+      if (data.type === 'dirt') {
+        data.type = 'empty';
+        cell.material = emptyMat;
+        cell.geometry.dispose();
+        cell.geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
+        cell.position.y = -0.35;
+        spawnDust(cell.position, 0x8b6b4a, 12);
+        if (cell.userData.glowLight) {
+          scene.remove(cell.userData.glowLight);
+          cell.userData.glowLight = null;
+        }
+      } else if (data.type === 'emerald') {
+        if (data.hp > 1) {
+          data.hp = 1;
+          cell.scale.set(0.75, 0.75, 0.75);
+          cell.material.emissiveIntensity = 0.8;
+          cell.material.color.setHex(0x00aa44);
+          cell.rotation.y += 0.5;
+          spawnDust(cell.position, 0x00cc66, 8);
+        } else {
+          data.type = 'empty';
+          if (cell.userData.glowLight) {
+            scene.remove(cell.userData.glowLight);
+          }
+          cell.material = emptyMat;
+          cell.geometry.dispose();
+          cell.geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
+          cell.position.y = -0.35;
+          cell.rotation.y = 0;
+          cell.scale.set(1, 1, 1);
+          spawnGemBurst(cell.position);
+          score.value++;
+          scoreElement.textContent = score.value;
+          if (score.value <= backpackGems.length) {
+            backpackGems[score.value - 1].visible = true;
+          }
+        }
+      }
+    }
+
+    // ============ ОБНОВЛЕНИЕ ============
+    const clock = new THREE.Clock();
+    const moveSpeed = 0.08;
+    const ROT_LERP = 0.2; // скорость плавного поворота
+
+    function updateDigger(delta) {
+      let moved = false;
+      let moveX = 0, moveZ = 0;
+
+      if (keys['w'] || keys['arrowup'])    { moveZ -= 1; moved = true; }
+      if (keys['s'] || keys['arrowdown'])  { moveZ += 1; moved = true; }
+      if (keys['a'] || keys['arrowleft'])  { moveX -= 1; moved = true; }
+      if (keys['d'] || keys['arrowright']) { moveX += 1; moved = true; }
+
+      // Двигаем персонажа
+      if (moved) {
+        // Нормализуем диагональ (чтобы не было быстрее)
+        const len = Math.hypot(moveX, moveZ);
+        if (len > 0) {
+          moveX /= len;
+          moveZ /= len;
+        }
+        digger.position.x += moveX * moveSpeed;
+        digger.position.z += moveZ * moveSpeed;
+
+        // Ограничение движения
+        digger.position.x = Math.max(moveBounds.minX, Math.min(moveBounds.maxX, digger.position.x));
+        digger.position.z = Math.max(moveBounds.minZ, Math.min(moveBounds.maxZ, digger.position.z));
+
+        // Поворачиваемся в сторону движения (только если не копаем)
+        if (digAnim <= 0) {
+          targetRotationY = dirToAngle(moveX, moveZ);
+        }
+      }
+
+      // Плавный поворот к целевому углу
+      digger.rotation.y = lerpAngle(digger.rotation.y, targetRotationY, ROT_LERP);
+
+      // Анимация ходьбы
+      if (moved) {
+        walkPhase += delta * 10;
+        const bob = Math.sin(walkPhase) * 0.08;
+        body.position.y = 0.9 + bob;
+        head.position.y = 1.65 + bob;
+        helmet.position.y = 1.75 + bob;
+        helmetLight.position.y = 1.85 + bob;
+        lamp.position.y = 1.78 + bob;
+        eyeL.position.y = 1.68 + bob;
+        eyeR.position.y = 1.68 + bob;
+        legL.rotation.x = Math.sin(walkPhase) * 0.3;
+        legR.rotation.x = -Math.sin(walkPhase) * 0.3;
+        armL.rotation.x = Math.sin(walkPhase + Math.PI) * 0.2;
+        if (digAnim <= 0) armR.rotation.x = Math.sin(walkPhase) * 0.2;
+        backpack.position.y = 1.0 + bob * 0.5;
+        backpackGems.forEach((g, i) => { g.position.y = 1.2 + i * 0.08 + bob * 0.5; });
+      } else {
+        legL.rotation.x *= 0.9;
+        legR.rotation.x *= 0.9;
+        armL.rotation.x *= 0.9;
+      }
+
+      // Анимация копания
+      if (digAnim > 0) {
+        digAnim -= delta;
+        const progress = 1 - digAnim / 0.6;
+        const swing = Math.sin(progress * Math.PI) * 1.6;
+        armR.rotation.x = -swing;
+        pickaxe.rotation.x = 0.3 + swing * 0.5;
+        body.rotation.x = Math.sin(progress * Math.PI) * 0.15;
+        head.rotation.x = Math.sin(progress * Math.PI) * 0.15;
+        
+        if (digAnim <= 0) {
+          armR.rotation.x = 0;
+          pickaxe.rotation.x = 0.3;
+          body.rotation.x = 0;
+          head.rotation.x = 0;
+        }
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        tryDig();
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const t = performance.now() * 0.001;
+
+      updateDigger(delta);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.position.add(p.userData.velocity);
+        p.userData.velocity.y -= 0.015;
+        p.userData.life -= p.userData.decay;
+        p.material.opacity = Math.max(0, p.userData.life);
+        if (p.userData.rotSpeed) p.rotation.y += p.userData.rotSpeed;
+        if (p.userData.life <= 0) {
+          scene.remove(p);
+          p.geometry.dispose();
+          p.material.dispose();
+          particles.splice(i, 1);
+        }
+      }
+
+      cellMeshes.forEach(cell => {
+        if (cell.userData.type === 'emerald' && cell.userData.glowLight) {
+          const int = 0.7 + Math.sin(t * 4 + cell.position.x) * 0.3;
+          cell.userData.glowLight.intensity = int;
+          cell.material.emissiveIntensity = 1.4 + Math.sin(t * 5 + cell.position.z) * 0.5;
+        }
+      });
+
+      stars.rotation.y += 0.00005;
+      fireflies.rotation.y += 0.0001;
+      fireflies.position.y = Math.sin(t * 0.3) * 0.5;
+
+      helmetLight.intensity = 1.3 + Math.sin(t * 3) * 0.3;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

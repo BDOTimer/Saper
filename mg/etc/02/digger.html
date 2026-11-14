@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Изумрудный Диггер | Three.js</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #e0ffe0;
+      text-shadow: 0 0 10px #00ff88, 0 0 20px #004400;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #score {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #b5ffb5;
+      text-shadow: 0 0 20px #00aa55, 0 0 40px #006633;
+      background: rgba(0, 30, 0, 0.6);
+      padding: 10px 25px;
+      border-radius: 50px;
+      backdrop-filter: blur(5px);
+      border: 2px solid #00ff88;
+      box-shadow: 0 0 30px #00ff88;
+      z-index: 10;
+    }
+    #controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #aaffaa;
+      background: rgba(0, 20, 0, 0.7);
+      padding: 12px 30px;
+      border-radius: 40px;
+      font-size: 18px;
+      letter-spacing: 2px;
+      backdrop-filter: blur(4px);
+      border: 1px solid #00cc66;
+      box-shadow: 0 0 25px #00aa55;
+      z-index: 10;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .key {
+      display: inline-block;
+      background: #003300;
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 4px 12px;
+      margin: 0 4px;
+      color: #ccffcc;
+      font-weight: bold;
+      box-shadow: 0 0 12px #00ff88;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">💎 Изумрудный Диггер</div>
+  <div id="score">💚 <span id="scoreValue">0</span></div>
+  <div id="controls">
+    <span class="key">←</span> <span class="key">→</span> <span class="key">↑</span> <span class="key">↓</span> копать
+  </div>
+
+  <!-- Подключаем Three.js и OrbitControls -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- Инициализация сцены ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050a10);
+    scene.fog = new THREE.FogExp2(0x050a10, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(15, 18, 25);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.bias = 0.0001;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    document.body.appendChild(renderer.domElement);
+
+    // --- Управление камерой (орбитальное, чтобы можно было осматривать) ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = false;
+    controls.enableZoom = true;
+    controls.zoomSpeed = 0.8;
+    controls.rotateSpeed = 0.5;
+    controls.target.set(0, 0, 0);
+    controls.maxPolarAngle = Math.PI / 2.2;
+
+    // --- Освещение ---
+    // Основной направленный свет (луна)
+    const dirLight = new THREE.DirectionalLight(0xaaccff, 1.5);
+    dirLight.position.set(10, 30, 20);
+    dirLight.castShadow = true;
+    dirLight.receiveShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    const d = 30;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.camera.near = 1;
+    dirLight.shadow.camera.far = 50;
+    dirLight.shadow.bias = -0.0005;
+    scene.add(dirLight);
+
+    // Заполняющий свет (голубоватый)
+    const fillLight = new THREE.PointLight(0x4466ff, 0.8);
+    fillLight.position.set(-10, 5, 15);
+    scene.add(fillLight);
+
+    // Теплый акцентный свет (снизу)
+    const accentLight = new THREE.PointLight(0xffaa33, 0.6);
+    accentLight.position.set(0, -2, 5);
+    scene.add(accentLight);
+
+    // Мерцающий свет для изумрудов
+    const gemLight = new THREE.PointLight(0x00ff88, 1.2);
+    gemLight.position.set(0, 0, 0);
+    scene.add(gemLight);
+
+    // --- Атмосферные частицы (звездная пыль) ---
+    const starsGeometry = new THREE.BufferGeometry();
+    const starsCount = 2000;
+    const starPositions = new Float32Array(starsCount * 3);
+    for (let i = 0; i < starsCount * 3; i += 3) {
+      starPositions[i] = (Math.random() - 0.5) * 200;
+      starPositions[i+1] = (Math.random() - 0.5) * 100 + 20; // выше
+      starPositions[i+2] = (Math.random() - 0.5) * 200;
+    }
+    starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starsMaterial = new THREE.PointsMaterial({
+      color: 0xaaccff,
+      size: 0.25,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending
+    });
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
+
+    // --- Земля (поле с сеткой для копания) ---
+    const gridSize = 10; // 10x10 клеток
+    const cellSize = 2;
+    const halfGrid = gridSize * cellSize / 2;
+    
+    // Основание (некопаемая мрачная земля)
+    const baseGeo = new THREE.BoxGeometry(gridSize * cellSize, 0.5, gridSize * cellSize);
+    const baseMat = new THREE.MeshStandardMaterial({ 
+      color: 0x1a2a1a, 
+      roughness: 0.9, 
+      metalness: 0.1,
+      emissive: new THREE.Color(0x002200)
+    });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = -0.75;
+    base.receiveShadow = true;
+    base.castShadow = true;
+    scene.add(base);
+
+    // Сетка (клетки для копания)
+    const cells = []; // { mesh, type: 'dirt' | 'emerald' | 'empty', gridX, gridZ, hp }
+    const cellMeshes = [];
+
+    // Материалы для клеток
+    const dirtMat = new THREE.MeshStandardMaterial({ 
+      color: 0x3a2e1e, 
+      roughness: 1.0,
+      emissive: new THREE.Color(0x1a0f00)
+    });
+    const dirtMat2 = new THREE.MeshStandardMaterial({ 
+      color: 0x4a3e2e, 
+      roughness: 1.0,
+      emissive: new THREE.Color(0x1a0f00)
+    });
+    const emeraldMat = new THREE.MeshStandardMaterial({ 
+      color: 0x00cc66, 
+      emissive: new THREE.Color(0x00ff88), 
+      emissiveIntensity: 1.8,
+      roughness: 0.2,
+      metalness: 0.3,
+      transparent: true,
+      opacity: 0.95
+    });
+    const emptyMat = new THREE.MeshStandardMaterial({ 
+      color: 0x111111, 
+      roughness: 0.8,
+      emissive: new THREE.Color(0x001100)
+    });
+
+    // Функция для создания клетки
+    function createCell(gridX, gridZ, type = 'dirt') {
+      let geometry, material;
+      if (type === 'emerald') {
+        // Кристаллическая форма - октаэдр
+        geometry = new THREE.OctahedronGeometry(0.8, 0);
+        material = emeraldMat.clone();
+      } else if (type === 'empty') {
+        geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
+        material = emptyMat;
+      } else {
+        // Земля - куб
+        geometry = new THREE.BoxGeometry(cellSize * 0.95, 0.5, cellSize * 0.95);
+        material = Math.random() > 0.5 ? dirtMat.clone() : dirtMat2.clone();
+        // Небольшой случайный сдвиг цвета
+        material.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
+      }
+
+      const mesh = new THREE.Mesh(geometry, material);
+      const x = (gridX - gridSize/2 + 0.5) * cellSize;
+      const z = (gridZ - gridSize/2 + 0.5) * cellSize;
+      
+      if (type === 'emerald') {
+        mesh.position.set(x, 0.6, z);
+        mesh.rotation.y = Math.random() * Math.PI;
+        // Добавляем свечение вокруг изумруда
+        const glowLight = new THREE.PointLight(0x00ff88, 0.8, 4);
+        glowLight.position.set(x, 1.0, z);
+        scene.add(glowLight);
+        mesh.userData.glowLight = glowLight;
+      } else if (type === 'empty') {
+        mesh.position.set(x, -0.35, z);
+      } else {
+        mesh.position.set(x, 0.0, z);
+      }
+      
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData = { 
+        ...mesh.userData,
+        gridX, 
+        gridZ, 
+        type: type,
+        hp: type === 'emerald' ? 2 : (type === 'dirt' ? 1 : 0) // изумруд нужно копать дважды
+      };
+      
+      scene.add(mesh);
+      cellMeshes.push(mesh);
+      return mesh;
+    }
+
+    // Заполняем сетку: изумруды случайно, остальное земля
+    const totalCells = gridSize * gridSize;
+    const emeraldCount = 25; // количество изумрудов
+    const emeraldIndices = new Set();
+    while (emeraldIndices.size < emeraldCount) {
+      emeraldIndices.add(Math.floor(Math.random() * totalCells));
+    }
+
+    let index = 0;
+    for (let z = 0; z < gridSize; z++) {
+      for (let x = 0; x < gridSize; x++) {
+        const type = emeraldIndices.has(index) ? 'emerald' : 'dirt';
+        createCell(x, z, type);
+        index++;
+      }
+    }
+
+    // --- Подсветка границ сетки (красиво) ---
+    const gridHelper = new THREE.GridHelper(gridSize * cellSize, gridSize, 0x00ff88, 0x005533);
+    gridHelper.position.y = 0.01;
+    scene.add(gridHelper);
+
+    // --- Декоративные частицы вокруг (светлячки) ---
+    const fireflyGeo = new THREE.BufferGeometry();
+    const fireflyCount = 300;
+    const fireflyPos = new Float32Array(fireflyCount * 3);
+    for (let i = 0; i < fireflyCount * 3; i += 3) {
+      fireflyPos[i] = (Math.random() - 0.5) * 30;
+      fireflyPos[i+1] = Math.random() * 8 + 1;
+      fireflyPos[i+2] = (Math.random() - 0.5) * 30;
+    }
+    fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+    const fireflyMat = new THREE.PointsMaterial({
+      color: 0x88ffaa,
+      size: 0.15,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.9
+    });
+    const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
+    scene.add(fireflies);
+
+    // --- Счёт ---
+    let score = 0;
+    const scoreElement = document.getElementById('scoreValue');
+
+    // --- Анимация мерцания изумрудов и света ---
+    const clock = new THREE.Clock();
+
+    // --- Управление копанием ---
+    // Курсор-указатель (невидимый, но для позиции)
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredCell = null;
+    let clickCooldown = false;
+
+    // Визуальный маркер под курсором
+    const markerGeo = new THREE.RingGeometry(0.6, 0.8, 32);
+    const markerMat = new THREE.MeshStandardMaterial({
+      color: 0x00ffaa,
+      emissive: new THREE.Color(0x00ff88),
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8
+    });
+    const marker = new THREE.Mesh(markerGeo, markerMat);
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.y = 0.3;
+    marker.visible = false;
+    scene.add(marker);
+
+    // Обработчик движения мыши
+    window.addEventListener('mousemove', (event) => {
+      // Преобразуем в нормализованные координаты
+      mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+      mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      
+      // Находим пересечения с клетками (только с землёй и изумрудами)
+      const intersects = raycaster.intersectObjects(cellMeshes);
+      
+      if (intersects.length > 0) {
+        const hit = intersects[0].object;
+        if (hit.userData.type !== 'empty') {
+          hoveredCell = hit;
+          marker.position.x = hit.position.x;
+          marker.position.z = hit.position.z;
+          marker.visible = true;
+          marker.material.emissiveIntensity = 1.5;
+        } else {
+          hoveredCell = null;
+          marker.visible = false;
+        }
+      } else {
+        hoveredCell = null;
+        marker.visible = false;
+      }
+    });
+
+    // Обработчик клика (копание)
+    window.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return; // только левая кнопка
+      if (clickCooldown) return;
+      
+      if (hoveredCell && hoveredCell.userData.type !== 'empty') {
+        digCell(hoveredCell);
+        clickCooldown = true;
+        setTimeout(() => { clickCooldown = false; }, 200);
+      }
+    });
+
+    // Функция копания
+    function digCell(cell) {
+      const data = cell.userData;
+      
+      if (data.type === 'dirt') {
+        // Превращаем в пустую клетку
+        data.type = 'empty';
+        cell.material = emptyMat;
+        cell.geometry.dispose();
+        cell.geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
+        cell.position.y = -0.35;
+        cell.scale.set(0.95, 0.6, 0.95);
+        // Анимация "провала"
+        cell.scale.set(1, 1, 1);
+        // Убираем свечение если было
+        if (cell.userData.glowLight) {
+          scene.remove(cell.userData.glowLight);
+          cell.userData.glowLight = null;
+        }
+        // Обновляем маркер
+        if (hoveredCell === cell) {
+          marker.visible = false;
+          hoveredCell = null;
+        }
+      } 
+      else if (data.type === 'emerald') {
+        if (data.hp > 1) {
+          // Первое попадание - трещина (визуально уменьшаем и меняем цвет)
+          data.hp = 1;
+          cell.scale.set(0.7, 0.7, 0.7);
+          cell.material.emissiveIntensity = 0.8;
+          cell.material.color.setHex(0x00aa44);
+          // Небольшой эффект
+          cell.rotation.y += 0.5;
+        } else {
+          // Добываем изумруд
+          data.type = 'empty';
+          // Удаляем свет
+          if (cell.userData.glowLight) {
+            scene.remove(cell.userData.glowLight);
+          }
+          // Меняем на пустую клетку
+          cell.material = emptyMat;
+          cell.geometry.dispose();
+          cell.geometry = new THREE.BoxGeometry(cellSize * 0.9, 0.3, cellSize * 0.9);
+          cell.position.y = -0.35;
+          cell.scale.set(1, 0.6, 1);
+          cell.rotation.y = 0;
+          
+          // Увеличиваем счёт
+          score++;
+          scoreElement.textContent = score;
+          
+          // Эффект вспышки
+          const flash = new THREE.PointLight(0x00ff88, 3, 6);
+          flash.position.set(cell.position.x, 1, cell.position.z);
+          scene.add(flash);
+          setTimeout(() => scene.remove(flash), 300);
+          
+          // Обновляем маркер
+          if (hoveredCell === cell) {
+            marker.visible = false;
+            hoveredCell = null;
+          }
+        }
+      }
+    }
+
+    // --- Управление с клавиатуры (стрелки для перемещения маркера? Не обязательно, но добавим для удобства) ---
+    // Можно было бы реализовать, но оставим только мышь для простоты, так как в задании сказано "копать изумруды".
+    // Но чтобы соответствовать "копать" - добавим возможность копать по клику. Уже есть.
+
+    // --- Анимация ---
+    function animate() {
+      const delta = clock.getDelta();
+      const elapsedTime = performance.now() * 0.001;
+
+      // Вращение звёзд и светлячков
+      stars.rotation.y += 0.0001;
+      fireflies.rotation.y += 0.0002;
+
+      // Пульсация света изумрудов
+      cellMeshes.forEach(mesh => {
+        if (mesh.userData.type === 'emerald' && mesh.userData.glowLight) {
+          const intensity = 0.6 + Math.sin(elapsedTime * 5 + mesh.position.x) * 0.3;
+          mesh.userData.glowLight.intensity = intensity;
+          if (mesh.material.emissiveIntensity !== undefined) {
+            mesh.material.emissiveIntensity = 1.2 + Math.sin(elapsedTime * 4 + mesh.position.z) * 0.6;
+          }
+        }
+      });
+
+      // Пульсация маркера
+      if (marker.visible) {
+        marker.scale.setScalar(1 + Math.sin(elapsedTime * 10) * 0.1);
+        marker.material.emissiveIntensity = 1.0 + Math.sin(elapsedTime * 12) * 0.5;
+      }
+
+      // Плавное вращение камеры вокруг центра (очень медленное, для эффекта)
+      // controls.autoRotate = true; // можно включить, но лучше не мешать игроку
+
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // --- Обработка ресайза ---
+    window.addEventListener('resize', onWindowResize, false);
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- Дополнительный визуальный эффект: свечение под землёй (некопаемое) ---
+    const undergroundGlow = new THREE.PointLight(0x224422, 0.5);
+    undergroundGlow.position.set(0, -2, 0);
+    scene.add(undergroundGlow);
+
+    // Немного тумана для глубины
+    scene.fog = new THREE.FogExp2(0x050a10, 0.02);
+
+    console.log('💎 Изумрудный Диггер запущен! Кликай по клеткам, чтобы копать. Изумруды нужно копать дважды.');
+  </script>
+</body>
+</html>
