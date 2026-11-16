@@ -276,6 +276,12 @@ export class Game {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+      if (e.code === 'KeyL' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        this._toggleGameLog();
+        return;
+      }
+
       // Модальные окна перехватывают горячие клавиши игры.
       if (this.armyView?.isOpen || this.townView?.isOpen ||
           this.battleView?.isOpen || this.armyChangeView?.isOpen) return;
@@ -364,6 +370,13 @@ export class Game {
     box.appendChild(d);
     box.scrollTop = box.scrollHeight;
     while (box.children.length > 40) box.removeChild(box.firstChild);
+  }
+
+  _toggleGameLog() {
+    const box = this.el.querySelector('#gameLog');
+    if (!box) return;
+    box.hidden = !box.hidden;
+    if (!box.hidden) box.scrollTop = box.scrollHeight;
   }
 
   /** Очистить панель лога (новый круг начинается с чистого листа). */

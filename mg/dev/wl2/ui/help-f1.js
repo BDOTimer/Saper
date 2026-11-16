@@ -5,7 +5,7 @@ const STYLE_ID = 'help-f1-styles';
 const GAME_KEY_CODES = new Set([
   'Space', 'Enter', 'NumpadEnter',
   'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight',
-  'KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyL',
 ]);
 
 const HELP_SECTIONS = [
@@ -33,6 +33,7 @@ const HELP_SECTIONS = [
       ['Зелёная кнопка «▶ Следующий круг»', 'Начать новый круг, когда текущий круг завершён.'],
       ['Space', 'Начать следующий круг, когда кнопка доступна.'],
       ['Enter / Numpad Enter', 'Начать следующий круг, когда кнопка доступна.'],
+      ['L', 'Показать или скрыть журнал партии.'],
       ['Ctrl', 'Открыть панель армии в фокусе во время планирования.'],
       ['Shift', 'Открыть панель города на выбранной клетке во время планирования.'],
     ],
