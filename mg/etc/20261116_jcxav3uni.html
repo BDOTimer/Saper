@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Эссе о времени и логике · неон</title>
+    <!-- Подключаем шрифты с поддержкой кириллицы и объёма -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,800;1,700&display=swap" rel="stylesheet">
+    <style>
+        /* ---- ГЛОБАЛЬНЫЙ НЕОНОВЫЙ ФОН ---- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0b10;
+            background-image: 
+                radial-gradient(circle at 20% 10%, rgba(0, 255, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 90%, rgba(255, 0, 200, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 40% 60%, rgba(120, 0, 255, 0.06) 0%, transparent 50%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            font-family: 'Merriweather', Georgia, 'Times New Roman', serif;
+            line-height: 1.85;
+            color: #e8edf5;
+        }
+
+        /* ---- ОБЪЁМНАЯ НЕОНОВАЯ КАРТОЧКА (выпуклая, с подсветкой) ---- */
+        .neon-card {
+            max-width: 820px;
+            width: 100%;
+            background: rgba(10, 12, 18, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 42px;
+            padding: 3rem 2.8rem;
+            position: relative;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.8),
+                0 0 0 1px rgba(0, 255, 255, 0.15),
+                0 0 25px rgba(0, 255, 255, 0.3),
+                0 0 60px rgba(170, 0, 255, 0.2),
+                inset 0 -6px 12px rgba(0, 0, 0, 0.8),
+                inset 0 6px 12px rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .neon-card:hover {
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.9),
+                0 0 0 1px rgba(0, 255, 255, 0.25),
+                0 0 35px rgba(0, 255, 255, 0.5),
+                0 0 90px rgba(200, 0, 255, 0.3),
+                inset 0 -6px 12px rgba(0, 0, 0, 0.9),
+                inset 0 6px 12px rgba(255, 255, 255, 0.08);
+        }
+
+        /* ---- ЗАГОЛОВОК: НЕОНОВЫЙ, ОБЪЁМНЫЙ ---- */
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 800;
+            font-size: 2.6rem;
+            text-align: center;
+            letter-spacing: 3px;
+            margin-bottom: 2.8rem;
+            color: #f0f7ff;
+            text-shadow: 
+                0 0 8px rgba(0, 255, 255, 0.9),
+                0 0 20px rgba(0, 200, 255, 0.7),
+                0 0 40px rgba(100, 0, 255, 0.5),
+                0 4px 10px rgba(0, 0, 0, 0.9),
+                0 1px 0 #9ad0ff;
+            transform: perspective(800px) translateZ(15px);
+            word-break: break-word;
+            filter: drop-shadow(0 0 12px #00b7ff);
+        }
+
+        /* ---- АБЗАЦЫ: ОБЪЁМНЫЙ ТЕКСТ С НЕОНОВЫМИ АКЦЕНТАМИ ---- */
+        p {
+            text-indent: 1.6em;
+            margin-bottom: 1.4rem;
+            font-size: 1.05rem;
+            font-weight: 400;
+            color: #d9e2f0;
+            text-shadow: 
+                0 1px 2px rgba(0, 0, 0, 0.9),
+                0 0 6px rgba(0, 180, 255, 0.15),
+                0 0 14px rgba(120, 0, 255, 0.1);
+            letter-spacing: 0.3px;
+            line-height: 1.9;
+            transition: text-shadow 0.2s;
+        }
+
+        p:hover {
+            text-shadow: 
+                0 1px 3px rgba(0, 0, 0, 1),
+                0 0 10px rgba(0, 220, 255, 0.4),
+                0 0 20px rgba(180, 0, 255, 0.25);
+        }
+
+        /* Буквица — неоновая, объёмная */
+        .drop-cap::first-letter {
+            font-family: 'Playfair Display', serif;
+            font-weight: 800;
+            font-size: 4.2em;
+            float: left;
+            line-height: 0.8;
+            margin-right: 12px;
+            margin-top: 8px;
+            color: #c6f0ff;
+            text-shadow: 
+                0 0 8px #00e0ff,
+                0 0 20px #0088ff,
+                0 0 35px #7000ff,
+                0 4px 8px rgba(0, 0, 0, 1);
+            transform: scale(1.02) translateY(-2px);
+            filter: drop-shadow(0 0 10px #00ccff);
+            transition: text-shadow 0.2s;
+        }
+
+        /* Выделяем курсив — лёгкое неоновое свечение */
+        i, em {
+            color: #b8e2ff;
+            font-style: italic;
+            text-shadow: 
+                0 0 5px rgba(0, 220, 255, 0.7),
+                0 0 12px rgba(140, 0, 255, 0.5),
+                0 1px 2px black;
+        }
+
+        /* ---- ДОПОЛНИТЕЛЬНЫЕ НЕОНОВЫЕ ЭЛЕМЕНТЫ ---- */
+        /* Неоновая линия сверху (декоративная) */
+        .neon-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, #aa00ff, #00ffff, transparent);
+            border-radius: 100%;
+            filter: blur(3px);
+            opacity: 0.8;
+            box-shadow: 0 0 20px #0ff, 0 0 40px #a0f;
+        }
+
+        /* Неоновая линия снизу */
+        .neon-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 15%;
+            width: 70%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #ff00c8, #00e0ff, #ff00c8, transparent);
+            border-radius: 100%;
+            filter: blur(3px);
+            opacity: 0.8;
+            box-shadow: 0 0 20px #0ff, 0 0 40px #f0f;
+        }
+
+        /* ---- АДАПТИВНОСТЬ ---- */
+        @media (max-width: 650px) {
+            body {
+                padding: 1rem;
+            }
+            .neon-card {
+                padding: 2rem 1.5rem;
+                border-radius: 28px;
+            }
+            h1 {
+                font-size: 1.9rem;
+                letter-spacing: 1.5px;
+                margin-bottom: 2rem;
+            }
+            p {
+                font-size: 0.98rem;
+                text-indent: 1.2em;
+                line-height: 1.8;
+            }
+            .drop-cap::first-letter {
+                font-size: 3.4em;
+                margin-right: 8px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .neon-card {
+                padding: 1.6rem 1rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            p {
+                font-size: 0.9rem;
+            }
+        }
+
+        /* ---- СТИЛИ ДЛЯ ПЕЧАТИ (чистый белый фон, без неона) ---- */
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+                display: block;
+                color: #000000;
+            }
+            .neon-card {
+                background: #ffffff;
+                backdrop-filter: none;
+                box-shadow: none;
+                border: none;
+                border-radius: 0;
+                padding: 0;
+                max-width: 100%;
+                box-shadow: none;
+            }
+            .neon-card::before,
+            .neon-card::after {
+                display: none;
+            }
+            h1 {
+                color: #000000;
+                text-shadow: none;
+                font-size: 24pt;
+                margin-bottom: 30pt;
+                letter-spacing: 1px;
+                filter: none;
+                transform: none;
+            }
+            p {
+                color: #000000;
+                text-shadow: none;
+                font-size: 12pt;
+                line-height: 1.6;
+                orphans: 3;
+                widows: 3;
+            }
+            .drop-cap::first-letter {
+                color: #000000;
+                text-shadow: none;
+                filter: none;
+                font-size: 3.8em;
+            }
+            i, em {
+                color: #000000;
+                text-shadow: none;
+            }
+            @page {
+                size: A4;
+                margin: 25mm 20mm 25mm 25mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="neon-card">
+        <h1>Что есть время?</h1>
+
+        <p class="drop-cap">Как-то раз довелось мне беседовать с кандидатом технических наук — что-то вроде физика, книжки писал — и математиком на тему «что есть время?».</p>
+
+        <p>Я высыпал ему целую портянку из пары десятков собственных тезисов — лог моих размышлений по этому вопросу. Тезисы были разные, но суть сводилась к одному: прежде чем спрашивать «что есть время», надо разобраться, что мы вообще делаем, когда задаём такой вопрос. Это не уход от проблемы, а требование к её постановке — иначе разговор превращается в обмен интуициями, которые невозможно ни подтвердить, ни опровергнуть.</p>
+
+        <p>В ответ он начал сыпать греческими софизмами, поросшими мхом. Апории Зенона, парадоксы становления, «время не существует, ибо прошлого уже нет, будущего ещё нет, а настоящее неуловимо» — весь этот набор, который две с половиной тысячи лет исправно служит заменой мысли о времени на мысли о затруднительности мысли о времени. Софизм, если разобрать его до конца, — это не аргумент, а его имитация: он создаёт впечатление глубины там, где нет ни одного проверяемого утверждения. Я указал ему на работы Витгенштейна — не как на священное писание, а как на разбор именно этого хода: значительная часть философских «проблем» возникает не из устройства мира, а из путаницы в употреблении языка, и задача философии — не строить новые системы поверх старой путаницы, а распутывать её. Это ровно тот случай: вопрос «что есть время?» выглядит осмысленным по аналогии с «что есть стол?», хотя работает совершенно иначе.</p>
+
+        <p>На это он назвал Витгенштейна «пидором», а значит, и его работы — не аргумент.</p>
+
+        <p>Тут важно зафиксировать, что именно произошло, потому что это не грубость и не случайная оговорка, а подмена всей структуры спора. Мне не возразили по существу — мне сообщили, что автор работ обладает свойством, которое, по мнению собеседника, отменяет содержание. Это классический <i>ad hominem</i>, но в особенно чистом, карикатурном виде: не «Витгенштейн ошибался вот здесь и здесь, потому что…», а «Витгенштейн — пидор». Заметьте, что при таком критерии рушится сама возможность науки: если личные качества автора отменяют его аргументы, то надо выбросить значительную часть математики, физики и философии — от Ньютона с его скверным характером до любого, чья биография не проходит чью-то личную цензуру. Аргумент либо верен, либо нет — и проверяется это логикой и фактами, а не анкетой автора. Собеседник с учёной степенью этого, разумеется, не мог не знать; значит, перед нами не убеждение, а риторический приём — способ закрыть неудобную тему, не разбираясь в ней.</p>
+
+        <p>Долго думая, что бы ему ответить, я не придумал ничего лучше, кроме как напомнить: Тьюринг тоже был «пидором» — так что ему, выходит, следует выкинуть свой компьютер.</p>
+
+        <p>И это не просто остроумная перепалка — это <i>reductio ad absurdum</i>, доведение его же принципа до конца. Если критерий «автор — пидор, значит, его работы не аргумент» применять последовательно, то придётся отказаться от теории вычислений, от машины Тьюринга, от криптографии, которая помогла взломать «Энигму», — то есть от всего того, на чём стоит компьютер, за которым он сидит. Он не может принять этот вывод — а значит, не может и удержать свой критерий. Принцип, который уничтожает собственные условия применения, несостоятелен по определению. Вся ирония в том, что человек с техническим образованием каждый день пользуется плодами работы человека, которого только что — по той же логике — объявил бы не заслуживающим внимания.</p>
+
+        <p>Вот так, из беседы с «мамкиным математиком», я узнал, что Витгенштейн и Тьюринг, оказывается, «пидоры», а заодно — что представляют собой «мамкины математики» с учёными званиями.</p>
+
+        <p>«Мамкин математик» — это не про уровень образования, а про способ мышления: человек, у которого есть диплом и звание, но нет привычки проверять собственные основания. Он может сыпать терминами и ссылаться на древних, но при первом же столкновении с неудобным аргументом переходит с разбора идеи на разбор личности — потому что разбирать идею не умеет или не хочет. Учёное звание в таком случае работает не как свидетельство компетентности, а как декорация: оно придаёт веса тому, что при проверке рассыпается.</p>
+
+        <p>Такие истории в Википедию не попадут...</p>
+    </div>
+</body>
+</html>
