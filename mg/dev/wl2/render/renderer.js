@@ -87,7 +87,7 @@ export class Renderer {
     const ctx = canvas.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 256);
     grad.addColorStop(0.0, '#16283a');
-    grad.addColorStop(0.45, '#0d1622');
+    grad.addColorStop(0.45, '#192c44');
     grad.addColorStop(1.0, '#05080c');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 2, 256);
