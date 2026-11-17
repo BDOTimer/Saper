@@ -6149,6 +6149,7 @@ function setupUI(){
   UI.fullscreenBtn.addEventListener('click', toggleFullscreen);
   document.addEventListener('fullscreenchange', updateFullscreenButton);
   document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+  bindParentFullscreenListeners();
   updateFullscreenButton();
 
   document.querySelectorAll('[data-close]').forEach(btn => {
@@ -6210,14 +6211,40 @@ function toggleSound(){
   else showToast('ЗВУК ВЫКЛЮЧЕН', 'warn', 1400);
 }
 
-/* --- полноэкранный режим на стартовом экране --- */
-function fullscreenElement(){
-  return document.fullscreenElement || document.webkitFullscreenElement || null;
+/* --- полноэкранный режим на стартовом экране (работает и внутри iframe) --- */
+function isEmbedded(){
+  try{ return window.self !== window.top; }catch(e){ return true; }
+}
+function fullscreenElement(doc){
+  try{
+    const d = doc || document;
+    return d.fullscreenElement || d.webkitFullscreenElement || d.mozFullScreenElement || d.msFullscreenElement || null;
+  }catch(e){ return null; }
+}
+function fullscreenActive(){
+  if(fullscreenElement()) return true;
+  if(!isEmbedded()) return false;
+  try{
+    if(window.parent !== window && fullscreenElement(window.parent.document)) return true;
+  }catch(e){}
+  try{
+    if(window.top !== window && fullscreenElement(window.top.document)) return true;
+  }catch(e){}
+  return false;
+}
+function bindParentFullscreenListeners(){
+  if(!isEmbedded()) return;
+  try{
+    if(window.top !== window && window.top.document){
+      window.top.document.addEventListener('fullscreenchange', updateFullscreenButton);
+      window.top.document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+    }
+  }catch(e){}
 }
 function updateFullscreenButton(){
   const btn = UI.fullscreenBtn;
   if(!btn) return;
-  const active = !!fullscreenElement();
+  const active = fullscreenActive();
   btn.classList.toggle('active', active);
   btn.setAttribute('aria-pressed', String(active));
   btn.title = active ? 'Выйти из полноэкранного режима' : 'На весь экран';
@@ -6225,17 +6252,69 @@ function updateFullscreenButton(){
   const label = btn.querySelector('.fs-label');
   if(label) label.textContent = active ? 'ВЫЙТИ ИЗ ПОЛНОЭКРАННОГО' : 'НА ВЕСЬ ЭКРАН';
 }
+function requestFs(el){
+  try{
+    if(!el) return Promise.reject(new Error('No element'));
+    if(el.requestFullscreen) return el.requestFullscreen({ navigationUI: 'hide' });
+    if(el.webkitRequestFullscreen) return Promise.resolve(el.webkitRequestFullscreen());
+    if(el.webkitRequestFullScreen) return Promise.resolve(el.webkitRequestFullScreen());
+    if(el.mozRequestFullScreen) return Promise.resolve(el.mozRequestFullScreen());
+    if(el.msRequestFullscreen) return Promise.resolve(el.msRequestFullscreen());
+    return Promise.reject(new Error('Fullscreen API unavailable'));
+  }catch(err){ return Promise.reject(err); }
+}
+function exitFsFromDoc(d){
+  try{
+    if(!d) return Promise.reject(new Error('No document'));
+    if(d.exitFullscreen) return d.exitFullscreen();
+    if(d.webkitExitFullscreen) return Promise.resolve(d.webkitExitFullscreen());
+    if(d.webkitCancelFullScreen) return Promise.resolve(d.webkitCancelFullScreen());
+    if(d.mozCancelFullScreen) return Promise.resolve(d.mozCancelFullScreen());
+    if(d.msExitFullscreen) return Promise.resolve(d.msExitFullscreen());
+    return Promise.reject(new Error('Fullscreen API unavailable'));
+  }catch(err){ return Promise.reject(err); }
+}
+function fullscreenTargets(){
+  const targets = [];
+  if(isEmbedded()){
+    try{ if(window.frameElement) targets.push(window.frameElement); }catch(e){}
+    try{ if(window.parent !== window && window.parent.document) targets.push(window.parent.document.documentElement); }catch(e){}
+    try{ if(window.top !== window && window.top !== window.parent && window.top.document) targets.push(window.top.document.documentElement); }catch(e){}
+  }
+  targets.push(document.documentElement);
+  return targets;
+}
+function fullscreenDocs(){
+  const docs = [];
+  if(isEmbedded()){
+    try{ if(window.parent !== window && window.parent.document) docs.push(window.parent.document); }catch(e){}
+    try{ if(window.top !== window && window.top !== window.parent && window.top.document) docs.push(window.top.document); }catch(e){}
+  }
+  docs.push(document);
+  return docs;
+}
 async function toggleFullscreen(){
   const btn = UI.fullscreenBtn;
   try{
-    if(fullscreenElement()){
-      if(document.exitFullscreen) await document.exitFullscreen();
-      else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+    if(fullscreenActive()){
+      for(const d of fullscreenDocs()){
+        if(!fullscreenElement(d)) continue;
+        try{ await exitFsFromDoc(d); }catch(e){}
+      }
     } else {
-      const el = document.documentElement;
-      if(el.requestFullscreen) await el.requestFullscreen();
-      else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      else throw new Error('Fullscreen API unavailable');
+      let ok = false;
+      for(const el of fullscreenTargets()){
+        try{ await requestFs(el); ok = true; break; }catch(e){}
+      }
+      if(!ok){
+        if(isEmbedded()){
+          showToast('IFRAME БЛОКИРУЕТ ПОЛНЫЙ ЭКРАН · ОТКРЫВАЮ В НОВОЙ ВКЛАДКЕ', 'warn', 3000);
+          window.open(location.href, '_blank', 'noopener');
+          updateFullscreenButton();
+          return;
+        }
+        throw new Error('Fullscreen API unavailable');
+      }
     }
   }catch(err){
     console.warn('Fullscreen unavailable', err);
