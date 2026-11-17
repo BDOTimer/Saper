@@ -421,6 +421,19 @@ h1.title .accent{display:block;color:transparent;-webkit-text-stroke:1px rgba(60
 .title-right .frame-tag{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font:500 7px/1 var(--mono);color:var(--dim);letter-spacing:1.4px;white-space:nowrap}
 .title-foot{position:absolute;left:0;right:0;bottom:20px;display:flex;justify-content:space-between;align-items:center;padding:0 4vw;font:500 7.5px/1 var(--mono);color:var(--dim);letter-spacing:.7px;z-index:2}
 .title-foot .dots{display:flex;gap:6px;align-items:center}.title-foot .dots i{width:4px;height:4px;background:var(--cyan);opacity:.5}.title-foot .dots i:nth-child(2){opacity:.25}.title-foot .dots i:nth-child(3){opacity:.12}
+.title-fullscreen{position:absolute;top:22px;right:26px;z-index:6;display:flex;align-items:center;gap:9px;height:34px;padding:0 13px;
+  background:rgba(5,18,20,.72);border:1px solid rgba(60,240,196,.3);color:var(--muted);cursor:pointer;
+  font:600 8px/1 var(--display);letter-spacing:1.7px;text-transform:uppercase;transition:.18s;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.title-fullscreen svg{width:14px;height:14px;color:var(--cyan);flex:0 0 auto;transition:.18s}
+.title-fullscreen:hover{border-color:var(--cyan);color:#eafff9;background:rgba(12,48,44,.82);box-shadow:0 0 20px rgba(60,240,196,.16)}
+.title-fullscreen:focus-visible{outline:1px solid var(--cyan);outline-offset:3px}
+.title-fullscreen.active{border-color:rgba(255,180,92,.58);color:var(--amber);background:rgba(38,26,11,.72)}
+.title-fullscreen.active svg{color:var(--amber)}
+@media (max-width:700px){
+  .title-fullscreen{top:12px;right:12px;width:38px;height:38px;padding:0;justify-content:center}
+  .title-fullscreen .fs-label{display:none}
+}
 
 /* --- загрузка --- */
 #loadingScreen{position:fixed;inset:0;z-index:300;background:#030809;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .5s}
@@ -510,6 +523,7 @@ h1.title .accent{display:block;color:transparent;-webkit-text-stroke:1px rgba(60
   <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8c1.5 2 1.5 6 0 8M19 5c3 4 3 10 0 14"/></symbol>
   <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></symbol>
   <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.7 2.7 0 115 1.2c-.7 1.2-2.5 1.6-2.5 3.3M12 17h.01"/></symbol>
+  <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
   <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
   <symbol id="i-hq" viewBox="0 0 24 24"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-6h6v6M12 8v3"/></symbol>
   <symbol id="i-walker" viewBox="0 0 64 64"><rect x="19" y="24" width="26" height="14" rx="2"/><path d="M25 38l-5 13M32 38l-3 13M39 38l5 13M35 38l3 13"/><path d="M26 24l-3-9h20l-4 9M28 31h8"/><circle cx="32" cy="18" r="3"/></symbol>
@@ -646,6 +660,10 @@ h1.title .accent{display:block;color:transparent;-webkit-text-stroke:1px rgba(60
 
 <!-- ТИТУЛЬНЫЙ ЭКРАН -->
 <div id="titleScreen" class="hidden">
+  <button class="title-fullscreen" id="fullscreenBtn" type="button" aria-label="Переключить полноэкранный режим" aria-pressed="false" title="На весь экран">
+    <svg><use href="#i-fullscreen"/></svg>
+    <span class="fs-label">НА ВЕСЬ ЭКРАН</span>
+  </button>
   <div class="title-inner">
     <div class="title-left">
       <div class="title-overline">1987 · ZX SPECTRUM · ПЕРВАЯ RTS <span>→ 2026</span></div>
@@ -1115,7 +1133,7 @@ function cacheUI(){
    'armyCount','clockPhase','clockTime','dayNum','objFactories','objBases','initBar','initVal','objHint',
    'alertFeed','interactPrompt','promptTitle','promptSub','promptExtra','toastRoot','radarCanvas','radarSector',
    'radarTime','sectorPos','manualHUD','manualName','manualHint','manualWeapons','crosshair','nightTint','flash',
-   'damageFlash','titleScreen','startBtn','loadingScreen','loadBar','loadStatus','soundBtn','helpBtn',
+   'damageFlash','titleScreen','startBtn','fullscreenBtn','loadingScreen','loadBar','loadStatus','soundBtn','helpBtn',
    'buildModal','orderModal','helpModal','endScreen','endCard','endKicker','endTitle','endText','endStats','restartBtn',
    'buildFactoryName','buildArmy','previewCanvas','previewCode','previewName','previewDesc',
    'stArmor','stArmorVal','stSpeed','stSpeedVal','stAcc','stAccVal','stAi','stAiVal','stDmg','stDmgVal','stRange','stRangeVal',
@@ -6128,6 +6146,10 @@ function setupUI(){
   UI.soundBtn.addEventListener('click', toggleSound);
   UI.helpBtn.addEventListener('click', toggleHelp);
   UI.restartBtn.addEventListener('click', () => location.reload());
+  UI.fullscreenBtn.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', updateFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+  updateFullscreenButton();
 
   document.querySelectorAll('[data-close]').forEach(btn => {
     btn.addEventListener('click', () => closeModal());
@@ -6186,6 +6208,46 @@ function toggleSound(){
   updateSoundButton();
   if(G.sound){ AudioFX.resume(); AudioFX.ui(); showToast('ЗВУК ВКЛЮЧЁН', 'good', 1400); }
   else showToast('ЗВУК ВЫКЛЮЧЕН', 'warn', 1400);
+}
+
+/* --- полноэкранный режим на стартовом экране --- */
+function fullscreenElement(){
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+function updateFullscreenButton(){
+  const btn = UI.fullscreenBtn;
+  if(!btn) return;
+  const active = !!fullscreenElement();
+  btn.classList.toggle('active', active);
+  btn.setAttribute('aria-pressed', String(active));
+  btn.title = active ? 'Выйти из полноэкранного режима' : 'На весь экран';
+  btn.setAttribute('aria-label', btn.title);
+  const label = btn.querySelector('.fs-label');
+  if(label) label.textContent = active ? 'ВЫЙТИ ИЗ ПОЛНОЭКРАННОГО' : 'НА ВЕСЬ ЭКРАН';
+}
+async function toggleFullscreen(){
+  const btn = UI.fullscreenBtn;
+  try{
+    if(fullscreenElement()){
+      if(document.exitFullscreen) await document.exitFullscreen();
+      else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else {
+      const el = document.documentElement;
+      if(el.requestFullscreen) await el.requestFullscreen();
+      else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else throw new Error('Fullscreen API unavailable');
+    }
+  }catch(err){
+    console.warn('Fullscreen unavailable', err);
+    if(btn){
+      const label = btn.querySelector('.fs-label');
+      if(label){
+        label.textContent = 'НЕДОСТУПНО';
+        setTimeout(updateFullscreenButton, 1800);
+      }
+    }
+  }
+  updateFullscreenButton();
 }
 
 /* ============================================================
