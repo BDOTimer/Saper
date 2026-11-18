@@ -1,0 +1,479 @@
+/* ui/hud.css */
+
+/*----------------------------------------------- 
+ *  Панель генератора
+ *-----------------------------------------------*/
+#genPanel {
+  position: absolute; top: 10px; left: 5px; bottom: 10px; width: 200px;
+  max-height: calc(100% - 24px); overflow-y: auto;
+  background: rgba(20,26,34,.94); padding: 12px; border-radius: 10px;
+  border: 1px solid #3162a2; font-size: 22px; line-height: 1.4;
+  backdrop-filter: blur(6px);
+}
+#genPanel h3 { margin: 0 0 8px; font-size: 24px; color: #b2d2f2; }
+#genPanel h4 { margin: 12px 0 6px; font-size: 18px; color: #7fa6c9;
+  border-bottom: 1px solid #3162a2; padding-bottom: 4px; }
+
+.slider-row { margin: 1px 0; }
+.slider-row .label {
+  display: flex; justify-content: space-between; margin-bottom: 2px;
+  font-size: 22px; color: #b8c4cf;
+}
+.slider-row .label .val { color: #7fd47f; font-variant-numeric: tabular-nums; }
+.slider-row input[type=range] { width: 100%; accent-color: #0d50a1; height: 18px; }
+
+.norm-row { font-size: 18px; color: #8899a6; margin-top: 4px; }
+
+.seed-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.seed-row input[type=number] {
+  width: 100px;
+  flex: 1; background: #0a1231; color: #e6edf3; border: 1px solid #34495e;
+  border-radius: 6px; padding: 5px 8px; font-size: 18px;
+}
+
+#genPanel::-webkit-scrollbar { width: 8px; }
+#genPanel::-webkit-scrollbar-track { background: #0b0f14; border-radius: 6px; }
+#genPanel::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3a4658, #1b222b);
+  border: 2px solid #0b0f14; border-radius: 6px;
+}
+#genPanel {
+  scrollbar-color: #2a3441 #0b0f14;
+  scrollbar-width: thin;
+}
+
+.map-editor { position: absolute; inset: 0; }
+.map-editor #app { position: fixed; inset: 0; }
+.map-editor #hud { position: fixed; inset: 0; pointer-events: none; }
+.map-editor #hud > * { pointer-events: auto; }
+
+.map-editor #topbar {
+  position: absolute;
+  top: 10px;
+  left: 240px;
+  right: 200px;
+  width: auto;
+  transform: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  box-sizing: border-box;
+  background: rgba(61, 82, 110, 0.5);
+  padding: 4px 12px;
+  border-radius: 10px;
+  border: 1px solid #3162a2;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  justify-content: center;
+}
+.map-editor #topbar .status { font-weight: 600; min-width: 220px; text-align: center; font-size: 16px; }
+
+.map-editor button {
+  background: #1f2b38; color: #e6edf3; border: 1px solid #4e77a0;
+  padding: 7px 11px; border-radius: 4px; cursor: pointer; font-size: 16px;
+}
+.map-editor button:hover:not(:disabled) { background: #2a3a4d; }
+.map-editor button:disabled { opacity: .45; cursor: default; }
+.map-editor button.primary { background: #1c4d30; border-color: #3fa86a; }
+.map-editor button.primary:hover:not(:disabled) { background: #369a5f; }
+.map-editor button.active { background: #1e5599; border-color: #4aa3ff; }
+
+/* Родительская панель левого нижнего угла: на ней лежат #panel и #log,
+   #genBusy тоже находится в DOM внутри неё. Сам dock прижат к углу. */
+.map-editor #bottomPanel {
+  position: absolute; bottom: 10px; right: 10px;
+  display: flex;
+  flex-direction: column;      /* вертикальное направление */
+  flex-wrap: nowrap;           /* при колонке перенос обычно не нужен */
+  align-items: flex-end;       /* выравнивание по правому краю */
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+}
+
+/* #panel — карточка «Карта» внутри #bottomPanel (своё позиционирование убрано) */
+.map-editor #panel {
+  min-width: 200px; max-width: 280px; box-sizing: border-box;
+  background: rgba(20,26,34,.92); padding: 10px 12px; border-radius: 10px;
+  border: 1px solid #3162a2; font-size: 16px; line-height: 1.5;
+}
+.map-editor #panel h3 { margin: 0 0 6px; font-size: 16px; }
+.map-editor #panel .muted { color: #8899a6; }
+.map-editor #panel .swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px; vertical-align: middle; margin-right: 6px;
+}
+
+/* #log — карточка лога рядом с #panel на той же родительской панели */
+.map-editor #log {
+  width: 280px; max-height: 200px;
+  overflow: auto; background: rgba(20,26,34,.92); padding: 8px 10px;
+  border-radius: 10px; border: 1px solid #3162a2; font-size: 16px;
+}
+.map-editor #log div { margin-bottom: 3px; color: #b8c4cf; }
+.map-editor #log div.hl { color: #ffd166; }
+
+.map-editor #legend {
+  position: absolute; top: 12px; right: 12px; background: rgba(20,26,34,.92);
+  padding: 8px 12px; border-radius: 10px; border: 1px solid #3162a2;
+  font-size: 16px; line-height: 1.6; min-width: 150px;
+}
+.map-editor #legend .item { display: flex; align-items: center; gap: 6px; }
+.map-editor #legend .sw { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #00000040; }
+
+/* #genBusy лежит в DOM внутри #bottomPanel, но это оверлей на весь экран:
+   position: fixed привязывает его к вьюпорту, а не к родительской панели */
+.map-editor #genBusy {
+  position: fixed; inset: 0; display: none;
+  background: rgba(0,0,0,.55); align-items: center; justify-content: center;
+  z-index: 100; pointer-events: none; font-size: 16px; color: #ffd166;
+}
+
+
+/* ---- game screen --------------------------------------------------------- */
+.game-screen {
+  position: fixed;
+  inset: 0;
+}
+.game-screen #app { position: absolute; inset: 0; }
+
+.game-screen #hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.game-screen #hud > * { pointer-events: auto; }
+
+/* ТОПБАР — во всю ширину экрана, отступы по 10px слева и справа.
+   Селектор .game-screen #hud #gameTopbar (специфичность 2 ID + класс),
+   чтобы победить любые одиночные #gameTopbar / #topbar правила из других css. */
+.game-screen #hud #gameTopbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  width: calc(100% - 20px);  /* явная ширина: экран минус два отступа по 10px */
+  max-width: none;           /* гасим чужие max-width */
+  margin: 0;                 /* гасим чужие margin / auto-центрирование */
+  transform: none;           /* гасим translateX(-50%) от старого «островка» */
+  box-sizing: border-box;
+  height: 50px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(3, 28, 60, 0.5);
+  border: 1px solid #2a3441;
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+}
+
+/* turn-label — по центру, тянется */
+.game-screen #gameTopbar .turn-label {
+  flex: 1 1 auto;
+  text-align: center;
+  font-weight: 600;
+}
+.game-screen #gameTopbar .turn-label .dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Кнопки — как в редакторе */
+.game-screen button {
+  background: #1f2b38; color: #e6edf3; border: 1px solid #34495e;
+  padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 16px;
+}
+.game-screen button:hover:not(:disabled) { background: #2a3a4d; }
+.game-screen button:disabled { opacity: .45; cursor: default; }
+.game-screen button.primary { background: #2e7d4f; border-color: #3fa86a; }
+.game-screen button.primary:hover:not(:disabled) { background: #369a5f; }
+.game-screen button.active { background: #2e8bff; border-color: #4aa3ff; }
+
+/* ---- Зелёная кнопка «▶ Следующий круг» ---------------------------------- */
+/* Круг завершён: кнопка пульсирует зелёным свечением и зовёт игрока. */
+.game-screen #btnEndTurn.ready {
+  background: linear-gradient(180deg, #2e7d4f 0%, #24613d 50%, #1b4a2f 100%);
+  border-color: #3fa86a;
+  font-weight: 700;
+  animation: nextCirclePulse 1.0s ease-in-out infinite;
+}
+
+@keyframes nextCirclePulse {
+  0%, 100% {
+    box-shadow:
+      0 0 6px rgba(63, 168, 106, .55),
+      0 0 16px rgba(63, 168, 106, .28),
+      inset 0 1px 0 rgba(255, 255, 255, .18);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(63, 168, 106, .85),
+      0 0 28px rgba(63, 168, 106, .50),
+      0 0 48px rgba(63, 168, 106, .28),
+      inset 0 1px 0 rgba(255, 255, 255, .25);
+  }
+}
+
+.game-screen #btnEndTurn.ready:hover {
+  filter: brightness(1.15);
+}
+
+/* БОКОВАЯ ПАНЕЛЬ — слева экрана, отступ 10px, сразу под топбаром */
+.game-screen #hud #gameSidePanel {
+  position: absolute;
+  top: 70px;                 /* 10 (отступ) + 50 (топбар) + 10 (зазор) */
+  left: 10px;
+  right: auto;
+  margin: 0;
+  transform: none;
+  box-sizing: border-box;
+  min-width: 240px;
+  max-width: 340px;
+  background: rgba(3, 28, 60, 0.5);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a3441;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.game-screen #gameSidePanel h3 { margin: 0 0 6px; font-size: 16px; }
+.game-screen #gameSidePanel .muted { color: #8899a6; }
+.game-screen #gameSidePanel .city-name { color: #ffd166; }
+
+/* Лог — 10px справа и снизу */
+.game-screen #gameLog {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 280px;
+  max-height: 200px;
+  overflow: auto;
+  background: rgba(3, 28, 60, 0.5);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #2a3441;
+  font-size: 16px;
+}
+.game-screen #gameLog div { margin-bottom: 3px; color: #b8c4cf; }
+.game-screen #gameLog div.hl { color: #ffd166; }
+
+/* ---- Свечение кнопки «Играть»  ------------------------------------------- */
+.map-editor #btnPlay {
+  position: relative;
+  border-color: #3fa86a;
+  background: linear-gradient(180deg, #2e7d4f 0%, #24613d 50%, #1b4a2f 100%);
+  box-shadow:
+    0 0 8px rgba(63, 168, 106, .55),
+    0 0 20px rgba(63, 168, 106, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .18);
+  transition: box-shadow .25s ease, transform .18s ease, filter .25s ease;
+  animation: playPulse 1.0s ease-in-out infinite;
+}
+
+@keyframes playPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(63, 168, 106, .55),
+      0 0 20px rgba(63, 168, 106, .30),
+      inset 0 1px 0 rgba(255, 255, 255, .18);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(63, 168, 106, .85),
+      0 0 34px rgba(63, 168, 106, .55),
+      0 0 60px rgba(63, 168, 106, .30),
+      inset 0 1px 0 rgba(255, 255, 255, .25);
+  }
+}
+
+.map-editor #btnPlay:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+  box-shadow:
+    0 0 18px rgba(63, 168, 106, 1),
+    0 0 42px rgba(63, 168, 106, .65),
+    0 0 80px rgba(63, 168, 106, .35),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+.map-editor #btnPlay:active:not(:disabled) {
+  transform: translateY(1px) scale(.98);
+  animation: none;
+  box-shadow:
+    0 0 10px rgba(63, 168, 106, .7),
+    inset 0 2px 4px rgba(0, 0, 0, .4);
+}
+
+/* ---- Панель хода игрока-человека ---------------------------------------- */
+/* Верхний правый угол, под верхней панелью (Завершить ход + камеры). */
+.game-screen #humanTurnPanel {
+  position: absolute;
+  top: 70px;
+  right: 10px;
+  left: auto;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+  max-width: 380px;
+  box-sizing: border-box;
+  background: rgba(3, 28, 60, 0.6);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a3441;
+  backdrop-filter: blur(6px);
+  font-size: 16px;
+  z-index: 10;
+}
+.game-screen #humanTurnPanel .htp-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.game-screen #humanTurnPanel .htp-title {
+  font-weight: 700;
+  color: #ffd166;
+}
+.game-screen #humanTurnPanel .htp-sub {
+  color: #b8c4cf;
+  font-size: 14px;
+}
+.game-screen #humanTurnPanel .htp-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.game-screen #hud #gameTopbar,
+.game-screen #hud #gameSidePanel,
+.game-screen #hud #gameLog,
+.game-screen #hud #humanTurnPanel {
+  opacity: 0.5;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% -18%, rgba(93, 166, 220, .18), transparent 58%) padding-box,
+    linear-gradient(158deg, #1d2d3e 0%, #101a25 48%, #192938 100%) padding-box,
+    linear-gradient(120deg, #6e89a4 0%, #a98445 18%, #f1dfae 40%, #8c6b35 60%, #4b6c88 82%, #9cb4c8 100%) border-box;
+  box-shadow:
+    0 12px 34px rgba(0, 0, 0, .46),
+    0 0 0 1px rgba(255, 255, 255, .035),
+    inset 0 1px 0 rgba(255, 255, 255, .20),
+    inset 0 -2px 0 rgba(0, 0, 0, .40);
+  -webkit-backdrop-filter: blur(8px) saturate(.94);
+  backdrop-filter: blur(8px) saturate(.94);
+}
+
+.game-screen #hud #gameTopbar .turn-label b {
+  color: #ffe8b5;
+}
+
+.game-screen #hud #gameSidePanel h3,
+.game-screen #hud #humanTurnPanel .htp-title {
+  color: #e8c37a;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+}
+
+.game-screen #hud #gameTopbar button,
+.game-screen #hud #humanTurnPanel .htp-actions button {
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, #405b73 0%, #223447 46%, #172431 54%, #0d1722 100%) padding-box,
+    linear-gradient(180deg, #f0d796, #8a652c) border-box;
+  color: #ffe8b5;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .045em;
+  line-height: 1.1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .75);
+  cursor: pointer;
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .25),
+    inset 0 -2px 0 rgba(0, 0, 0, .45);
+  transition: filter .18s ease, transform .18s ease, box-shadow .18s ease;
+  white-space: nowrap;
+}
+
+.game-screen #hud #gameTopbar button:hover:not(:disabled),
+.game-screen #hud #humanTurnPanel .htp-actions button:hover:not(:disabled) {
+  filter: brightness(1.18);
+  box-shadow:
+    0 5px 14px rgba(232, 195, 122, .22),
+    0 3px 9px rgba(0, 0, 0, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .32),
+    inset 0 -2px 0 rgba(0, 0, 0, .45);
+}
+
+.game-screen #hud #gameTopbar button:active:not(:disabled),
+.game-screen #hud #humanTurnPanel .htp-actions button:active:not(:disabled) {
+  transform: translateY(1px) scale(.985);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, .55),
+    inset 0 -1px 0 rgba(255, 255, 255, .08);
+}
+
+.game-screen #hud #gameTopbar button:focus-visible,
+.game-screen #hud #humanTurnPanel .htp-actions button:focus-visible {
+  outline: none;
+  border-color: #f0d796;
+  box-shadow:
+    0 0 0 3px rgba(240, 215, 150, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+
+.game-screen #hud #gameTopbar #btnCamOrbit.active,
+.game-screen #hud #gameTopbar #btnCamTop.active {
+  background:
+    linear-gradient(180deg, #fff1bf 0%, #e6c46e 42%, #c8953d 52%, #8d6222 100%) padding-box,
+    linear-gradient(180deg, #fff9e7, #a97a30) border-box;
+  color: #1b1307;
+  font-weight: 900;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+  box-shadow:
+    0 0 0 1px rgba(255, 246, 213, .50),
+    0 0 18px rgba(240, 196, 104, .55),
+    0 4px 12px rgba(0, 0, 0, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .65),
+    inset 0 -2px 0 rgba(84, 54, 10, .55);
+}
+
+.game-screen #hud #gameTopbar #btnEndTurn.ready {
+  background:
+    linear-gradient(180deg, #2e7d4f 0%, #24613d 46%, #1b4a2f 54%, #0b2a18 100%) padding-box,
+    linear-gradient(180deg, #f0d796, #8a652c) border-box;
+  color: #eafff1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .65);
+}
+
+.game-screen #hud #gameLog {
+  height: 50vh;
+  max-height: 50vh;
+  box-sizing: border-box;
+}
+
+.game-screen #hud #gameLog[hidden] {
+  display: none;
+}
+
+.map-editor #genPanel,
+.map-editor #topbar,
+.map-editor #panel,
+.map-editor #log,
+.map-editor #legend,
+.game-screen #hud #gameTopbar,
+.game-screen #hud #gameSidePanel,
+.game-screen #hud #gameLog,
+.game-screen #hud #humanTurnPanel {
+  opacity: 0.7;
+}
