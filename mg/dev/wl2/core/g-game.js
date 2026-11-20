@@ -14,8 +14,9 @@ import { WorldMap    } from './world.js';
 import { ArmyMover   } from './g-move.js';
 import { visitRuins  } from './ruins.js';
 import { HumanBrain  } from './human-brain.js';
-import { canGrowArmy } from './g-limits.js';
+import { canGrowArmy, canCreateArmy } from './g-limits.js';
 import { ArmyView    } from '../render/army-view.js';
+import { ArmyViewDevide } from '../render/army-view-devide.js';
 import { TownView    } from '../render/town-view.js';
 import { BattleView  } from '../render/battle-view.js';
 import { ArmyChangeView } from '../render/army-change-view.js';
@@ -111,6 +112,7 @@ export class Game {
     this.armyView = new ArmyView(this.mapView, {
       getPlayers: () => this.playersModel,
       getMapClickEnabled: () => !this.humanBrain?.isActive,
+      onArmyClick: (army) => this._openArmyView(army),
     });
 
     // Панель города: клик по модельке города на карте → открывается.
@@ -140,6 +142,34 @@ export class Game {
         this._log(`Армия #${army.id} опустела и расформирована.`);
       },
       onClose: (res) => this._onArmyChangeClosed(res),
+    });
+
+    // Панель разделения армии: открывается, если рядом есть клетка её
+    // действующего маршрута (куда можно поставить новую армию).
+    this.armyViewDevide = new ArmyViewDevide({
+      mapView:    this.mapView,
+      getPlayers: () => this.playersModel,
+      canCreateArmy: (army) => {
+        const owner = this.playersModel?.get?.(army?.idOwner)
+          ?? this.judge?.playerByIndex?.(army?.idOwner)
+          ?? null;
+        if (!owner) return false;
+        const limits = this.judge?.limits?.forPlayer?.(owner) ?? owner.limits ?? null;
+        return canCreateArmy(owner, limits);
+      },
+      onArmyCreated: ({ army, unit, from, cell }) => {
+        this._log(
+          `Армия #${from.id} разделена: «${unit.name}» → Армия #${army.id} ` +
+          `(${cell.x}, ${cell.y}).`, true);
+      },
+      onTransfer: ({ unit, from, to, cost }) => {
+        this._log(
+          `Перестановка: «${unit.name}» из Армии #${from.id} ` +
+          `в Армию #${to.id} (−${cost} стамины).`);
+      },
+      onArmyEmpty: (army) => {
+        this._log(`Армия #${army.id} опустела и расформирована.`);
+      },
     });
 
     // Город выпустил юнита (см. Judge._doCities): обновляем модель армии
@@ -284,7 +314,8 @@ export class Game {
 
       // Модальные окна перехватывают горячие клавиши игры.
       if (this.armyView?.isOpen || this.townView?.isOpen ||
-          this.battleView?.isOpen || this.armyChangeView?.isOpen) return;
+          this.battleView?.isOpen || this.armyChangeView?.isOpen ||
+          this.armyViewDevide?.isOpen) return;
 
       if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !e.repeat) {
         if (this.humanBrain?.isPlanning) {
@@ -495,12 +526,22 @@ export class Game {
     }
   }
 
-  /** Ctrl / кнопка «Армия»: панель просмотра состава армии в фокусе. */
-  _openArmyView() {
-    const army = this._focusedArmy ?? this.humanBrain?.selected ?? null;
-    if (!army || army.alive === false || !army.units?.length) return;
+  /** Ctrl / кнопка «Армия»: панель армии в фокусе (состав или разделение). */
+  _openArmyView(army = null) {
+    const target = army ?? this._focusedArmy ?? this.humanBrain?.selected ?? null;
+    if (!target || target.alive === false || !target.units?.length) return;
     SND.clickUnit.play();
-    this.armyView?.show?.(army);
+
+    const owner = this.playersModel?.get?.(target.idOwner) ?? null;
+    const canEdit = owner?.isHuman === true && this.humanBrain?.isPlanning === true;
+
+    if (canEdit && ArmyViewDevide.shouldOpen(this.worldMap, target)) {
+      this.armyView?.close?.();
+      this.armyViewDevide?.show?.(target);
+    } else {
+      this.armyViewDevide?.close?.();
+      this.armyView?.show?.(target);
+    }
   }
 
   /** Shift / кнопка «Город»: панель просмотра выбранной клетки с городом. */
@@ -853,6 +894,7 @@ export class Game {
     this.judge.onTurnStart = null;
     this.humanBrain?.detach?.();
     this.armyView?.destroy?.();
+    this.armyViewDevide?.destroy?.();
     this.townView?.destroy?.();
     this.battleView?.destroy?.();
     this.armyChangeView?.destroy?.();

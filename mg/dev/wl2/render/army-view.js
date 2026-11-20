@@ -221,6 +221,7 @@ export class ArmyView {
   constructor(mapView, opts = {}) {
     this.mapView   = mapView;
     this.getPlayers = opts.getPlayers ?? (() => mapView.players ?? null);
+    this._onArmyClick = opts.onArmyClick ?? null;
     // Во время хода человека клики по армиям уходят в HumanBrain (выбор
     // армии / маршрут), а не в панель состава.
     this._getMapClickEnabled = opts.getMapClickEnabled ?? (() => true);
@@ -355,7 +356,10 @@ export class ArmyView {
       if (e.button !== 0) return;
       if (!this._getMapClickEnabled()) return;
       const army = this._pickArmy(e);
-      if (army) { SND.clickUnit.play(); this.show(army); }   // клик по юниту
+      if (army) {
+        if (this._onArmyClick) this._onArmyClick(army);
+        else { SND.clickUnit.play(); this.show(army); }   // клик по юниту
+      }
     });
   }
 
