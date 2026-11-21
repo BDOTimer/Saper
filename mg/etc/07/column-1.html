@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>3D Columns — Glass Aquarium</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:#05070c; font-family:system-ui,Segoe UI,Roboto,sans-serif; }
+  #hud {
+    position:fixed; top:12px; left:12px; color:#cfeeff; z-index:10;
+    text-shadow:0 0 8px rgba(80,200,255,.8); user-select:none; pointer-events:none;
+    font-size:14px; line-height:1.5;
+  }
+  #hud b { color:#9fe8ff; }
+  #msg {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#eaffff; font-size:42px; font-weight:700; letter-spacing:2px;
+    text-shadow:0 0 18px #46b6ff,0 0 42px #1d6fff; pointer-events:none; opacity:0;
+    transition:opacity .3s; z-index:11;
+  }
+  #hint {
+    position:fixed; bottom:10px; left:50%; transform:translateX(-50%);
+    color:#7fb6cc; font-size:12px; z-index:10; user-select:none;
+  }
+  #settings {
+    position:fixed; top:12px; right:12px; z-index:10;
+    background:rgba(10,18,28,.78); border:1px solid rgba(120,200,255,.25);
+    border-radius:10px; padding:10px 12px; color:#cfeeff;
+    font-size:13px; user-select:none; backdrop-filter:blur(6px);
+    box-shadow:0 6px 24px rgba(0,20,40,.5);
+    display:flex; flex-direction:column; gap:8px; min-width:190px;
+  }
+  #settings label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  #settings input[type="number"] {
+    width:70px; background:#0b1622; color:#eaffff; border:1px solid rgba(120,200,255,.35);
+    border-radius:6px; padding:4px 6px; font-size:13px; outline:none;
+  }
+  #settings input[type="number"]:focus { border-color:#6fd0ff; box-shadow:0 0 0 2px rgba(80,200,255,.2); }
+  #settings button {
+    background:linear-gradient(180deg,#2a6fa8,#1c4c74); color:#eaffff;
+    border:1px solid rgba(120,200,255,.5); border-radius:6px;
+    padding:6px 10px; cursor:pointer; font-size:13px; font-weight:600;
+    letter-spacing:.5px; transition:filter .15s;
+  }
+  #settings button:hover { filter:brightness(1.15); }
+  #settings .err { color:#ff8080; font-size:11px; min-height:14px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div>Счёт: <b id="score">0</b></div>
+  <div>Уровень: <b id="level">1</b></div>
+  <div>Линии: <b id="lines">0</b></div>
+</div>
+<div id="msg"></div>
+<div id="hint">←/→ сдвиг · ↑/↓ перестановка цветов · Space — вниз · P — пауза</div>
+
+<div id="settings">
+  <label>Ширина (ячейки)
+    <input type="number" id="inpCols" min="3" max="15" step="1" />
+  </label>
+  <label>Высота (ячейки)
+    <input type="number" id="inpRows" min="5" max="24" step="1" />
+  </label>
+  <button id="btnApply">Применить (перезапуск)</button>
+  <div class="err" id="cfgErr"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   КОНФИГУРАЦИЯ
+   ============================================================ */
+const CONFIG = {
+  // Размер «корзины» (аквариума) в ячейках — целые числа
+  cols: 7,          // ширина корзины (3..15)
+  rows: 14,         // высота корзины (5..24)
+
+  depth: 1,
+  columnHeight: 3,
+  colors: 5,
+  shape: 'mixed',           // 'box' | 'sphere' | 'mixed'
+  cell: 1.0,
+  gap: 0.08,
+  fallStart: 0.85,
+  fallMin: 0.12,
+  fallStep: 0.07,
+  scorePerCell: 10,
+  scorePerLine: 50,
+  scorePerLevel: 250,
+  magicChance: 0.06,
+  glassThickness: 0.12,
+  glassHeightExtra: 1.4,
+  shadowMapSize: 2048,
+};
+
+const LIMITS = {
+  cols: { min: 3, max: 15 },
+  rows: { min: 5, max: 24 },
+};
+
+const COLORS = [
+  0xff4d6d, 0x4dd2ff, 0x7cff6b, 0xffd93d, 0xb26bff, 0xff9f43, 0x8affff,
+].slice(0, CONFIG.colors);
+
+/* ============================================================
+   БАЗОВАЯ СЦЕНА
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070c);
+scene.fog = new THREE.FogExp2(0x05070c, 0.018);
+
+const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI * 0.52;
+
+/* ============================================================
+   ПРОЦЕДУРНЫЕ ТЕКСТУРЫ
+   ============================================================ */
+function makeCanvas(size = 512) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  return { c, ctx: c.getContext('2d') };
+}
+
+function noiseCanvas(size = 512, base = [10, 18, 30], amp = 20, oct = 4) {
+  const { c, ctx } = makeCanvas(size);
+  const img = ctx.createImageData(size, size);
+  const grid = [];
+  const gsize = 64;
+  for (let i = 0; i < (gsize + 1) * (gsize + 1); i++) grid.push(Math.random());
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = t => t * t * (3 - 2 * t);
+  function valueNoise(x, y) {
+    const gx = (x / size) * gsize, gy = (y / size) * gsize;
+    const x0 = Math.floor(gx), y0 = Math.floor(gy);
+    const tx = smooth(gx - x0), ty = smooth(gy - y0);
+    const g = (ix, iy) => grid[(iy % gsize) * (gsize + 1) + (ix % gsize)];
+    const v00 = g(x0, y0), v10 = g(x0 + 1, y0);
+    const v01 = g(x0, y0 + 1), v11 = g(x0 + 1, y0 + 1);
+    return lerp(lerp(v00, v10, tx), lerp(v01, v11, tx), ty);
+  }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let v = 0, a = 1, f = 1, norm = 0;
+      for (let o = 0; o < oct; o++) {
+        v += valueNoise(x * f, y * f) * a;
+        norm += a; a *= 0.5; f *= 2;
+      }
+      v /= norm;
+      const i = (y * size + x) * 4;
+      img.data[i] = base[0] + v * amp;
+      img.data[i + 1] = base[1] + v * amp;
+      img.data[i + 2] = base[2] + v * amp;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function glassStreakCanvas(size = 512) {
+  const { c, ctx } = makeCanvas(size);
+  const g = ctx.createLinearGradient(0, 0, size, size);
+  g.addColorStop(0, 'rgba(200,240,255,0.25)');
+  g.addColorStop(0.4, 'rgba(120,200,255,0.05)');
+  g.addColorStop(1, 'rgba(220,250,255,0.22)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 40; i++) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.02 + Math.random() * 0.06})`;
+    ctx.lineWidth = 0.5 + Math.random() * 2;
+    ctx.beginPath();
+    const x = Math.random() * size;
+    ctx.moveTo(x, 0);
+    ctx.bezierCurveTo(x + 20, size * 0.3, x - 20, size * 0.7, x + 10, size);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function sphereCanvas(size = 256) {
+  const { c, ctx } = makeCanvas(size);
+  const g = ctx.createRadialGradient(size * 0.35, size * 0.32, size * 0.05, size * 0.5, size * 0.5, size * 0.55);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.25, 'rgba(255,255,255,0.65)');
+  g.addColorStop(0.6, 'rgba(180,200,220,0.15)');
+  g.addColorStop(1, 'rgba(60,80,100,0.05)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const floorTex = noiseCanvas(512, [8, 14, 24], 18, 5);
+floorTex.repeat.set(4, 4);
+const glassStreakTex = glassStreakCanvas(512);
+glassStreakTex.repeat.set(2, 3);
+const sphereTex = sphereCanvas(256);
+const tableTex = noiseCanvas(512, [14, 18, 28], 12, 3);
+tableTex.repeat.set(3, 3);
+
+/* ============================================================
+   ШЕЙДЕРЫ
+   ============================================================ */
+const glassMat = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+  uniforms: {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color(0x9fe9ff) },
+    uStreak: { value: glassStreakTex },
+  },
+  vertexShader: /* glsl */`
+    varying vec3 vNormalW;
+    varying vec3 vViewDir;
+    varying vec2 vUv;
+    varying vec3 vWorldPos;
+    void main() {
+      vUv = uv;
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWorldPos = wp.xyz;
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      vViewDir = normalize(cameraPosition - wp.xyz);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform float uTime;
+    uniform vec3 uColor;
+    uniform sampler2D uStreak;
+    varying vec3 vNormalW;
+    varying vec3 vViewDir;
+    varying vec2 vUv;
+    varying vec3 vWorldPos;
+
+    void main() {
+      float f = pow(1.0 - max(dot(vNormalW, vViewDir), 0.0), 2.5);
+      vec2 uv = vUv;
+      uv.y += uTime * 0.04;
+      vec3 streak = texture2D(uStreak, uv).rgb;
+      float pulse = 0.5 + 0.5 * sin(uTime * 1.2 + vWorldPos.y * 0.6);
+      float grid = smoothstep(0.92, 1.0, fract(vUv.x * 8.0));
+      grid += smoothstep(0.92, 1.0, fract(vUv.y * 10.0));
+      grid *= 0.15;
+
+      vec3 col = uColor * (0.12 + f * 1.4 + streak * 0.8 + grid) + streak * 0.15;
+      col += uColor * pulse * 0.05;
+      float alpha = clamp(0.10 + f * 0.55 + streak.r * 0.25, 0.0, 0.85);
+      gl_FragColor = vec4(col, alpha);
+    }
+  `,
+});
+
+const magicMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: /* glsl */`
+    varying vec3 vPos;
+    varying vec3 vNormalW;
+    void main() {
+      vPos = position;
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform float uTime;
+    varying vec3 vPos;
+    varying vec3 vNormalW;
+    void main() {
+      float bands = 0.5 + 0.5 * sin(vPos.y * 12.0 + uTime * 4.0);
+      float swirl = 0.5 + 0.5 * sin(atan(vPos.z, vPos.x) * 6.0 + uTime * 3.0);
+      vec3 a = vec3(1.0, 0.9, 0.3);
+      vec3 b = vec3(1.0, 0.2, 0.9);
+      vec3 c = vec3(0.3, 0.9, 1.0);
+      vec3 col = mix(a, b, bands);
+      col = mix(col, c, swirl * 0.6);
+      float rim = pow(1.0 - abs(vNormalW.z), 2.0);
+      col += rim * 0.8;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+});
+
+/* ============================================================
+   ИЗМЕНЯЕМЫЕ ОБЪЕКТЫ ПОЛЯ / АКВАРИУМА / СВЕТА
+   (пересоздаются в buildField)
+   ============================================================ */
+let W = 0, H = 0, D = 0;
+let aquarium = null;
+let table = null;
+let waterGlow = null;
+let keyLight = null, rimLight = null, fillLight = null;
+
+// Динамический массив поля
+let grid = [];
+const group = new THREE.Group();
+scene.add(group);
+
+/* ============================================================
+   ПОСТРОЕНИЕ ПОЛЯ И АКВАРИУМА ПОД ТЕКУЩИЕ CONFIG.cols/rows
+   ============================================================ */
+function disposeObject(obj) {
+  if (!obj) return;
+  obj.traverse?.((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+      else o.material.dispose();
+    }
+  });
+  obj.parent?.remove(obj);
+}
+
+function clearFieldObjects() {
+  // Удалить все элементы поля
+  for (let i = group.children.length - 1; i >= 0; i--) {
+    const m = group.children[i];
+    disposeObject(m);
+  }
+
+  if (aquarium) { disposeObject(aquarium); aquarium = null; }
+  if (table)    { disposeObject(table);    table = null; }
+  if (waterGlow) { disposeObject(waterGlow); waterGlow = null; }
+  if (keyLight)  { scene.remove(keyLight); keyLight.dispose?.(); keyLight = null; }
+  if (rimLight)  { scene.remove(rimLight); rimLight.dispose?.(); rimLight = null; }
+  if (fillLight) { scene.remove(fillLight); fillLight.dispose?.(); fillLight = null; }
+}
+
+function buildField() {
+  clearFieldObjects();
+
+  // Пересчёт размеров
+  W = CONFIG.cols * CONFIG.cell;
+  H = CONFIG.rows * CONFIG.cell;
+  D = CONFIG.depth * CONFIG.cell;
+
+  // --- Свет ---
+  keyLight = new THREE.DirectionalLight(0xffffff, 2.6);
+  keyLight.position.set(W * 1.4, H * 1.8, D * 6 + 4);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(CONFIG.shadowMapSize, CONFIG.shadowMapSize);
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = Math.max(W, H) * 6 + 20;
+  keyLight.shadow.camera.left = -W * 1.2;
+  keyLight.shadow.camera.right = W * 1.2;
+  keyLight.shadow.camera.top = H * 1.2;
+  keyLight.shadow.camera.bottom = -H * 0.2;
+  keyLight.shadow.bias = -0.0006;
+  keyLight.shadow.normalBias = 0.02;
+  scene.add(keyLight);
+
+  rimLight = new THREE.DirectionalLight(0x5fc8ff, 1.4);
+  rimLight.position.set(-W * 1.2, H * 0.8, -D * 5);
+  scene.add(rimLight);
+
+  fillLight = new THREE.PointLight(0x74d0ff, 12, Math.max(W, H) * 3, 2);
+  fillLight.position.set(0, H * 0.2, D * 3 + 2);
+  scene.add(fillLight);
+
+  // --- Аквариум ---
+  aquarium = new THREE.Group();
+  scene.add(aquarium);
+
+  const glassH = H + CONFIG.glassHeightExtra;
+  const t = CONFIG.glassThickness;
+
+  // Пол
+  const floorGeo = new THREE.PlaneGeometry(W + t * 2, D + t * 2);
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: floorTex,
+    roughness: 0.85,
+    metalness: 0.15,
+    color: 0x9fc4e0,
+    emissive: 0x0a1a26,
+    emissiveIntensity: 0.6,
+  });
+  const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.receiveShadow = true;
+  aquarium.add(floorMesh);
+
+  // Стол
+  const tableMat = new THREE.MeshStandardMaterial({
+    map: tableTex, roughness: 0.9, metalness: 0.05, color: 0x223044,
+  });
+  table = new THREE.Mesh(new THREE.BoxGeometry(W * 1.8, 0.4, D * 6 + 3), tableMat);
+  table.position.set(0, -0.25, 0.6);
+  table.receiveShadow = true;
+  scene.add(table);
+
+  // Стенки (без передней)
+  const addGlassPanel = (w, h, d, x, y, z) => {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const m = new THREE.Mesh(geo, glassMat);
+    m.position.set(x, y, z);
+    aquarium.add(m);
+  };
+  addGlassPanel(W + t * 2, glassH, t, 0, glassH / 2, -D / 2 - t / 2); // задняя
+  addGlassPanel(t, glassH, D + t * 2, -W / 2 - t / 2, glassH / 2, 0); // левая
+  addGlassPanel(t, glassH, D + t * 2,  W / 2 + t / 2, glassH / 2, 0); // правая
+  addGlassPanel(W + t * 2, t, D + t * 2, 0, -t / 2, 0);               // дно
+
+  // Рёбра (только задние)
+  const ribMat = new THREE.MeshStandardMaterial({ color: 0x2b3d55, roughness: 0.35, metalness: 0.9 });
+  const ribGeo = new THREE.BoxGeometry(t * 1.6, glassH, t * 1.6);
+  for (const x of [-W / 2, W / 2]) {
+    const rib = new THREE.Mesh(ribGeo, ribMat);
+    rib.position.set(x, glassH / 2, -D / 2);
+    rib.castShadow = true;
+    rib.receiveShadow = true;
+    aquarium.add(rib);
+  }
+
+  // Свечение воды
+  waterGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, D * 1.2),
+    new THREE.MeshBasicMaterial({
+      color: 0x2a9fd6, transparent: true, opacity: 0.12,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    })
+  );
+  waterGlow.rotation.x = -Math.PI / 2;
+  waterGlow.position.y = 0.02;
+  aquarium.add(waterGlow);
+
+  // --- Сетка поля ---
+  grid = Array.from({ length: CONFIG.rows }, () =>
+    Array.from({ length: CONFIG.cols }, () => null)
+  );
+
+  // --- Камера под новые размеры ---
+  const camDist = Math.max(W, H);
+  camera.position.set(W * 0.9, H * 0.75, camDist * 0.95);
+  controls.target.set(0, H * 0.48, 0);
+  controls.minDistance = camDist * 0.6;
+  controls.maxDistance = camDist * 2.4;
+  controls.update();
+  camera.lookAt(controls.target);
+}
+
+/* ============================================================
+   ЭЛЕМЕНТЫ
+   ============================================================ */
+function createElementMesh(colorIdx, isMagic = false, forcedShape = null) {
+  const shape = forcedShape || (CONFIG.shape === 'mixed'
+    ? (Math.random() < 0.5 ? 'box' : 'sphere')
+    : CONFIG.shape);
+
+  let geo, mat;
+  const size = CONFIG.cell - CONFIG.gap;
+
+  if (shape === 'sphere') {
+    geo = new THREE.SphereGeometry(size / 2, 32, 24);
+    mat = new THREE.MeshStandardMaterial({
+      color: isMagic ? 0xffffff : COLORS[colorIdx],
+      roughness: 0.15, metalness: 0.35, map: sphereTex,
+      emissive: isMagic ? 0x8866ff : COLORS[colorIdx],
+      emissiveIntensity: isMagic ? 1.2 : 0.08,
+      envMapIntensity: 1.2,
+    });
+  } else {
+    geo = new THREE.BoxGeometry(size, size, size, 2, 2, 2);
+    const pos = geo.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      v.multiplyScalar(0.92);
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals();
+    mat = new THREE.MeshStandardMaterial({
+      color: isMagic ? 0xffffff : COLORS[colorIdx],
+      roughness: 0.25, metalness: 0.4,
+      emissive: isMagic ? 0x8866ff : COLORS[colorIdx],
+      emissiveIntensity: isMagic ? 1.2 : 0.06,
+    });
+  }
+
+  if (isMagic) {
+    mat = magicMat.clone();
+    mat.uniforms.uTime.value = 0;
+    mat.userData.isMagic = true;
+  }
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData = { colorIdx, isMagic, shape };
+  return mesh;
+}
+
+function applyLookToMesh(mesh, colorIdx, isMagic, shape) {
+  const m = mesh.material;
+  if (isMagic) {
+    if (!m.userData || !m.userData.isMagic) {
+      mesh.material = magicMat.clone();
+      mesh.material.uniforms.uTime.value = 0;
+      mesh.material.userData.isMagic = true;
+    }
+  } else {
+    if (m.userData && m.userData.isMagic) {
+      const isSphere = shape === 'sphere';
+      const std = new THREE.MeshStandardMaterial({
+        color: COLORS[colorIdx],
+        roughness: isSphere ? 0.15 : 0.25,
+        metalness: 0.35,
+        map: isSphere ? sphereTex : null,
+        emissive: COLORS[colorIdx],
+        emissiveIntensity: 0.08,
+        envMapIntensity: 1.2,
+      });
+      mesh.material.dispose();
+      mesh.material = std;
+    } else {
+      m.color.setHex(COLORS[colorIdx]);
+      m.emissive.setHex(COLORS[colorIdx]);
+    }
+  }
+  mesh.userData.colorIdx = colorIdx;
+  mesh.userData.isMagic = isMagic;
+}
+
+function cellToWorld(col, row) {
+  const centerX = -W / 2;
+  const x = centerX + col * CONFIG.cell + CONFIG.cell / 2;
+  const y = row * CONFIG.cell + CONFIG.cell / 2;
+  return new THREE.Vector3(x, y, 0);
+}
+
+/* ============================================================
+   ПАДАЮЩАЯ ФИГУРА
+   ============================================================ */
+let falling = null;
+
+function spawnFalling() {
+  if (!grid.length || !grid[0]) return;
+
+  const cells = [];
+  const useMagic = Math.random() < CONFIG.magicChance;
+  const magicIndex = useMagic ? Math.floor(Math.random() * CONFIG.columnHeight) : -1;
+
+  for (let i = 0; i < CONFIG.columnHeight; i++) {
+    const isMagic = i === magicIndex;
+    const colorIdx = Math.floor(Math.random() * COLORS.length);
+    const mesh = createElementMesh(colorIdx, isMagic);
+    group.add(mesh);
+    cells.push({
+      colorIdx, isMagic, mesh,
+      shape: mesh.userData.shape,
+      target: new THREE.Vector3(),
+    });
+  }
+
+  const startCol = Math.floor(CONFIG.cols / 2);
+  const startY = CONFIG.rows;
+
+  falling = {
+    col: startCol, y: startY, cells,
+    timer: 0, fallInterval: getFallInterval(),
+  };
+
+  computeTargets();
+  for (const c of cells) {
+    c.mesh.position.copy(c.target);
+    c.mesh.position.y += CONFIG.cell * 1.5;
+  }
+}
+
+function getFallInterval() {
+  return Math.max(CONFIG.fallMin, CONFIG.fallStart - (level - 1) * CONFIG.fallStep);
+}
+
+function computeTargets() {
+  if (!falling) return;
+  const n = falling.cells.length;
+  for (let i = 0; i < n; i++) {
+    const row = falling.y - (n - 1 - i);
+    falling.cells[i].target.copy(cellToWorld(falling.col, row));
+  }
+}
+
+function layoutFalling() { computeTargets(); }
+
+function updateFallingVisual(dt) {
+  if (!falling) return;
+  const k = 1 - Math.exp(-22 * dt);
+  for (const c of falling.cells) c.mesh.position.lerp(c.target, k);
+}
+
+function canMoveTo(col, y) {
+  if (col < 0 || col >= CONFIG.cols) return false;
+  const n = falling.cells.length;
+  for (let i = 0; i < n; i++) {
+    const row = y - (n - 1 - i);
+    if (row < 0) return false;
+    if (row < CONFIG.rows && grid[row][col]) return false;
+  }
+  return true;
+}
+
+function lockFalling() {
+  const baseRow = falling.y;
+  const newlyPlaced = [];
+  const n = falling.cells.length;
+  for (let i = 0; i < n; i++) {
+    const c = falling.cells[i];
+    const row = baseRow - (n - 1 - i);
+    if (row < 0 || row >= CONFIG.rows) continue;
+    const slot = { colorIdx: c.colorIdx, isMagic: c.isMagic, mesh: c.mesh, shape: c.shape };
+    grid[row][falling.col] = slot;
+    const p = cellToWorld(falling.col, row);
+    c.mesh.position.copy(p);
+    c.target.copy(p);
+    newlyPlaced.push({ row, col: falling.col, slot });
+  }
+
+  for (const { row, col, slot } of newlyPlaced) {
+    if (slot.isMagic) triggerMagic(slot, row, col);
+  }
+
+  falling = null;
+
+  resolveBoard();
+  if (!gameOver) spawnFalling();
+}
+
+/* ============================================================
+   МАГИЯ
+   ============================================================ */
+function triggerMagic(magicSlot, row, col) {
+  const counts = new Array(COLORS.length).fill(0);
+  for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]) {
+    const r = row + dr, c = col + dc;
+    if (r >= 0 && r < CONFIG.rows && c >= 0 && c < CONFIG.cols && grid[r][c] && !grid[r][c].isMagic) {
+      counts[grid[r][c].colorIdx]++;
+    }
+  }
+  let target = counts.indexOf(Math.max(...counts));
+  if (counts[target] === 0) target = Math.floor(Math.random() * COLORS.length);
+
+  const toRemove = [];
+  for (let r = 0; r < CONFIG.rows; r++) {
+    for (let c = 0; c < CONFIG.cols; c++) {
+      const s = grid[r][c];
+      if (s && !s.isMagic && s.colorIdx === target) toRemove.push({ r, c, s });
+    }
+  }
+  if (grid[row][col]) toRemove.push({ r: row, c: col, s: grid[row][col] });
+
+  for (const { r, c, s } of toRemove) {
+    grid[r][c] = null;
+    removeMeshAnimated(s.mesh);
+  }
+  flashMessage('МАГИЯ!');
+}
+
+function removeMeshAnimated(mesh) {
+  const start = performance.now();
+  const t0 = mesh.scale.x;
+  function tick(now) {
+    const k = Math.min(1, (now - start) / 260);
+    const s = t0 * (1 - k);
+    mesh.scale.setScalar(Math.max(0.001, s));
+    if (k < 1) requestAnimationFrame(tick);
+    else { group.remove(mesh); mesh.geometry.dispose(); }
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ============================================================
+   МАТЧ-3
+   ============================================================ */
+function findMatches() {
+  const matched = new Set();
+  const N = CONFIG.rows, M = CONFIG.cols;
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < M; c++) {
+      const s = grid[r][c];
+      if (!s || s.isMagic) continue;
+      for (const [dr, dc] of dirs) {
+        let len = 1;
+        let rr = r + dr, cc = c + dc;
+        while (rr >= 0 && rr < N && cc >= 0 && cc < M) {
+          const t = grid[rr][cc];
+          if (!t || t.isMagic || t.colorIdx !== s.colorIdx) break;
+          len++; rr += dr; cc += dc;
+        }
+        if (len >= 3) {
+          for (let k = 0; k < len; k++) matched.add((r + dr * k) + ',' + (c + dc * k));
+        }
+      }
+    }
+  }
+  return matched;
+}
+
+function resolveBoard() {
+  if (gameOver) return;
+
+  const matched = findMatches();
+  if (matched.size > 0) {
+    let removed = 0;
+    for (const key of matched) {
+      const [r, c] = key.split(',').map(Number);
+      const s = grid[r][c];
+      if (s) { removed++; grid[r][c] = null; removeMeshAnimated(s.mesh); }
+    }
+    score += removed * CONFIG.scorePerCell + CONFIG.scorePerLine;
+    lines += 1;
+    updateHUD();
+    flashMessage(`+${removed * CONFIG.scorePerCell + CONFIG.scorePerLine}`);
+    applyGravity();
+    setTimeout(() => resolveBoard(), 260);
+    return;
+  }
+
+  const newLevel = Math.floor(score / 500) + 1;
+  if (newLevel !== level) {
+    level = newLevel;
+    score += CONFIG.scorePerLevel;
+    updateHUD();
+    flashMessage(`УРОВЕНЬ ${level}`);
+  }
+
+  if (falling === null) {
+    spawnFalling();
+    if (!canMoveTo(falling.col, falling.y)) {
+      gameOver = true;
+      flashMessage('GAME OVER');
+      setTimeout(restart, 2400);
+    }
+  }
+}
+
+function applyGravity() {
+  for (let c = 0; c < CONFIG.cols; c++) {
+    let writeRow = 0;
+    for (let r = 0; r < CONFIG.rows; r++) {
+      const s = grid[r][c];
+      if (s) {
+        if (r !== writeRow) {
+          grid[writeRow][c] = s;
+          grid[r][c] = null;
+          animateFall(s.mesh, cellToWorld(c, writeRow));
+        }
+        writeRow++;
+      }
+    }
+  }
+}
+
+function animateFall(mesh, target) {
+  const start = mesh.position.clone();
+  const t0 = performance.now();
+  function tick(now) {
+    const k = Math.min(1, (now - t0) / 180);
+    const e = 1 - Math.pow(1 - k, 3);
+    mesh.position.lerpVectors(start, target, e);
+    if (k < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ============================================================
+   HUD
+   ============================================================ */
+let score = 0;
+let level = 1;
+let lines = 0;
+let gameOver = false;
+let paused = false;
+
+const elScore = document.getElementById('score');
+const elLevel = document.getElementById('level');
+const elLines = document.getElementById('lines');
+const elMsg = document.getElementById('msg');
+
+function updateHUD() {
+  elScore.textContent = score;
+  elLevel.textContent = level;
+  elLines.textContent = lines;
+}
+
+let msgTimer = null;
+function flashMessage(text) {
+  elMsg.textContent = text;
+  elMsg.style.opacity = '1';
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { elMsg.style.opacity = '0'; }, 900);
+}
+
+function restart() {
+  // очистить поле и падающую фигуру
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      const s = grid[r][c];
+      if (s) { group.remove(s.mesh); s.mesh.geometry.dispose(); }
+      grid[r][c] = null;
+    }
+  }
+  if (falling) {
+    for (const c of falling.cells) { group.remove(c.mesh); c.mesh.geometry.dispose(); }
+    falling = null;
+  }
+  score = 0; level = 1; lines = 0; gameOver = false; paused = false;
+  updateHUD();
+  spawnFalling();
+  flashMessage('СТАРТ');
+}
+
+/* ============================================================
+   НАСТРОЙКИ UI
+   ============================================================ */
+const inpCols = document.getElementById('inpCols');
+const inpRows = document.getElementById('inpRows');
+const btnApply = document.getElementById('btnApply');
+const cfgErr = document.getElementById('cfgErr');
+
+inpCols.value = CONFIG.cols;
+inpRows.value = CONFIG.rows;
+inpCols.min = LIMITS.cols.min; inpCols.max = LIMITS.cols.max;
+inpRows.min = LIMITS.rows.min; inpRows.max = LIMITS.rows.max;
+
+function applySizeSettings() {
+  cfgErr.textContent = '';
+  const cols = Math.round(Number(inpCols.value));
+  const rows = Math.round(Number(inpRows.value));
+
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) {
+    cfgErr.textContent = 'Введите целые числа';
+    return;
+  }
+  if (cols < LIMITS.cols.min || cols > LIMITS.cols.max) {
+    cfgErr.textContent = `Ширина: ${LIMITS.cols.min}..${LIMITS.cols.max}`;
+    return;
+  }
+  if (rows < LIMITS.rows.min || rows > LIMITS.rows.max) {
+    cfgErr.textContent = `Высота: ${LIMITS.rows.min}..${LIMITS.rows.max}`;
+    return;
+  }
+
+  // Убираем падающую фигуру, чтобы она не «висела» на старой сетке
+  if (falling) {
+    for (const c of falling.cells) { group.remove(c.mesh); c.mesh.geometry.dispose(); }
+    falling = null;
+  }
+
+  CONFIG.cols = cols;
+  CONFIG.rows = rows;
+  buildField();
+  restart();
+}
+
+btnApply.addEventListener('click', applySizeSettings);
+inpCols.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySizeSettings(); });
+inpRows.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySizeSettings(); });
+
+/* ============================================================
+   УПРАВЛЕНИЕ
+   ============================================================ */
+addEventListener('keydown', (e) => {
+  // не перехватывать, если фокус в input
+  if (e.target && e.target.tagName === 'INPUT') return;
+
+  if (e.key === 'p' || e.key === 'P') {
+    paused = !paused;
+    flashMessage(paused ? 'ПАУЗА' : 'ПРОДОЛЖАЕМ');
+    return;
+  }
+  if (paused || gameOver) return;
+  if (!falling) return;
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (canMoveTo(falling.col - 1, falling.y)) {
+      falling.col--;
+      computeTargets();
+    }
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (canMoveTo(falling.col + 1, falling.y)) {
+      falling.col++;
+      computeTargets();
+    }
+  } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+    e.preventDefault();
+    const cells = falling.cells;
+    const last = cells.pop();
+    cells.unshift(last);
+    cells.forEach(c => applyLookToMesh(c.mesh, c.colorIdx, c.isMagic, c.shape));
+    computeTargets();
+  } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+    e.preventDefault();
+    const cells = falling.cells;
+    const first = cells.shift();
+    cells.push(first);
+    cells.forEach(c => applyLookToMesh(c.mesh, c.colorIdx, c.isMagic, c.shape));
+    computeTargets();
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    if (falling) falling.timer = falling.fallInterval + 1;
+  }
+});
+
+/* ============================================================
+   ИГРОВОЙ ЦИКЛ
+   ============================================================ */
+const clock = new THREE.Clock();
+
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  glassMat.uniforms.uTime.value = time;
+
+  group.children.forEach(m => {
+    if (m.material && m.material.uniforms && m.material.uniforms.uTime) {
+      m.material.uniforms.uTime.value = time;
+    }
+  });
+
+  if (!paused && !gameOver && falling) {
+    falling.timer += dt;
+    falling.fallInterval = getFallInterval();
+
+    if (falling.timer >= falling.fallInterval) {
+      falling.timer -= falling.fallInterval;
+      if (canMoveTo(falling.col, falling.y - 1)) {
+        falling.y--;
+        computeTargets();
+      } else {
+        lockFalling();
+      }
+    }
+  }
+
+  if (falling && !paused) updateFallingVisual(dt);
+
+  if (waterGlow) waterGlow.rotation.z = Math.sin(time * 0.3) * 0.05;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   АДАПТАЦИЯ И СТАРТ
+   ============================================================ */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// Старт
+buildField();
+spawnFalling();
+tick();
+</script>
+</body>
+</html>
