@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
-<title>3D Columns — Glass Aquarium</title>
+<title>3D Columns — Glass Aquarium on Legs</title>
 <style>
   html, body { margin:0; height:100%; overflow:hidden; background:#05070c; font-family:system-ui,Segoe UI,Roboto,sans-serif; }
   #hud {
@@ -35,6 +35,11 @@
     border-radius:6px; padding:4px 6px; font-size:13px; outline:none;
   }
   #settings input[type="number"]:focus { border-color:#6fd0ff; box-shadow:0 0 0 2px rgba(80,200,255,.2); }
+  #settings select {
+    background:#0b1622; color:#eaffff; border:1px solid rgba(120,200,255,.35);
+    border-radius:6px; padding:4px 6px; font-size:13px; outline:none; cursor:pointer;
+  }
+  #settings select:focus { border-color:#6fd0ff; }
   #settings button {
     background:linear-gradient(180deg,#2a6fa8,#1c4c74); color:#eaffff;
     border:1px solid rgba(120,200,255,.5); border-radius:6px;
@@ -49,10 +54,10 @@
 <div id="hud">
   <div>Счёт: <b id="score">0</b></div>
   <div>Уровень: <b id="level">1</b></div>
-  <div>Линии: <b id="lines">0</b></div>
+  <div>Серии: <b id="lines">0</b></div>
 </div>
 <div id="msg"></div>
-<div id="hint">←/→ сдвиг · ↑/↓ перестановка цветов · Space — вниз · P — пауза</div>
+<div id="hint">←/→ сдвиг · ↑/↓ перестановка · Space (удерживать) — ускорение · P — пауза</div>
 
 <div id="settings">
   <label>Ширина (ячейки)
@@ -60,6 +65,19 @@
   </label>
   <label>Высота (ячейки)
     <input type="number" id="inpRows" min="5" max="24" step="1" />
+  </label>
+  <label>Элементов в фигуре
+    <input type="number" id="inpHeight" min="1" max="7" step="1" />
+  </label>
+  <label>Цветов
+    <input type="number" id="inpColors" min="3" max="8" step="1" />
+  </label>
+  <label>Форма элементов
+    <select id="selShape">
+      <option value="mixed">Вперемешку</option>
+      <option value="box">Кубики</option>
+      <option value="sphere">Шарики</option>
+    </select>
   </label>
   <button id="btnApply">Применить (перезапуск)</button>
   <div class="err" id="cfgErr"></div>
@@ -82,19 +100,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
    КОНФИГУРАЦИЯ
    ============================================================ */
 const CONFIG = {
-  // Размер «корзины» (аквариума) в ячейках — целые числа
-  cols: 7,          // ширина корзины (3..15)
-  rows: 14,         // высота корзины (5..24)
-
+  cols: 7,
+  rows: 14,
   depth: 1,
   columnHeight: 3,
   colors: 5,
-  shape: 'mixed',           // 'box' | 'sphere' | 'mixed'
+  shape: 'mixed',
   cell: 1.0,
   gap: 0.08,
   fallStart: 0.85,
   fallMin: 0.12,
   fallStep: 0.07,
+  softDropInterval: 0.05,
   scorePerCell: 10,
   scorePerLine: 50,
   scorePerLevel: 250,
@@ -102,19 +119,29 @@ const CONFIG = {
   glassThickness: 0.12,
   glassHeightExtra: 1.4,
   shadowMapSize: 2048,
+  spinMin: 0.1,
+  spinMax: 0.5,
+  // зазор между дном аквариума и поверхностью стола (устраняет z-fighting)
+  floorGap: 0.06,
 };
 
 const LIMITS = {
   cols: { min: 3, max: 15 },
   rows: { min: 5, max: 24 },
+  height: { min: 1, max: 7 },
+  colors: { min: 3, max: 8 },
 };
 
-const COLORS = [
-  0xff4d6d, 0x4dd2ff, 0x7cff6b, 0xffd93d, 0xb26bff, 0xff9f43, 0x8affff,
-].slice(0, CONFIG.colors);
+const PALETTE = [
+  0xff4d6d, 0x4dd2ff, 0x7cff6b, 0xffd93d, 0xb26bff, 0xff9f43, 0x8affff, 0x5cffdb,
+];
+let COLORS = PALETTE.slice(0, CONFIG.colors);
+function rebuildPalette() {
+  COLORS = PALETTE.slice(0, CONFIG.colors);
+}
 
 /* ============================================================
-   БАЗОВАЯ СЦЕНА
+   СЦЕНА
    ============================================================ */
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -221,13 +248,125 @@ function sphereCanvas(size = 256) {
   return tex;
 }
 
+// Текстура дерева для стола
+function woodCanvas(size = 1024) {
+  const { c, ctx } = makeCanvas(size);
+  ctx.fillStyle = '#3a2518';
+  ctx.fillRect(0, 0, size, size);
+  // базовые полосы
+  for (let y = 0; y < size; y++) {
+    const n = Math.sin(y * 0.02) * 0.5 + Math.sin(y * 0.05) * 0.3 + Math.random() * 0.2;
+    const shade = 0.7 + n * 0.3;
+    ctx.fillStyle = `rgba(${Math.floor(58 * shade)},${Math.floor(37 * shade)},${Math.floor(24 * shade)},1)`;
+    ctx.fillRect(0, y, size, 1);
+  }
+  // волокна
+  for (let i = 0; i < 200; i++) {
+    const y = Math.random() * size;
+    const alpha = 0.03 + Math.random() * 0.08;
+    ctx.strokeStyle = `rgba(20,10,5,${alpha})`;
+    ctx.lineWidth = 0.5 + Math.random() * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    let cy = y;
+    for (let x = 0; x < size; x += 20) {
+      cy += (Math.random() - 0.5) * 2;
+      ctx.lineTo(x, cy);
+    }
+    ctx.stroke();
+  }
+  // блики
+  for (let i = 0; i < 60; i++) {
+    const y = Math.random() * size;
+    ctx.strokeStyle = `rgba(120,80,50,${0.02 + Math.random() * 0.05})`;
+    ctx.lineWidth = 0.5 + Math.random();
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(size, y + (Math.random() - 0.5) * 10);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Нормаль-карта для лёгких неровностей стекла (пузырьки/волны)
+function glassNormalCanvas(size = 512) {
+  const { c, ctx } = makeCanvas(size);
+  const img = ctx.createImageData(size, size);
+  // heightmap из суммы синусов + шум
+  const height = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size;
+      let h = 0;
+      h += Math.sin(u * Math.PI * 6 + Math.sin(v * Math.PI * 2) * 1.2) * 0.5;
+      h += Math.sin(v * Math.PI * 8 + Math.sin(u * Math.PI * 3) * 0.8) * 0.35;
+      h += Math.sin((u + v) * Math.PI * 10) * 0.15;
+      h += (Math.random() - 0.5) * 0.08;
+      height[y * size + x] = h;
+    }
+  }
+  // нормали из heightmap
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const xl = (x - 1 + size) % size, xr = (x + 1) % size;
+      const yt = (y - 1 + size) % size, yb = (y + 1) % size;
+      const dx = height[y * size + xr] - height[y * size + xl];
+      const dy = height[yb * size + x] - height[yt * size + x];
+      const nx = -dx * 0.5, ny = -dy * 0.5, nz = 1;
+      const len = Math.hypot(nx, ny, nz);
+      const i = (y * size + x) * 4;
+      img.data[i]     = Math.floor((nx / len * 0.5 + 0.5) * 255);
+      img.data[i + 1] = Math.floor((ny / len * 0.5 + 0.5) * 255);
+      img.data[i + 2] = Math.floor((nz / len * 0.5 + 0.5) * 255);
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
+// Пятна «грязи» / блики — для бликов на стекле
+function glassBlotchCanvas(size = 512) {
+  const { c, ctx } = makeCanvas(size);
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 10 + Math.random() * 60;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const a = 0.02 + Math.random() * 0.08;
+    g.addColorStop(0, `rgba(255,255,255,${a})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const glassNormalTex = glassNormalCanvas(512);
+glassNormalTex.repeat.set(3, 4);
+const glassBlotchTex = glassBlotchCanvas(512);
+glassBlotchTex.repeat.set(2, 3);
+
 const floorTex = noiseCanvas(512, [8, 14, 24], 18, 5);
 floorTex.repeat.set(4, 4);
 const glassStreakTex = glassStreakCanvas(512);
 glassStreakTex.repeat.set(2, 3);
 const sphereTex = sphereCanvas(256);
-const tableTex = noiseCanvas(512, [14, 18, 28], 12, 3);
-tableTex.repeat.set(3, 3);
+const woodTex = woodCanvas(1024);
+woodTex.repeat.set(2, 2);
 
 /* ============================================================
    ШЕЙДЕРЫ
@@ -236,47 +375,114 @@ const glassMat = new THREE.ShaderMaterial({
   transparent: true,
   depthWrite: false,
   side: THREE.DoubleSide,
+  blending: THREE.NormalBlending,
   uniforms: {
-    uTime: { value: 0 },
-    uColor: { value: new THREE.Color(0x9fe9ff) },
-    uStreak: { value: glassStreakTex },
+    uTime:      { value: 0 },
+    uTint:      { value: new THREE.Color(0x9fe9ff) },   // основной оттенок
+    uTintDeep:  { value: new THREE.Color(0x2a5f8a) },   // оттенок в глубине
+    uStreak:    { value: glassStreakTex },
+    uNormal:    { value: glassNormalTex },
+    uBlotch:    { value: glassBlotchTex },
+    uEnvColor:  { value: new THREE.Color(0x0a1a2a) },
+    uLightDir:  { value: new THREE.Vector3(0.4, 0.7, 0.6).normalize() },
   },
   vertexShader: /* glsl */`
     varying vec3 vNormalW;
     varying vec3 vViewDir;
-    varying vec2 vUv;
     varying vec3 vWorldPos;
+    varying vec2 vUv;
+    varying float vFresnel;
+
     void main() {
       vUv = uv;
       vec4 wp = modelMatrix * vec4(position, 1.0);
       vWorldPos = wp.xyz;
-      vNormalW = normalize(mat3(modelMatrix) * normal);
+      vec3 n = normalize(mat3(modelMatrix) * normal);
+      vNormalW = n;
       vViewDir = normalize(cameraPosition - wp.xyz);
+      vFresnel = pow(1.0 - abs(dot(n, vViewDir)), 3.0);
       gl_Position = projectionMatrix * viewMatrix * wp;
     }
   `,
   fragmentShader: /* glsl */`
     uniform float uTime;
-    uniform vec3 uColor;
+    uniform vec3  uTint;
+    uniform vec3  uTintDeep;
+    uniform vec3  uEnvColor;
+    uniform vec3  uLightDir;
     uniform sampler2D uStreak;
-    varying vec3 vNormalW;
-    varying vec3 vViewDir;
-    varying vec2 vUv;
-    varying vec3 vWorldPos;
+    uniform sampler2D uNormal;
+    uniform sampler2D uBlotch;
+
+    varying vec3  vNormalW;
+    varying vec3  vViewDir;
+    varying vec3  vWorldPos;
+    varying vec2  vUv;
+    varying float vFresnel;
+
+    // хеш-шум для тонкой «пыли»
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
 
     void main() {
-      float f = pow(1.0 - max(dot(vNormalW, vViewDir), 0.0), 2.5);
-      vec2 uv = vUv;
-      uv.y += uTime * 0.04;
-      vec3 streak = texture2D(uStreak, uv).rgb;
-      float pulse = 0.5 + 0.5 * sin(uTime * 1.2 + vWorldPos.y * 0.6);
-      float grid = smoothstep(0.92, 1.0, fract(vUv.x * 8.0));
-      grid += smoothstep(0.92, 1.0, fract(vUv.y * 10.0));
-      grid *= 0.15;
+      // --- нормаль с лёгкими искажениями (пузырьки/волны) ---
+      vec2 nUv = vUv;
+      nUv.y += uTime * 0.01;
+      vec3 nTex = texture2D(uNormal, nUv).rgb * 2.0 - 1.0;
+      vec3 N = normalize(vNormalW + nTex * 0.12);
+      vec3 V = normalize(vViewDir);
 
-      vec3 col = uColor * (0.12 + f * 1.4 + streak * 0.8 + grid) + streak * 0.15;
-      col += uColor * pulse * 0.05;
-      float alpha = clamp(0.10 + f * 0.55 + streak.r * 0.25, 0.0, 0.85);
+      // --- fresnel (сильнее по краям, слабее в центре) ---
+      float fres = pow(1.0 - abs(dot(N, V)), 3.0);
+
+      // --- отражение «окружения» (упрощённое): свет сверху + оттенок ---
+      vec3 R = reflect(-V, N);
+      float skyMix = clamp(R.y * 0.5 + 0.5, 0.0, 1.0);
+      vec3 env = mix(uTintDeep, uTint, skyMix);
+
+      // --- направленный блик (sun) ---
+      vec3 L = normalize(uLightDir);
+      vec3 H = normalize(L + V);
+      float spec = pow(max(dot(N, H), 0.0), 90.0);
+      float specWide = pow(max(dot(N, H), 0.0), 8.0) * 0.15;
+
+      // --- полосы (streak) — движутся по стеклу ---
+      vec2 sUv = vUv;
+      sUv.y += uTime * 0.03;
+      sUv.x += sin(uTime * 0.2 + vUv.y * 4.0) * 0.01;
+      vec3 streak = texture2D(uStreak, sUv).rgb;
+
+      // --- пятна/блики ---
+      vec3 blotch = texture2D(uBlotch, vUv * vec2(1.5, 2.0) + vec2(uTime * 0.005, 0.0)).rgb;
+
+      // --- «пыль» по краям ---
+      float dust = hash(floor(vUv * 400.0)) * 0.04 * smoothstep(0.4, 1.0, fres);
+
+      // --- лёгкая пульсация аквариумного света ---
+      float pulse = 0.5 + 0.5 * sin(uTime * 0.9 + vWorldPos.y * 0.7);
+
+      // --- сборка цвета ---
+      vec3 col = uEnvColor;
+      col += env * (0.25 + fres * 0.9);                     // отражение
+      col += uTint * (0.10 + pulse * 0.05);                 // базовый оттенок
+      col += vec3(1.0) * (spec * 1.8 + specWide);           // блики солнца
+      col += streak * (0.10 + fres * 0.35);                 // полосы
+      col += blotch * 0.25;                                 // пятна
+      col += dust;                                          // пыль
+
+      // --- альфа: почти прозрачное в центре, плотное по краям ---
+      float alpha = 0.04
+                  + fres * 0.55
+                  + spec * 0.9
+                  + streak.r * 0.12
+                  + blotch.r * 0.15;
+      alpha = clamp(alpha, 0.0, 0.92);
+
+      // лёгкое затемнение нижней части (вода)
+      float depthDark = smoothstep(-0.5, 1.0, vWorldPos.y);
+      col *= mix(0.6, 1.0, depthDark);
+
       gl_FragColor = vec4(col, alpha);
     }
   `,
@@ -313,23 +519,18 @@ const magicMat = new THREE.ShaderMaterial({
 });
 
 /* ============================================================
-   ИЗМЕНЯЕМЫЕ ОБЪЕКТЫ ПОЛЯ / АКВАРИУМА / СВЕТА
-   (пересоздаются в buildField)
+   ПОЛЕ / АКВАРИУМ / СВЕТ
    ============================================================ */
 let W = 0, H = 0, D = 0;
 let aquarium = null;
-let table = null;
 let waterGlow = null;
+let table = null;
 let keyLight = null, rimLight = null, fillLight = null;
 
-// Динамический массив поля
 let grid = [];
 const group = new THREE.Group();
 scene.add(group);
 
-/* ============================================================
-   ПОСТРОЕНИЕ ПОЛЯ И АКВАРИУМА ПОД ТЕКУЩИЕ CONFIG.cols/rows
-   ============================================================ */
 function disposeObject(obj) {
   if (!obj) return;
   obj.traverse?.((o) => {
@@ -343,24 +544,25 @@ function disposeObject(obj) {
 }
 
 function clearFieldObjects() {
-  // Удалить все элементы поля
   for (let i = group.children.length - 1; i >= 0; i--) {
-    const m = group.children[i];
-    disposeObject(m);
+    disposeObject(group.children[i]);
   }
-
-  if (aquarium) { disposeObject(aquarium); aquarium = null; }
-  if (table)    { disposeObject(table);    table = null; }
+  if (aquarium)  { disposeObject(aquarium);  aquarium = null; }
   if (waterGlow) { disposeObject(waterGlow); waterGlow = null; }
-  if (keyLight)  { scene.remove(keyLight); keyLight.dispose?.(); keyLight = null; }
-  if (rimLight)  { scene.remove(rimLight); rimLight.dispose?.(); rimLight = null; }
-  if (fillLight) { scene.remove(fillLight); fillLight.dispose?.(); fillLight = null; }
+  if (table)     { disposeObject(table);     table = null; }
+  if (keyLight)  { scene.remove(keyLight);  keyLight = null; }
+  if (rimLight)  { scene.remove(rimLight);  rimLight = null; }
+  if (fillLight) { scene.remove(fillLight); fillLight = null; }
+
+  for (let i = scene.children.length - 1; i >= 0; i--) {
+    const o = scene.children[i];
+    if (o.userData && o.userData.isLeg) disposeObject(o);
+  }
 }
 
 function buildField() {
   clearFieldObjects();
 
-  // Пересчёт размеров
   W = CONFIG.cols * CONFIG.cell;
   H = CONFIG.rows * CONFIG.cell;
   D = CONFIG.depth * CONFIG.cell;
@@ -379,6 +581,10 @@ function buildField() {
   keyLight.shadow.bias = -0.0006;
   keyLight.shadow.normalBias = 0.02;
   scene.add(keyLight);
+  
+  glassMat.uniforms.uLightDir.value.copy(
+      keyLight.position.clone().normalize()
+    );
 
   rimLight = new THREE.DirectionalLight(0x5fc8ff, 1.4);
   rimLight.position.set(-W * 1.2, H * 0.8, -D * 5);
@@ -388,50 +594,69 @@ function buildField() {
   fillLight.position.set(0, H * 0.2, D * 3 + 2);
   scene.add(fillLight);
 
+  const t = CONFIG.glassThickness;
+  const floorGap = CONFIG.floorGap;
+  const legH = 0.9;
+
+  // --- Стол (под аквариумом) ---
+  // Верх стола на y = -(t + floorGap + legH), чтобы между дном аквариума (y=0)
+  // и столом было пространство, заполненное ножками.
+  table = new THREE.Group();
+  scene.add(table);
+
+  const tableMat = new THREE.MeshStandardMaterial({
+    map: woodTex, roughness: 0.7, metalness: 0.05,
+    color: 0x8a6a4a,
+  });
+  const tableSize = Math.max(W, H) * 2.5;
+  const tableTopY = -(t + floorGap + legH); // верх стола
+  const tableThickness = 0.15;
+  const tableGeo = new THREE.BoxGeometry(tableSize, tableThickness, tableSize);
+  const tableTop = new THREE.Mesh(tableGeo, tableMat);
+  tableTop.position.y = tableTopY - tableThickness / 2;
+  tableTop.receiveShadow = true;
+  tableTop.castShadow = true;
+  table.add(tableTop);
+
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.6, metalness: 0.1 });
+  const edgeGeo = new THREE.BoxGeometry(tableSize + 0.1, 0.05, tableSize + 0.1);
+  const edge = new THREE.Mesh(edgeGeo, edgeMat);
+  edge.position.y = tableTopY + 0.02;
+  edge.receiveShadow = true;
+  table.add(edge);
+
   // --- Аквариум ---
+  // НЕ поднимаем: дно аквариума (верх плоскости дна) на y = 0,
+  // там же, где стоит сетка (cellToWorld → y = row*cell + cell/2, row=0 → y=0.5).
   aquarium = new THREE.Group();
   scene.add(aquarium);
 
   const glassH = H + CONFIG.glassHeightExtra;
-  const t = CONFIG.glassThickness;
 
-  // Пол
   const floorGeo = new THREE.PlaneGeometry(W + t * 2, D + t * 2);
   const floorMat = new THREE.MeshStandardMaterial({
-    map: floorTex,
-    roughness: 0.85,
-    metalness: 0.15,
-    color: 0x9fc4e0,
-    emissive: 0x0a1a26,
-    emissiveIntensity: 0.6,
+    map: floorTex, roughness: 0.85, metalness: 0.15,
+    color: 0x9fc4e0, emissive: 0x0a1a26, emissiveIntensity: 0.6,
   });
   const floorMesh = new THREE.Mesh(floorGeo, floorMat);
   floorMesh.rotation.x = -Math.PI / 2;
   floorMesh.receiveShadow = true;
+  floorMesh.position.y = 0; // плоскость дна
   aquarium.add(floorMesh);
 
-  // Стол
-  const tableMat = new THREE.MeshStandardMaterial({
-    map: tableTex, roughness: 0.9, metalness: 0.05, color: 0x223044,
-  });
-  table = new THREE.Mesh(new THREE.BoxGeometry(W * 1.8, 0.4, D * 6 + 3), tableMat);
-  table.position.set(0, -0.25, 0.6);
-  table.receiveShadow = true;
-  scene.add(table);
-
-  // Стенки (без передней)
   const addGlassPanel = (w, h, d, x, y, z) => {
     const geo = new THREE.BoxGeometry(w, h, d);
     const m = new THREE.Mesh(geo, glassMat);
     m.position.set(x, y, z);
     aquarium.add(m);
   };
-  addGlassPanel(W + t * 2, glassH, t, 0, glassH / 2, -D / 2 - t / 2); // задняя
-  addGlassPanel(t, glassH, D + t * 2, -W / 2 - t / 2, glassH / 2, 0); // левая
-  addGlassPanel(t, glassH, D + t * 2,  W / 2 + t / 2, glassH / 2, 0); // правая
-  addGlassPanel(W + t * 2, t, D + t * 2, 0, -t / 2, 0);               // дно
+  addGlassPanel(W + t * 2, glassH, t, 0, glassH / 2, -D / 2 - t / 2);
+  addGlassPanel(t, glassH, D + t * 2, -W / 2 - t / 2, glassH / 2, 0);
+  addGlassPanel(t, glassH, D + t * 2,  W / 2 + t / 2, glassH / 2, 0);
+  // нижняя стеклянная панель — целиком ПОД плоскостью дна (верх панели на y = -0.005),
+  // чтобы не пересекаться с floorMesh (устраняет дрожание текстуры)
+  addGlassPanel(W + t * 2, t, D + t * 2, 0, -t / 2 - 0.005, 0);
 
-  // Рёбра (только задние)
   const ribMat = new THREE.MeshStandardMaterial({ color: 0x2b3d55, roughness: 0.35, metalness: 0.9 });
   const ribGeo = new THREE.BoxGeometry(t * 1.6, glassH, t * 1.6);
   for (const x of [-W / 2, W / 2]) {
@@ -442,7 +667,18 @@ function buildField() {
     aquarium.add(rib);
   }
 
-  // Свечение воды
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x1b2a3d, roughness: 0.3, metalness: 0.95 });
+  const frameBar = (w, d, x, z) => {
+    const g = new THREE.BoxGeometry(w, t * 1.4, d);
+    const m = new THREE.Mesh(g, frameMat);
+    m.position.set(x, glassH, z);
+    m.castShadow = true;
+    aquarium.add(m);
+  };
+  frameBar(W + t * 2, t * 1.6, 0, -D / 2 - t / 2);
+  frameBar(t * 1.6, D + t * 2, -W / 2 - t / 2, 0);
+  frameBar(t * 1.6, D + t * 2,  W / 2 + t / 2, 0);
+
   waterGlow = new THREE.Mesh(
     new THREE.PlaneGeometry(W, D * 1.2),
     new THREE.MeshBasicMaterial({
@@ -451,15 +687,49 @@ function buildField() {
     })
   );
   waterGlow.rotation.x = -Math.PI / 2;
-  waterGlow.position.y = 0.02;
+  waterGlow.position.y = 0.03;
   aquarium.add(waterGlow);
 
-  // --- Сетка поля ---
+  // --- Ножки аквариума ---
+  // Идут от нижней плоскости аквариума (y = -t) до стола (y = tableTopY).
+  const legMat = new THREE.MeshStandardMaterial({
+    color: 0x1b2a3d, roughness: 0.35, metalness: 0.95,
+    emissive: 0x061420, emissiveIntensity: 0.4,
+  });
+  const legR = 0.09;
+  // Длина ножки: от -t до tableTopY => legLen = -t - tableTopY = legH + floorGap
+  const legLen = legH + floorGap;
+  const legGeo = new THREE.CylinderGeometry(legR, legR * 1.15, legLen, 16, 1);
+  const footGeo = new THREE.CylinderGeometry(legR * 2.0, legR * 2.0, 0.08, 20);
+  const footMat = new THREE.MeshStandardMaterial({ color: 0x0e1622, roughness: 0.5, metalness: 0.8 });
+
+  const inset = t * 3 + 0.15;
+  const legPositions = [
+    [-W / 2 + inset, -D / 2 + inset],
+    [ W / 2 - inset, -D / 2 + inset],
+    [-W / 2 + inset,  D / 2 - inset],
+    [ W / 2 - inset,  D / 2 - inset],
+  ];
+  for (const [x, z] of legPositions) {
+    const leg = new THREE.Mesh(legGeo, legMat);
+    // центр ножки — посередине между -t и tableTopY
+    leg.position.set(x, (-t + tableTopY) / 2, z);
+    leg.castShadow = true;
+    leg.receiveShadow = true;
+    leg.userData.isLeg = true;
+    scene.add(leg);
+
+    const foot = new THREE.Mesh(footGeo, footMat);
+    foot.position.set(x, tableTopY + 0.04, z);
+    foot.castShadow = true;
+    foot.userData.isLeg = true;
+    scene.add(foot);
+  }
+
   grid = Array.from({ length: CONFIG.rows }, () =>
     Array.from({ length: CONFIG.cols }, () => null)
   );
 
-  // --- Камера под новые размеры ---
   const camDist = Math.max(W, H);
   camera.position.set(W * 0.9, H * 0.75, camDist * 0.95);
   controls.target.set(0, H * 0.48, 0);
@@ -480,13 +750,17 @@ function createElementMesh(colorIdx, isMagic = false, forcedShape = null) {
   let geo, mat;
   const size = CONFIG.cell - CONFIG.gap;
 
-  if (shape === 'sphere') {
+  if (isMagic) {
+    mat = magicMat.clone();
+    mat.uniforms.uTime.value = 0;
+    mat.userData.isMagic = true;
+  } else if (shape === 'sphere') {
     geo = new THREE.SphereGeometry(size / 2, 32, 24);
     mat = new THREE.MeshStandardMaterial({
-      color: isMagic ? 0xffffff : COLORS[colorIdx],
+      color: COLORS[colorIdx],
       roughness: 0.15, metalness: 0.35, map: sphereTex,
-      emissive: isMagic ? 0x8866ff : COLORS[colorIdx],
-      emissiveIntensity: isMagic ? 1.2 : 0.08,
+      emissive: COLORS[colorIdx],
+      emissiveIntensity: 0.08,
       envMapIntensity: 1.2,
     });
   } else {
@@ -500,55 +774,28 @@ function createElementMesh(colorIdx, isMagic = false, forcedShape = null) {
     }
     geo.computeVertexNormals();
     mat = new THREE.MeshStandardMaterial({
-      color: isMagic ? 0xffffff : COLORS[colorIdx],
+      color: COLORS[colorIdx],
       roughness: 0.25, metalness: 0.4,
-      emissive: isMagic ? 0x8866ff : COLORS[colorIdx],
-      emissiveIntensity: isMagic ? 1.2 : 0.06,
+      emissive: COLORS[colorIdx],
+      emissiveIntensity: 0.06,
     });
-  }
-
-  if (isMagic) {
-    mat = magicMat.clone();
-    mat.uniforms.uTime.value = 0;
-    mat.userData.isMagic = true;
   }
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  mesh.userData = { colorIdx, isMagic, shape };
+  mesh.userData = {
+    colorIdx, isMagic, shape,
+    spin: {
+      axis: new THREE.Vector3(
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1
+      ).normalize(),
+      speed: CONFIG.spinMin + Math.random() * (CONFIG.spinMax - CONFIG.spinMin),
+    },
+  };
   return mesh;
-}
-
-function applyLookToMesh(mesh, colorIdx, isMagic, shape) {
-  const m = mesh.material;
-  if (isMagic) {
-    if (!m.userData || !m.userData.isMagic) {
-      mesh.material = magicMat.clone();
-      mesh.material.uniforms.uTime.value = 0;
-      mesh.material.userData.isMagic = true;
-    }
-  } else {
-    if (m.userData && m.userData.isMagic) {
-      const isSphere = shape === 'sphere';
-      const std = new THREE.MeshStandardMaterial({
-        color: COLORS[colorIdx],
-        roughness: isSphere ? 0.15 : 0.25,
-        metalness: 0.35,
-        map: isSphere ? sphereTex : null,
-        emissive: COLORS[colorIdx],
-        emissiveIntensity: 0.08,
-        envMapIntensity: 1.2,
-      });
-      mesh.material.dispose();
-      mesh.material = std;
-    } else {
-      m.color.setHex(COLORS[colorIdx]);
-      m.emissive.setHex(COLORS[colorIdx]);
-    }
-  }
-  mesh.userData.colorIdx = colorIdx;
-  mesh.userData.isMagic = isMagic;
 }
 
 function cellToWorld(col, row) {
@@ -559,11 +806,21 @@ function cellToWorld(col, row) {
 }
 
 /* ============================================================
+   ЭПОХА ИГРЫ
+   ============================================================ */
+let epoch = 0;
+function schedule(fn, delay) {
+  const e = epoch;
+  setTimeout(() => { if (e === epoch) fn(); }, delay);
+}
+
+/* ============================================================
    ПАДАЮЩАЯ ФИГУРА
    ============================================================ */
 let falling = null;
 
 function spawnFalling() {
+  if (gameOver) return;
   if (!grid.length || !grid[0]) return;
 
   const cells = [];
@@ -583,17 +840,20 @@ function spawnFalling() {
   }
 
   const startCol = Math.floor(CONFIG.cols / 2);
-  const startY = CONFIG.rows;
+  const startY = CONFIG.rows + CONFIG.columnHeight - 1;
 
   falling = {
-    col: startCol, y: startY, cells,
-    timer: 0, fallInterval: getFallInterval(),
+    col: startCol,
+    y: startY,
+    visualRow: startY,
+    cells,
+    fallInterval: getFallInterval(),
+    softDrop: false,
   };
 
   computeTargets();
   for (const c of cells) {
     c.mesh.position.copy(c.target);
-    c.mesh.position.y += CONFIG.cell * 1.5;
   }
 }
 
@@ -604,23 +864,27 @@ function getFallInterval() {
 function computeTargets() {
   if (!falling) return;
   const n = falling.cells.length;
+  const vRow = Math.max(falling.visualRow, falling.y);
   for (let i = 0; i < n; i++) {
-    const row = falling.y - (n - 1 - i);
+    const row = vRow - (n - 1 - i);
     falling.cells[i].target.copy(cellToWorld(falling.col, row));
   }
 }
 
-function layoutFalling() { computeTargets(); }
-
 function updateFallingVisual(dt) {
   if (!falling) return;
-  const k = 1 - Math.exp(-22 * dt);
-  for (const c of falling.cells) c.mesh.position.lerp(c.target, k);
+  computeTargets();
+
+  const kX = 1 - Math.exp(-22 * dt);
+  for (const c of falling.cells) {
+    c.mesh.position.x += (c.target.x - c.mesh.position.x) * kX;
+    c.mesh.position.y = c.target.y;
+    c.mesh.position.z = c.target.z;
+  }
 }
 
-function canMoveTo(col, y) {
+function canMoveTo(col, y, n = CONFIG.columnHeight) {
   if (col < 0 || col >= CONFIG.cols) return false;
-  const n = falling.cells.length;
   for (let i = 0; i < n; i++) {
     const row = y - (n - 1 - i);
     if (row < 0) return false;
@@ -629,30 +893,57 @@ function canMoveTo(col, y) {
   return true;
 }
 
+function bounceMesh(mesh) {
+  const start = performance.now();
+  const dur = 140;
+  const baseX = mesh.scale.x;
+  const baseY = mesh.scale.y;
+  const baseZ = mesh.scale.z;
+  function tickB(now) {
+    const k = Math.min(1, (now - start) / dur);
+    const s = Math.sin(k * Math.PI) * 0.12;
+    mesh.scale.set(
+      baseX * (1 + s * 0.6),
+      baseY * (1 - s),
+      baseZ * (1 + s * 0.6)
+    );
+    if (k < 1) requestAnimationFrame(tickB);
+    else mesh.scale.set(baseX, baseY, baseZ);
+  }
+  requestAnimationFrame(tickB);
+}
+
 function lockFalling() {
+  if (!falling) return;
   const baseRow = falling.y;
+  const col = falling.col;
+  const cells = falling.cells;
+  const n = cells.length;
+  falling = null;
+
   const newlyPlaced = [];
-  const n = falling.cells.length;
   for (let i = 0; i < n; i++) {
-    const c = falling.cells[i];
+    const c = cells[i];
     const row = baseRow - (n - 1 - i);
-    if (row < 0 || row >= CONFIG.rows) continue;
+    if (row < 0 || row >= CONFIG.rows) {
+      removeMeshAnimated(c.mesh);
+      continue;
+    }
     const slot = { colorIdx: c.colorIdx, isMagic: c.isMagic, mesh: c.mesh, shape: c.shape };
-    grid[row][falling.col] = slot;
-    const p = cellToWorld(falling.col, row);
+    grid[row][col] = slot;
+    const p = cellToWorld(col, row);
     c.mesh.position.copy(p);
     c.target.copy(p);
-    newlyPlaced.push({ row, col: falling.col, slot });
+    newlyPlaced.push({ row, col, slot });
+
+    if (!c.isMagic) bounceMesh(c.mesh);
   }
 
   for (const { row, col, slot } of newlyPlaced) {
     if (slot.isMagic) triggerMagic(slot, row, col);
   }
 
-  falling = null;
-
   resolveBoard();
-  if (!gameOver) spawnFalling();
 }
 
 /* ============================================================
@@ -682,7 +973,10 @@ function triggerMagic(magicSlot, row, col) {
     grid[r][c] = null;
     removeMeshAnimated(s.mesh);
   }
-  flashMessage('МАГИЯ!');
+  const gained = toRemove.length * CONFIG.scorePerCell;
+  score += gained;
+  updateHUD();
+  flashMessage(`МАГИЯ! +${gained}`);
 }
 
 function removeMeshAnimated(mesh) {
@@ -693,7 +987,11 @@ function removeMeshAnimated(mesh) {
     const s = t0 * (1 - k);
     mesh.scale.setScalar(Math.max(0.001, s));
     if (k < 1) requestAnimationFrame(tick);
-    else { group.remove(mesh); mesh.geometry.dispose(); }
+    else {
+      group.remove(mesh);
+      mesh.geometry.dispose();
+      if (mesh.material) mesh.material.dispose();
+    }
   }
   requestAnimationFrame(tick);
 }
@@ -743,7 +1041,7 @@ function resolveBoard() {
     updateHUD();
     flashMessage(`+${removed * CONFIG.scorePerCell + CONFIG.scorePerLine}`);
     applyGravity();
-    setTimeout(() => resolveBoard(), 260);
+    schedule(resolveBoard, 260);
     return;
   }
 
@@ -755,14 +1053,24 @@ function resolveBoard() {
     flashMessage(`УРОВЕНЬ ${level}`);
   }
 
-  if (falling === null) {
-    spawnFalling();
-    if (!canMoveTo(falling.col, falling.y)) {
-      gameOver = true;
-      flashMessage('GAME OVER');
-      setTimeout(restart, 2400);
-    }
+  if (falling === null) trySpawn();
+}
+
+function trySpawn() {
+  const col = Math.floor(CONFIG.cols / 2);
+  let blocked = false;
+  for (let i = 0; i < CONFIG.columnHeight; i++) {
+    const row = CONFIG.rows - 1 - i;
+    if (row >= 0 && grid[row][col]) { blocked = true; break; }
   }
+  if (blocked) {
+    falling = null;
+    gameOver = true;
+    flashMessage('GAME OVER', 0);
+    schedule(restart, 2400);
+    return;
+  }
+  spawnFalling();
 }
 
 function applyGravity() {
@@ -815,26 +1123,22 @@ function updateHUD() {
 }
 
 let msgTimer = null;
-function flashMessage(text) {
+function flashMessage(text, holdMs = 900) {
   elMsg.textContent = text;
   elMsg.style.opacity = '1';
   clearTimeout(msgTimer);
-  msgTimer = setTimeout(() => { elMsg.style.opacity = '0'; }, 900);
+  if (holdMs > 0) msgTimer = setTimeout(() => { elMsg.style.opacity = '0'; }, holdMs);
 }
 
 function restart() {
-  // очистить поле и падающую фигуру
+  epoch++;
+  for (let i = group.children.length - 1; i >= 0; i--) {
+    disposeObject(group.children[i]);
+  }
   for (let r = 0; r < grid.length; r++) {
-    for (let c = 0; c < grid[r].length; c++) {
-      const s = grid[r][c];
-      if (s) { group.remove(s.mesh); s.mesh.geometry.dispose(); }
-      grid[r][c] = null;
-    }
+    for (let c = 0; c < grid[r].length; c++) grid[r][c] = null;
   }
-  if (falling) {
-    for (const c of falling.cells) { group.remove(c.mesh); c.mesh.geometry.dispose(); }
-    falling = null;
-  }
+  falling = null;
   score = 0; level = 1; lines = 0; gameOver = false; paused = false;
   updateHUD();
   spawnFalling();
@@ -846,58 +1150,73 @@ function restart() {
    ============================================================ */
 const inpCols = document.getElementById('inpCols');
 const inpRows = document.getElementById('inpRows');
+const inpHeight = document.getElementById('inpHeight');
+const inpColors = document.getElementById('inpColors');
+const selShape = document.getElementById('selShape');
 const btnApply = document.getElementById('btnApply');
 const cfgErr = document.getElementById('cfgErr');
 
 inpCols.value = CONFIG.cols;
 inpRows.value = CONFIG.rows;
+inpHeight.value = CONFIG.columnHeight;
+inpColors.value = CONFIG.colors;
+selShape.value = CONFIG.shape;
 inpCols.min = LIMITS.cols.min; inpCols.max = LIMITS.cols.max;
 inpRows.min = LIMITS.rows.min; inpRows.max = LIMITS.rows.max;
+inpHeight.min = LIMITS.height.min; inpHeight.max = LIMITS.height.max;
+inpColors.min = LIMITS.colors.min; inpColors.max = LIMITS.colors.max;
 
 function applySizeSettings() {
   cfgErr.textContent = '';
   const cols = Math.round(Number(inpCols.value));
   const rows = Math.round(Number(inpRows.value));
+  const height = Math.round(Number(inpHeight.value));
+  const colors = Math.round(Number(inpColors.value));
+  const shape = selShape.value;
 
-  if (!Number.isFinite(cols) || !Number.isFinite(rows)) {
-    cfgErr.textContent = 'Введите целые числа';
-    return;
+  if (![cols, rows, height, colors].every(Number.isFinite)) {
+    cfgErr.textContent = 'Введите целые числа'; return;
   }
   if (cols < LIMITS.cols.min || cols > LIMITS.cols.max) {
-    cfgErr.textContent = `Ширина: ${LIMITS.cols.min}..${LIMITS.cols.max}`;
-    return;
+    cfgErr.textContent = `Ширина: ${LIMITS.cols.min}..${LIMITS.cols.max}`; return;
   }
   if (rows < LIMITS.rows.min || rows > LIMITS.rows.max) {
-    cfgErr.textContent = `Высота: ${LIMITS.rows.min}..${LIMITS.rows.max}`;
-    return;
+    cfgErr.textContent = `Высота: ${LIMITS.rows.min}..${LIMITS.rows.max}`; return;
   }
-
-  // Убираем падающую фигуру, чтобы она не «висела» на старой сетке
-  if (falling) {
-    for (const c of falling.cells) { group.remove(c.mesh); c.mesh.geometry.dispose(); }
-    falling = null;
+  const maxH = Math.min(LIMITS.height.max, rows);
+  if (height < LIMITS.height.min || height > maxH) {
+    cfgErr.textContent = `Элементов в фигуре: ${LIMITS.height.min}..${maxH}`; return;
+  }
+  if (colors < LIMITS.colors.min || colors > LIMITS.colors.max) {
+    cfgErr.textContent = `Цветов: ${LIMITS.colors.min}..${LIMITS.colors.max}`; return;
   }
 
   CONFIG.cols = cols;
   CONFIG.rows = rows;
+  CONFIG.columnHeight = height;
+  CONFIG.colors = colors;
+  CONFIG.shape = shape;
+  rebuildPalette();
   buildField();
   restart();
+  btnApply.blur();
 }
 
 btnApply.addEventListener('click', applySizeSettings);
-inpCols.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySizeSettings(); });
-inpRows.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySizeSettings(); });
+for (const el of [inpCols, inpRows, inpHeight, inpColors, selShape]) {
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySizeSettings(); });
+}
 
 /* ============================================================
    УПРАВЛЕНИЕ
    ============================================================ */
 addEventListener('keydown', (e) => {
-  // не перехватывать, если фокус в input
-  if (e.target && e.target.tagName === 'INPUT') return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
 
   if (e.key === 'p' || e.key === 'P') {
     paused = !paused;
-    flashMessage(paused ? 'ПАУЗА' : 'ПРОДОЛЖАЕМ');
+    if (falling) falling.softDrop = false;
+    flashMessage(paused ? 'ПАУЗА' : 'ПРОДОЛЖАЕМ', paused ? 0 : 900);
     return;
   }
   if (paused || gameOver) return;
@@ -920,19 +1239,21 @@ addEventListener('keydown', (e) => {
     const cells = falling.cells;
     const last = cells.pop();
     cells.unshift(last);
-    cells.forEach(c => applyLookToMesh(c.mesh, c.colorIdx, c.isMagic, c.shape));
     computeTargets();
   } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
     e.preventDefault();
     const cells = falling.cells;
     const first = cells.shift();
     cells.push(first);
-    cells.forEach(c => applyLookToMesh(c.mesh, c.colorIdx, c.isMagic, c.shape));
     computeTargets();
   } else if (e.key === ' ') {
     e.preventDefault();
-    if (falling) falling.timer = falling.fallInterval + 1;
+    falling.softDrop = true;
   }
+});
+
+addEventListener('keyup', (e) => {
+  if (e.key === ' ' && falling) falling.softDrop = false;
 });
 
 /* ============================================================
@@ -946,29 +1267,49 @@ function tick() {
   const time = clock.elapsedTime;
 
   glassMat.uniforms.uTime.value = time;
+  
+  glassMat.uniforms.uLightDir.value.set(
+  Math.sin(time * 0.1) * 0.6,
+  0.7,
+  Math.cos(time * 0.1) * 0.6
+).normalize();
 
-  group.children.forEach(m => {
+  for (let i = 0; i < group.children.length; i++) {
+    const m = group.children[i];
     if (m.material && m.material.uniforms && m.material.uniforms.uTime) {
       m.material.uniforms.uTime.value = time;
     }
-  });
-
-  if (!paused && !gameOver && falling) {
-    falling.timer += dt;
-    falling.fallInterval = getFallInterval();
-
-    if (falling.timer >= falling.fallInterval) {
-      falling.timer -= falling.fallInterval;
-      if (canMoveTo(falling.col, falling.y - 1)) {
-        falling.y--;
-        computeTargets();
-      } else {
-        lockFalling();
-      }
+    if (m.userData && m.userData.spin) {
+      m.rotateOnAxis(m.userData.spin.axis, m.userData.spin.speed * dt);
     }
   }
 
-  if (falling && !paused) updateFallingVisual(dt);
+  if (!paused && !gameOver && falling) {
+    const interval = falling.softDrop
+      ? CONFIG.softDropInterval
+      : getFallInterval();
+
+    falling.fallInterval = interval;
+
+    const speedRowsPerSec = 1 / interval;
+    falling.visualRow -= speedRowsPerSec * dt;
+
+    let guard = 0;
+    while (falling && falling.visualRow < falling.y && guard++ < 100) {
+      if (canMoveTo(falling.col, falling.y - 1)) {
+        falling.y--;
+      } else {
+        falling.visualRow = falling.y;
+        lockFalling();
+        break;
+      }
+    }
+
+    if (falling) {
+      if (falling.visualRow < falling.y) falling.visualRow = falling.y;
+      updateFallingVisual(dt);
+    }
+  }
 
   if (waterGlow) waterGlow.rotation.z = Math.sin(time * 0.3) * 0.05;
 
@@ -985,7 +1326,18 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// Старт
+window.__game = {
+  CONFIG,
+  get grid() { return grid; },
+  get falling() { return falling; },
+  get gameOver() { return gameOver; },
+  get paused() { return paused; },
+  get score() { return score; },
+  get level() { return level; },
+  get lines() { return lines; },
+  get groupSize() { return group.children.length; },
+};
+
 buildField();
 spawnFalling();
 tick();
