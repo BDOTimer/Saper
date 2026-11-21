@@ -160,7 +160,7 @@
 
 // ============================================================
 // Звук ---> тут только короткие звуки!
-// Использовать так: SND.click.play(); SND.clear.play();
+// Использовать так: SND.click.play(); SND.scratch.play();
 // ============================================================
 const Vol = 0.3; // Settings.volume;
 const kit = window.SND.createSoundKit({
@@ -171,8 +171,9 @@ const kit = window.SND.createSoundKit({
     move         : { src: "./snd/move.mp3"   , volume: Vol, pool: 4 }, // двинуть в сторону
     space        : { src: "./snd/space.mp3"  , volume: Vol, pool: 1 }, // ускорить падение
     clear        : { src: "./snd/yas.mp3"    , volume: Vol, pool: 3 }, // фигуры совпали!
+    scratch      : { src: "./snd/scratch.mp3", volume: 0.1, pool: 4 }, // мягкое ускорение падения
 });
-
+  
 kit.autoUnlock();
 window.SNDS = kit.sounds; // SNDS.boom1.play();
 

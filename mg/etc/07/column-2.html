@@ -1752,12 +1752,15 @@ function initUI(){
     if(paused||e.repeat)return;
     if(KEYMAP[code])pressDir(KEYMAP[code]);
     else if(code==='ArrowUp'||code==='KeyX'||code==='KeyZ')rotatePiece();
-    else if(code==='ArrowDown')heldSoft=true;
-    else if(code==='Space')hardDrop();
+    else if(code==='Space')
+    {   SND.scratch.play();
+        heldSoft=true;
+    }
+    else if(code==='ArrowDown')hardDrop();
   });
   addEventListener('keyup',e=>{
     if(KEYMAP[e.code])delete held[KEYMAP[e.code]];
-    if(e.code==='ArrowDown')heldSoft=false;
+    if(e.code==='Space')heldSoft=false;
   });
   for(const btn of document.querySelectorAll('#touch button')){
     const act=btn.dataset.act, dirMap={left:'L',right:'R',zF:'F',zB:'B'};
