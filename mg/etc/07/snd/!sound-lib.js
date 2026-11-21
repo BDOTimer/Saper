@@ -164,14 +164,14 @@
 // ============================================================
 const Vol = 0.3; // Settings.volume;
 const kit = window.SND.createSoundKit({
-    click        : { src: "./snd/click.mp3"  , volume: Vol, pool: 3 }, // клик по кнопкам меню
-    drop1        : { src: "./snd/drop-1.mp3" , volume: Vol, pool: 1 }, // упал на фигуру
-    drop2        : { src: "./snd/drop-2.mp3" , volume: Vol, pool: 1 }, // упал на дно
-    kikside      : { src: "./snd/kikside.mp3", volume: Vol, pool: 3 }, // удар об стенку
-    move         : { src: "./snd/move.mp3"   , volume: Vol, pool: 4 }, // двинуть в сторону
-    space        : { src: "./snd/space.mp3"  , volume: Vol, pool: 1 }, // ускорить падение
-    clear        : { src: "./snd/yas.mp3"    , volume: Vol, pool: 3 }, // фигуры совпали!
-    scratch      : { src: "./snd/scratch.mp3", volume: 0.1, pool: 4 }, // мягкое ускорение падения
+    click      : { src: "./snd/click.mp3"   , volume: Vol, pool: 3 }, // клик по кнопкам меню
+    drop1      : { src: "./snd/drop-1.mp3"  , volume: Vol, pool: 1 }, // упал на фигуру
+    drop2      : { src: "./snd/drop-2.mp3"  , volume: Vol, pool: 1 }, // упал на дно
+    kikside    : { src: "./snd/kikside2.mp3", volume: 0.1, pool: 3 }, // удар об стенку
+    move       : { src: "./snd/move.mp3"    , volume: Vol, pool: 4 }, // двинуть в сторону
+    space      : { src: "./snd/space.mp3"   , volume: Vol, pool: 1 }, // ускорить падение
+    clear      : { src: "./snd/yas.mp3"     , volume: Vol, pool: 3 }, // фигуры совпали!
+    scratch    : { src: "./snd/scratch.mp3" , volume: 0.1, pool: 4 }, // мягкое ускорение падения
 });
   
 kit.autoUnlock();
