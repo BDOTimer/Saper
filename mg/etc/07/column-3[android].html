@@ -2,7 +2,9 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#030b12">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Колонны 3D — Columns на Three.js</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
@@ -11,8 +13,8 @@
     --bg:#030b12; --aqua:#46e0ff; --mint:#7cf7c4; --text:#dff4ff; --dim:#8fb4c6;
     --glass:rgba(8,22,34,.62); --line:rgba(120,220,255,.22); --danger:#ff5b7a; --amber:#ffd97a;
   }
-  *{box-sizing:border-box; margin:0; padding:0}
-  html,body{height:100%; overflow:hidden; background:var(--bg); color:var(--text);
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden; overscroll-behavior:none; background:var(--bg); color:var(--text);
     font-family:Rubik,system-ui,sans-serif; -webkit-user-select:none; user-select:none}
   #app,#app canvas{position:fixed; inset:0; touch-action:none}
   .glass{background:var(--glass); border:1px solid var(--line); border-radius:16px;
@@ -36,8 +38,11 @@
   #quick{position:fixed; top:14px; right:16px; z-index:20; display:flex; gap:8px}
   #quick button{width:42px; height:42px; font-size:18px; border-radius:12px; cursor:pointer;
     color:var(--text); background:var(--glass); border:1px solid var(--line);
-    backdrop-filter:blur(14px); transition:.15s}
+    backdrop-filter:blur(14px); transition:.15s; touch-action:manipulation}
   #quick button:hover{border-color:var(--aqua); box-shadow:0 0 16px rgba(70,224,255,.35); transform:translateY(-1px)}
+  #bFull{display:none}
+  body.touch #bFull{display:block}
+  body.android #quick{top:calc(10px + env(safe-area-inset-top))}
   /* ---------- панель настроек ---------- */
   #panel{position:fixed; top:66px; right:16px; z-index:15; width:276px; padding:16px;
     max-height:calc(100vh - 90px); overflow:auto;
@@ -58,6 +63,8 @@
     background:rgba(4,14,22,.9); border:1px solid var(--line); font-family:inherit; font-size:12px}
   #panel label.row{display:flex; align-items:center; gap:8px; color:var(--text); cursor:pointer}
   #panel input[type=checkbox]{accent-color:var(--aqua); width:16px; height:16px; cursor:pointer}
+  #rowVibrate{display:none}
+  body.android #rowVibrate{display:flex}
   #panel .primary{width:100%; padding:11px; border:none; border-radius:10px; cursor:pointer;
     font-family:inherit; font-weight:800; font-size:14px; letter-spacing:.05em; color:#03222e;
     background:linear-gradient(90deg,var(--aqua),var(--mint));
@@ -81,18 +88,34 @@
     animation:rise 1.1s ease-out forwards; white-space:nowrap}
   .pop.gold{color:var(--amber); text-shadow:0 0 16px rgba(255,200,90,.9)}
   @keyframes rise{0%{opacity:0; margin-top:0} 12%{opacity:1} 100%{opacity:0; margin-top:-70px}}
-  /* ---------- подсказки / тач ---------- */
+  /* ---------- подсказки ---------- */
   #help{position:fixed; left:16px; bottom:14px; z-index:10; pointer-events:none;
     font-size:11px; color:var(--dim); line-height:1.8; letter-spacing:.03em; max-width:60vw}
   #help b{color:var(--text); background:rgba(120,220,255,.12); border:1px solid var(--line);
     border-radius:5px; padding:1px 6px; font-weight:600}
-  #touch{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:20;
-    display:none; gap:10px}
+  body.touch #help{display:none}
+  #gestureHint{position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(84px + env(safe-area-inset-bottom)); z-index:19; display:none;
+    font-size:10.5px; letter-spacing:.05em; color:var(--dim); background:var(--glass);
+    border:1px solid var(--line); border-radius:20px; padding:5px 13px; pointer-events:none;
+    white-space:nowrap; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px)}
+  #gestureHint.on{display:block}
+  #gestureHint b{color:var(--mint); font-weight:600}
+  /* ---------- сенсорное управление: два кластера под большие пальцы ---------- */
+  #touch{position:fixed; left:0; right:0; bottom:0; z-index:20; display:none;
+    justify-content:space-between; align-items:flex-end; pointer-events:none;
+    padding:0 12px calc(12px + env(safe-area-inset-bottom))}
+  body.touch #touch{display:flex}
   @media (pointer:coarse){ #touch{display:flex} #help{display:none} }
+  .tcluster{display:flex; gap:9px; pointer-events:auto}
   #touch button{width:56px; height:56px; border-radius:50%; font-size:22px; color:var(--text);
-    background:var(--glass); border:1px solid var(--line); backdrop-filter:blur(10px);
-    touch-action:none; cursor:pointer}
-  #touch button:active{border-color:var(--aqua); background:rgba(70,224,255,.25)}
+    background:var(--glass); border:1px solid var(--line);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    touch-action:none; cursor:pointer; transition:background .1s, border-color .1s, transform .1s;
+    box-shadow:0 6px 22px rgba(0,0,0,.4)}
+  #touch button:active{border-color:var(--aqua); background:rgba(70,224,255,.28); transform:scale(.94)}
+  #touch button[data-act="drop"]{border-color:rgba(255,217,122,.45); color:var(--amber)}
+  #touch button[data-act="rot"]{border-color:rgba(124,247,196,.45); color:var(--mint)}
   #touch .zbtn{display:none; font-size:14px; font-weight:700}
   #touch.depth .zbtn{display:block}
   /* ---------- оверлеи ---------- */
@@ -121,8 +144,14 @@
     #panel{right:10px; width:min(276px,calc(100vw - 20px))}
     .chip{padding:6px 10px; min-width:72px}
     .chip .v{font-size:18px}
+    #top .sub{display:none}
+  }
+  @media (max-width:420px){
     #touch button{width:48px; height:48px; font-size:19px}
-    #touch{gap:7px}
+    .tcluster{gap:7px}
+    #touch.depth button{width:42px; height:42px; font-size:16px}
+    #gestureHint{font-size:9.5px; bottom:calc(72px + env(safe-area-inset-bottom))}
+    .card{padding:26px 24px}
   }
 </style>
 </head>
@@ -141,6 +170,7 @@
 </header>
 
 <div id="quick">
+  <button id="bFull" title="На весь экран">⛶</button>
   <button id="bPause" title="Пауза (P)">⏸</button>
   <button id="bMute"  title="Звук (M)">🔊</button>
   <button id="bRestart" title="Новая игра (R)">↻</button>
@@ -186,11 +216,13 @@
     </select></label>
   <label class="row"><input type="checkbox" id="sGhost"> Фигура-призрак (куда упадёт)</label>
   <label class="row"><input type="checkbox" id="sSound" checked> Звук</label>
+  <label class="row" id="rowVibrate"><input type="checkbox" id="sVibrate" checked> Вибрация</label>
 
   <button id="bNew" class="primary">▶ НОВАЯ ИГРА</button>
   <p class="hint">Размеры корзины и параметры фигуры применяются в новой игре. При глубине &gt;1
-    добавляется движение по Z (<b>W/S</b>) и совпадения по всем 13 направлениям 3D.
-    Призрак и звук переключаются мгновенно.</p>
+    добавляется движение по Z (<b>W/S</b> или кнопки <b>Z−/Z+</b>) и совпадения по всем 13 направлениям 3D.
+    На Android: <b>1 палец</b> — свайп влево/вправо двигает фигуру, тап и свайп вверх вращают,
+    свайп вниз ускоряет, быстрый flick вниз — сброс; <b>2 пальца</b> — камера.</p>
   <details><summary>Правила</summary>
     <p>Собирайте линии из <b>3+</b> одинаковых элементов: по горизонтали, вертикали и диагоналям.
     Цепные обрушения дают множитель. Радужный элемент <b>✦</b> уничтожает весь цвет, на который
@@ -199,6 +231,7 @@
 
 <div id="chain"></div>
 <div id="popups"></div>
+<div id="gestureHint"></div>
 
 <div id="help">
   <b>← →</b> движение &nbsp; <b>↑ / X</b> вращение &nbsp; <b>↓</b> ускорить &nbsp;
@@ -206,13 +239,17 @@
 </div>
 
 <div id="touch">
-  <button class="zbtn" data-act="zF">Z−</button>
-  <button data-act="left">◀</button>
-  <button data-act="rot">⟳</button>
-  <button data-act="right">▶</button>
-  <button data-act="soft">▼</button>
-  <button data-act="drop">⤓</button>
-  <button class="zbtn" data-act="zB">Z+</button>
+  <div class="tcluster">
+    <button class="zbtn" data-act="zF" title="Дальше по Z">Z−</button>
+    <button data-act="left" title="Влево">◀</button>
+    <button data-act="right" title="Вправо">▶</button>
+    <button class="zbtn" data-act="zB" title="Ближе по Z">Z+</button>
+  </div>
+  <div class="tcluster">
+    <button data-act="rot" title="Вращение">⟳</button>
+    <button data-act="soft" title="Ускорить">▼</button>
+    <button data-act="drop" title="Сбросить">⤓</button>
+  </div>
 </div>
 
 <div id="pauseOv" class="ov hidden"><div class="card glass pause">
@@ -251,15 +288,30 @@ addEventListener('error',e=>{
 });
 
 /* ============================================================
+   ПЛАТФОРМА: программное определение Android
+============================================================ */
+function detectAndroid(){
+  try{
+    const uad=navigator.userAgentData;
+    if(uad&&typeof uad.platform==='string'&&/android/i.test(uad.platform))return true;
+  }catch(e){}
+  const ua=navigator.userAgent||'';
+  if(/android/i.test(ua))return true;
+  return /linux/i.test(navigator.platform||'')&&navigator.maxTouchPoints>1&&/mobile/i.test(ua);
+}
+const IS_ANDROID=detectAndroid();
+const TOUCH_MODE=IS_ANDROID||matchMedia('(pointer:coarse)').matches;
+
+/* ============================================================
    КОНФИГ И СОСТОЯНИЕ
 ============================================================ */
-let W=6, H=13;                       // размеры корзины в ячейках (настраиваются)
-let D=1;                             // глубина (настраивается)
+let W=6, H=13;
+let D=1;
 const CELL=1;
 const PALETTE=[0xff3b57,0xffb02e,0x35e08c,0x2fd4ff,0x4f7bff,0xb45bff,0xff5bd0];
 const SHAPES=['sphere','cube','gem','dodeca','capsule','torus','ico'];
 const CFG={ count:3, colors:5, shape:'mix', width:6, height:13, depth:1,
-            speedIdx:1, quality:'high', sound:true, ghost:false };
+            speedIdx:1, quality:'high', sound:true, ghost:false, vibrate:true };
 
 let DIRS=[];
 function buildDirs(){
@@ -277,14 +329,13 @@ let score=0, best=0, level=1, cleared=0, startBest=0, dispScore=0, markerPulse=0
 try{ best=parseInt(localStorage.getItem('columns3d_best')||'0')||0; }catch(e){}
 
 const idx   =(x,y,z)=>(z*W+x)*H+y;
-const unidx =i=>{ const y=i%H, t=(i-y)/H, x=t%W, z=(t-x)/W; return {x,y,z}; };
 const cellAt=(x,y,z)=>(x<0||x>=W||y<0||y>=H||z<0||z>=D)?null:grid[idx(x,y,z)];
 const wx=x=>(x-(W-1)/2)*CELL;
 const wz=z=>(z-(D-1)/2)*CELL;
 const wy=y=>y*CELL+CELL/2;
 
 /* ============================================================
-   МИНИ-ТВИНЫ (промисы + «владелец»)
+   МИНИ-ТВИНЫ
 ============================================================ */
 const tweens=[];
 const easeLinear =k=>k;
@@ -314,7 +365,7 @@ function pulse(mesh){
 }
 
 /* ============================================================
-   ПРОЦЕДУРНЫЙ ШУМ И ТЕКСТУРЫ
+   ПРОЦЕДУРНЫЕ ТЕКСТУРЫ
 ============================================================ */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -620,7 +671,7 @@ function makeMagicMaterial(){
 }
 
 /* ============================================================
-   МАТЕРИАЛЫ / ГЕОМЕТРИЯ / ПУЛ ЭЛЕМЕНТОВ
+   МАТЕРИАЛЫ / ГЕОМЕТРИЯ / ПУЛ + НАЧАЛЬНОЕ ВРАЩЕНИЕ
 ============================================================ */
 const jewelMaps=PALETTE.map((h,i)=>makeJewelMaps(h,100+i*17));
 const baseMats=jewelMaps.map((m,i)=>new THREE.MeshPhysicalMaterial({
@@ -656,8 +707,6 @@ function geoFor(shape){
   let g;
   switch(shape){
     case 'sphere': g=new THREE.SphereGeometry(.42,40,28); break;
-    // куб со скруглениями: макс. радиус при ЛЮБОМ повороте ≈ .481 < .5 —
-    // вращающийся кубик никогда не задевает стекло и соседей по ячейке
     case 'cube':   g=new RoundedBoxGeometry(.64,.64,.64,4,.1); break;
     case 'gem':    g=new THREE.OctahedronGeometry(.48,0); break;
     case 'dodeca': g=new THREE.DodecahedronGeometry(.46,0); break;
@@ -671,21 +720,15 @@ function geoFor(shape){
 const FLAT=new Set(['gem','dodeca','ico']);
 const pool=new Map();
 
-/* ---------- начальное вращение: случайная ось + 0.3–1 оборот/с ---------- */
 function reigniteSpin(m,scale=1){
   const u=m.userData;
-  // равномерная случайная ось на единичной сфере
   const z=Math.random()*2-1, t=Math.random()*Math.PI*2, r=Math.sqrt(Math.max(0,1-z*z));
   if(!u.spinAxis)u.spinAxis=new THREE.Vector3();
   u.spinAxis.set(r*Math.cos(t),r*Math.sin(t),z);
-  u.spinSpeed=(0.1+Math.random()*0.4)*Math.PI*2*(Math.random()<.5?-1:1)*scale; // рад/с
-  u.spinK=1;          // 1 — в полёте, плавно → 0 после укладки (вода гасит вращение)
-  u.settled=false;
+  u.spinSpeed=(0.3+Math.random()*0.7)*Math.PI*2*(Math.random()<.5?-1:1)*scale;
+  u.spinK=1; u.settled=false;
 }
-function assignSpin(m){
-  reigniteSpin(m,1);
-  m.quaternion.random();   // случайная стартовая ориентация
-}
+function assignSpin(m){ reigniteSpin(m,1); m.quaternion.random(); }
 function updateSpins(dt){
   const step=m=>{
     const u=m.userData;
@@ -717,7 +760,7 @@ function getMesh(color,shape){
     mesh.castShadow=true; mesh.receiveShadow=true;
     mesh.userData={color,shape,baseColor:color>=0?new THREE.Color(PALETTE[color]):null};
   }
-  assignSpin(mesh);          // каждый новый элемент получает свой случайный спин
+  assignSpin(mesh);
   return mesh;
 }
 function poolPut(mesh){
@@ -889,7 +932,7 @@ function rotatePiece(){
 async function hardDrop(){
   if(!piece||state!=='falling')return;
   const s=session, r=landingRow(piece.x,piece.z,piece.row), dist=piece.row-r;
-  piece.row=r; piece.y=r; state='dropping'; updateGhost(); sfx.hard();
+  piece.row=r; piece.y=r; state='dropping'; updateGhost(); sfx.hard(); buzz(18);
   fovKick=Math.max(fovKick,.9);
   const from=piece.group.position.y, to=wy(r);
   await tween({owner:piece.group,dur:.06+.008*dist,ease:easeInQuad,
@@ -948,10 +991,10 @@ async function collapse(){
       if(y!==ptr){
         grid[idx(x,ptr,z)]=c; grid[idx(x,y,z)]=null;
         const m=c.mesh, from=m.position.y, to=wy(ptr), dist=y-ptr;
-        reigniteSpin(m,.7);      // падающий после обрушения элемент снова кувыркается
+        reigniteSpin(m,.7);
         jobs.push(tween({owner:m,dur:.1+.055*dist,ease:easeInQuad,
           up:k=>m.position.y=from+(to-from)*k}).then(()=>{
-            if(s===session){m.userData.settled=true;pulse(m);}   // приводнение → спин затухает
+            if(s===session){m.userData.settled=true;pulse(m);}
           }));
       }
       ptr++;
@@ -965,12 +1008,12 @@ function addScore(n){
 }
 function checkLevel(){
   const nl=1+Math.floor(cleared/30);
-  if(nl>level){level=nl;sfx.level();popupCenter('УРОВЕНЬ '+level,true);}
+  if(nl>level){level=nl;sfx.level();buzz(20);popupCenter('УРОВЕНЬ '+level,true);}
 }
 async function lockPiece(){
   const s=session;
   state='resolving'; ghostGroup.clear(); marker.visible=false;
-  sfx.lock(); markerPulse=1;
+  sfx.lock(); buzz(12); markerPulse=1;
   const p=piece; piece=null;
   let overflow=false, magic=null, magicY=0;
   p.elems.forEach((e,i)=>{
@@ -981,7 +1024,7 @@ async function lockPiece(){
     if(y>=H){overflow=true;poolPut(e.mesh);return;}
     if(e.color===-1){magic=e;magicY=y;return;}
     grid[idx(p.x,y,p.z)]={color:e.color,shape:e.shape,mesh:e.mesh};
-    e.mesh.userData.settled=true;        // уложен в стопку — вращение плавно гаснет
+    e.mesh.userData.settled=true;
   });
   p.group.removeFromParent();
   if(overflow){state='over';gameOver();return;}
@@ -999,7 +1042,7 @@ async function lockPiece(){
       chain=1;
       const gained=targets.length*15*(1+Math.floor((level-1)*.25));
       addScore(gained); cleared+=targets.length; checkLevel();
-      sfx.clear(1);
+      sfx.clear(1); buzz([14,26,14]);
       const info=await animateClears(targets); if(s!==session)return;
       if(info&&info.cnt)popupAt(info.center,'+'+gained,true);
       await collapse(); if(s!==session)return;
@@ -1012,7 +1055,7 @@ async function lockPiece(){
     const gained=Math.round(matches.length*10*chain*(1+(level-1)*.25));
     addScore(gained); cleared+=matches.length; checkLevel();
     if(chain>=2){showChain('ЦЕПЬ ×'+chain+'!');fovKick=Math.max(fovKick,Math.min(1.6,.5*chain));}
-    sfx.clear(chain);
+    sfx.clear(chain); buzz([14,26,14]);
     const info=await animateClears(matches); if(s!==session)return;
     if(info&&info.cnt)popupAt(info.center,'+'+gained,chain>=2);
     await collapse(); if(s!==session)return;
@@ -1022,7 +1065,7 @@ async function lockPiece(){
 }
 function gameOver(){
   state='over'; ghostGroup.clear(); marker.visible=false;
-  sfx.over();
+  sfx.over(); buzz([50,40,70]);
   const all=[];
   for(const c of grid)if(c)all.push(c.mesh);
   if(piece)piece.elems.forEach(e=>{all.push(e.mesh);e.mesh.userData.settled=true;});
@@ -1149,7 +1192,7 @@ function applyQuality(){
 }
 
 /* ============================================================
-   ЗВУК
+   ЗВУК + ВИБРАЦИЯ (Android)
 ============================================================ */
 let actx=null, master=null;
 function initAudio(){
@@ -1181,9 +1224,13 @@ const sfx={
   level: ()=>{beep(520,.1,'triangle',.3);beep(780,.14,'triangle',.3,0,.1);},
   over:  ()=>{[400,300,220,150].forEach((f,i)=>beep(f,.2,'sawtooth',.2,0,i*.16));}
 };
+function buzz(pattern){
+  if(!IS_ANDROID||!CFG.vibrate)return;
+  try{ if(navigator.vibrate)navigator.vibrate(pattern); }catch(e){}
+}
 
 /* ============================================================
-   UI / ВВОД
+   UI / ВВОД: клавиатура, кнопки, Android-жесты
 ============================================================ */
 const $=id=>document.getElementById(id);
 function bind(el,ev,fn){if(el)el.addEventListener(ev,fn);}
@@ -1211,7 +1258,7 @@ function showChain(text){
 }
 function setPause(v){
   if(state==='over')return;
-  paused=v;
+  paused=v; heldSoft=false;
   $('pauseOv').classList.toggle('hidden',!v);
   if(ui.bPause)ui.bPause.textContent=v?'▶':'⏸';
 }
@@ -1239,19 +1286,80 @@ function updateHeld(dt){
 }
 const KEYMAP={ArrowLeft:'L',KeyA:'L',ArrowRight:'R',KeyD:'R',KeyW:'F',KeyS:'B'};
 
+/* ---------- жесты одним пальцем: игра; два пальца: камера ---------- */
+function enableTouchGestures(){
+  const el=renderer.domElement;
+  const g={id:null,x0:0,y0:0,t0:0,cell:40,doneX:0,moved:false,soft:false,samples:[]};
+  const cellPx=()=>{
+    const a=tmpV.set(wx(0),wy(0),wz(0)).project(camera); const ax=a.x;
+    const b=new THREE.Vector3(wx(1),wy(0),wz(0)).project(camera);
+    return Math.min(90,Math.max(26,Math.abs(b.x-ax)*innerWidth/2));
+  };
+  const reset=()=>{ if(g.soft){heldSoft=false;g.soft=false;} g.id=null; g.moved=false; g.doneX=0; g.samples.length=0; };
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch')return;
+    if(g.id!==null){reset();return;}                 // второй палец → отдаём камеру OrbitControls
+    if(paused||state==='over')return;
+    initAudio();
+    g.id=e.pointerId; g.x0=e.clientX; g.y0=e.clientY; g.t0=performance.now();
+    g.cell=cellPx(); g.doneX=0; g.moved=false; g.samples=[{t:g.t0,y:e.clientY}];
+    try{el.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  el.addEventListener('pointermove',e=>{
+    if(e.pointerId!==g.id)return;
+    const dx=e.clientX-g.x0, dy=e.clientY-g.y0;
+    if(Math.abs(dx)>8||Math.abs(dy)>8)g.moved=true;
+    const steps=Math.trunc(dx/g.cell);
+    while(g.doneX<steps){applyDir('R');g.doneX++;}
+    while(g.doneX>steps){applyDir('L');g.doneX--;}
+    const soft=dy>g.cell*.9&&dy>Math.abs(dx)*.8;
+    if(soft!==g.soft){g.soft=soft;heldSoft=soft;}
+    g.samples.push({t:performance.now(),y:e.clientY});
+    if(g.samples.length>6)g.samples.shift();
+  });
+  const finish=e=>{
+    if(e.pointerId!==g.id)return;
+    const dt=performance.now()-g.t0, dx=e.clientX-g.x0, dy=e.clientY-g.y0;
+    let vy=0;
+    if(g.samples.length>1){
+      const a=g.samples[0], b=g.samples[g.samples.length-1];
+      if(b.t>a.t)vy=(b.y-a.y)/(b.t-a.t);
+    }
+    if(!g.moved&&dt<260)rotatePiece();
+    else if(dy<-g.cell*1.2&&Math.abs(dy)>Math.abs(dx)*1.2)rotatePiece();
+    else if(dy>g.cell*1.4&&vy>1.0&&dy>Math.abs(dx)*1.2)hardDrop();
+    try{el.releasePointerCapture(e.pointerId);}catch(err){}
+    reset();
+  };
+  el.addEventListener('pointerup',finish);
+  el.addEventListener('pointercancel',finish);
+}
+
 function initUI(){
   ui={ sCount:$('sCount'),sColors:$('sColors'),sShape:$('sShape'),sDepth:$('sDepth'),
     sWidth:$('sWidth'),sHeight:$('sHeight'),
-    sSpeed:$('sSpeed'),sQuality:$('sQuality'),sSound:$('sSound'),sGhost:$('sGhost'),
+    sSpeed:$('sSpeed'),sQuality:$('sQuality'),sSound:$('sSound'),sGhost:$('sGhost'),sVibrate:$('sVibrate'),
     hScore:$('hScore'),hBest:$('hBest'),hLevel:$('hLevel'),lvlFill:$('lvlFill'),bPause:$('bPause') };
   if(ui.hBest)ui.hBest.textContent=best;
   for(const [inp,out] of [[ui.sCount,'vCount'],[ui.sColors,'vColors'],
                           [ui.sWidth,'vWidth'],[ui.sHeight,'vHeight'],[ui.sDepth,'vDepth']])
     if(inp)bind(inp,'input',()=>{const o=$(out);if(o)o.textContent=inp.value;});
-  const isCoarse=matchMedia('(pointer:coarse)').matches;
-  CFG.quality=isCoarse?'medium':'high';
+
+  CFG.quality=TOUCH_MODE?'medium':'high';
   if(ui.sQuality)ui.sQuality.value=CFG.quality;
-  if(isCoarse)$('panel').classList.add('hidden');
+
+  if(IS_ANDROID)document.body.classList.add('android');
+  if(TOUCH_MODE){
+    document.body.classList.add('touch');
+    controls.touches.ONE=-1;                          // один палец не вращает камеру — это игра
+    controls.touches.TWO=THREE.TOUCH.DOLLY_ROTATE;    // два пальца: зум + орбита
+    enableTouchGestures();
+    $('panel').classList.add('hidden');
+    const hint=$('gestureHint');
+    hint.innerHTML=(IS_ANDROID?'<b>ANDROID</b> · ':'')+'☝ 1 палец — игра · ✌ 2 пальца — камера';
+    hint.classList.add('on');
+  }
 
   bind($('bNew'),'click',e=>{newGame();e.currentTarget.blur();});
   bind($('bAgain'),'click',()=>newGame());
@@ -1260,9 +1368,25 @@ function initUI(){
   bind($('bResume'),'click',()=>setPause(false));
   bind($('bMute'),'click',e=>{setMute(CFG.sound);e.currentTarget.blur();});
   bind($('bPanel'),'click',e=>{$('panel').classList.toggle('hidden');e.currentTarget.blur();});
+  bind($('bFull'),'click',async e=>{
+    e.currentTarget.blur();
+    const d=document, root=d.documentElement;
+    try{
+      if(d.fullscreenElement||d.webkitFullscreenElement){
+        await (d.exitFullscreen||d.webkitExitFullscreen).call(d);
+      }else{
+        await (root.requestFullscreen||root.webkitRequestFullscreen).call(root,{navigationUI:'hide'});
+      }
+    }catch(err){}
+  });
+  document.addEventListener('fullscreenchange',()=>{
+    const on=!!(document.fullscreenElement||document.webkitFullscreenElement);
+    $('bFull').textContent=on?'⛝':'⛶'; resize();
+  });
   bind(ui.sQuality,'change',()=>{CFG.quality=ui.sQuality.value;applyQuality();});
   bind(ui.sSound,'change',()=>setMute(!ui.sSound.checked));
   bind(ui.sGhost,'change',()=>{CFG.ghost=ui.sGhost.checked;updateGhost();});
+  bind(ui.sVibrate,'change',()=>{CFG.vibrate=ui.sVibrate.checked;});
 
   addEventListener('keydown',e=>{
     if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
