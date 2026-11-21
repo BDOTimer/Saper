@@ -863,7 +863,7 @@ function spawnNext(){
   });
   group.position.set(wx(x),wy(H-1),wz(z));
   scene.add(group);
-  piece={x,z,row:H-1,y:H-1,elems,group,lockT:0};
+  piece={x,z,row:H-1,y:H-1,elems,group};
   if(!canOccupy(x,z,H-1)){state='over';gameOver();return;}
   state='falling'; updateGhost();
 }
@@ -871,7 +871,7 @@ function tryMove(dx,dz){
   if(!piece||state!=='falling')return;
   const nx=piece.x+dx, nz=piece.z+dz;
   if(!canOccupy(nx,nz,piece.row))return;
-  piece.x=nx; piece.z=nz; piece.lockT=0;
+  piece.x=nx; piece.z=nz;
   const gx=piece.group.position.x, gz=piece.group.position.z, tx=wx(nx), tz=wz(nz);
   tween({owner:piece.group,dur:.07,ease:easeOutQuad,
     up:k=>{piece.group.position.x=gx+(tx-gx)*k; piece.group.position.z=gz+(tz-gz)*k;}});
@@ -884,7 +884,7 @@ function rotatePiece(){
     const from=e.mesh.position.y, to=i*CELL;
     tween({owner:e.mesh,dur:.12,ease:easeOutQuad,up:k=>e.mesh.position.y=from+(to-from)*k});
   });
-  piece.lockT=0; updateGhost(); sfx.rotate();
+  updateGhost(); sfx.rotate();
 }
 async function hardDrop(){
   if(!piece||state!=='falling')return;
@@ -1049,15 +1049,13 @@ function updateFalling(dt){
   const sp=fallSpeed()*(heldSoft?8:1);
   const target=piece.row-1;
   if(canOccupy(piece.x,piece.z,target)){
-    piece.lockT=0;
     piece.y-=sp*dt;
     if(piece.y<=target){piece.y=target;piece.row=target;updateGhost();}
     piece.group.position.y=wy(piece.y);
   }else{
     piece.y=piece.row;
     piece.group.position.y=wy(piece.row);
-    piece.lockT+=dt*(heldSoft?4:1);
-    if(piece.lockT>.32)lockPiece();
+    lockPiece();
   }
 }
 
