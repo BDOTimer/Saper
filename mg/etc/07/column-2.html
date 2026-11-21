@@ -185,12 +185,13 @@
       <option value="high">Высокое</option>
     </select></label>
   <label class="row"><input type="checkbox" id="sGhost"> Фигура-призрак (куда упадёт)</label>
+  <label class="row"><input type="checkbox" id="sFish" checked> Рыбки</label>
   <label class="row"><input type="checkbox" id="sSound" checked> Звук</label>
 
   <button id="bNew" class="primary">▶ НОВАЯ ИГРА</button>
   <p class="hint">Размеры корзины и параметры фигуры применяются в новой игре. При глубине &gt;1
     добавляется движение по Z (<b>W/S</b>) и совпадения по всем 13 направлениям 3D.
-    Призрак и звук переключаются мгновенно.</p>
+    Призрак, рыбки и звук переключаются мгновенно.</p>
   <details><summary>Правила</summary>
     <p>Собирайте линии из <b>3+</b> одинаковых элементов: по горизонтали, вертикали и диагоналям.
     Цепные обрушения дают множитель. Радужный элемент <b>✦</b> уничтожает весь цвет, на который
@@ -259,7 +260,7 @@ const CELL=1;
 const PALETTE=[0xff3b57,0xffb02e,0x35e08c,0x2fd4ff,0x4f7bff,0xb45bff,0xff5bd0];
 const SHAPES=['sphere','cube','gem','dodeca','capsule','torus','ico'];
 const CFG={ count:3, colors:5, shape:'mix', width:6, height:13, depth:1,
-            speedIdx:1, quality:'high', sound:true, ghost:false };
+            speedIdx:1, quality:'high', sound:true, ghost:false, fish:true };
 
 let DIRS=[];
 function buildDirs(){
@@ -805,6 +806,446 @@ function buildTank(){
 }
 
 /* ============================================================
+   РЫБКИ (3 вида, плавают и обходят фигуры)
+============================================================ */
+const fishGroup=new THREE.Group(); scene.add(fishGroup);
+let fishes=[];
+const FISH_UP=new THREE.Vector3(0,1,0);
+const FGEO={
+  sphere:new THREE.SphereGeometry(1,20,14),
+  box:new THREE.BoxGeometry(1,1,1),
+  cone3:new THREE.ConeGeometry(1,1,3),
+  cone4:new THREE.ConeGeometry(1,1,4)
+};
+const fMats=new Map();
+function fMat(key,params){
+  if(!fMats.has(key))fMats.set(key,new THREE.MeshStandardMaterial(params));
+  return fMats.get(key);
+}
+const fPMats=new Map();
+function fMatP(key,params){
+  if(!fPMats.has(key))fPMats.set(key,new THREE.MeshPhysicalMaterial(params));
+  return fPMats.get(key);
+}
+function fPart(parent,geo,mat,x,y,z,sx,sy,sz,rx=0,ry=0,rz=0){
+  const m=new THREE.Mesh(geo,mat);
+  m.position.set(x,y,z); m.scale.set(sx,sy,sz); m.rotation.set(rx,ry,rz);
+  parent.add(m); return m;
+}
+function fEyes(parent,x,y,z){
+  const eye=fMat('eye',{color:0x04070a,roughness:.15,metalness:.3});
+  const hi=fMat('eyeHi',{color:0xffffff,emissive:0xffffff,emissiveIntensity:1.5,roughness:.2});
+  for(const s of[-1,1]){
+    fPart(parent,FGEO.sphere,eye,x,y,s*z,.032,.032,.022);
+    fPart(parent,FGEO.sphere,hi,x+.006,y+.008,s*(z+.016),.011,.011,.009);
+  }
+}
+let angelGeos=null;
+function getAngelGeos(){
+  if(angelGeos)return angelGeos;
+  const curve=fn=>{
+    const s=new THREE.Shape(); fn(s);
+    return new THREE.ShapeGeometry(s,14);
+  };
+  const S=256, cv=canvasOf(S), ctx=cv.getContext('2d');
+  const grd=ctx.createLinearGradient(0,0,0,S);
+  grd.addColorStop(0,'#eef8fc'); grd.addColorStop(.45,'#dceef6');
+  grd.addColorStop(.75,'#c4dfeb'); grd.addColorStop(1,'#a9cad9');
+  ctx.fillStyle=grd; ctx.fillRect(0,0,S,S);
+  for(const u of[.08,.25,.42,.58,.75,.92]){
+    const x=u*S;
+    const sg=ctx.createLinearGradient(x-16,0,x+16,0);
+    sg.addColorStop(0,'rgba(18,40,56,0)');
+    sg.addColorStop(.5,'rgba(18,40,56,.72)');
+    sg.addColorStop(1,'rgba(18,40,56,0)');
+    ctx.fillStyle=sg; ctx.fillRect(x-16,0,32,S);
+  }
+  const top=ctx.createLinearGradient(0,0,0,S*.45);
+  top.addColorStop(0,'rgba(12,30,44,.55)'); top.addColorStop(1,'rgba(12,30,44,0)');
+  ctx.fillStyle=top; ctx.fillRect(0,0,S,S*.45);
+  const belly=ctx.createLinearGradient(0,S*.7,0,S);
+  belly.addColorStop(0,'rgba(255,255,255,0)'); belly.addColorStop(1,'rgba(255,255,255,.45)');
+  ctx.fillStyle=belly; ctx.fillRect(0,S*.7,S,S*.3);
+  angelGeos={
+    tex:texOf(cv,true),
+    body:new THREE.LatheGeometry(
+      [[0,-.30],[.06,-.26],[.11,-.17],[.15,-.06],[.16,.02],[.145,.11],[.11,.2],[.06,.27],[0,.33]]
+        .map(p=>new THREE.Vector2(p[0],p[1])),32),
+    dorsal:curve(s=>{
+      s.moveTo(-.01,.15);
+      s.bezierCurveTo(.03,.30,-.04,.48,-.20,.57);
+      s.bezierCurveTo(-.29,.61,-.38,.52,-.41,.38);
+      s.bezierCurveTo(-.34,.37,-.24,.27,-.15,.13);
+      s.closePath();
+    }),
+    anal:curve(s=>{
+      s.moveTo(-.01,-.15);
+      s.bezierCurveTo(.02,-.28,-.05,-.44,-.19,-.52);
+      s.bezierCurveTo(-.27,-.56,-.35,-.48,-.38,-.35);
+      s.bezierCurveTo(-.31,-.34,-.22,-.25,-.14,-.12);
+      s.closePath();
+    }),
+    tail:curve(s=>{
+      s.moveTo(-.07,.05);
+      s.bezierCurveTo(-.17,.16,-.29,.25,-.41,.29);
+      s.bezierCurveTo(-.37,.13,-.33,.05,-.36,0);
+      s.bezierCurveTo(-.33,-.05,-.37,-.13,-.41,-.29);
+      s.bezierCurveTo(-.29,-.25,-.17,-.16,-.07,-.05);
+      s.closePath();
+    }),
+    pect:curve(s=>{
+      s.moveTo(0,.05);
+      s.bezierCurveTo(.01,-.03,-.05,-.12,-.14,-.17);
+      s.bezierCurveTo(-.11,-.07,-.08,.02,0,.05);
+      s.closePath();
+    }),
+    pelvic:curve(s=>{
+      s.moveTo(0,.02);
+      s.bezierCurveTo(-.01,-.10,-.05,-.20,-.11,-.27);
+      s.bezierCurveTo(-.06,-.16,-.02,-.06,.01,-.02);
+      s.closePath();
+    })
+  };
+  return angelGeos;
+}
+function makeFish(type){
+  const g=new THREE.Group(), inner=new THREE.Group();
+  g.add(inner);
+  const u={type,radius:.22,speed:.45,dir:new THREE.Vector3(1,0,0),
+    wander:new THREE.Vector3(1,0,0),wt:0,phase:Math.random()*Math.PI*2,
+    tailSpeed:7,tail:null,finL:null,finR:null,inner,
+    finBaseL:0,finBaseR:0,esc:0,escDir:new THREE.Vector3()};
+  let tailPivot=null;
+  if(type===0){
+    /* неоновая тетра */
+    const body=fMat('neonBody',{color:0x9fe4ff,metalness:.55,roughness:.22,emissive:0x0a3444,emissiveIntensity:.55,envMapIntensity:1.3});
+    const stripe=fMat('neonStripe',{color:0x06222c,emissive:0x2fd4ff,emissiveIntensity:2,roughness:.3,metalness:.2});
+    const red=fMat('neonRed',{color:0x2a0508,emissive:0xff2b55,emissiveIntensity:1.5,roughness:.3});
+    const fin=fMat('neonFin',{color:0xff9d8a,transparent:true,opacity:.8,side:THREE.DoubleSide,roughness:.35,metalness:.05,emissive:0x6a2418,emissiveIntensity:.5});
+    fPart(inner,FGEO.sphere,body,0,0,0,.2,.11,.07);
+    for(const s of[-1,1]){
+      fPart(inner,FGEO.box,stripe,-.01,.02,s*.064,.34,.026,.012);
+      fPart(inner,FGEO.box,red,-.135,-.025,s*.064,.1,.022,.012);
+    }
+    tailPivot=new THREE.Group(); tailPivot.position.set(-.18,0,0); inner.add(tailPivot);
+    fPart(tailPivot,FGEO.cone4,fin,-.12,0,0,.16,.26,.03,0,0,-Math.PI/2);
+    u.finL=fPart(inner,FGEO.cone3,fin,.03,-.03,.075,.05,.11,.012,1.9,0,2.2);
+    u.finR=fPart(inner,FGEO.cone3,fin,.03,-.03,-.075,.05,.11,.012,-1.9,0,2.2);
+    fEyes(inner,.13,.03,.056);
+    u.radius=.24; u.speed=.55; u.tailSpeed=9;
+  }else if(type===1){
+    /* скалярия — жемчужное тело, длинные плавники, полосатый окрас */
+    const G=getAngelGeos();
+    const body=fMatP('angelBody',{map:G.tex,color:0xffffff,metalness:.12,roughness:.34,
+      clearcoat:.55,clearcoatRoughness:.3,
+      iridescence:.35,iridescenceIOR:1.3,iridescenceThicknessRange:[120,380],
+      emissive:0x081a24,emissiveIntensity:.18,envMapIntensity:.85});
+    const fin=fMat('angelFin',{color:0xbfe8f8,transparent:true,opacity:.42,side:THREE.DoubleSide,
+      depthWrite:false,roughness:.25,metalness:.05,emissive:0x1e5470,emissiveIntensity:.35});
+    const iris=fMat('angelIris',{color:0xffc46a,metalness:.55,roughness:.25,emissive:0xff9a3d,emissiveIntensity:.4});
+    const pupil=fMat('angelPupil',{color:0x05070a,roughness:.12,metalness:.2});
+    fPart(inner,G.body,body,0,0,0,1,1.05,.30);
+    fPart(inner,G.dorsal,fin,0,0,0,1,1,1);
+    fPart(inner,G.anal,fin,0,0,0,1,1,1);
+    u.finL=fPart(inner,G.pect,fin,.04,-.02,.036,.85,.85,1,0,.55,.08);
+    u.finR=fPart(inner,G.pect,fin,.04,-.02,-.036,.85,.85,1,0,-.55,-.08);
+    u.finBaseL=.55; u.finBaseR=-.55;
+    tailPivot=new THREE.Group(); tailPivot.position.set(-.12,0,0); inner.add(tailPivot);
+    fPart(tailPivot,G.tail,fin,0,0,0,1,1,1);
+    fPart(inner,G.pelvic,fin,.02,-.14,.016,.8,1,1,0,.3,.05);
+    fPart(inner,G.pelvic,fin,.02,-.14,-.016,.8,1,1,0,-.3,-.05);
+    for(const s of[-1,1]){
+      fPart(inner,FGEO.sphere,iris,.10,.075,s*.034,.030,.030,.012);
+      fPart(inner,FGEO.sphere,pupil,.106,.075,s*.042,.014,.014,.007);
+      fPart(inner,FGEO.sphere,fMat('eyeHi',{color:0xffffff,emissive:0xffffff,emissiveIntensity:1.5,roughness:.2}),.109,.079,s*.047,.006,.006,.004);
+    }
+    u.radius=.33; u.speed=.38; u.tailSpeed=5.5;
+  }else{
+    /* золотая рыбка (вуалехвост) */
+    const body=fMat('goldBody',{color:0xffb02e,metalness:.45,roughness:.24,emissive:0xff6a00,emissiveIntensity:.35,envMapIntensity:1.2});
+    const fin=fMat('goldFin',{color:0xff8a3d,transparent:true,opacity:.7,side:THREE.DoubleSide,roughness:.3,metalness:.1,emissive:0x8a2a00,emissiveIntensity:.5});
+    const fin2=fMat('goldFin2',{color:0xffd27a,transparent:true,opacity:.6,side:THREE.DoubleSide,roughness:.3,metalness:.1,emissive:0x6a3a00,emissiveIntensity:.5});
+    fPart(inner,FGEO.sphere,body,0,0,0,.17,.13,.1);
+    fPart(inner,FGEO.cone3,fin,0,.16,0,.09,.2,.02,0,0,-.35);
+    tailPivot=new THREE.Group(); tailPivot.position.set(-.15,0,0); inner.add(tailPivot);
+    fPart(tailPivot,FGEO.cone4,fin,-.17,0,0,.16,.4,.025,0,0,-Math.PI/2-.5);
+    fPart(tailPivot,FGEO.cone4,fin2,-.18,0,0,.18,.42,.025,0,0,-Math.PI/2);
+    fPart(tailPivot,FGEO.cone4,fin,-.17,0,0,.16,.4,.025,0,0,-Math.PI/2+.5);
+    u.finL=fPart(inner,FGEO.cone3,fin,.04,-.03,.095,.06,.13,.014,1.9,0,2.2);
+    u.finR=fPart(inner,FGEO.cone3,fin,.04,-.03,-.095,.06,.13,.014,-1.9,0,2.2);
+    fEyes(inner,.11,.05,.078);
+    u.radius=.28; u.speed=.42; u.tailSpeed=6;
+  }
+  u.tail=tailPivot;
+  const s=type===1?.8+Math.random()*.15:.85+Math.random()*.25;
+  g.scale.setScalar(s);
+  u.radius*=s; u.speed*=.9+Math.random()*.2;
+  g.userData=u;
+  return g;
+}
+function fishBounds(){
+  const zPad=Math.max(.05,D/2-.5);
+  return {x0:-W/2+.5,x1:W/2-.5,y0:.45,y1:H-.45,z0:-D/2+zPad,z1:D/2-zPad};
+}
+function clampFish(p,b){
+  p.x=THREE.MathUtils.clamp(p.x,b.x0,b.x1);
+  p.y=THREE.MathUtils.clamp(p.y,b.y0,b.y1);
+  p.z=THREE.MathUtils.clamp(p.z,b.z0,b.z1);
+}
+function fishPush(p,rad,out){
+  const xi=Math.round(p.x+(W-1)/2), yi=Math.floor(p.y), zi=Math.round(p.z+(D-1)/2);
+  for(let z=zi-1;z<=zi+1;z++)for(let x=xi-1;x<=xi+1;x++)for(let y=yi-1;y<=yi+1;y++){
+    if(!cellAt(x,y,z))continue;
+    const dx=p.x-wx(x),dy=p.y-wy(y),dz=p.z-wz(z);
+    const R=rad+.44, d2=dx*dx+dy*dy+dz*dz;
+    if(d2<R*R){
+      const d=Math.sqrt(d2)||.001, w=(R-d)/R;
+      out.x+=dx/d*w; out.y+=dy/d*w; out.z+=dz/d*w;
+    }
+  }
+  if(piece){
+    for(const e of piece.elems){
+      e.mesh.getWorldPosition(tmpV);
+      const dx=p.x-tmpV.x,dy=p.y-tmpV.y,dz=p.z-tmpV.z;
+      const R=rad+.58, d2=dx*dx+dy*dy+dz*dz;
+      if(d2<R*R){
+        const d=Math.sqrt(d2)||.001, w=(R-d)/R;
+        out.x+=dx/d*w; out.y+=dy/d*w; out.z+=dz/d*w;
+      }
+    }
+    const lr=landingRow(piece.x,piece.z,piece.row);
+    for(let i=0;i<piece.elems.length;i++){
+      const dx=p.x-wx(piece.x),dy=p.y-wy(lr+i),dz=p.z-wz(piece.z);
+      const R=rad+.72, d2=dx*dx+dy*dy+dz*dz;
+      if(d2<R*R){
+        const d=Math.sqrt(d2)||.001, w=(R-d)/R*.8;
+        out.x+=dx/d*w; out.y+=dy/d*w; out.z+=dz/d*w;
+      }
+    }
+  }
+}
+function fishHits(p,rad){
+  const xi=Math.round(p.x+(W-1)/2), yi=Math.floor(p.y), zi=Math.round(p.z+(D-1)/2);
+  for(let z=zi-1;z<=zi+1;z++)for(let x=xi-1;x<=xi+1;x++)for(let y=yi-1;y<=yi+1;y++){
+    if(!cellAt(x,y,z))continue;
+    const dx=p.x-wx(x),dy=p.y-wy(y),dz=p.z-wz(z);
+    const R=rad+.42;
+    if(dx*dx+dy*dy+dz*dz<R*R)return true;
+  }
+  if(piece){
+    for(const e of piece.elems){
+      e.mesh.getWorldPosition(tmpV);
+      const dx=p.x-tmpV.x,dy=p.y-tmpV.y,dz=p.z-tmpV.z;
+      const R=rad+.42;
+      if(dx*dx+dy*dy+dz*dz<R*R)return true;
+    }
+  }
+  return false;
+}
+function fishNearest(p,maxR,out){
+  let bestD2=maxR*maxR;
+  out.found=false;
+  const xi=Math.round(p.x+(W-1)/2), yi=Math.floor(p.y), zi=Math.round(p.z+(D-1)/2);
+  const r=Math.ceil(maxR);
+  for(let z=zi-r;z<=zi+r;z++)for(let x=xi-r;x<=xi+r;x++)for(let y=yi-r;y<=yi+r;y++){
+    if(!cellAt(x,y,z))continue;
+    const dx=p.x-wx(x),dy=p.y-wy(y),dz=p.z-wz(z);
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<bestD2){bestD2=d2;out.center.set(wx(x),wy(y),wz(z));out.found=true;}
+  }
+  if(piece)for(const e of piece.elems){
+    e.mesh.getWorldPosition(tmpV);
+    const dx=p.x-tmpV.x,dy=p.y-tmpV.y,dz=p.z-tmpV.z;
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<bestD2){bestD2=d2;out.center.copy(tmpV);out.found=true;}
+  }
+  out.dist=Math.sqrt(bestD2);
+  return out.found;
+}
+function fishClearance(p,maxR){
+  let best2=maxR*maxR;
+  const xi=Math.round(p.x+(W-1)/2), yi=Math.floor(p.y), zi=Math.round(p.z+(D-1)/2);
+  const r=Math.ceil(maxR);
+  for(let z=zi-r;z<=zi+r;z++)for(let x=xi-r;x<=xi+r;x++)for(let y=yi-r;y<=yi+r;y++){
+    if(!cellAt(x,y,z))continue;
+    const dx=p.x-wx(x),dy=p.y-wy(y),dz=p.z-wz(z);
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<best2)best2=d2;
+  }
+  if(piece)for(const e of piece.elems){
+    e.mesh.getWorldPosition(tmpV);
+    const dx=p.x-tmpV.x,dy=p.y-tmpV.y,dz=p.z-tmpV.z;
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<best2)best2=d2;
+  }
+  return Math.sqrt(best2);
+}
+function fishClearanceEx(p,maxR,skip){
+  let best2=maxR*maxR;
+  const xi=Math.round(p.x+(W-1)/2), yi=Math.floor(p.y), zi=Math.round(p.z+(D-1)/2);
+  const r=Math.ceil(maxR);
+  for(let z=zi-r;z<=zi+r;z++)for(let x=xi-r;x<=xi+r;x++)for(let y=yi-r;y<=yi+r;y++){
+    if(!cellAt(x,y,z))continue;
+    const cx=wx(x),cy=wy(y),cz=wz(z);
+    if(skip&&Math.abs(cx-skip.x)<1e-6&&Math.abs(cy-skip.y)<1e-6&&Math.abs(cz-skip.z)<1e-6)continue;
+    const dx=p.x-cx,dy=p.y-cy,dz=p.z-cz;
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<best2)best2=d2;
+  }
+  if(piece)for(const e of piece.elems){
+    e.mesh.getWorldPosition(tmpV);
+    if(skip&&tmpV.distanceToSquared(skip)<1e-8)continue;
+    const dx=p.x-tmpV.x,dy=p.y-tmpV.y,dz=p.z-tmpV.z;
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<best2)best2=d2;
+  }
+  return Math.sqrt(best2);
+}
+function pickEscapeDir(p,out){
+  if(!fishNearest(p,2.4,_fishNear)){out.copy(FISH_UP);return;}
+  _fishNormal.copy(p).sub(_fishNear.center);
+  if(_fishNormal.lengthSq()<1e-6)_fishNormal.copy(FISH_UP);
+  else _fishNormal.normalize();
+  _fishTan.crossVectors(_fishNormal,FISH_UP);
+  if(_fishTan.lengthSq()<1e-6)_fishTan.set(1,0,0);
+  _fishTan.normalize();
+  _fishBit.crossVectors(_fishNormal,_fishTan).normalize();
+  let best=-1;
+  const L=.4;
+  const test=(dx,dy,dz)=>{
+    _fishNext.set(p.x+dx*L,p.y+dy*L,p.z+dz*L);
+    const c=fishClearance(_fishNext,1.6);
+    if(c>best){best=c;out.set(dx,dy,dz);}
+  };
+  test(_fishNormal.x,_fishNormal.y,_fishNormal.z);
+  for(const t of[_fishTan,_fishBit])for(const s of[1,-1])for(const a of[.9,1.5]){
+    const ca=Math.cos(a),sa=Math.sin(a)*s;
+    test(_fishNormal.x*ca+t.x*sa,_fishNormal.y*ca+t.y*sa,_fishNormal.z*ca+t.z*sa);
+  }
+  out.normalize();
+}
+function fishEscape(f,b,dt){
+  const u=f.userData;
+  if(fishNearest(f.position,2.4,_fishNear))_fishSkip.copy(_fishNear.center);
+  else _fishSkip.copy(f.position);
+  const d0=f.position.distanceTo(_fishSkip);
+  const s0=fishClearanceEx(f.position,1.6,_fishSkip);
+  pickEscapeDir(f.position,_fishPushV);
+  if(u.escDir.lengthSq()<1e-6)u.escDir.copy(_fishPushV);
+  else u.escDir.lerp(_fishPushV,Math.min(1,dt*4)).normalize();
+  const ang=u.dir.angleTo(u.escDir);
+  if(ang>1e-4)u.dir.lerp(u.escDir,Math.min(1,(7*dt)/ang)).normalize();
+  u.esc=Math.min(1,u.esc+dt*5);
+  const sp=u.speed*(1+.9*u.esc);
+  _fishNext.copy(f.position).addScaledVector(u.dir,sp*dt);
+  clampFish(_fishNext,b);
+  const d1=_fishNext.distanceTo(_fishSkip);
+  const s1=fishClearanceEx(_fishNext,1.6,_fishSkip);
+  if(d1>=d0-.005&&(s1>=s0-.01||s1>=u.radius+.44))f.position.copy(_fishNext);
+  if(D===1){u.dir.z*=.15;u.dir.normalize();}
+}
+function buildFishes(){
+  fishGroup.clear(); fishes=[];
+  fishGroup.visible=CFG.fish;
+  const b=fishBounds();
+  const vol=W*H*D;
+  const n=Math.max(2,Math.min(10,Math.round(2+vol/90)));
+  for(let i=0;i<n;i++){
+    const f=makeFish(i%3), u=f.userData;
+    let placed=false;
+    for(let tr=0;tr<50&&!placed;tr++){
+      const p=new THREE.Vector3(
+        THREE.MathUtils.lerp(b.x0,b.x1,Math.random()),
+        THREE.MathUtils.lerp(b.y0,b.y1,Math.random()),
+        THREE.MathUtils.lerp(b.z0,b.z1,Math.random()));
+      if(!fishHits(p,u.radius)){f.position.copy(p);placed=true;}
+    }
+    if(!placed)f.position.set((b.x0+b.x1)/2,(b.y0+b.y1)/2,(b.z0+b.z1)/2);
+    u.dir.set(1,0,0).applyAxisAngle(FISH_UP,Math.random()*Math.PI*2);
+    u.dir.y=(Math.random()-.5)*.2;
+    u.dir.normalize();
+    if(D===1){u.dir.z*=.15;u.dir.normalize();}
+    f.quaternion.setFromUnitVectors(_fishFwd,u.dir);
+    fishes.push(f); fishGroup.add(f);
+  }
+}
+const _fishQ=new THREE.Quaternion(), _fishFwd=new THREE.Vector3(1,0,0),
+      _fishNext=new THREE.Vector3(), _fishPushV=new THREE.Vector3(),
+      _fishDesired=new THREE.Vector3(), _fishNormal=new THREE.Vector3(),
+      _fishTan=new THREE.Vector3(), _fishBit=new THREE.Vector3(), _fishSkip=new THREE.Vector3(),
+      _fishNear={center:new THREE.Vector3(),dist:0,found:false};
+function updateFishes(dt){
+  if(!CFG.fish||!fishGroup.visible||!fishes.length)return;
+  const b=fishBounds(), t=uTime.value;
+  for(const f of fishes){
+    const u=f.userData;
+    u.wt-=dt;
+    if(u.wt<=0){
+      u.wt=1.2+Math.random()*2.2;
+      u.wander.set(Math.random()*2-1,(Math.random()*2-1)*.55,Math.random()*2-1).normalize();
+    }
+    if(fishHits(f.position,u.radius)){
+      fishEscape(f,b,dt);
+    }else{
+      u.esc=Math.max(0,u.esc-dt*2.5);
+      _fishPushV.set(0,0,0);
+      fishPush(f.position,u.radius+.38,_fishPushV);
+      const soft=.3;
+      if(f.position.x<b.x0+soft)_fishPushV.x+=(b.x0+soft-f.position.x)*4;
+      if(f.position.x>b.x1-soft)_fishPushV.x-=(f.position.x-(b.x1-soft))*4;
+      if(f.position.y<b.y0+soft)_fishPushV.y+=(b.y0+soft-f.position.y)*4;
+      if(f.position.y>b.y1-soft)_fishPushV.y-=(f.position.y-(b.y1-soft))*4;
+      if(f.position.z<b.z0+soft)_fishPushV.z+=(b.z0+soft-f.position.z)*4;
+      if(f.position.z>b.z1-soft)_fishPushV.z-=(f.position.z-(b.z1-soft))*4;
+      _fishDesired.copy(u.wander).multiplyScalar(1.1).addScaledVector(_fishPushV,3.6);
+      if(_fishDesired.lengthSq()<1e-6)_fishDesired.copy(u.dir);
+      _fishDesired.normalize();
+      if(fishNearest(f.position,u.radius+1.3,_fishNear)&&_fishNear.dist<u.radius+.7){
+        _fishNormal.copy(f.position).sub(_fishNear.center);
+        if(_fishNormal.lengthSq()<1e-6)_fishNormal.copy(FISH_UP);
+        else _fishNormal.normalize();
+        const into=_fishDesired.dot(_fishNormal);
+        if(into<0)_fishDesired.addScaledVector(_fishNormal,-into);
+        _fishDesired.addScaledVector(_fishNormal,.5).normalize();
+      }
+      if(D===1){_fishDesired.z*=.15;_fishDesired.normalize();}
+      const ang=u.dir.angleTo(_fishDesired);
+      if(ang>1e-4)u.dir.lerp(_fishDesired,Math.min(1,(4.2*dt)/ang)).normalize();
+      _fishNext.copy(f.position).addScaledVector(u.dir,u.speed*dt);
+      clampFish(_fishNext,b);
+      const c0=fishClearance(f.position,u.radius+1.6);
+      if(fishClearance(_fishNext,u.radius+1.6)<c0-1e-4){
+        if(fishNearest(f.position,u.radius+1.5,_fishNear)){
+          _fishNormal.copy(f.position).sub(_fishNear.center);
+          if(_fishNormal.lengthSq()<1e-6)_fishNormal.copy(FISH_UP);
+          else _fishNormal.normalize();
+          _fishTan.copy(u.dir).addScaledVector(_fishNormal,-u.dir.dot(_fishNormal));
+          if(_fishTan.lengthSq()<1e-4){
+            _fishTan.crossVectors(_fishNormal,FISH_UP);
+            if(_fishTan.lengthSq()<1e-4)_fishTan.set(1,0,0);
+          }
+          _fishTan.normalize();
+          if(_fishTan.dot(u.dir)<0)_fishTan.negate();
+          const ang2=u.dir.angleTo(_fishTan);
+          if(ang2>1e-4)u.dir.lerp(_fishTan,Math.min(1,(7*dt)/ang2)).normalize();
+          _fishNext.copy(f.position).addScaledVector(u.dir,u.speed*dt*.85);
+          clampFish(_fishNext,b);
+          if(fishClearance(_fishNext,u.radius+1.6)>=c0-1e-4)f.position.copy(_fishNext);
+        }
+      }else{
+        f.position.copy(_fishNext);
+      }
+    }
+    _fishQ.setFromUnitVectors(_fishFwd,u.dir);
+    f.quaternion.slerp(_fishQ,Math.min(1,dt*3.5));
+    if(u.tail)u.tail.rotation.y=Math.sin(t*u.tailSpeed+u.phase)*.55;
+    if(u.finL)u.finL.rotation.y=u.finBaseL+Math.sin(t*u.tailSpeed*.9+u.phase+1.3)*.45;
+    if(u.finR)u.finR.rotation.y=u.finBaseR+Math.sin(t*u.tailSpeed*.9+u.phase+1.3)*.45;
+    u.inner.rotation.x=Math.sin(t*1.6+u.phase)*.08;
+  }
+}
+
+/* ============================================================
    ИГРОВАЯ ЛОГИКА
 ============================================================ */
 function canOccupy(x,z,row){
@@ -1097,6 +1538,7 @@ function newGame(){
   CFG.depth   =ui.sDepth  ?+ui.sDepth.value        :1;
   CFG.speedIdx=ui.sSpeed  ?+ui.sSpeed.value        :1;
   CFG.ghost   =ui.sGhost  ?ui.sGhost.checked       :false;
+  CFG.fish    =ui.sFish   ?ui.sFish.checked        :true;
   W=CFG.width; H=CFG.height; D=CFG.depth; buildDirs();
   bubbleMat.uniforms.uH.value=H;
   for(const c of grid)if(c)poolPut(c.mesh);
@@ -1110,6 +1552,7 @@ function newGame(){
     tankGroup.removeFromParent();
   }
   tankGroup=buildTank(); scene.add(tankGroup);
+  buildFishes();
   fitLight();
   if(W!==viewW||H!==viewH||D!==viewD||CFG.count!==viewN){
     fitView(); viewW=W; viewH=H; viewD=D; viewN=CFG.count;
@@ -1240,7 +1683,7 @@ const KEYMAP={ArrowLeft:'L',KeyA:'L',ArrowRight:'R',KeyD:'R',KeyW:'F',KeyS:'B'};
 function initUI(){
   ui={ sCount:$('sCount'),sColors:$('sColors'),sShape:$('sShape'),sDepth:$('sDepth'),
     sWidth:$('sWidth'),sHeight:$('sHeight'),
-    sSpeed:$('sSpeed'),sQuality:$('sQuality'),sSound:$('sSound'),sGhost:$('sGhost'),
+    sSpeed:$('sSpeed'),sQuality:$('sQuality'),sSound:$('sSound'),sGhost:$('sGhost'),sFish:$('sFish'),
     hScore:$('hScore'),hBest:$('hBest'),hLevel:$('hLevel'),lvlFill:$('lvlFill'),bPause:$('bPause') };
   if(ui.hBest)ui.hBest.textContent=best;
   for(const [inp,out] of [[ui.sCount,'vCount'],[ui.sColors,'vColors'],
@@ -1261,6 +1704,7 @@ function initUI(){
   bind(ui.sQuality,'change',()=>{CFG.quality=ui.sQuality.value;applyQuality();});
   bind(ui.sSound,'change',()=>setMute(!ui.sSound.checked));
   bind(ui.sGhost,'change',()=>{CFG.ghost=ui.sGhost.checked;updateGhost();});
+  bind(ui.sFish,'change',()=>{CFG.fish=ui.sFish.checked;fishGroup.visible=CFG.fish;});
 
   addEventListener('keydown',e=>{
     if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
@@ -1314,7 +1758,7 @@ function loop(){
   const dt=Math.min(clock.getDelta(),.05);
   uTime.value+=dt;
   controls.update();
-  if(!paused){updateHeld(dt);updateFalling(dt);updateTweens(dt);updateSpins(dt);}
+  if(!paused){updateHeld(dt);updateFalling(dt);updateFishes(dt);updateTweens(dt);updateSpins(dt);}
   if(fovKick>.001){
     fovKick*=Math.exp(-dt*6);
     camera.fov=45+fovKick; camera.updateProjectionMatrix();
