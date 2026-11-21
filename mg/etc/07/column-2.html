@@ -483,6 +483,7 @@ const domeMat=new THREE.ShaderMaterial({
     float hash31(vec3 p){p=fract(p*.3183+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
     void main(){
       vec3 d=normalize(vDir); float h=d.y*.5+.5;
+      
       vec3 col=mix(vec3(.012,.05,.085),vec3(.03,.11,.16),smoothstep(.0,.4,h));
       col=mix(col,vec3(.004,.012,.03),smoothstep(.42,1.,h));
       col+=vec3(.05,.22,.26)*exp(-abs(d.y+.02)*7.)*.8;
@@ -492,6 +493,11 @@ const domeMat=new THREE.ShaderMaterial({
       float st=hash31(floor(d*220.));
       float tw=.5+.5*sin(uTime*2.+st*40.);
       col+=vec3(.9,.95,1.)*step(.9975,st)*tw*smoothstep(.15,.5,h);
+      
+    col.r*=0.15;
+    col.g*=0.15;
+    col.b*=0.15;
+      
       gl_FragColor=vec4(col,1.);
     }`
 });
@@ -1333,7 +1339,7 @@ async function hardDrop(){
   piece.row=r; piece.y=r; state='dropping'; updateGhost(); sfx.hard();
   fovKick=Math.max(fovKick,.9);
   const from=piece.group.position.y, to=wy(r);
-  await tween({owner:piece.group,dur:.06+.008*dist,ease:easeInQuad,
+  await tween({owner:piece.group,dur:.3+.01*dist,ease:easeInQuad,
     up:k=>piece.group.position.y=from+(to-from)*k});
   if(s!==session)return;
   lockPiece();
