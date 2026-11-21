@@ -236,6 +236,8 @@
 }}
 </script>
 
+<script src="./snd/_sound-lib.js"></script>
+
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls }      from 'three/addons/controls/OrbitControls.js';
@@ -245,6 +247,8 @@ import { EffectComposer }     from 'three/addons/postprocessing/EffectComposer.j
 import { RenderPass }         from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass }    from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass }         from 'three/addons/postprocessing/OutputPass.js';
+
+const SND = window.SNDS || {};
 
 addEventListener('error',e=>{
   const l=document.getElementById('loading');
@@ -494,7 +498,7 @@ const domeMat=new THREE.ShaderMaterial({
       float tw=.5+.5*sin(uTime*2.+st*40.);
       col+=vec3(.9,.95,1.)*step(.9975,st)*tw*smoothstep(.15,.5,h);
       
-    col.r*=0.15;
+    col.r*=0.25;
     col.g*=0.15;
     col.b*=0.15;
       
@@ -1317,12 +1321,17 @@ function spawnNext(){
 function tryMove(dx,dz){
   if(!piece||state!=='falling')return;
   const nx=piece.x+dx, nz=piece.z+dz;
-  if(!canOccupy(nx,nz,piece.row))return;
+  if(!canOccupy(nx,nz,piece.row))
+  { SND.kikside.play();
+    return;
+  }
   piece.x=nx; piece.z=nz;
   const gx=piece.group.position.x, gz=piece.group.position.z, tx=wx(nx), tz=wz(nz);
   tween({owner:piece.group,dur:.07,ease:easeOutQuad,
     up:k=>{piece.group.position.x=gx+(tx-gx)*k; piece.group.position.z=gz+(tz-gz)*k;}});
-  updateGhost(); sfx.move();
+  updateGhost(); 
+  //sfx.move();
+  SND.move.play();
 }
 function rotatePiece(){
   if(!piece||state!=='falling')return;
@@ -1336,7 +1345,10 @@ function rotatePiece(){
 async function hardDrop(){
   if(!piece||state!=='falling')return;
   const s=session, r=landingRow(piece.x,piece.z,piece.row), dist=piece.row-r;
-  piece.row=r; piece.y=r; state='dropping'; updateGhost(); sfx.hard();
+  piece.row=r; piece.y=r; state='dropping'; updateGhost(); 
+  sfx.hard();
+  SND.space.play();
+  
   fovKick=Math.max(fovKick,.9);
   const from=piece.group.position.y, to=wy(r);
   await tween({owner:piece.group,dur:.3+.01*dist,ease:easeInQuad,
@@ -1417,7 +1429,14 @@ function checkLevel(){
 async function lockPiece(){
   const s=session;
   state='resolving'; ghostGroup.clear(); marker.visible=false;
-  sfx.lock(); markerPulse=1;
+  
+  //sfx.lock();
+  if(piece && piece.row === 0){
+    SND.drop2.play();   // drop-2.mp3 = «упал на дно»
+  }
+  else SND.drop1.play();
+  
+  markerPulse=1;
   const p=piece; piece=null;
   let overflow=false, magic=null, magicY=0;
   p.elems.forEach((e,i)=>{
@@ -1459,7 +1478,10 @@ async function lockPiece(){
     const gained=Math.round(matches.length*10*chain*(1+(level-1)*.25));
     addScore(gained); cleared+=matches.length; checkLevel();
     if(chain>=2){showChain('ЦЕПЬ ×'+chain+'!');fovKick=Math.max(fovKick,Math.min(1.6,.5*chain));}
-    sfx.clear(chain);
+    
+    //sfx.clear(chain);
+    SND.clear.play();
+    
     const info=await animateClears(matches); if(s!==session)return;
     if(info&&info.cnt)popupAt(info.center,'+'+gained,chain>=2);
     await collapse(); if(s!==session)return;
@@ -1663,10 +1685,15 @@ function setPause(v){
   if(ui.bPause)ui.bPause.textContent=v?'▶':'⏸';
 }
 function setMute(v){
-  CFG.sound=!v;
-  if(ui.sSound)ui.sSound.checked=!v;
-  $('bMute').textContent=v?'🔇':'🔊';
-  if(master)master.gain.value=v?0:.35;
+  CFG.sound = !v;
+  if (ui.sSound) ui.sSound.checked = !v;
+  $('bMute').textContent = v ? '🔇' : '🔊';
+
+  // 1) старый синтез (beep/sfx)
+  if (master) master.gain.value = v ? 0 : .35;
+
+  // 2) mp3 из _sound-lib.js
+  if (window.SND_KIT) window.SND_KIT.setMuted(v);
 }
 function pressDir(dir){
   if(held[dir])return;
