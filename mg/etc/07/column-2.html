@@ -356,7 +356,7 @@ function makeJewelMaps(hex,seed){
     const q=n.fbm(u*4,v*4,4,4);
     const w=n.fbm(u*8+q*2,v*8-q*2,3,8);
     const band=.5+.5*Math.sin((u*3+v*2+q*1.6)*Math.PI*2);
-    let l=.68+.34*band*(.45+.55*w);
+    const l=.68+.34*band*(.45+.55*w);
     const sp=n.hash(x*7+seed,y*13+seed);
     let R=br*l,G=bg*l,B=bb*l;
     if(sp>.996){R=R*.3+230;G=G*.3+230;B=B*.3+230;}
@@ -656,7 +656,9 @@ function geoFor(shape){
   let g;
   switch(shape){
     case 'sphere': g=new THREE.SphereGeometry(.42,40,28); break;
-    case 'cube':   g=new RoundedBoxGeometry(.8,.8,.8,4,.1); break;
+    // куб со скруглениями: макс. радиус при ЛЮБОМ повороте ≈ .481 < .5 —
+    // вращающийся кубик никогда не задевает стекло и соседей по ячейке
+    case 'cube':   g=new RoundedBoxGeometry(.64,.64,.64,4,.1); break;
     case 'gem':    g=new THREE.OctahedronGeometry(.48,0); break;
     case 'dodeca': g=new THREE.DodecahedronGeometry(.46,0); break;
     case 'capsule':g=new THREE.CapsuleGeometry(.3,.34,6,18); break;
@@ -668,23 +670,59 @@ function geoFor(shape){
 }
 const FLAT=new Set(['gem','dodeca','ico']);
 const pool=new Map();
+
+/* ---------- начальное вращение: случайная ось + 0.3–1 оборот/с ---------- */
+function reigniteSpin(m,scale=1){
+  const u=m.userData;
+  // равномерная случайная ось на единичной сфере
+  const z=Math.random()*2-1, t=Math.random()*Math.PI*2, r=Math.sqrt(Math.max(0,1-z*z));
+  if(!u.spinAxis)u.spinAxis=new THREE.Vector3();
+  u.spinAxis.set(r*Math.cos(t),r*Math.sin(t),z);
+  u.spinSpeed=(0.1+Math.random()*0.4)*Math.PI*2*(Math.random()<.5?-1:1)*scale; // рад/с
+  u.spinK=1;          // 1 — в полёте, плавно → 0 после укладки (вода гасит вращение)
+  u.settled=false;
+}
+function assignSpin(m){
+  reigniteSpin(m,1);
+  m.quaternion.random();   // случайная стартовая ориентация
+}
+function updateSpins(dt){
+  const step=m=>{
+    const u=m.userData;
+    if(!u.spinAxis||u.spinK<=0)return;
+    if(u.settled){
+      u.spinK*=Math.exp(-dt*2.4);
+      if(u.spinK<.002){u.spinK=0;return;}
+    }
+    m.rotateOnWorldAxis(u.spinAxis,u.spinSpeed*u.spinK*dt);
+  };
+  for(const m of jewelsGroup.children)step(m);
+  if(piece)for(const e of piece.elems)step(e.mesh);
+  for(const m of previewGroup.children)step(m);
+}
+
 function getMesh(color,shape){
   const key=color+'|'+shape;
   const arr=pool.get(key);
-  if(arr&&arr.length){const m=arr.pop(); m.visible=true; return m;}
-  let mat;
-  if(color===-1)mat=makeMagicMaterial();
+  let mesh;
+  if(arr&&arr.length){mesh=arr.pop(); mesh.visible=true;}
   else{
-    mat=baseMats[color].clone();
-    if(FLAT.has(shape)){mat.flatShading=true;mat.needsUpdate=true;}
+    let mat;
+    if(color===-1)mat=makeMagicMaterial();
+    else{
+      mat=baseMats[color].clone();
+      if(FLAT.has(shape)){mat.flatShading=true;mat.needsUpdate=true;}
+    }
+    mesh=new THREE.Mesh(geoFor(shape),mat);
+    mesh.castShadow=true; mesh.receiveShadow=true;
+    mesh.userData={color,shape,baseColor:color>=0?new THREE.Color(PALETTE[color]):null};
   }
-  const mesh=new THREE.Mesh(geoFor(shape),mat);
-  mesh.castShadow=true; mesh.receiveShadow=true;
-  mesh.userData={color,shape,baseColor:color>=0?new THREE.Color(PALETTE[color]):null};
+  assignSpin(mesh);          // каждый новый элемент получает свой случайный спин
   return mesh;
 }
 function poolPut(mesh){
   mesh.scale.setScalar(1); mesh.rotation.set(0,0,0); mesh.visible=true;
+  mesh.userData.spinK=0; mesh.userData.settled=true;
   if(mesh.userData.color===-1){mesh.material.uniforms.uBoost.value=0;mesh.material.uniforms.uGray.value=0;}
   else{
     mesh.material.color.set(0xffffff);
@@ -910,8 +948,11 @@ async function collapse(){
       if(y!==ptr){
         grid[idx(x,ptr,z)]=c; grid[idx(x,y,z)]=null;
         const m=c.mesh, from=m.position.y, to=wy(ptr), dist=y-ptr;
+        reigniteSpin(m,.7);      // падающий после обрушения элемент снова кувыркается
         jobs.push(tween({owner:m,dur:.1+.055*dist,ease:easeInQuad,
-          up:k=>m.position.y=from+(to-from)*k}).then(()=>{if(s===session)pulse(m);}));
+          up:k=>m.position.y=from+(to-from)*k}).then(()=>{
+            if(s===session){m.userData.settled=true;pulse(m);}   // приводнение → спин затухает
+          }));
       }
       ptr++;
     }
@@ -940,6 +981,7 @@ async function lockPiece(){
     if(y>=H){overflow=true;poolPut(e.mesh);return;}
     if(e.color===-1){magic=e;magicY=y;return;}
     grid[idx(p.x,y,p.z)]={color:e.color,shape:e.shape,mesh:e.mesh};
+    e.mesh.userData.settled=true;        // уложен в стопку — вращение плавно гаснет
   });
   p.group.removeFromParent();
   if(overflow){state='over';gameOver();return;}
@@ -983,7 +1025,7 @@ function gameOver(){
   sfx.over();
   const all=[];
   for(const c of grid)if(c)all.push(c.mesh);
-  if(piece)piece.elems.forEach(e=>all.push(e.mesh));
+  if(piece)piece.elems.forEach(e=>{all.push(e.mesh);e.mesh.userData.settled=true;});
   for(const m of all){
     if(m.material.uniforms){
       tween({owner:m,dur:.9,up:k=>m.material.uniforms.uGray.value=k});
@@ -1274,7 +1316,7 @@ function loop(){
   const dt=Math.min(clock.getDelta(),.05);
   uTime.value+=dt;
   controls.update();
-  if(!paused){updateHeld(dt);updateFalling(dt);updateTweens(dt);}
+  if(!paused){updateHeld(dt);updateFalling(dt);updateTweens(dt);updateSpins(dt);}
   if(fovKick>.001){
     fovKick*=Math.exp(-dt*6);
     camera.fov=45+fovKick; camera.updateProjectionMatrix();
