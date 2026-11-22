@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Процедурный шутер: разрушенный город</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: monospace; }
+        #info {
+            position: absolute; top: 20px; left: 20px; color: #fff;
+            background: rgba(0,0,0,0.7); padding: 10px; border-radius: 4px;
+            pointer-events: none; z-index: 100;
+        }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+            background: white; border-radius: 50%; transform: translate(-50%, -50%);
+            pointer-events: none; z-index: 99; opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">WASD: движение | Мышь: обзор | Shift: бег | Space: прыжок</div>
+    <div id="crosshair"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ================= 1. Базовые настройки сцены =================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e); // Тёмный фон для атмосферы
+        scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015); // Туман для глубины
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.7, 0); // Высота глаз
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Мягкие тени
+        document.body.appendChild(renderer.domElement);
+
+        // ================= 2. Освещение (Закат + Объёмный свет) =================
+        // Тёплый направленный свет (Солнце)
+        const sunLight = new THREE.DirectionalLight(0xffaa66, 2.5);
+        sunLight.position.set(50, 60, -50);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 200;
+        sunLight.shadow.camera.left = -60;
+        sunLight.shadow.camera.right = 60;
+        sunLight.shadow.camera.top = 60;
+        sunLight.shadow.camera.bottom = -60;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+        scene.add(sunLight.target);
+
+        // Холодный заполняющий свет (Небо)
+        const hemiLight = new THREE.HemisphereLight(0x445588, 0x332211, 0.8);
+        scene.add(hemiLight);
+
+        // Атмосферный свет (лампа для акцента)
+        const fillLight = new THREE.AmbientLight(0x404060, 0.5);
+        scene.add(fillLight);
+
+        // ================= 3. Процедурная генерация мира =================
+        // Простой PRNG с seed для воспроизводимости
+        function mulberry32(seed) {
+            return function() {
+                let t = seed += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+        const rng = mulberry32(12345); // Измени seed для другой карты
+
+        // Массив для хранения AABB коллайдеров
+        const colliders = [];
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        // --- 3.1 Генерация земли (Простой рельеф) ---
+        const groundSize = 100;
+        const groundGeo = new THREE.PlaneGeometry(groundSize, groundSize, 32, 32);
+        groundGeo.rotateX(-Math.PI / 2);
+
+        // Добавляем небольшие неровности
+        const pos = groundGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            // Простой шум на основе синусов
+            const y = Math.sin(x * 0.2) * Math.cos(z * 0.2) * 0.5;
+            pos.setY(i, y);
+        }
+        groundGeo.computeVertexNormals();
+
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.receiveShadow = true;
+        worldGroup.add(ground);
+        
+        // Коллайдер земли (плоский, для простоты, чтобы игрок не проваливался)
+        // Для точного рельефа нужен Raycast, но для этого демо используем плоскость
+        colliders.push(new THREE.Box3(new THREE.Vector3(-groundSize/2, -1, -groundSize/2), new THREE.Vector3(groundSize/2, 0.5, groundSize/2)));
+
+        // --- 3.2 Генерация разрушенных стен ---
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
+        
+        function createRuinWall(x, z, width, height, depth, angle) {
+            const geo = new THREE.BoxGeometry(width, height, depth);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(x, height / 2, z);
+            mesh.rotation.y = angle;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            worldGroup.add(mesh);
+            
+            // Обновляем матрицу мира для корректного AABB
+            mesh.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(mesh);
+            colliders.push(box);
+        }
+
+        // Расставляем стены в сетке с случайными пропусками и поворотами
+        for (let i = -4; i <= 4; i++) {
+            for (let j = -4; j <= 4; j++) {
+                if (rng() > 0.6) continue; // Пропуск для "улиц"
+                const x = i * 12 + (rng() - 0.5) * 4;
+                const z = j * 12 + (rng() - 0.5) * 4;
+                const width = 3 + rng() * 4;
+                const height = 2 + rng() * 3;
+                const depth = 0.5 + rng() * 0.5;
+                const angle = rng() * Math.PI * 2;
+                createRuinWall(x, z, width, height, depth, angle);
+            }
+        }
+
+        // --- 3.3 Генерация камней ---
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
+        
+        for (let i = 0; i < 40; i++) {
+            const x = (rng() - 0.5) * 80;
+            const z = (rng() - 0.5) * 80;
+            // Проверка, чтобы камни не спавнились слишком близко к центру (спавн игрока)
+            if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
+
+            const size = 0.5 + rng() * 2;
+            const geo = new THREE.DodecahedronGeometry(size, 0);
+            const mesh = new THREE.Mesh(geo, rockMat);
+            mesh.position.set(x, size * 0.5, z);
+            mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            worldGroup.add(mesh);
+
+            mesh.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(mesh);
+            colliders.push(box);
+        }
+
+        // --- 3.4 Генерация деревьев (Ствол + Крона) ---
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2817, roughness: 1 });
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d4a1e, roughness: 1 });
+
+        function createTree(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            
+            // Ствол
+            const trunkHeight = 2 + rng() * 3;
+            const trunkGeo = new THREE.CylinderGeometry(0.2 + rng() * 0.2, 0.4, trunkHeight, 6);
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = trunkHeight / 2;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            group.add(trunk);
+
+            // Крона (несколько сфер)
+            const leafCount = 3 + Math.floor(rng() * 3);
+            for (let i = 0; i < leafCount; i++) {
+                const leafSize = 1 + rng() * 1.5;
+                const leafGeo = new THREE.IcosahedronGeometry(leafSize, 0);
+                const leaf = new THREE.Mesh(leafGeo, leafMat);
+                leaf.position.set(
+                    (rng() - 0.5) * 2,
+                    trunkHeight + (rng() - 0.5) * 1.5,
+                    (rng() - 0.5) * 2
+                );
+                leaf.castShadow = true;
+                leaf.receiveShadow = true;
+                group.add(leaf);
+            }
+
+            worldGroup.add(group);
+
+            // Коллайдер для ствола (крону игнорируем для простоты, чтобы можно было пройти под ней)
+            group.updateMatrixWorld(true);
+            // Создаём коллайдер только для нижней части ствола
+            const trunkBox = new THREE.Box3(
+                new THREE.Vector3(x - 0.5, 0, z - 0.5),
+                new THREE.Vector3(x + 0.5, trunkHeight * 0.6, z + 0.5) // Коллизия только до середины ствола
+            );
+            colliders.push(trunkBox);
+        }
+
+        // Расставляем деревья
+        for (let i = 0; i < 25; i++) {
+            const x = (rng() - 0.5) * 90;
+            const z = (rng() - 0.5) * 90;
+            if (Math.abs(x) < 4 && Math.abs(z) < 4) continue;
+            createTree(x, z);
+        }
+
+        // --- 3.5 Генерация брёвен (поваленные деревья) ---
+        for (let i = 0; i < 15; i++) {
+            const x = (rng() - 0.5) * 80;
+            const z = (rng() - 0.5) * 80;
+            if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
+
+            const length = 2 + rng() * 4;
+            const radius = 0.3 + rng() * 0.3;
+            const geo = new THREE.CylinderGeometry(radius, radius, length, 6);
+            const log = new THREE.Mesh(geo, trunkMat);
+            log.position.set(x, radius, z);
+            log.rotation.z = Math.PI / 2;
+            log.rotation.y = rng() * Math.PI;
+            log.castShadow = true;
+            log.receiveShadow = true;
+            worldGroup.add(log);
+
+            log.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(log);
+            colliders.push(box);
+        }
+
+        // ================= 4. Управление от первого лица (FPS) =================
+        const player = {
+            pos: new THREE.Vector3(0, 1.7, 0),
+            vel: new THREE.Vector3(),
+            yaw: 0,
+            pitch: 0,
+            height: 1.7,
+            radius: 0.4, // Половина ширины игрока для AABB
+            speed: 5,
+            sprintSpeed: 8,
+            onGround: true
+        };
+
+        const keys = {};
+        document.addEventListener('keydown', (e) => keys[e.code] = true);
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // Управление мышью (Pointer Lock)
+        document.body.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body) {
+                player.yaw -= e.movementX * 0.002;
+                player.pitch -= e.movementY * 0.002;
+                // Ограничение наклона
+                player.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, player.pitch));
+            }
+        });
+
+        // ================= 5. Логика коллизий (AABB, раздельное перемещение) =================
+        // Получение AABB игрока в позиции (x, z)
+        function getPlayerBox(x, z) {
+            return new THREE.Box3(
+                new THREE.Vector3(x - player.radius, 0, z - player.radius),
+                new THREE.Vector3(x + player.radius, player.height, z + player.radius)
+            );
+        }
+
+        // Строгая проверка пересечения (касание не считается пересечением)
+        function overlaps(a, b) {
+            return a.min.x < b.max.x && a.max.x > b.min.x &&
+                   a.min.z < b.max.z && a.max.z > b.min.z &&
+                   a.min.y < b.max.y && a.max.y > b.min.y;
+        }
+
+        // Перемещение по одной оси с разрешением коллизий
+        function moveAxis(axis, amount) {
+            if (amount === 0) return;
+            
+            const oldVal = player.pos[axis];
+            player.pos[axis] += amount;
+            
+            const playerBox = getPlayerBox(player.pos.x, player.pos.z);
+            
+            for (const collider of colliders) {
+                // Пропускаем коллайдер земли для простоты (он очень большой)
+                if (collider.max.x - collider.min.x > 90) continue; 
+                
+                if (overlaps(playerBox, collider)) {
+                    // Разрешение коллизии: откат к границе
+                    if (amount > 0) {
+                        player.pos[axis] = collider.min[axis] - player.radius - 0.001;
+                    } else {
+                        player.pos[axis] = collider.max[axis] + player.radius + 0.001;
+                    }
+                    // Пересчитываем box после коррекции
+                    const newBox = getPlayerBox(player.pos.x, player.pos.z);
+                    // Если всё ещё пересекается (застряли), откатываем полностью
+                    if (overlaps(newBox, collider)) {
+                        player.pos[axis] = oldVal;
+                    }
+                    // Обнуляем скорость по этой оси
+                    player.vel[axis] = 0;
+                }
+            }
+        }
+
+        // ================= 6. Игровой цикл =================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            const delta = Math.min(clock.getDelta(), 0.1); // Ограничение delta
+
+            // 1. Расчет направления движения
+            const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+            const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+            
+            let moveDir = new THREE.Vector3();
+            if (keys['KeyW']) moveDir.add(forward);
+            if (keys['KeyS']) moveDir.sub(forward);
+            if (keys['KeyD']) moveDir.add(right);
+            if (keys['KeyA']) moveDir.sub(right);
+            
+            if (moveDir.lengthSq() > 0) {
+                moveDir.normalize();
+            }
+
+            // 2. Скорость (бег)
+            const currentSpeed = keys['ShiftLeft'] ? player.sprintSpeed : player.speed;
+            
+            // 3. Гравитация и прыжок
+            player.vel.y -= 20 * delta; // Гравитация
+            if (keys['Space'] && player.onGround) {
+                player.vel.y = 7;
+                player.onGround = false;
+            }
+
+            // 4. Перемещение по осям с коллизиями
+            // Сначала X
+            const moveX = moveDir.x * currentSpeed * delta;
+            moveAxis('x', moveX);
+            
+            // Затем Z
+            const moveZ = moveDir.z * currentSpeed * delta;
+            moveAxis('z', moveZ);
+            
+            // Затем Y (вертикаль)
+            player.pos.y += player.vel.y * delta;
+            
+            // Проверка приземления (простой пол на y=0)
+            if (player.pos.y < player.height) {
+                player.pos.y = player.height;
+                player.vel.y = 0;
+                player.onGround = true;
+            } else {
+                player.onGround = false;
+            }
+
+            // 5. Обновление камеры
+            camera.position.copy(player.pos);
+            
+            // Применяем поворот камеры
+            const quaternion = new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')
+            );
+            camera.quaternion.copy(quaternion);
+
+            // 6. Рендер
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+
+        // Обработка ресайза
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

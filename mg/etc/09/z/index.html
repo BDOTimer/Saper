@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Пепельный город — процедурный FPS (Three.js)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --amber:#e8a34c; }
+  * { box-sizing: border-box; }
+  body { margin:0; overflow:hidden; background:#000; color:#d8cdbb;
+         font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  #app canvas { display:block; }
+  #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+               pointer-events:none; z-index:5; }
+  #crosshair span { display:block; width:7px; height:7px;
+                    border:1px solid rgba(232,205,160,.9); border-radius:50%;
+                    box-shadow:0 0 4px rgba(0,0,0,.7); }
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:3;
+              background:radial-gradient(ellipse at center, transparent 55%, rgba(18,11,6,.55) 100%); }
+  #debug { position:fixed; left:10px; top:10px; z-index:6;
+           background:rgba(10,8,6,.75); padding:8px 12px;
+           font:12px/1.55 Consolas,monospace; color:#e6d6b4;
+           border:1px solid rgba(232,163,76,.35); border-radius:4px;
+           white-space:pre; }
+  .hidden { display:none !important; }
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+           background:rgba(22,15,9,.92); border:1px solid rgba(232,163,76,.5);
+           padding:8px 16px; border-radius:4px; z-index:9;
+           transition:opacity .4s; opacity:0; font-size:14px; }
+  #overlay { position:fixed; inset:0; z-index:10; display:flex;
+             align-items:center; justify-content:center;
+             background:radial-gradient(ellipse at center, rgba(10,7,4,.82) 0%, rgba(6,4,2,.94) 100%); }
+  .panel { width:min(700px,94vw); max-height:92vh; overflow:auto;
+           background:linear-gradient(180deg, rgba(26,19,12,.97), rgba(14,10,7,.97));
+           border:1px solid rgba(232,163,76,.4); border-radius:10px;
+           padding:28px 36px; box-shadow:0 20px 60px rgba(0,0,0,.75); }
+  h1 { margin:0 0 4px; font-size:34px; letter-spacing:7px;
+       color:var(--amber); font-weight:800; }
+  .sub { margin:0 0 18px; color:#9b8d78; font-size:13px; letter-spacing:1px; }
+  #progressLabel { font-size:13px; color:#b9a887; margin-bottom:7px; }
+  .bar { height:10px; background:#241c13; border:1px solid #3a2f20;
+         border-radius:5px; overflow:hidden; }
+  #progressFill { height:100%; width:0;
+                  background:linear-gradient(90deg,#8a5a20,var(--amber));
+                  transition:width .2s; }
+  .controls { display:grid; grid-template-columns:auto 1fr; gap:5px 16px;
+              font-size:14px; margin:16px 0; color:#c8bba4; }
+  .controls b { color:var(--amber); font-family:Consolas,monospace; font-weight:600; }
+  .seedRow { display:flex; gap:8px; margin:12px 0 4px; align-items:center; flex-wrap:wrap; }
+  .seedRow label { font-size:13px; color:#9b8d78; }
+  input { background:#171008; border:1px solid #4a3a24; color:#e8d9bd;
+          padding:8px 10px; border-radius:4px; font-family:Consolas,monospace;
+          width:150px; }
+  button { background:linear-gradient(180deg,#a3691f,#7c4c12); color:#ffe9c8;
+           border:1px solid #caa15c; padding:9px 18px; border-radius:5px;
+           font-size:14px; cursor:pointer; letter-spacing:.5px; }
+  button:hover { filter:brightness(1.18); }
+  .btns { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center; }
+  #btnPlay { font-size:16px; padding:12px 34px; }
+  .hint { font-size:12px; color:#8a7c66; margin-top:14px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+<div id="crosshair" class="hidden"><span></span></div>
+<div id="debug" class="hidden"></div>
+<div id="toast"></div>
+
+<div id="overlay">
+  <div class="panel">
+    <h1 id="title">ПЕПЕЛЬНЫЙ ГОРОД</h1>
+    <p class="sub">процедурно генерируемый разрушенный город · Three.js · seed-репродукция</p>
+
+    <div id="progressWrap">
+      <div id="progressLabel">Инициализация…</div>
+      <div class="bar"><div id="progressFill"></div></div>
+    </div>
+
+    <div id="menuBody" class="hidden">
+      <div class="controls">
+        <b>WASD</b><span>движение</span>
+        <b>SHIFT</b><span>бег</span>
+        <b>SPACE</b><span>прыжок (на груды обломков можно запрыгивать)</span>
+        <b>МЫШЬ</b><span>обзор</span>
+        <b>ESC</b><span>пауза / меню</span>
+        <b>F3</b><span>отладка (FPS, draw calls, коллайдеры)</span>
+        <b>R</b><span>перегенерация мира со случайным seed</span>
+      </div>
+
+      <div class="seedRow">
+        <label>Seed:</label>
+        <input id="seedInput" type="text">
+        <button id="btnApply" class="ghost">Применить seed</button>
+        <button id="btnRandom" class="ghost">Случайный</button>
+      </div>
+
+      <div class="btns">
+        <button id="btnPlay">ИГРАТЬ</button>
+      </div>
+
+      <p class="hint">Один seed — один и тот же мир: вся генерация детерминирована
+      (объекты привязаны к координатам). Поделитесь ссылкой вида
+      <b>?seed=1337</b> — друг увидит ровно тот же город. Все параметры
+      генерации настраиваются в <b>js/config.js</b>.</p>
+    </div>
+  </div>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/rng.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/grid.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/city.js"></script>
+<script src="js/props.js"></script>
+<script src="js/lighting.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/player.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
