@@ -1479,6 +1479,7 @@ function spawnNext(){
   if(!canOccupy(x,z,H-1)){state='over';gameOver();return;}
   state='falling'; updateGhost();
 }
+
 function tryMove(dx,dz){
   if(!piece||state!=='falling')return;
   const nx=piece.x+dx, nz=piece.z+dz;
@@ -1487,13 +1488,14 @@ function tryMove(dx,dz){
     return;
   }
   piece.x=nx; piece.z=nz;
-  const gx=piece.group.position.x, gz=piece.group.position.z, tx=wx(nx), tz=wz(nz);
-  tween({owner:piece.group,dur:.07,ease:easeOutQuad,
-    up:k=>{piece.group.position.x=gx+(tx-gx)*k; piece.group.position.z=gz+(tz-gz)*k;}});
+  const grp=piece.group;                    // запоминаем группу сейчас
+  const gx=grp.position.x, gz=grp.position.z, tx=wx(nx), tz=wz(nz);
+  tween({owner:grp,dur:.07,ease:easeOutQuad,
+    up:k=>{grp.position.x=gx+(tx-gx)*k; grp.position.z=gz+(tz-gz)*k;}});
   updateGhost(); 
-  //sfx.move();
   SND.move.play();
 }
+
 function rotatePiece(){
   if(!piece||state!=='falling')return;
   piece.elems.unshift(piece.elems.pop());
@@ -1503,20 +1505,22 @@ function rotatePiece(){
   });
   updateGhost(); sfx.rotate();
 }
+
 async function hardDrop(){
   if(!piece||state!=='falling')return;
   const s=session, r=landingRow(piece.x,piece.z,piece.row), dist=piece.row-r;
   piece.row=r; piece.y=r; state='dropping'; updateGhost(); 
   sfx.hard();
   SND.space.play();
-  
   fovKick=Math.max(fovKick,.9);
-  const from=piece.group.position.y, to=wy(r);
-  await tween({owner:piece.group,dur:.3+.01*dist,ease:easeInQuad,
-    up:k=>piece.group.position.y=from+(to-from)*k});
+  const grp=piece.group;
+  const from=grp.position.y, to=wy(r);
+  await tween({owner:grp,dur:.3+.01*dist,ease:easeInQuad,
+    up:k=>grp.position.y=from+(to-from)*k});
   if(s!==session)return;
   lockPiece();
 }
+
 function findMatches(){
   const res=new Set();
   for(let z=0;z<D;z++)for(let x=0;x<W;x++)for(let y=0;y<H;y++){
@@ -1598,7 +1602,9 @@ async function lockPiece(){
   else SND.drop1.play();
   
   markerPulse=1;
-  const p=piece; piece=null;
+  const p=piece; 
+  killTweens(p.group); /// +
+  piece=null;
   let overflow=false, magic=null, magicY=0;
   p.elems.forEach((e,i)=>{
     const y=p.row+i;
