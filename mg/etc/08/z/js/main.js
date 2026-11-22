@@ -145,6 +145,7 @@
   clock = new T.Clock();
   window.HUD.init({
     onPlay: function () {
+      window.HUD.hideMenu();
       window.AudioSys.init();
       renderer.domElement.requestPointerLock();
     },
