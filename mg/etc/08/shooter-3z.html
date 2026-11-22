@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ИГРА ШУТЕР: РУИНЫ — ЗАГРУЗКА</title>
+    <title>ИГРА ШУТЕР: ГОРОД РУИН — ЗАГРУЗКА</title>
     <style>
         body {
             margin: 0;
@@ -42,6 +42,44 @@
             text-align: center;
             padding: 20px;
             box-sizing: border-box;
+        }
+        /* Кнопка должна получать клики, поэтому pointer-events: auto */
+        .btn-start {
+            pointer-events: auto;
+            margin-top: 30px;
+            padding: 16px 55px;
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: 900;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: #1a0e00;
+            background: linear-gradient(180deg, #ffcc66 0%, #ff9900 50%, #cc6600 100%);
+            border: 3px solid #ffe0a0;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 25px #ff8800, 0 0 60px rgba(255, 100, 0, 0.6), inset 0 2px 6px rgba(255, 255, 255, 0.5);
+            transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+            animation: btnPulse 2s infinite;
+        }
+        .btn-start:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 40px #ffaa00, 0 0 90px rgba(255, 140, 0, 0.9), inset 0 2px 10px rgba(255, 255, 255, 0.8);
+            filter: brightness(1.15);
+        }
+        .btn-start:active {
+            transform: scale(0.97);
+            box-shadow: 0 0 15px #ff8800, inset 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+        .btn-start:disabled {
+            cursor: default;
+            filter: grayscale(0.7) brightness(0.6);
+            animation: none;
+            box-shadow: 0 0 10px #553300;
+        }
+        @keyframes btnPulse {
+            0%, 100% { box-shadow: 0 0 25px #ff8800, 0 0 60px rgba(255, 100, 0, 0.6), inset 0 2px 6px rgba(255,255,255,0.5); }
+            50%      { box-shadow: 0 0 40px #ffaa33, 0 0 90px rgba(255, 140, 0, 0.9), inset 0 2px 10px rgba(255,255,255,0.8); }
         }
         h1 {
             font-size: clamp(2rem, 8vw, 5rem);
@@ -82,11 +120,21 @@
             animation: blink 1.8s infinite;
             font-weight: bold;
         }
-        .wait span {
+        .dots-anim::after {
+            content: '...';
             display: inline-block;
-            animation: dots 1.5s infinite;
-            width: 30px;
+            width: 1.5em;
             text-align: left;
+            animation: dotAnim 1.5s infinite steps(1);
+        }
+        #status {
+            margin-top: 20px;
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            letter-spacing: 4px;
+            color: #ffcc66;
+            min-height: 1.5em;
+            text-shadow: 0 0 20px #ff6600;
+            transition: opacity 0.4s;
         }
         @keyframes flicker {
             0% { opacity: 0.9; text-shadow: 0 0 30px #ff6600, 0 0 60px #ff3300; }
@@ -104,21 +152,6 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
-        @keyframes dots {
-            0% { content: ''; }
-            25% { content: '.'; }
-            50% { content: '..'; }
-            75% { content: '...'; }
-            100% { content: ''; }
-        }
-        /* Псевдоэлемент для анимации точек (проще через JS, но оставим CSS-анимацию на span) */
-        .dots-anim::after {
-            content: '...';
-            display: inline-block;
-            width: 1.5em;
-            text-align: left;
-            animation: dotAnim 1.5s infinite steps(1);
-        }
         @keyframes dotAnim {
             0% { content: ''; }
             25% { content: '.'; }
@@ -135,19 +168,26 @@
             opacity: 0.7;
             pointer-events: none;
         }
+        
+        .btn-start {
+    /* ... существующие стили ... */
+    display: inline-block;      /* добавьте */
+    text-decoration: none;      /* добавьте */
+    line-height: normal;        /* добавьте */
+}
     </style>
 </head>
 <body>
     <!-- Фоновая заставка из fon.jpg -->
     <div id="bg"></div>
 
-    <!-- Three.js сцена (canvas будет добавлен скриптом) -->
-    
-    <!-- Текст-заглушка -->
+    <!-- Текст-заглушка и кнопка -->
     <div id="overlay">
         <h1>РУИНЫ</h1>
-        <div class="subtitle">ИГРА ШУТЕР: РУИНЫ ПОКА ЕЩЁ НАХОДИТСЯ В ГЕНЕРАЦИИ ...</div>
-        <div class="wait">... ждите <span class="dots-anim"></span></div>
+        <div class="subtitle">ИГРА ШУТЕР: "ГОРОД РУИН" СГЕНЕРИРОВАНА.</div>
+        <div class="wait">... готов ...<span class="dots-anim"></span></div>
+        <a id="startBtn" class="btn-start" href="z/index.html">ЗАПУСТИТЬ</a>
+        <div id="status"></div>
     </div>
 
     <!-- Импорт three.js и скрипт сцены -->
@@ -164,7 +204,6 @@
 
         // --- Настройка сцены ---
         const scene = new THREE.Scene();
-        // Прозрачный фон, чтобы был виден fon.jpg
         scene.background = null;
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -174,43 +213,36 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.shadowMap.enabled = true; // не обязательно, но для антуража
+        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- Освещение (атмосферное, мрачноватое) ---
-        // Общий мягкий свет
+        // --- Освещение ---
         const ambientLight = new THREE.AmbientLight(0x404060);
         scene.add(ambientLight);
 
-        // Направленный свет, имитирующий луну или закат
         const dirLight = new THREE.DirectionalLight(0xffaa66, 1.2);
         dirLight.position.set(5, 10, 7);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // Добавим немного холодного света с другой стороны
         const backLight = new THREE.PointLight(0x4466ff, 0.8);
         backLight.position.set(-5, 0, -5);
         scene.add(backLight);
 
-        // Точечный свет для выделения руин
         const ruinLight = new THREE.PointLight(0xff6600, 1.5, 20);
         ruinLight.position.set(2, 1, 2);
         scene.add(ruinLight);
 
-        // --- Создание руин (абстрактные обломки) ---
+        // --- Руины ---
         const ruinGroup = new THREE.Group();
 
-        // Функция для создания случайного "камня" (параллелепипед с искажениями)
         function createDebris(posX, posY, posZ, scaleX, scaleY, scaleZ, rotY, color) {
             const geometry = new THREE.BoxGeometry(scaleX, scaleY, scaleZ);
-            // Немного исказим вершины для эффекта разрушения
             const positionAttribute = geometry.attributes.position;
             for (let i = 0; i < positionAttribute.count; i++) {
                 const x = positionAttribute.getX(i);
                 const y = positionAttribute.getY(i);
                 const z = positionAttribute.getZ(i);
-                // Небольшое случайное смещение
                 positionAttribute.setXYZ(
                     i,
                     x + (Math.random() - 0.5) * 0.2,
@@ -219,7 +251,7 @@
                 );
             }
             geometry.computeVertexNormals();
-            
+
             const material = new THREE.MeshStandardMaterial({
                 color: color,
                 roughness: 0.8,
@@ -227,7 +259,7 @@
                 emissive: new THREE.Color(0x221100),
                 flatShading: false
             });
-            
+
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(posX, posY, posZ);
             mesh.rotation.y = rotY;
@@ -236,15 +268,12 @@
             return mesh;
         }
 
-        // Создаём несколько «стен» и обломков
-        // Основная стена (разрушенная)
         const wall1 = createDebris(-1.5, 0.5, -1, 2.5, 1.8, 0.4, 0.3, 0x8a7a6a);
         ruinGroup.add(wall1);
 
         const wall2 = createDebris(1.8, 0.3, -0.5, 1.2, 1.2, 0.5, -0.5, 0x7a6a5a);
         ruinGroup.add(wall2);
 
-        // Колонна
         const columnGeo = new THREE.CylinderGeometry(0.3, 0.4, 2.5, 8);
         const columnMat = new THREE.MeshStandardMaterial({ color: 0x9a8a7a, roughness: 0.9, emissive: new THREE.Color(0x221100) });
         const column = new THREE.Mesh(columnGeo, columnMat);
@@ -253,7 +282,6 @@
         column.receiveShadow = true;
         ruinGroup.add(column);
 
-        // Обломки поменьше (случайные)
         for (let i = 0; i < 25; i++) {
             const x = (Math.random() - 0.5) * 6;
             const z = (Math.random() - 0.5) * 6;
@@ -267,7 +295,6 @@
             ruinGroup.add(debris);
         }
 
-        // Добавим «сломанную арку» — два столба и перекладина
         const pillarLeft = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.0, 0.4), new THREE.MeshStandardMaterial({ color: 0x8a7a6a, roughness: 0.9 }));
         pillarLeft.position.set(-1.8, 1.0, 1.8);
         pillarLeft.castShadow = true;
@@ -289,7 +316,7 @@
 
         scene.add(ruinGroup);
 
-        // --- Атмосферные частицы (пыль) ---
+        // --- Частицы пыли ---
         const particlesGeo = new THREE.BufferGeometry();
         const particlesCount = 800;
         const posArray = new Float32Array(particlesCount * 3);
@@ -309,29 +336,25 @@
         const particles = new THREE.Points(particlesGeo, particlesMat);
         scene.add(particles);
 
-        // --- Дополнительный «туман» для глубины ---
         scene.fog = new THREE.FogExp2(0x000000, 0.05);
 
         // --- Анимация ---
         let time = 0;
+        let running = true;
 
         function animate() {
+            if (!running) return;
             requestAnimationFrame(animate);
             time += 0.005;
 
-            // Медленное вращение камеры вокруг руин
             camera.position.x = 7 * Math.sin(time * 0.3);
             camera.position.z = 7 * Math.cos(time * 0.3);
             camera.position.y = 3 + Math.sin(time * 0.8) * 0.5;
             camera.lookAt(0, 0.5, 0);
 
-            // Лёгкое вращение и покачивание группы руин для динамики
             ruinGroup.rotation.y = Math.sin(time * 0.2) * 0.1;
-            
-            // Мерцание света
             ruinLight.intensity = 1.2 + Math.sin(time * 5) * 0.5;
 
-            // Вращение частиц
             particles.rotation.y += 0.0005;
             particles.rotation.x += 0.0002;
 
@@ -347,8 +370,43 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Небольшая задержка, чтобы фон загрузился, и мы не перекрывали его полностью
-        // (прозрачный canvas)
+        // --- Кнопка "ЗАПУСТИТЬ" ---
+        const startBtn = document.getElementById('startBtn');
+        const statusEl = document.getElementById('status');
+        const overlayEl = document.getElementById('overlay');
+
+        startBtn.addEventListener('click', () => {
+            // Блокируем кнопку, чтобы не нажимали повторно
+            startBtn.disabled = true;
+            startBtn.textContent = 'ЗАГРУЗКА...';
+            statusEl.textContent = 'ИНИЦИАЛИЗАЦИЯ ГЕНЕРАТОРА РУИН...';
+
+            // Небольшая имитация загрузки
+            const messages = [
+                'ИНИЦИАЛИЗАЦИЯ ГЕНЕРАТОРА РУИН...',
+                'ЗАГРУЗКА ТЕКСТУР...',
+                'СБОРКА ГЕОМЕТРИИ...',
+                'ПОДГОТОВКА ОРУЖИЯ...',
+                'ПОЧТИ ГОТОВО...'
+            ];
+            let step = 0;
+            const interval = setInterval(() => {
+                step++;
+                if (step < messages.length) {
+                    statusEl.textContent = messages[step];
+                } else {
+                    clearInterval(interval);
+                    statusEl.innerHTML = '⚠ РУИНЫ ВСЁ ЕЩЁ В ГЕНЕРАЦИИ...<br>ЗАПУСК НЕВОЗМОЖЕН. ЖДИТЕ ОБНОВЛЕНИЯ.';
+                    startBtn.textContent = 'НЕДОСТУПНО';
+                    // Возвращаем кнопку в исходное состояние через несколько секунд
+                    setTimeout(() => {
+                        startBtn.disabled = false;
+                        startBtn.textContent = 'ЗАПУСТИТЬ';
+                        statusEl.textContent = '';
+                    }, 4000);
+                }
+            }, 900);
+        });
     </script>
 </body>
 </html>
