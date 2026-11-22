@@ -370,7 +370,7 @@ kbd{display:inline-block;padding:1px 5px;border-radius:4px;background:var(--surf
         <div id="panelFoot">
           <button class="btn" id="btnRandom" title="Случайный стиль"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" stroke="none"/></svg>Рандом</button>
           <button class="btn" id="btnExport" title="Скачать PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PNG</button>
-          <button class="btn" id="btnCam" title="Сброс вида камеры"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>Вид</button>
+          <button class="btn" id="btnCam" title="Кадрировать куб целиком с трёх граней"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>Вид</button>
         </div>
         <div class="foot-note">three.js · процедурные текстуры и шейдеры · без внешних ассетов</div>
       </div>
@@ -381,7 +381,6 @@ kbd{display:inline-block;padding:1px 5px;border-radius:4px;background:var(--surf
 <noscript><div style="position:fixed;inset:0;background:#070a14;color:#ff4d5e;display:flex;align-items:center;justify-content:center;font-family:sans-serif;z-index:200">Для игры нужен включённый JavaScript.</div></noscript>
 
 <script>
-/* Ранний перехват ошибок — даже если модуль не распарсится */
 window.__bootErrors=[];window.__frames=0;window.__bootStage='старт';
 window.addEventListener('error',function(e){window.__bootErrors.push(e.message||'ошибка скрипта');});
 window.addEventListener('unhandledrejection',function(e){window.__bootErrors.push(String(e.reason&&e.reason.message||e.reason||'ошибка'));});
@@ -418,7 +417,6 @@ try{
 }catch(e){
   fatal('Не удалось загрузить three.js с CDN. Проверьте интернет и перезагрузите страницу.');throw e;
 }
-/* опциональные модули — при их отсутствии игра работает без них */
 let RoomEnvironment=null,EffectComposer=null,RenderPass=null,UnrealBloomPass=null,OutputPass=null,ShaderPass=null,FXAAShader=null;
 try{({RoomEnvironment}=await import('three/addons/environments/RoomEnvironment.js'));}catch(e){console.warn('RoomEnvironment недоступен',e);}
 let usePost=true;
@@ -452,6 +450,7 @@ const easeInOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 const rnd=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
 const ri=n=>Math.floor(Math.random()*n);
 let spacing=1+CFG.gap;
+const flat={active:false,body:null,stickers:null,defs:[],geo:null,stGeo:null};
 
 /* ============================== AUDIO ============================== */
 const Snd={
@@ -535,8 +534,15 @@ const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x0a0e1f);
 scene.fog=new THREE.FogExp2(0x070a14,0.0075);
 const camera=new THREE.PerspectiveCamera(38,1,0.1,400);
-const DEFAULT_DIR=new THREE.Vector3(0.62,0.46,0.88).normalize();
-camera.position.copy(DEFAULT_DIR).multiplyScalar(14);
+/* канонический ракурс: азимут 36°, подъём 26° — видно верх, фас и правый бок */
+const VIEW_AZ=36*Math.PI/180,VIEW_EL=26*Math.PI/180;
+const DEFAULT_DIR=new THREE.Vector3(
+  Math.sin(VIEW_AZ)*Math.cos(VIEW_EL),
+  Math.sin(VIEW_EL),
+  Math.cos(VIEW_AZ)*Math.cos(VIEW_EL)
+).normalize();
+const WORLD_UP=new THREE.Vector3(0,1,0);
+camera.position.copy(DEFAULT_DIR).multiplyScalar(16);
 camera.lookAt(0,0,0);
 
 const controls=new OrbitControls(camera,canvas);
@@ -552,18 +558,16 @@ let dirtyFrames=4;
 function markDirty(n=2){dirtyFrames=Math.max(dirtyFrames,n);renderer.shadowMap.needsUpdate=true;}
 controls.addEventListener('change',()=>markDirty(2));
 
-/* авто-фолбэк при ошибке любого шейдера */
 const shaderFail={cubie:false,mirror:false,bg:false,points:false,notified:false};
 renderer.debug.onShaderError=(gl,prog,vs,fs)=>{
   let src='';try{src=(gl.getShaderSource(vs)||'')+(gl.getShaderSource(fs)||'');}catch(e){}
-  console.error('Shader error:',gl.getProgramInfoLog(prog),gl.getShaderInfoLog(vs),gl.getShaderInfoLog(fs));
+  console.warn('Шейдер не скомпилирован — включаю безопасный режим.',gl.getShaderInfoLog(fs)||gl.getProgramInfoLog(prog));
   if(src.indexOf('iSticker0')>=0)shaderFail.cubie=true;
   else if(src.indexOf('vUvP')>=0)shaderFail.mirror=true;
   else if(src.indexOf('vDir')>=0)shaderFail.bg=true;
   else shaderFail.points=true;
 };
 
-/* окружение (процедурное) — опционально */
 stageName('окружение');
 if(RoomEnvironment){
   try{
@@ -573,7 +577,6 @@ if(RoomEnvironment){
   }catch(e){console.warn('env fallback',e);}
 }
 
-/* свет */
 const hemi=new THREE.HemisphereLight(0x35406e,0x0c0f1c,0.65);scene.add(hemi);
 const key=new THREE.DirectionalLight(0xfff2e0,2.8);
 key.castShadow=true;key.shadow.mapSize.set(2048,2048);
@@ -582,7 +585,6 @@ scene.add(key);scene.add(key.target);
 const rim=new THREE.DirectionalLight(0x58c8ff,1.5);scene.add(rim);
 const fill=new THREE.DirectionalLight(0xff5fa8,0.6);scene.add(fill);
 
-/* post-processing: HalfFloat БЕЗ MSAA (надёжно) + FXAA */
 stageName('post-processing');
 let composer=null,bloom=null,fxaa=null;
 if(usePost){
@@ -618,7 +620,7 @@ function applyPalette(){
 }
 applyPalette();
 
-/* ============================== ФОН (аврора) ============================== */
+/* ============================== ФОН ============================== */
 const bgMat=new THREE.ShaderMaterial({
   uniforms:{uTime:sharedU.uTime},side:THREE.BackSide,depthWrite:false,fog:false,
   vertexShader:`varying vec3 vDir;void main(){vDir=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
@@ -650,7 +652,7 @@ void main(){
 const bgMesh=new THREE.Mesh(new THREE.SphereGeometry(150,48,32),bgMat);
 scene.add(bgMesh);
 
-/* ============================== ПОЛ (процедурная canvas-текстура) ============================== */
+/* ============================== ПОЛ ============================== */
 function makeFloorTexture(){
   const s=1024,cv=document.createElement('canvas');cv.width=cv.height=s;
   const g=cv.getContext('2d');
@@ -680,21 +682,24 @@ const ring2=new THREE.Mesh(new THREE.TorusGeometry(1,0.008,8,140),ringMat2);
 ring1.rotation.x=ring2.rotation.x=-Math.PI/2;ring1.position.y=ring2.position.y=0.02;
 floorGroup.add(ring1,ring2);
 
-/* ============================== МАТЕРИАЛ КУБИКОВ (шейдерный путь) ============================== */
+/* ============================== МАТЕРИАЛ КУБИКОВ ============================== */
 const cubieMat=new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:0.4,metalness:0,clearcoat:0.55,clearcoatRoughness:0.28,envMapIntensity:0.85});
-cubieMat.customProgramCacheKey=()=>'cubie-v2';
+cubieMat.extensions={derivatives:true};
+cubieMat.customProgramCacheKey=()=>'cubie-v3';
 cubieMat.onBeforeCompile=shader=>{
   Object.assign(shader.uniforms,sharedU);
   shader.vertexShader=`
 attribute vec3 iSticker0;attribute vec3 iSticker1;attribute float iSeed;
 varying vec3 vLocalPos;varying vec3 vLocalNormal;varying float vSeed;varying vec3 vViewN;
+varying vec3 vSt0;varying vec3 vSt1;
 `+shader.vertexShader;
   shader.vertexShader=shader.vertexShader
-    .replace('#include <begin_vertex>','#include <begin_vertex>\nvLocalPos=position;vLocalNormal=normal;vSeed=iSeed;')
+    .replace('#include <begin_vertex>','#include <begin_vertex>\nvLocalPos=position;vLocalNormal=normal;vSeed=iSeed;vSt0=iSticker0;vSt1=iSticker1;')
     .replace('#include <defaultnormal_vertex>','#include <defaultnormal_vertex>\nvViewN=transformedNormal;');
   shader.fragmentShader=`
 uniform vec3 uPalette[7];uniform float uGlow;uniform float uHalf;
 varying vec3 vLocalPos;varying vec3 vLocalNormal;varying float vSeed;varying vec3 vViewN;
+varying vec3 vSt0;varying vec3 vSt1;
 float gMask,gNoiseA,gWear,gSpeck,gStreak;vec3 gCol;vec2 gGrad;
 `+NOISE_GLSL+shader.fragmentShader;
   shader.fragmentShader=shader.fragmentShader
@@ -706,8 +711,8 @@ float gMask,gNoiseA,gWear,gSpeck,gStreak;vec3 gCol;vec2 gGrad;
   float comp=dot(nL,ax);
   float fi=dot(ax,vec3(0.,2.,4.))+((comp<0.0)?1.0:0.0);
   float idx=0.0;
-  if(fi<0.5)idx=iSticker0.x;else if(fi<1.5)idx=iSticker0.y;else if(fi<2.5)idx=iSticker0.z;
-  else if(fi<3.5)idx=iSticker1.x;else if(fi<4.5)idx=iSticker1.y;else idx=iSticker1.z;
+  if(fi<0.5)idx=vSt0.x;else if(fi<1.5)idx=vSt0.y;else if(fi<2.5)idx=vSt0.z;
+  else if(fi<3.5)idx=vSt1.x;else if(fi<4.5)idx=vSt1.y;else idx=vSt1.z;
   vec2 tc=(ax.x>0.5)?vLocalPos.zy:((ax.y>0.5)?vLocalPos.xz:vLocalPos.xy);
   vec2 qq=abs(tc)-vec2(uHalf-0.095);
   float sd=length(max(qq,0.0))-0.095;
@@ -722,8 +727,8 @@ float gMask,gNoiseA,gWear,gSpeck,gStreak;vec3 gCol;vec2 gGrad;
   vec3 plastic=uPalette[0]*(0.85+0.3*hash21(vec2(vSeed,3.7)));
   float wear=smoothstep(0.55,0.95,1.0-dom)*smoothstep(0.30,0.5,max(abs(vLocalPos.x),max(abs(vLocalPos.y),abs(vLocalPos.z))));
   plastic+=vec3(0.035)*wear;
-  vec3 sticker=pal*(0.90+0.14*n1)*edgeDark;
-  gCol=mix(plastic,sticker,mask);
+  vec3 stickerCol=pal*(0.90+0.14*n1)*edgeDark;
+  gCol=mix(plastic,stickerCol,mask);
   diffuseColor.rgb=gCol;
   gMask=mask;gNoiseA=n1;gWear=wear;gStreak=streak;
   float e=0.09;
@@ -751,7 +756,6 @@ totalEmissiveRadiance+=gCol*(gMask*uGlow)+vec3(1.0,0.98,0.9)*gSpeck*1.4;`);
 const AXES=[new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)];
 const FACE_DIRS=[new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,0,-1)];
 let cubies=[],mesh=null;
-const flat={active:false,body:null,stickers:null,defs:[],geo:null,stGeo:null};
 let history=[];
 const S={mode:'free',solved:true,prevSolved:true,moves:0,last:null,scrambleLeft:0,solveLeft:0,solveTotal:0};
 const timer={run:false,t0:0,acc:0};
@@ -766,11 +770,12 @@ function makeCubies(N){
   for(let x=0;x<N;x++)for(let y=0;y<N;y++)for(let z=0;z<N;z++){
     if(x>0&&x<N-1&&y>0&&y<N-1&&z>0&&z<N-1)continue;
     list.push({c:new THREE.Vector3(x,y,z),c0:new THREE.Vector3(x,y,z),q:new THREE.Quaternion(),
-      s:[x===N-1?1:0,x===0?2:0,y===N-1?3:0,y===0?4:0,z===N-1?5:0,z===0?6:0],seed:rnd(100),flip:0});
+      s:[x===N-1?1:0,x===0?2:0,y===N-1?3:0,y===0?4:0,z===N-1?5:0,z===0?6:0],
+      seed:rnd(100),flip:0,mc:new THREE.Matrix4()});
   }
   return list;
 }
-const _q=new THREE.Quaternion(),_v=new THREE.Vector3(),_v2=new THREE.Vector3(),_v3=new THREE.Vector3();
+const _q=new THREE.Quaternion(),_v=new THREE.Vector3(),_v2=new THREE.Vector3();
 const _m=new THREE.Matrix4(),_mRot=new THREE.Matrix4(),_mBase=new THREE.Matrix4(),_mFace=new THREE.Matrix4();
 const ONE=new THREE.Vector3(1,1,1);
 function applyMove(list,m){
@@ -778,7 +783,7 @@ function applyMove(list,m){
   _q.setFromAxisAngle(AXES[m.axis],m.dir*HALF_PI);
   for(const c of list){
     if(c.c.getComponent(m.axis)!==m.layer)continue;
-    _v.copy(c.c);_v.setComponent(m.axis,_v.getComponent(m.axis)-half);
+    _v.copy(c.c).subScalar(half);
     _v.applyQuaternion(_q);
     c.c.set(Math.round(_v.x+half),Math.round(_v.y+half),Math.round(_v.z+half));
     c.q.premultiply(_q).normalize();
@@ -817,7 +822,6 @@ function buildCubeVisual(){
   if(flat.active)buildFlat();
   updateMatrices();
 }
-/* безопасный фолбэк: тёмные кубики + наклейки-квады (только встроенные материалы) */
 function roundedRectGeo(w,h,r){
   const s=new THREE.Shape(),x=-w/2,y=-h/2;
   s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);
@@ -830,14 +834,14 @@ const FACE_QUAT=FACE_DIRS.map(d=>new THREE.Quaternion().setFromUnitVectors(new T
 function buildFlat(){
   disposeFlat();
   flat.geo=new RoundedBoxGeometry(1,1,1,3,CFG.radius);
-  const bodyMat=new THREE.MeshStandardMaterial({color:PALETTES[CFG.palette].plastic,roughness:0.42,metalness:0.05});
+  const bodyMat=new THREE.MeshPhysicalMaterial({color:PALETTES[CFG.palette].plastic,roughness:0.42,metalness:0.05,clearcoat:0.4,clearcoatRoughness:0.3});
   flat.body=new THREE.InstancedMesh(flat.geo,bodyMat,cubies.length);
   flat.body.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   flat.body.castShadow=true;flat.body.receiveShadow=true;flat.body.frustumCulled=false;
   flat.defs=[];
   cubies.forEach((c,i)=>{for(let f=0;f<6;f++)if(c.s[f])flat.defs.push({ci:i,f});});
   flat.stGeo=roundedRectGeo(0.8,0.8,0.1);
-  const stMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.24,metalness:0.05});
+  const stMat=new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:0.24,metalness:0.05,clearcoat:0.6,clearcoatRoughness:0.22});
   flat.stickers=new THREE.InstancedMesh(flat.stGeo,stMat,flat.defs.length);
   flat.stickers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   flat.stickers.frustumCulled=false;
@@ -845,16 +849,17 @@ function buildFlat(){
   recolorFlat();
   if(mesh)mesh.visible=false;
 }
+const _fc=new THREE.Color();
 function recolorFlat(){
   if(!flat.stickers)return;
   const p=PALETTES[CFG.palette];
   flat.body.material.color.set(p.plastic);
-  flat.defs.forEach((d,i)=>{_v3.set(0,0,0);const col=new THREE.Color(p.cols[cubies[d.ci].s[d.f]-1]);flat.stickers.setColorAt(i,col);});
+  flat.defs.forEach((d,i)=>{_fc.set(p.cols[cubies[d.ci].s[d.f]-1]);flat.stickers.setColorAt(i,_fc);});
   if(flat.stickers.instanceColor)flat.stickers.instanceColor.needsUpdate=true;
 }
 function disposeFlat(){
-  if(flat.body){scene.remove(flat.body);flat.body.dispose();flat.body=null;}
-  if(flat.stickers){scene.remove(flat.stickers);flat.stickers.dispose();flat.stickers=null;}
+  if(flat.body){scene.remove(flat.body);flat.body.dispose();flat.body.material.dispose();flat.body=null;}
+  if(flat.stickers){scene.remove(flat.stickers);flat.stickers.dispose();flat.stickers.material.dispose();flat.stickers=null;}
   if(flat.geo){flat.geo.dispose();flat.geo=null;}
   if(flat.stGeo){flat.stGeo.dispose();flat.stGeo=null;}
   flat.defs=[];
@@ -863,6 +868,12 @@ function activateFlatFallback(){
   if(flat.active)return;
   flat.active=true;buildFlat();updateMatrices();
   if(!shaderFail.notified){shaderFail.notified=true;toast('Включён безопасный режим графики — кубик всегда виден','warn',5000);}
+}
+function applyShaderFallbacks(){
+  if(shaderFail.cubie&&!flat.active)activateFlatFallback();
+  if(shaderFail.bg&&bgMesh.visible){bgMesh.visible=false;markDirty(3);}
+  if(shaderFail.points){pPoints.visible=false;dust.visible=false;}
+  if(shaderFail.mirror)mirrorGroups.forEach(g=>g.traverse(o=>{if(o.isMirror)o.visible=false;}));
 }
 function rebuildGeometryOnly(){
   sharedU.uHalf.value=0.5-CFG.radius-0.015;
@@ -881,9 +892,9 @@ function updateMatrices(){
     const c=cubies[i];
     _v.set((c.c.x-half)*spacing,(c.c.y-half)*spacing,(c.c.z-half)*spacing);
     _mBase.compose(_v,c.q,ONE);
-    if(src&&c.c.getComponent(src.axis)===src.layer){_m.multiplyMatrices(_mRot,_mBase);}else _m.copy(_mBase);
+    if(src&&c.c.getComponent(src.axis)===src.layer)_m.multiplyMatrices(_mRot,_mBase);else _m.copy(_mBase);
     target.setMatrixAt(i,_m);
-    if(flat.active)c._mCache=_m.clone();
+    if(flat.active)c.mc.copy(_m);
   }
   target.instanceMatrix.needsUpdate=true;
   if(flat.active&&flat.stickers){
@@ -891,7 +902,7 @@ function updateMatrices(){
       const d=flat.defs[k],c=cubies[d.ci];
       _v2.copy(FACE_DIRS[d.f]).multiplyScalar(0.503);
       _mFace.compose(_v2,FACE_QUAT[d.f],ONE);
-      _m.multiplyMatrices(c._mCache,_mFace);
+      _m.multiplyMatrices(c.mc,_mFace);
       flat.stickers.setMatrixAt(k,_m);
     }
     flat.stickers.instanceMatrix.needsUpdate=true;
@@ -913,7 +924,7 @@ function faceUniform(){
   return ok;
 }
 
-/* ============================== ВАЛИДАЦИЯ (проверена симуляцией N=2..8) ============================== */
+/* ============================== ВАЛИДАЦИЯ ============================== */
 const sig=c=>c.s.filter(v=>v>0).sort((a,b)=>a-b).join('');
 const keyOf=v=>`${v.x},${v.y},${v.z}`;
 function permParity(arr){
@@ -971,7 +982,7 @@ function validate(){
       return permParity(p);
     };
     const pc=parityOf(3,grp(3)),pe=parityOf(2,grp(2)),pm=parityOf(1,grp(1));
-    add(pe===(pc+pm)%2,'Чётность перестановок',`углы⊕центры = ${(pc+pm)%2} · рёбра = ${pe} — совпадают (учитывает ходы средних слоёв)`);
+    add(pe===(pc+pm)%2,'Чётность перестановок',`углы⊕центры = ${(pc+pm)%2} · рёбра = ${pe} — совпадают`);
   }else if(N===2){
     lines.push({ok:true,t:'Чётность 2×2',d:'на 2×2 не инвариант — достижимость доказана реплеем'});
   }else{
@@ -1030,6 +1041,7 @@ void main(){
     this.rt=rt;this.isMirror=true;this.mirrorActive=true;this.dead=false;
     this.onBeforeRender=(rndr,scn,cam)=>{
       if(mirrorPass||!this.mirrorActive||this.dead||shaderFail.mirror)return;
+      if(shaderFail.cubie&&!flat.active)return;
       const curRT=rndr.getRenderTarget();
       try{
         _mp.setFromMatrixPosition(this.matrixWorld);
@@ -1192,7 +1204,6 @@ function sparks(m){
     spawnP(p,v,_col,rnd(0.35,0.6),rnd(2,4));
   }
 }
-/* пыль */
 const DUST=150;
 const dGeo=new THREE.BufferGeometry();
 {
@@ -1225,7 +1236,70 @@ gl_FragColor=vec4(vC,a*0.55);
 }`}));
 dust.frustumCulled=false;scene.add(dust);
 
-/* ============================== РАСКЛАДКА СЦЕНЫ ============================== */
+/* ============================== КАДРИРОВАНИЕ КАМЕРЫ ============================== */
+const _fitDir=new THREE.Vector3(),_fitRight=new THREE.Vector3(),_fitUp=new THREE.Vector3(),_fitV=new THREE.Vector3();
+const cubeSize=()=>(CFG.size-1)*spacing+1;
+/* точная дистанция, при которой все 8 углов куба помещаются в кадр с запасом */
+function fitDistance(dir,margin=1.18){
+  const a=cubeSize()/2;
+  _fitDir.copy(dir);
+  if(_fitDir.lengthSq()<1e-8)_fitDir.copy(DEFAULT_DIR);
+  _fitDir.normalize();
+  _fitRight.crossVectors(WORLD_UP,_fitDir);
+  if(_fitRight.lengthSq()<1e-8)_fitRight.set(1,0,0);
+  _fitRight.normalize();
+  _fitUp.crossVectors(_fitDir,_fitRight).normalize();
+  const tanV=Math.tan(camera.fov*Math.PI/360);
+  const tanH=tanV*Math.max(0.25,camera.aspect||1);
+  let d=0;
+  for(let i=0;i<8;i++){
+    _fitV.set((i&1)?a:-a,(i&2)?a:-a,(i&4)?a:-a);
+    const z=_fitV.dot(_fitDir);
+    const x=Math.abs(_fitV.dot(_fitRight));
+    const y=Math.abs(_fitV.dot(_fitUp));
+    d=Math.max(d,z+x/tanH,z+y/tanV);
+  }
+  return d*margin;
+}
+function updateDistanceLimits(dist){
+  const size=cubeSize();
+  controls.minDistance=size*0.95;
+  controls.maxDistance=Math.max(size*6+6,dist*2.4);
+}
+let camTween=null;
+function frameCamera(intro=false){
+  const dir=DEFAULT_DIR.clone();
+  const dist=fitDistance(dir);
+  updateDistanceLimits(dist);
+  const to=dir.multiplyScalar(dist);
+  const tt=new THREE.Vector3(0,0,0);
+  if(intro){
+    camera.position.copy(to).multiplyScalar(1.26);camera.position.y+=cubeSize()*0.3;
+    camTween={t:0,dur:1.15,fp:camera.position.clone(),tp:to,ft:controls.target.clone(),tt};
+  }else{
+    camTween={t:0,dur:0.95,fp:camera.position.clone(),tp:to,ft:controls.target.clone(),tt};
+  }
+  controls.enabled=false;
+  markDirty(3);
+}
+function resetView(){
+  const dir=DEFAULT_DIR.clone();
+  const dist=fitDistance(dir);
+  updateDistanceLimits(dist);
+  camTween={t:0,dur:0.95,fp:camera.position.clone(),tp:dir.multiplyScalar(dist),ft:controls.target.clone(),tt:new THREE.Vector3(0,0,0)};
+  controls.enabled=false;
+  toast('Куб в кадре целиком · вид с трёх граней');
+}
+function stepCamTween(dt){
+  if(!camTween)return;
+  camTween.t+=dt/camTween.dur;
+  const e=easeInOut(Math.min(1,camTween.t));
+  camera.position.lerpVectors(camTween.fp,camTween.tp,e);
+  controls.target.lerpVectors(camTween.ft,camTween.tt,e);
+  camera.lookAt(controls.target);
+  markDirty(2);
+  if(camTween.t>=1){camTween=null;controls.enabled=true;controls.update();}
+}
 function layoutEnvironment(){
   const ext=CFG.size*spacing;
   floorGroup.position.y=-(ext/2+1.05);
@@ -1240,40 +1314,8 @@ function layoutEnvironment(){
   dust.scale.setScalar(ext/4.28);
   transformMirrors();markDirty(4);
 }
-let camTween=null;
-function frameCamera(intro=false){
-  const ext=CFG.size*spacing,dist=ext*2.35+1.0;
-  controls.minDistance=ext*1.15;controls.maxDistance=ext*6+6;
-  _v.copy(camera.position).sub(controls.target);
-  if(_v.lengthSq()<1e-6)_v.copy(DEFAULT_DIR);
-  _v.normalize();
-  const to=_v.multiplyScalar(dist).add(controls.target);
-  if(intro){
-    camera.position.copy(to).multiplyScalar(1.3);camera.position.y+=1.5;
-    camTween={t:0,dur:0.9,fp:camera.position.clone(),tp:to,ft:controls.target.clone(),tt:new THREE.Vector3(0,0,0)};
-  }else{
-    camTween={t:0,dur:0.7,fp:camera.position.clone(),tp:to,ft:controls.target.clone(),tt:new THREE.Vector3(0,0,0)};
-  }
-  controls.enabled=false;
-}
-function resetView(){
-  const ext=CFG.size*spacing,dist=ext*2.35+1.0;
-  camTween={t:0,dur:0.85,fp:camera.position.clone(),tp:DEFAULT_DIR.clone().multiplyScalar(dist),ft:controls.target.clone(),tt:new THREE.Vector3(0,0,0)};
-  controls.enabled=false;
-  toast('Вид камеры сброшен');
-}
-function stepCamTween(dt){
-  if(!camTween)return;
-  camTween.t+=dt/camTween.dur;
-  const e=easeInOut(Math.min(1,camTween.t));
-  camera.position.lerpVectors(camTween.fp,camTween.tp,e);
-  controls.target.lerpVectors(camTween.ft,camTween.tt,e);
-  camera.lookAt(controls.target);
-  markDirty(2);
-  if(camTween.t>=1){camTween=null;controls.enabled=true;controls.update();}
-}
 
-/* ============================== ХОДЫ / АНИМАЦИЯ ============================== */
+/* ============================== ХОДЫ ============================== */
 const queue=[];
 function notation(m){
   const fams=[['L','R'],['D','U'],['B','F']];
@@ -1424,7 +1466,7 @@ const hideBanner=()=>$('bannerWrap').classList.remove('show');
 $('btnAgain').addEventListener('click',()=>{hideBanner();doScramble();});
 $('btnBannerClose').addEventListener('click',hideBanner);
 
-/* ============================== ВВОД: ПОВОРОТЫ МЫШЬЮ/ПАЛЬЦЕМ ============================== */
+/* ============================== ВВОД ============================== */
 const raycaster=new THREE.Raycaster();
 const ndc=new THREE.Vector2();
 function setRay(e){
@@ -1446,6 +1488,7 @@ function raycastCube(){
 }
 const _hitP=new THREE.Vector3(),_delta=new THREE.Vector3(),_r=new THREE.Vector3(),_tan=new THREE.Vector3();
 stage.addEventListener('pointerdown',e=>{
+  if(e.target!==canvas)return;
   if(e.pointerType==='mouse'&&e.button!==0)return;
   if(drag){finishDrag();return;}
   if(S.mode!=='free'||anim||queue.length)return;
@@ -1634,9 +1677,9 @@ function applyConfig(key){
       history=[];S.moves=0;S.last=null;timerReset();S.solved=true;S.prevSolved=true;
       buildCubeVisual();layoutEnvironment();frameCamera(false);
       runValidation(false);popVal($('sizeVal'));
-      toast(`Куб ${CFG.size}×${CFG.size}×${CFG.size} создан заново`,'ok');
+      toast(`Куб ${CFG.size}×${CFG.size}×${CFG.size} · кадр перестроен`,'ok');
       break;}
-    case 'gap':updateMatrices();layoutEnvironment();break;
+    case 'gap':updateMatrices();layoutEnvironment();refitIfNeeded(0.4);break;
     case 'radius':rebuildGeometryOnly();break;
     case 'palette':applyPalette();break;
     case 'mirrors':rebuildMirrors();popVal($('mirVal'));break;
@@ -1654,7 +1697,7 @@ function applyQuality(){
   const pr=Math.min(devicePixelRatio||1,q.pr);
   renderer.setPixelRatio(pr);
   pU.uPx.value=pr;
-  if(composer){composer.setPixelRatio(pr);}
+  if(composer)composer.setPixelRatio(pr);
   key.shadow.mapSize.set(q.shadow,q.shadow);
   if(key.shadow.map){key.shadow.map.dispose();key.shadow.map=null;}
   resize();rebuildMirrors();markDirty(4);
@@ -1758,7 +1801,23 @@ $('btnPanel').addEventListener('click',()=>{$('panel').classList.toggle('collaps
 document.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(b&&!b.disabled)Snd.tick(0.5);});
 document.addEventListener('pointerup',()=>{const a=document.activeElement;if(a&&a.tagName==='BUTTON')a.blur();});
 
-/* ============================== RESIZE ============================== */
+/* ============================== RESIZE + АВТОКАДР ============================== */
+const _rsDir=new THREE.Vector3();
+function refitIfNeeded(dur=0.5){
+  if(camTween||drag)return;
+  _rsDir.copy(camera.position).sub(controls.target);
+  const cur=_rsDir.length();
+  if(cur<1e-4)return;
+  _rsDir.normalize();
+  const need=fitDistance(_rsDir,1.12);
+  updateDistanceLimits(Math.max(need,cur));
+  if(cur<need-1e-3){
+    camTween={t:0,dur,fp:camera.position.clone(),
+      tp:_rsDir.clone().multiplyScalar(need).add(controls.target),
+      ft:controls.target.clone(),tt:controls.target.clone()};
+    controls.enabled=false;
+  }
+}
 function resize(){
   const w=stage.clientWidth,h=stage.clientHeight;
   if(w<2||h<2)return;
@@ -1769,6 +1828,7 @@ function resize(){
     if(fxaa){const pr=renderer.getPixelRatio();fxaa.material.uniforms.resolution.value.set(1/(w*pr),1/(h*pr));}
   }
   markDirty(3);
+  refitIfNeeded(0.45);
 }
 new ResizeObserver(resize).observe(stage);
 addEventListener('resize',resize);
@@ -1778,27 +1838,24 @@ stageName('сборка куба');
 cubies=makeCubies(CFG.size);
 buildCubeVisual();
 layoutEnvironment();
-rebuildMirrors();
 applyQuality();
 frameCamera(true);
 runValidation(false);
 updateChips();syncUI();
 resize();
-/* первый кадр — сразу, до цикла */
-try{renderFrame();}catch(e){console.error(e);fatal('Ошибка первого рендера: '+e.message);throw e;}
+stageName('первый кадр');
+try{renderFrame();}catch(e){console.warn('первый кадр:',e);if(composer)composer=null;}
+applyShaderFallbacks();
+try{renderFrame();}catch(e){console.error(e);fatal('Ошибка рендера: '+e.message);throw e;}
 
-/* ============================== ГЛАВНЫЙ ЦИКЛ ============================== */
+/* ============================== ЦИКЛ ============================== */
 let last=performance.now(),tGlobal=0,frame=0,lastTimeChip=0;
 function tick(now){
   requestAnimationFrame(tick);
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   tGlobal+=dt*(reduceMotion?0.35:1);
   sharedU.uTime.value=tGlobal;
-  /* применяем фолбэки шейдеров вне рендера */
-  if(shaderFail.cubie&&!flat.active)activateFlatFallback();
-  if(shaderFail.bg&&bgMesh.visible){bgMesh.visible=false;markDirty(3);}
-  if(shaderFail.points){pPoints.visible=false;dust.visible=false;}
-  if(shaderFail.mirror)mirrorGroups.forEach(g=>g.traverse(o=>{if(o.isMirror)o.visible=false;}));
+  applyShaderFallbacks();
   stepCamTween(dt);
   if(!camTween){
     controls.update();
