@@ -173,6 +173,7 @@
   window.HUD.init({
     onPlay: function () {
       window.AudioSys.init();
+      window.HUD.hideMenu();
       renderer.domElement.requestPointerLock();
     },
     onSeed: function (s) { regen(s); },
