@@ -58,6 +58,44 @@ window.GridLib = (function () {
   };
   SpatialGrid.prototype.clear = function () { this.cells.clear(); this.items.length = 0; };
 
+  // Обход ячеек вдоль луча (2D DDA по XZ). Используется пулями и
+  // проверкой линии видимости: собирает все коллайдеры, через
+  // которые проходит луч, без пропуска тонких стен.
+  SpatialGrid.prototype.rayQuery = function (ox, oz, dx, dz, maxDist, out) {
+    out = out || [];
+    var seen = this._seen; seen.clear();
+    var c = this.cell;
+    var cx = Math.floor(ox / c), cz = Math.floor(oz / c);
+    var stepX = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+    var stepZ = dz > 0 ? 1 : (dz < 0 ? -1 : 0);
+    var invX = dx !== 0 ? Math.abs(dx) : Infinity;
+    var invZ = dz !== 0 ? Math.abs(dz) : Infinity;
+    var tMaxX = stepX !== 0 ? ((stepX > 0 ? (cx + 1) * c - ox : ox - cx * c) / invX) : Infinity;
+    var tMaxZ = stepZ !== 0 ? ((stepZ > 0 ? (cz + 1) * c - oz : oz - cz * c) / invZ) : Infinity;
+    var tDX = stepX !== 0 ? c / invX : Infinity;
+    var tDZ = stepZ !== 0 ? c / invZ : Infinity;
+    var guard = 0;
+    while (guard++ < 800) {
+      var arr = this.cells.get(this._key(cx, cz));
+      if (arr) {
+        for (var i = 0; i < arr.length; i++) {
+          var idx = arr[i];
+          if (seen.has(idx)) continue;
+          seen.add(idx);
+          out.push(this.items[idx]);
+        }
+      }
+      if (tMaxX < tMaxZ) {
+        if (tMaxX > maxDist) break;
+        cx += stepX; tMaxX += tDX;
+      } else {
+        if (tMaxZ > maxDist) break;
+        cz += stepZ; tMaxZ += tDZ;
+      }
+    }
+    return out;
+  };
+
   // Сетка «захвата» территории: чтобы сгенерированные объекты не пересекались.
   // big=true — крупные объекты (здания, камни, деревья); мелкий мусор
   // блокируется только крупными объектами, между собой допустимо.
