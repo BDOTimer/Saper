@@ -107,6 +107,7 @@ input[type=range]{accent-color:var(--ac);width:120px}
 </head>
 <body>
 <canvas id="c"></canvas>
+<audio id="musicTrack" loop preload="auto" src="Zombie%20Ambient.mp3"></audio>
 
 <div id="hud">
   <div id="vig"></div><div id="dmg"></div><div id="lowhp"></div><div id="heal"></div>
@@ -153,7 +154,7 @@ input[type=range]{accent-color:var(--ac);width:120px}
       <span>Качество:
         <span class="seg" id="qseg"><button data-q="low">Низкое</button><button data-q="mid">Среднее</button><button data-q="high" class="on">Высокое</button></span>
       </span>
-      <label>Музыка <input type="range" id="vmus" min="0" max="100" value="70"></label>
+      <label>Музыка <input type="range" id="vmus" min="0" max="100" value="25"></label>
       <label>Звуки <input type="range" id="vsfx" min="0" max="100" value="80"></label>
     </div>
     <button class="btn" id="startbtn" disabled>ИГРАТЬ</button>
@@ -382,7 +383,7 @@ function isFree(x,z,r){
 }
 
 /* ================= GENERATION ================= */
-const buildings=[]; const flats=[]; const lightRecs=[]; const fires=[]; const sceneProps=[];
+const buildings=[]; const flats=[]; const lightRecs=[]; const fires=[]; const sceneProps=[]; const treeSpots=[]; const coverSpots=[];
 function rectDist(f,x,z){ const dx=Math.max(Math.abs(x-f.x)-f.hw,0),dz=Math.max(Math.abs(z-f.z)-f.hd,0); return Math.hypot(dx,dz); }
 function minFlatDist(x,z){ let m=1e9; for(let i=0;i<flats.length;i++){ const d=rectDist(flats[i],x,z); if(d<m)m=d; } return m; }
 
@@ -616,7 +617,7 @@ function buildVegetation(){
     else if(r<0.87) oaks.push({x,y:y-0.1,z,sx:s,sy:s*rand(0.9,1.15),sz:s,ry});
     else deads.push({x,y:y-0.1,z,sx:s*0.9,sy:s,sz:s*0.9,ry});
     mark(x,z,1.0); trees++;
-    const tr=0.3*s; addCircCol(x,z,tr+0.05,6); addSolid(x-tr,y-0.2,z-tr,x+tr,y+4,z+tr);
+    const tr=0.3*s; addCircCol(x,z,tr+0.05,6); addSolid(x-tr,y-0.2,z-tr,x+tr,y+4,z+tr); treeSpots.push({x,z,r:tr+0.05});
   }
   att=0; let nr=0;
   while(nr<220&&att++<5000){
@@ -672,6 +673,29 @@ function buildWorld(){
     const sp2=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xff7a2a,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.35,fog:false}));
     sp2.position.set(f.x,f.y+0.7,f.z); sp2.scale.set(5,5,1); scene.add(sp2); f.sp2=sp2;
   }
+}
+function buildCoverSpots(){
+  for(const b of buildings) if(!b.dummy) coverSpots.push({t:'corner',b});
+  for(const t of treeSpots) coverSpots.push({t:'tree',x:t.x,z:t.z,r:t.r});
+  for(const p of sceneProps) if(p.y<=1.2) coverSpots.push({t:'prop',x:p.x,z:p.z});
+}
+function findCoverSpot(minD,maxD){
+  for(let i=0;i<120;i++){
+    const s=pick(coverSpots); if(!s) return null;
+    let x,z;
+    if(s.t==='corner'){
+      x=s.b.x+(Math.random()<.5?-1:1)*(s.b.hw+1.5);
+      z=s.b.z+(Math.random()<.5?-1:1)*(s.b.hd+1.5);
+    } else {
+      const dx=P.x-s.x,dz=P.z-s.z,d=Math.hypot(dx,dz)||1,off=s.t==='tree'?s.r+0.85:1.45;
+      x=s.x-dx/d*off; z=s.z-dz/d*off;
+    }
+    const d=Math.hypot(x-P.x,z-P.z); if(d<minD||d>maxD) continue;
+    if(Math.hypot(x,z)>PLAY_R) continue;
+    if(!isFree(x,z,0.5)) continue;
+    return {x,z};
+  }
+  return null;
 }
 
 /* fireflies / dust motes */
@@ -826,7 +850,7 @@ const muzzleFlash2=new THREE.Mesh(new THREE.PlaneGeometry(.3,.3),flashMat); muzz
 const HIP={x:0.2,y:-0.2,z:-0.4},ADS={x:0,y:-0.101,z:-0.3};
 
 /* ================= AUDIO ================= */
-const AU={ctx:null,inten:0,target:0,musicVol:0.7,sfxVol:0.8,muted:false,noise:null};
+const AU={ctx:null,inten:0,target:0,musicVol:0.25,sfxVol:0.8,muted:false,noise:null,track:null};
 const BPM=100,STEP=60/BPM/4;
 const mf=m=>440*Math.pow(2,(m-69)/12);
 const ROOT=[38,34,41,36,38,34,43,33];
@@ -846,7 +870,7 @@ function auInit(){
   AU.master=C.createGain(); AU.master.gain.value=0.9;
   const comp=C.createDynamicsCompressor(); comp.threshold.value=-14; comp.knee.value=18; comp.ratio.value=4; comp.attack.value=0.01; comp.release.value=0.25;
   AU.master.connect(comp); comp.connect(C.destination);
-  AU.music=C.createGain(); AU.music.gain.value=AU.musicVol*0.6; AU.music.connect(AU.master);
+  AU.music=C.createGain(); AU.music.gain.value=0; AU.music.connect(AU.master);
   AU.sfx=C.createGain(); AU.sfx.gain.value=AU.sfxVol; AU.sfx.connect(AU.master);
   const len=C.sampleRate*3,ir=C.createBuffer(2,len,C.sampleRate);
   for(let ch=0;ch<2;ch++){ const d=ir.getChannelData(ch); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); }
@@ -866,8 +890,8 @@ function auInit(){
   AU.humG=C.createGain(); AU.humG.gain.value=0;
   ho.connect(hf); hf.connect(AU.humG); AU.humG.connect(AU.sfx); ho.start();
   AU.crackT=0; AU.farT=12; AU.howlT=25; AU.ambStep=0;
-  AU.nextT=C.currentTime+0.25; AU.step=0;
-  setInterval(auSched,50);
+  AU.track=$('musicTrack');
+  if(AU.track){ AU.track.volume=AU.musicVol; playTrack(); }
 }
 function route(g,o){
   const C=AU.ctx; let out=g;
@@ -935,9 +959,10 @@ function auSched(){
   AU.inten+=(AU.target-AU.inten)*(AU.target>AU.inten?0.12:0.015);
   while(AU.nextT<C.currentTime+0.6){ if(!AU.muted) playStep(AU.step,AU.nextT); AU.nextT+=STEP; AU.step=(AU.step+1)%128; }
 }
-function setMusicVol(v){ AU.musicVol=v; if(AU.ctx) AU.music.gain.setTargetAtTime(AU.muted?0:v*0.6,AU.ctx.currentTime,0.1); }
+function playTrack(){ if(!AU.track) return; const p=AU.track.play(); if(p&&p.catch) p.catch(()=>{}); }
+function setMusicVol(v){ AU.musicVol=v; if(AU.track){ AU.track.volume=AU.muted?0:v; AU.track.muted=AU.muted; } }
 function setSfxVol(v){ AU.sfxVol=v; if(AU.ctx) AU.sfx.gain.setTargetAtTime(v,AU.ctx.currentTime,0.1); }
-function toggleMusic(){ AU.muted=!AU.muted; if(AU.ctx) AU.music.gain.setTargetAtTime(AU.muted?0:AU.musicVol*0.6,AU.ctx.currentTime,0.15); toast(AU.muted?'МУЗЫКА ВЫКЛ':'МУЗЫКА ВКЛ','c'); }
+function toggleMusic(){ AU.muted=!AU.muted; if(AU.track){ AU.track.muted=AU.muted; AU.track.volume=AU.muted?0:AU.musicVol; if(!AU.muted) playTrack(); } toast(AU.muted?'МУЗЫКА ВЫКЛ':'МУЗЫКА ВКЛ','c'); }
 const sfx={
   shot(){ if(!AU.ctx) return; const t=AU.ctx.currentTime,d=AU.sfx;
     noiseBurst({t,dur:0.11,vol:0.5,type:'bandpass',f:2400,f2:600,q:0.7,dest:d,rev:0.4}); noiseBurst({t,dur:0.03,vol:0.3,type:'highpass',f:3000,dest:d});
@@ -963,7 +988,7 @@ const sfx={
     if(Math.random()<0.35) noiseBurst({t:t+0.02,dur:0.05,vol:v*0.25,type:'highpass',f:2600,dest:AU.sfx,pan:p}); },
   land(){ if(!AU.ctx) return; const t=AU.ctx.currentTime; noiseBurst({t,dur:0.14,vol:0.25,type:'lowpass',f:400,dest:AU.sfx}); tone({type:'sine',f:80,f2:45,glide:0.1,t,dur:0.1,vol:0.3,dest:AU.sfx}); },
   botDie(dist){ if(!AU.ctx) return; const t=AU.ctx.currentTime,v=clamp(1/(1+dist/15),0.05,0.4); noiseBurst({t,dur:0.3,vol:v,type:'lowpass',f:500,dest:AU.sfx}); tone({type:'sawtooth',f:240,f2:60,glide:0.4,t,dur:0.3,vol:v*0.4,lp:700,dest:AU.sfx}); },
-  die(){ if(!AU.ctx) return; const t=AU.ctx.currentTime; tone({type:'sawtooth',f:300,f2:35,glide:1.6,t,dur:1.4,vol:0.3,lp:600,dest:AU.sfx,rev:0.6}); AU.music.gain.setTargetAtTime(AU.musicVol*0.12,t,0.5); },
+  die(){ if(!AU.ctx) return; const t=AU.ctx.currentTime; tone({type:'sawtooth',f:300,f2:35,glide:1.6,t,dur:1.4,vol:0.3,lp:600,dest:AU.sfx,rev:0.6}); if(AU.track) AU.track.volume=AU.muted?0:AU.musicVol*0.12; },
   jump(){ if(!AU.ctx) return; const t=AU.ctx.currentTime; noiseBurst({t,dur:0.07,vol:0.08,type:'lowpass',f:700,dest:AU.sfx}); tone({type:'sine',f:130,f2:190,glide:0.1,t,dur:0.08,vol:0.09,dest:AU.sfx}); },
   impact(kind,s){ if(!AU.ctx) return; const t=AU.ctx.currentTime,p=s?s.pan:0,v=s?s.vol:1;
     if(kind==='flesh'){ noiseBurst({t,dur:0.07,vol:0.22*v,type:'lowpass',f:700,dest:AU.sfx,pan:p}); tone({type:'sine',f:150,f2:70,glide:0.08,t,dur:0.08,vol:0.2*v,dest:AU.sfx,pan:p}); return; }
@@ -1084,10 +1109,29 @@ function findSpot(inBuilding,minD,maxD){
   }
   return null;
 }
-function spawnBot(x,z){
-  const m=makeBotMesh(); const b={mesh:m.root,legL:m.legL,legR:m.legR,fl:m.fl,flT:0,x,y:groundH(x,z),z,yaw:rand(0,TAU),hp:70,state:'patrol',wp:null,idle:rand(0,3),lastSeen:{x,z},canSee:false,sightT:Math.random()*0.3,lost:0,react:0,burst:0,shotCd:0,strafeDir:rng()<.5?-1:1,strafeT:0,stuck:0,avoidT:0,avoidDir:1,speed:0,phase:Math.random()*6,desired:rand(13,26),dead:false,deadT:0,home:{x,z},inB:null};
+function spawnBot(x,z,guard){
+  const m=makeBotMesh(); const b={mesh:m.root,legL:m.legL,legR:m.legR,fl:m.fl,flT:0,x,y:groundH(x,z),z,yaw:rand(0,TAU),hp:70,state:'patrol',wp:null,idle:rand(0,3),lastSeen:{x,z},canSee:false,sightT:Math.random()*0.3,lost:0,react:0,burst:0,shotCd:0,strafeDir:rng()<.5?-1:1,strafeT:0,stuck:0,avoidT:0,avoidDir:1,speed:0,phase:Math.random()*6,desired:rand(13,26),dead:false,deadT:0,home:{x,z},inB:null,guard:!!guard};
   for(const bb of buildings) if(Math.abs(x-bb.x)<bb.hw&&Math.abs(z-bb.z)<bb.hd) b.inB=bb;
   m.root.position.set(x,b.y,z); scene.add(m.root); bots.push(b); return b;
+}
+function spawnBotInBuilding(b){
+  for(let att=0;att<30;att++){
+    const x=b.x+rand(-b.hw+1.3,b.hw-1.3),z=b.z+rand(-b.hd+1.3,b.hd-1.3);
+    if(Math.hypot(x-P.x,z-P.z)<14) continue;
+    if(!isFree(x,z,0.55)) continue;
+    return spawnBot(x,z,true);
+  }
+  return null;
+}
+function spawnBotsInBuildings(minN=1,maxN=4,cap=50){
+  const list=buildings.filter(b=>!b.dummy).sort((a,b)=>Math.hypot(a.x-P.x,a.z-P.z)-Math.hypot(b.x-P.x,b.z-P.z));
+  let n=0;
+  for(const b of list){
+    const k=randi(minN,maxN);
+    for(let i=0;i<k&&n<cap;i++) if(spawnBotInBuilding(b)) n++;
+    if(n>=cap) break;
+  }
+  return n;
 }
 function alertBot(b,x,z){ if(b.dead) return; if(b.state==='patrol'){ b.state='chase'; b.react=rand(0.5,0.9); sfx.botAlert(spatial(b.x,b.z)); } b.lastSeen={x,z}; b.lost=0; }
 function botMove(b,dx,dz,spd,dt){
@@ -1138,7 +1182,7 @@ function updateBot(b,dt){
       if(!b.wp||Math.hypot(b.wp.x-b.x,b.wp.z-b.z)<1.2){
         if(b.wp){ b.wp=null; b.idle=rand(1.5,4); }
         else if(b.inB&&rng()<0.8){ const bb=b.inB; b.wp={x:bb.x+rand(-bb.hw+1.3,bb.hw-1.3),z:bb.z+rand(-bb.hd+1.3,bb.hd-1.3)}; }
-        else { const a=rand(0,TAU),r=rand(8,30); b.wp={x:clamp(b.home.x+Math.cos(a)*r,-PLAY_R,PLAY_R),z:clamp(b.home.z+Math.sin(a)*r,-PLAY_R,PLAY_R)}; }
+        else { const a=rand(0,TAU),r=rand(6,b.guard?12:30); b.wp={x:clamp(b.home.x+Math.cos(a)*r,-PLAY_R,PLAY_R),z:clamp(b.home.z+Math.sin(a)*r,-PLAY_R,PLAY_R)}; }
       }
       if(b.wp){ const r=botMove(b,b.wp.x-b.x,b.wp.z-b.z,1.8,dt); faceX=r[0]; faceZ=r[1]; spd=1.8; }
     }
@@ -1187,12 +1231,21 @@ function killBot(b,head){
 let spawnTimer=10;
 function aliveCount(){ let n=0; for(const b of bots) if(!b.dead) n++; return n; }
 function updateSpawner(dt){
-  const maxAlive=10+Math.min(6,Math.floor(P.kills/8));
-  spawnTimer-=dt; if(spawnTimer>0) return; spawnTimer=7;
-  if(aliveCount()<maxAlive){ const s=findSpot(rng()<0.25,75,150)||findSpot(false,60,200); if(s) spawnBot(s.x,s.z); }
+  const maxAlive=14+Math.min(8,Math.floor(P.kills/6));
+  spawnTimer-=dt; if(spawnTimer>0) return; spawnTimer=5.5;
+  if(aliveCount()<maxAlive){
+    if(rng()<0.5){
+      const list=buildings.filter(b=>!b.dummy&&Math.hypot(b.x-P.x,b.z-P.z)<170).sort((a,b)=>Math.hypot(a.x-P.x,a.z-P.z)-Math.hypot(b.x-P.x,b.z-P.z));
+      for(const b of list) if(spawnBotInBuilding(b)) return;
+    }
+    const s=findCoverSpot(65,170)||findSpot(rng()<0.3,65,150)||findSpot(false,60,200);
+    if(s) spawnBot(s.x,s.z,true);
+  }
 }
 function spawnInitialBots(){
-  let n=0,tries=0; while(n<10&&tries++<80){ const s=findSpot(n<4,45,260); if(s){ spawnBot(s.x,s.z); n++; } }
+  spawnBotsInBuildings(1,4,50);
+  let n=0,tries=0;
+  while(n<8&&tries++<300){ const s=findCoverSpot(35,260)||findSpot(false,45,260); if(s){ spawnBot(s.x,s.z,true); n++; } }
 }
 
 /* ================= PLAYER ================= */
@@ -1480,7 +1533,7 @@ $('startbtn').addEventListener('click',()=>{
   requestLock();
   if(state==='paused'||state==='menu'){ /* switched in pointerlockchange */ }
 });
-$('restartbtn').addEventListener('click',()=>{ $('dead').classList.add('hide'); if(AU.ctx) AU.music.gain.setTargetAtTime(AU.muted?0:AU.musicVol*0.6,AU.ctx.currentTime,0.3); startNewGame(); $('menu').classList.remove('hide'); requestLock(); });
+$('restartbtn').addEventListener('click',()=>{ $('dead').classList.add('hide'); if(AU.track){ AU.track.volume=AU.muted?0:AU.musicVol; playTrack(); } startNewGame(); $('menu').classList.remove('hide'); requestLock(); });
 window.addEventListener('resize',()=>{ renderer.setSize(window.innerWidth,window.innerHeight); camera.aspect=wCam.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); wCam.updateProjectionMatrix(); });
 
 function startNewGame(){
@@ -1498,7 +1551,7 @@ function startNewGame(){
 function boot(){
   try{
     $('loadtxt').textContent='Генерация мира…';
-    buildWorld(); initEffects();
+    buildWorld(); buildCoverSpots(); initEffects();
     P.y=groundH(0,0);
     // initial population for the menu background
     spawnInitialPickups(); spawnInitialBots();
